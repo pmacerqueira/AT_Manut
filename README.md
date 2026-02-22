@@ -44,6 +44,12 @@ Após `npm run dev`, abra o browser em `http://localhost:5173`.
 - date-fns (datas em português)
 - Lucide React (ícones)
 
+## Git / GitHub
+
+Repositório: `https://github.com/pmacerqueira/AT_Manut`
+
+Após cada build fechado: commit, tag de versão e push. Ver `.cursor/rules/at-manut-workflow.mdc` para o fluxo completo.
+
 ## Documentação
 
 - **[DOCUMENTACAO.md](./DOCUMENTACAO.md)** – Estrutura do projeto, modelo de dados, autenticação, rotas, fluxos Montagem/Manutenção, histórico de alterações

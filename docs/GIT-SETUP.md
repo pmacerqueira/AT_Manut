@@ -31,7 +31,7 @@ Abrir o PowerShell ou o terminal do Cursor e executar:
 
 ```powershell
 git config --global user.name "Pedro Cerqueira"
-git config --global user.email "teu-email@exemplo.com"
+git config --global user.email "pmcerqueira@navel.pt"
 ```
 
 ---

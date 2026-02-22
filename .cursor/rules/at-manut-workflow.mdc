@@ -33,6 +33,14 @@ Quando o utilizador pedir para **optimizar, corrigir ou preparar um novo build**
 6. **Novo build limpo** após correcções
 7. **Gerar zip**: `Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force`
 8. **Actualizar `CHANGELOG.md`** com resumo das alterações
+9. **Push para GitHub** (backup e histórico de versões):
+   ```powershell
+   git add -A
+   git commit -m "v{APP_VERSION} - {resumo breve}"
+   git tag -a v{APP_VERSION} -m "Release v{APP_VERSION}"
+   git push origin master
+   git push origin v{APP_VERSION}
+   ```
 
 ## Autorização de uso de logs
 
@@ -103,7 +111,17 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 | AT_Manut     | `c:\AT_Manut\` |
 | Website Navel| `c:\navel-site\` |
 
+## Boas práticas Git
+
+- **Commits:** Mensagens claras e descritivas (ex.: `v1.4.0 - Corrigir export PDF em relatórios`)
+- **Nunca commitar:** passwords, tokens, chaves API, ficheiros `.env` (usar `.env.example` como template)
+- **`.gitignore`:** Manter atualizado — `dist/`, `node_modules/`, `dist_upload.zip`, `.env*`, logs
+- **Ficheiro grande já commitado:** `git rm --cached ficheiro` + commit + adicionar ao `.gitignore`
+- **Autenticação GitHub:** Usar Personal Access Token (não password) — [github.com/settings/tokens](https://github.com/settings/tokens)
+
 ## Deployment
+
+**GitHub:** Manter o repo atualizado após cada build fechado — backup em cloud, histórico de versões (tags), base para CI/CD futuro.
 
 ```powershell
 # Build
@@ -111,6 +129,13 @@ npm run build
 
 # Zip para upload cPanel (public_html/manut/)
 Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+
+# Push para GitHub (após cada build fechado)
+git add -A
+git commit -m "v{versão} - resumo"
+git tag -a v{versão} -m "Release v{versão}"
+git push origin master
+git push origin v{versão}
 
 # Ficheiro PHP separado para upload (public_html/api/)
 # servidor-cpanel/send-email.php
