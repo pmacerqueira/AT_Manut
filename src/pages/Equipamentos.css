@@ -1,0 +1,22 @@
+/* Estilos específicos de Equipamentos - estilos comuns em index.css */
+.maquina-row-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.maquina-row-info .equip-desc-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.maquina-row-info .equip-num-serie {
+  font-size: 0.85em;
+}
+
+.horas-acumuladas-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.horas-acumuladas-section h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--color-text-muted); }
+.horas-info { margin: 0; font-size: 0.9em; color: var(--color-text); }
+.horas-cell { font-size: 0.9em; }
+.consumiveis-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.consumiveis-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text-muted); }

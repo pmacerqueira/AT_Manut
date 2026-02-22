@@ -1,0 +1,35 @@
+/* Overlay de carregamento global — ícone N a rodar ao centro do ecrã */
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 20, 25, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.global-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--color-bg-card);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-border);
+}
+
+.global-loading-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  animation: global-loading-spin 1.2s linear infinite;
+}
+
+@keyframes global-loading-spin {
+  to { transform: rotate(360deg); }
+}

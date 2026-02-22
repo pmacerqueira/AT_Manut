@@ -1,0 +1,422 @@
+/* Tabela condensada: fichas compactas, máximo de linhas por ecrã */
+.manutencoes-table .data-table {
+  font-size: 0.78em;
+}
+.manutencoes-table .data-table th,
+.manutencoes-table .data-table td {
+  padding: 0.2rem 0.35rem;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.manutencoes-table .data-table th {
+  font-size: 0.7em;
+  padding: 0.25rem 0.35rem;
+}
+/* Coluna de ações */
+.manutencoes-table .data-table th:last-child {
+  width: 1%;
+  min-width: 11rem;
+  white-space: nowrap;
+  text-align: right;
+}
+.manutencoes-table .data-table td.actions {
+  /* Forçar display: table-cell para garantir vertical-align */
+  display: table-cell !important;
+  width: 1%;
+  min-width: 11rem;
+  white-space: nowrap;
+  text-align: right;
+  vertical-align: middle !important;
+}
+/* O flex fica no wrapper interno — nunca no td */
+.manutencoes-table .data-table td.actions .actions-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+.manutencoes-table .data-table .icon-btn,
+.manutencoes-table .data-table .icon-btn.readonly {
+  min-width: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0.25rem !important;
+  flex-shrink: 0;
+}
+
+/* Botão Executar — mesmo tamanho dos icon-btn mas verde */
+.icon-btn.btn-executar-manut {
+  color: #16a34a !important;
+}
+.icon-btn.btn-executar-manut:hover {
+  color: #fff !important;
+  background: #16a34a !important;
+}
+/* Tipo, Data, Técnico e Status em linha única — evita badge "Em atraso" partir em 2 linhas */
+.manutencoes-table .data-table td:nth-child(2),
+.manutencoes-table .data-table td:nth-child(3),
+.manutencoes-table .data-table td:nth-child(4),
+.manutencoes-table .data-table td:nth-child(5),
+.manutencoes-table .data-table td.col-status {
+  white-space: nowrap;
+}
+/* Status: min-width para garantir que badge fica inteiro */
+.manutencoes-table .data-table th:nth-child(6),
+.manutencoes-table .data-table td.col-status {
+  min-width: 6rem;
+}
+
+.manutencoes-list-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.manutencoes-concluidas-card {
+  margin-top: 1.5rem;
+}
+
+.manutencoes-concluidas-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.manutencoes-concluidas-toggle:hover {
+  background: var(--color-border);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.manutencoes-concluidas-toggle span {
+  flex: 1;
+}
+
+.badge-pendente { background: var(--color-warning); color: #000; white-space: nowrap; }
+.badge-agendada { background: var(--color-warning); color: #000; white-space: nowrap; }
+.badge-proxima { background: var(--color-warning); color: #000; white-space: nowrap; }
+.badge-emAtraso { background: var(--color-danger); color: #fff; white-space: nowrap; }
+.badge-concluida { background: rgba(34, 197, 94, 0.2); color: var(--color-success); white-space: nowrap; }
+
+/* Equipamento: nome, Nº Série e Cliente em linhas compactas */
+.equip-desc-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.equip-desc-block strong {
+  font-size: 0.95em;
+}
+.equip-desc-block .equip-num-serie {
+  font-size: 0.85em;
+}
+.equip-desc-block .equip-cliente {
+  font-size: 0.9em;
+}
+
+/* Datas: agendada + execução em duas linhas */
+.datas-manut {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.9em;
+}
+
+.badge-assinado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.75em;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.icon-btn.readonly {
+  cursor: default;
+  opacity: 0.6;
+}
+
+
+.modal-relatorio-form { flex: 1; min-height: 0; overflow-y: auto; }
+.form-tecnico-destaque { border-left: 3px solid var(--color-accent); padding-left: 0.5rem; }
+.form-tecnico-hint { font-size: 0.85em; color: var(--color-text-muted); font-weight: 400; margin-left: 0.25rem; }
+.form-section { display: block; margin-bottom: 1.25rem; }
+.form-section h3 { margin: 0 0 0.75rem; font-size: clamp(0.6rem, 2.2vw, 0.88rem); font-weight: 500; color: var(--color-text-muted); }
+.checklist-respostas { max-height: min(280px, 35dvh); overflow-y: auto; margin-bottom: 0.5rem; }
+.checklist-item-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); font-size: 0.85em; }
+.checklist-item-row:last-child { border-bottom: none; }
+.checklist-item-num { flex-shrink: 0; color: var(--color-text-muted); min-width: 1.5rem; }
+.checklist-item-texto { flex: 1; }
+.checklist-item-btns { display: flex; gap: 0.25rem; flex-shrink: 0; }
+.btn-simnao { padding: 0.25rem 0.6rem; font-size: 0.85em; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-bg); cursor: pointer; color: var(--color-text); }
+.btn-simnao.active-sim { background: var(--color-success); color: #fff; border-color: var(--color-success); }
+.btn-simnao.active-nao { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+.btn-simnao:not(.active-sim):not(.active-nao):hover { background: var(--color-bg-elevated); }
+.char-count { font-size: 0.85em; color: var(--color-text-muted); font-weight: 400; }
+.modal-hint { font-size: 0.85rem; color: var(--color-text-muted); margin: -0.35rem 0 0.85rem; }
+.modal-relatorio { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.modal-relatorio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-shrink: 0; }
+.btn-fechar { padding: 0.4rem 0.8rem; font-size: 0.85em; }
+
+/* Modal envio de email */
+.modal-email-envio h2 { display: flex; align-items: center; gap: 0.4rem; }
+
+/* ── Lista field-service mobile ─────────────────────────────────────────── */
+.manutencoes-cards { display: none; }
+
+.manutencoes-cards-vazio {
+  padding: 2rem 0;
+  text-align: center;
+}
+
+/* Item da lista */
+.mc {
+  display: flex;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+.mc:active { box-shadow: 0 0 0 2px var(--color-primary); }
+
+/* Faixa colorida lateral — status imediato visível */
+.mc-strip {
+  width: 4px;
+  flex-shrink: 0;
+}
+.mc-concluida .mc-strip { background: var(--color-success); }
+.mc-proxima   .mc-strip { background: #f59e0b; }
+.mc-agendada  .mc-strip { background: var(--color-primary); }
+.mc-pendente  .mc-strip { background: #f59e0b; }
+.mc-emAtraso  .mc-strip { background: var(--color-danger); }
+
+.mc-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.7rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Topo: badge status + tipo + número */
+.mc-top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.1rem;
+}
+.mc-tipo-label {
+  font-size: 0.72em;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+.mc-num {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 1.05em;
+}
+
+/* Título: subcategoria + modelo */
+.mc-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mc-sub {
+  font-size: 0.72em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  line-height: 1.2;
+}
+.mc-title strong {
+  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+/* Identificação do cliente — linha dedicada */
+.mc-cliente-linha {
+  font-size: 0.82em;
+  color: var(--color-text-muted);
+  margin-top: 0.2rem;
+}
+.mc-cliente-label {
+  font-weight: 500;
+  margin-right: 0.35rem;
+}
+.mc-cliente-nome {
+  color: var(--color-text);
+}
+
+/* Número série */
+.mc-info {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.75em;
+  color: var(--color-text-muted);
+}
+.mc-serie { font-family: 'Courier New', monospace; }
+
+/* Data + técnico */
+.mc-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.78em;
+  margin-top: 0.15rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.mc-date-exec {
+  font-weight: 600;
+  color: var(--color-success);
+}
+.mc-date-agenda {
+  font-weight: 500;
+  color: var(--color-text);
+}
+.mc-tecnico {
+  margin-left: auto;
+  font-style: italic;
+}
+
+/* Rodapé: acção primária + ícones */
+.mc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0 0.45rem;
+  margin-top: 0.1rem;
+  border-top: 1px solid var(--color-border);
+  gap: 0.35rem;
+}
+.mc-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+/* Botão acção primária "Executar" — thumb-zone, prominent */
+.mc-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--color-success);
+  color: #fff;
+  font-size: 0.82em;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 2rem;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.mc-btn-primary:active { background: #15803d; transform: scale(0.97); }
+
+/* ── Responsivo: mobile mostra lista, desktop mostra tabela ─────────────── */
+@media (max-width: 768px) {
+  .manutencoes-table { display: none !important; }
+  .manutencoes-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 1.5rem;
+  }
+  .checklist-respostas { max-height: min(280px, 40dvh); }
+  .btn-simnao { padding: 0.45rem 0.85rem; min-height: 2.5rem; min-width: 2.5rem; }
+  /* Melhorar legibilidade do card */
+  .mc-tipo-label { font-size: 0.78em; }
+  .mc-sub { font-size: 0.78em; }
+  .mc-info { font-size: 0.8em; }
+  .mc-meta { font-size: 0.82em; }
+  .mc-btn-primary { font-size: 0.88em; min-height: 2.5rem; }
+  .num-servico { font-size: 0.78em; }
+  /* Touch targets na tabela (caso esteja visível em tablets largos) */
+  .manutencoes-table .data-table .icon-btn,
+  .manutencoes-table .data-table .icon-btn.readonly {
+    min-width: 2.25rem !important;
+    min-height: 2.25rem !important;
+  }
+}
+@media (max-width: 480px) {
+  .mc-body { padding: 0.5rem 0.6rem 0; }
+  .checklist-item-row { flex-wrap: wrap; }
+  .checklist-item-btns { margin-left: auto; }
+}
+
+/* Número de serviço na tabela */
+.num-servico {
+  display: block;
+  font-size: 0.72em;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.03em;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+/* Modal pré-visualização de fotografias */
+.modal-fotos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  flex-shrink: 0;
+}
+.modal-fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.modal-foto-item {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: #fff;
+}
+.modal-foto-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(180px, 25dvh);
+  object-fit: contain;
+}
+
+/* Landscape em tablets: painéis de fotos e checklist mais compactos */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .checklist-respostas { max-height: min(200px, 45dvh); }
+  .modal-fotos-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+}

@@ -1,0 +1,9 @@
+# .htaccess para public_html/api/
+# Carregar este ficheiro para public_html/api/.htaccess
+# Não necessita de desativar ModSecurity — os dados enviados são texto pequeno (~3 KB)
+# pelo que o ModSecurity não deverá bloquear.
+
+# Opcional: cabeçalhos CORS a nível Apache (PHP já os envia, mas por garantia)
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
+</IfModule>

@@ -1,0 +1,140 @@
+.install-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  animation: install-prompt-fade 0.2s ease;
+}
+
+@keyframes install-prompt-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.install-prompt {
+  background: var(--color-bg-card);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--color-border);
+  position: relative;
+}
+
+.install-prompt-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.install-prompt-close:hover {
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+}
+
+.install-prompt h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.install-prompt-desc {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.install-prompt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.install-prompt-actions.install-prompt-ios {
+  gap: 1rem;
+}
+
+.install-prompt-ios ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.install-prompt-ios .install-prompt-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.install-prompt-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.install-prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.install-prompt-btn.primary {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.install-prompt-btn.primary:hover {
+  opacity: 0.95;
+}
+
+.install-prompt-btn.secondary {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.install-prompt-btn.secondary:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+
+.install-prompt-skip {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.install-prompt-link {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.install-prompt-link:hover {
+  color: var(--color-text);
+}

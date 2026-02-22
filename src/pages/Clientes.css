@@ -1,0 +1,52 @@
+/* Tabela condensada: todos os campos visíveis, máximo de linhas por ecrã */
+.clientes-table .data-table {
+  font-size: 0.85em;
+}
+.clientes-table .data-table th,
+.clientes-table .data-table td {
+  padding: 0.35rem 0.5rem;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.clientes-table .data-table th {
+  font-size: 0.75em;
+  padding: 0.4rem 0.5rem;
+}
+
+/* Colunas curtas em linha única */
+.clientes-table .data-table td:nth-child(1),
+.clientes-table .data-table td:nth-child(4),
+.clientes-table .data-table td:nth-child(6),
+.clientes-table .data-table td:nth-child(8) {
+  white-space: nowrap;
+}
+.clientes-table .data-table th:nth-child(1),
+.clientes-table .data-table th:nth-child(4),
+.clientes-table .data-table th:nth-child(6),
+.clientes-table .data-table th:nth-child(8) {
+  white-space: nowrap;
+}
+
+/* Larguras mínimas para colunas compactas */
+.clientes-table .data-table th:nth-child(1),
+.clientes-table .data-table td:nth-child(1) { width: 1%; min-width: 5rem; }
+.clientes-table .data-table th:nth-child(4),
+.clientes-table .data-table td:nth-child(4) { width: 1%; min-width: 4.5rem; }
+.clientes-table .data-table th:nth-child(8),
+.clientes-table .data-table td:nth-child(8) { width: 1%; min-width: 3rem; }
+.clientes-table .data-table td:nth-child(9) { width: 1%; white-space: nowrap; }
+
+/* Botões sempre lado a lado */
+.clientes-table .data-table .actions {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .clientes-table .data-table { font-size: 0.88em; }
+  .clientes-table .data-table th { font-size: 0.78em; }
+  .clientes-table .data-table th:nth-child(1),
+  .clientes-table .data-table td:nth-child(1) { min-width: 4rem; }
+  .clientes-table .data-table th:nth-child(4),
+  .clientes-table .data-table td:nth-child(4) { min-width: 3.5rem; }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "/manut/",
+  "name": "NAVEL Dashboard — Assistência Técnica",
+  "short_name": "Dashboard Navel",
+  "description": "Dashboard de assistência técnica e planeamento de manutenções preventivas",
+  "start_url": "/manut/",
+  "scope": "/manut/",
+  "display": "standalone",
+  "background_color": "#0f1419",
+  "theme_color": "#1a4880",
+  "orientation": "portrait-primary",
+  "icons": [
+    {"src": "/manut/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/manut/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/manut/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/manut/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

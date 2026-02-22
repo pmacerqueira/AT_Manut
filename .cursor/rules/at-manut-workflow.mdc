@@ -1,0 +1,130 @@
+---
+description: Regras de desenvolvimento e fluxos de trabalho do projecto AT_Manut (Navel Manutenções)
+alwaysApply: true
+---
+
+# AT_Manut — Regras de Desenvolvimento
+
+## Stack e arquitectura
+
+- React 19 + Vite + React Router (basename `/manut`)
+- Estado global em `DataContext.jsx` persistido em `localStorage` (chave `atm_*`)
+- Autenticação em `AuthContext.jsx` (2 utilizadores: Admin, ATecnica) — JWT em `sessionStorage` (sessão termina ao fechar janela)
+- Notificações via `Toast.jsx` (`useToast` / `showToast`) — **nunca** usar `alert()` ou estados inline para feedback de operações
+- Log de sistema em `logger.js` (`logEntry`, `logger.*`) — registar erros, acções importantes e eventos de autenticação
+- Email e PDF gerados pelo servidor cPanel via `servidor-cpanel/send-email.php`
+
+## Imagens e ícones
+
+**Regra obrigatória:** Todas as imagens em `public/` e `src/assets/` devem ser otimizadas. O script `npm run optimize-images` é executado automaticamente antes do build (`prebuild`).
+
+- Ao adicionar novas imagens PNG que precisem de redimensionamento, configurar em `scripts/optimize-images.js` (DIMENSIONS)
+- Documentação completa: `docs/IMAGENS-E-ICONES.md`
+
+## Fluxo obrigatório: "optimizar e preparar build"
+
+Quando o utilizador pedir para **optimizar, corrigir ou preparar um novo build**, seguir sempre esta sequência:
+
+1. **Verificar logs do sistema** (se o utilizador colou um relatório de suporte no chat, analisar primeiro)
+2. **Correr `ReadLints`** nos ficheiros recentemente editados
+3. **Correr `npm run build`** e verificar todos os warnings e erros (o prebuild executa optimize-images automaticamente)
+4. **Corrigir** todos os problemas encontrados
+5. **Actualizar `APP_VERSION`** em `src/config/version.js` (incrementar patch: ex. `1.3.0` → `1.4.0`)
+6. **Novo build limpo** após correcções
+7. **Gerar zip**: `Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force`
+8. **Actualizar `CHANGELOG.md`** com resumo das alterações
+
+## Autorização de uso de logs
+
+**O utilizador (Pedro Cerqueira / Navel) concede plena autorização** ao assistente para:
+- Ler, analisar e interpretar todos os dados dos logs colados no chat
+- Usar o conteúdo dos logs de forma iterativa e generativa para diagnóstico
+- Correlacionar entradas de log com o código fonte e corrigir proactivamente
+- Agir sobre os logs sem pedir confirmação adicional — o utilizador confia no assistente para usar esses dados para melhorar a aplicação
+
+## Fluxo de análise de logs colados no chat
+
+Quando o utilizador cola um relatório de suporte (texto iniciado com `=== RELATÓRIO DE SUPORTE`):
+
+1. Analisar **todas** as entradas — erros, avisos e acções — para reconstituir o fluxo completo
+2. Identificar padrões: erros repetidos, sequências de acções que precedem falhas, rotas problemáticas
+3. Ligar cada erro ao componente e acção indicados (`component › action`)
+4. Ler o ficheiro fonte correspondente antes de propor correcções
+5. Corrigir de forma iterativa — um problema pode revelar outro
+6. Confirmar com build limpo e novo zip antes de fechar a sessão
+7. Registar no CHANGELOG o que foi encontrado e corrigido via log
+
+## Regras de notificações (Toast) e loading
+
+**Directrizes obrigatórias** — ver `docs/MANUAL-UX-UI.md` para o manual completo.
+
+### Toast
+- **Posicionamento:** Sempre ao centro do ecrã (qualquer tipo de ecrã)
+- **Duração:** success/error = 4 s; warning/info = 2.5 s
+- **Nunca** usar `alert()` — sempre `showToast()`
+
+| Situação | Fazer |
+|---|---|
+| Operação concluída (gravar, enviar, eliminar) | `showToast('msg', 'success')` |
+| Erro de rede / servidor | `showToast('msg', 'error', 4000)` |
+| Aviso de regra de negócio | `showToast('msg', 'warning')` |
+| Validação de campo num formulário | Manter inline (próximo do campo) |
+| Erro de login | Manter inline (padrão UX) |
+
+### Indicador de carregamento (Overlay "N")
+- **Quando:** Operações assíncronas que possam demorar >500 ms (email, PDF, backup, fetch)
+- **Como:** `showGlobalLoading()` no início, `hideGlobalLoading()` no `finally`
+- **Aspecto:** Ícone "N" a rodar ao centro do ecrã (identidade Navel)
+
+## Regras de logging
+
+```js
+// Acção do utilizador concluída
+logger.action('Componente', 'nomeOperacao', 'Descrição legível', { dados: 'opcionais' })
+
+// Erro recuperável (operação falhou, app continua)
+logger.error('Componente', 'nomeOperacao', 'Mensagem de erro', { stack: err.stack?.slice(0,400) })
+
+// Erro irrecuperável (ErrorBoundary, crash)
+logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,600) })
+```
+
+**Nunca logar**: passwords, tokens, dados pessoais completos, conteúdo de ficheiros de fotos.
+
+## Persistência de dados
+
+- Chaves localStorage: `atm_clientes`, `atm_categorias`, `atm_subcategorias`, `atm_checklist`, `atm_maquinas`, `atm_manutencoes`, `atm_relatorios`, `atm_log`, `atm_app_version`
+- Depois de alterar `DataContext.jsx`, verificar que o novo campo tem lazy initializer e `useEffect` de sincronização
+
+## Localizações no disco
+
+| Projeto      | Caminho        |
+|--------------|----------------|
+| AT_Manut     | `c:\AT_Manut\` |
+| Website Navel| `c:\navel-site\` |
+
+## Deployment
+
+```powershell
+# Build
+npm run build
+
+# Zip para upload cPanel (public_html/manut/)
+Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+
+# Ficheiro PHP separado para upload (public_html/api/)
+# servidor-cpanel/send-email.php
+```
+
+## Incremento de versão
+
+Incrementar `APP_VERSION` em `src/config/version.js` **sempre** que houver um novo deployment.
+Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas funcionalidades.
+
+## Rodapé em relatórios
+
+**Obrigatório:** Todos os relatórios (HTML, PDF, email) devem incluir o rodapé:
+`Navel-Açores, Lda — Todos os direitos reservados · v{APP_VERSION}`
+
+- Usar `APP_FOOTER_TEXT` de `src/config/version.js` (inclui versão automaticamente)
+- Aplicar em: relatorioHtml.js, gerarPdfRelatorio.js, send-email.php, EnviarDocumentoModal, e qualquer novo relatório
