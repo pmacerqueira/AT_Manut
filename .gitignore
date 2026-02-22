@@ -30,3 +30,11 @@ dist_upload.zip
 
 # OS
 Thumbs.db
+
+# Dados extraídos do Filosoft (contém dados de clientes)
+clientes-filosoft.csv
+clientes-filosoft.json
+clientes-fttercei.csv
+clientes-fttercei.json
+artigos-armazem-*.csv
+artigos-armazem-*.json

@@ -1,6 +1,8 @@
 # Configuração do Git — AT_Manut
 
-Instruções para configurar o Git no projeto e criar a tag da primeira versão estável.
+Instruções para configurar o Git no projeto e manter o repositório sincronizado com o GitHub.
+
+**Repositório:** https://github.com/pmacerqueira/AT_Manut
 
 ---
 
@@ -60,25 +62,24 @@ git tag -a v1.0.0 -m "Primeira versão estável"
 
 ---
 
-## 5. GitHub (opcional)
+## 5. GitHub (configurado)
 
-Só precisas do GitHub se quiseres:
-- Guardar o código na nuvem
-- Partilhar o projeto com outros
-- Ter backup online
+O repositório está em **https://github.com/pmacerqueira/AT_Manut**.
 
-Se quiseres usar o GitHub:
-
-1. Criar conta em https://github.com
-2. Criar um repositório novo (ex.: `AT_Manut`)
-3. Ligar o projeto local ao repositório e fazer push:
+### Push após cada build fechado
 
 ```powershell
-git remote add origin https://github.com/TEU_USERNAME/AT_Manut.git
-git branch -M main
-git push -u origin main
-git push origin v1.0.0
+cd c:\AT_Manut
+git add -A
+git commit -m "v{versão} - resumo breve"
+git tag -a v{versão} -m "Release v{versão}"
+git push origin master
+git push origin v{versão}
 ```
+
+**Autenticação:** Usar [Personal Access Token](https://github.com/settings/tokens) em vez de password.
+
+Ver `.cursor/rules/at-manut-workflow.mdc` para o fluxo completo de build e deploy.
 
 ---
 

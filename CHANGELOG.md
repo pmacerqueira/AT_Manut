@@ -4,6 +4,20 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.1.0] — 2026-02-22 — Documentação, Git e fluxo de deploy
+
+### Documentação
+- DOCUMENTACAO.md: versão 1.4, data 22/02/2026
+- docs/GIT-SETUP.md: atualizado com repo GitHub (pmacerqueira/AT_Manut), fluxo de push após build
+- docs/DEPLOY_CHECKLIST.md: instruções com dist_upload.zip e Compress-Archive
+
+### Git e workflow
+- .gitignore: dist_upload.zip, .env, Thumbs.db
+- Boas práticas Git documentadas em at-manut-workflow.mdc
+- README: secção Git/GitHub com link do repositório
+
+---
+
 ## [1.0.0] — 2026-02-21 — Primeira versão estável
 
 **Marco:** Primeira release considerada estável para produção.

@@ -1,8 +1,8 @@
 # Navel Manutenções – Documentação do Projeto
 
 **Data da documentação:** 20 de fevereiro de 2026  
-**Versão:** 1.3  
-**Última atualização:** 20 de fevereiro de 2026
+**Versão:** 1.4  
+**Última atualização:** 22 de fevereiro de 2026
 
 ---
 

@@ -82,11 +82,12 @@ Se a BD foi criada **antes** das checklists sub2/sub4/sub12 expandidas (20 itens
 | Build React (`dist/`)   | `public_html/` ou subpasta | `npm run build`      |
 
 ### Build da aplicação React
-```bash
+```powershell
 cd c:\AT_Manut
 npm run build
+Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
 ```
-Enviar o conteúdo de `dist/` para o servidor (ex.: via File Manager ou FTP).
+Enviar `dist_upload.zip` para o cPanel (File Manager → Upload → Extract em `public_html/manut/`).
 
 ### Variáveis de ambiente
 - Garantir que `VITE_API_BASE_URL` aponta para a API no cPanel (ex.: `https://navel.pt/api`)
