@@ -107,27 +107,19 @@ Quando um cliente pede o registo histórico de um elevador para uma inspeção, 
 
 ---
 
-### Etapa 5 — Sincronização Supabase — multi-dispositivo
-**Esforço:** Alto · **Impacto:** Transformador · **Horizonte:** 3-6 meses
+### Etapa 5 — Atualizações em tempo real (Supabase Realtime)
+**Esforço:** Alto · **Impacto:** Médio · **Horizonte:** 3-6 meses
 
-Este é o **teto de vidro** atual da app. O `localStorage` amarra os dados a um só dispositivo. Se o Admin cria uma manutenção no computador, o técnico não a vê no telemóvel. Se o técnico executa em campo, o Admin não vê em tempo real. O Supabase já está configurado no navel-site — migrar seria o passo que transforma o AT_Manut de uma app local num **sistema partilhado de verdade**.
+> **Nota importante:** A sincronização multi-dispositivo **já está assegurada** pelo backend PHP + MySQL no cPanel. O `localStorage` é apenas cache offline — qualquer dispositivo que abra a app lê os mesmos dados do mesmo servidor. Não há problema de dados separados por dispositivo.
 
-**O que fazer:**
-- Migrar armazenamento: `localStorage` → Supabase (PostgreSQL)
-- Manter `localStorage` como cache offline (a arquitectura de sync já está feita em v1.3.0)
-- RLS (Row Level Security): Admin vê tudo, ATecnica vê só as suas manutenções
-- Sync em tempo real via Supabase Realtime
+O que **não existe** ainda é actualização automática em tempo real: se o Admin criar uma manutenção no computador, o técnico só a vê quando refrescar a app manualmente. Para uma equipa pequena, isto raramente é um problema prático.
 
-**Arquitectura (a infra de fila já existe):**
-```
-localStorage (cache offline — syncQueue.js já implementado)
-    ↕ sync ao conectar (processQueue já implementado)
-Supabase PostgreSQL + Realtime
-    ↕ subscriptions
-Todos os dispositivos em tempo real
-```
+**O que o Supabase acrescentaria:**
+- Actualizações em tempo real via WebSockets (sem refrescar)
+- Armazenamento de fotos no servidor em vez de base64 no MySQL
+- Potencialmente melhor escalabilidade a longo prazo
 
-**Porquê planear agora:** É uma migração de fundo que requer desenho cuidadoso. Começar a pensar na estrutura das tabelas e nas regras RLS antes de implementar.
+**Recomendação:** Manter o PHP/MySQL actual enquanto a equipa for pequena. Reavaliar quando houver múltiplas equipas em simultâneo no terreno ou quando o tamanho dos dados (fotos) começar a ser um problema.
 
 ---
 
@@ -139,7 +131,7 @@ Todos os dispositivos em tempo real
 | 2 | Alertas de conformidade (atraso) | 🔴 Alto (legal) | 🟢 Baixo | **Imediato** |
 | 3 | QR Code por máquina | 🔴 Alto (campo) | 🟡 Médio | **Próximo sprint** |
 | 4 | Histórico PDF por máquina | 🟡 Médio (comercial) | 🟡 Médio | **1-2 meses** |
-| 5 | Supabase — multi-dispositivo | 🔴 Alto (transformador) | 🔴 Alto | **3-6 meses** |
+| 5 | Atualizações em tempo real (Supabase) | 🟡 Médio (nice-to-have) | 🔴 Alto | **3-6 meses** |
 
 ---
 
@@ -169,6 +161,12 @@ Todos os dispositivos em tempo real
 
 ## Fase 3 — Inteligência e decisão
 *(horizonte 6-12 meses)*
+
+### F3.0 — Arquitectura actual — ponto de situação
+
+> O AT_Manut usa **PHP + MySQL no cPanel** como fonte de verdade. O `localStorage` é apenas cache offline (v1.3.0). A sincronização multi-dispositivo já funciona: qualquer dispositivo autenticado lê e escreve nos mesmos dados do servidor.
+>
+> O que não existe é *push* em tempo real — as alterações feitas por outro utilizador só são visíveis após refrescar. Para a equipa actual, não é um problema prático.
 
 ### F3.1 — Dashboard de métricas (KPIs de manutenção)
 - MTBF (Mean Time Between Failures) por equipamento/cliente
