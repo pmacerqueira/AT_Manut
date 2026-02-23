@@ -4,6 +4,19 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.4.1] — 2026-02-23 — Logotipo Navel na sidebar + correcções de documentação
+
+### Interface
+- Logotipo completo Navel (`logo-navel.png`) substitui o ícone "N" (`logo.png`) no cabeçalho da sidebar
+- Dimensões ajustadas: `max-width: 112px`, `max-height: 34px` (−30% face ao original)
+
+### Documentação
+- `docs/ROADMAP.md` — 5 etapas prioritárias refinadas com base em análise estratégica e casos de sucesso CMMS (TRACTIAN, DIMO Maint, UpKeep, Limble, MaintainX)
+- Etapa 5 corrigida: a sincronização multi-dispositivo **já está assegurada** pelo PHP + MySQL no cPanel — o `localStorage` é apenas cache offline; o Supabase reposicionado como *nice-to-have* para atualizações em tempo real
+- `.cursor/rules/at-manut-workflow.mdc` — arquitectura clarificada: MySQL/cPanel é fonte de verdade, `localStorage` é cache offline
+
+---
+
 ## [1.4.0] — 2026-02-23 — Suite de testes E2E (Playwright)
 
 ### Infra-estrutura de testes

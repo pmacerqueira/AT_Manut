@@ -8,11 +8,14 @@ alwaysApply: true
 ## Stack e arquitectura
 
 - React 19 + Vite + React Router (basename `/manut`)
-- Estado global em `DataContext.jsx` persistido em `localStorage` (chave `atm_*`)
+- **Backend (fonte de verdade):** PHP + MySQL no cPanel (`servidor-cpanel/api/data.php`) — todas as leituras e escritas passam por aqui via `apiService.js`
+- **Cache offline:** `localStorage` (chave `atm_cache_v1`) — carregado quando o dispositivo está sem ligação; sincronizado automaticamente ao reconectar via `syncQueue.js`
+- **Sincronização multi-dispositivo já assegurada:** qualquer dispositivo autenticado lê/escreve no mesmo MySQL; não é necessário Supabase para isso
 - Autenticação em `AuthContext.jsx` (2 utilizadores: Admin, ATecnica) — JWT em `sessionStorage` (sessão termina ao fechar janela)
 - Notificações via `Toast.jsx` (`useToast` / `showToast`) — **nunca** usar `alert()` ou estados inline para feedback de operações
 - Log de sistema em `logger.js` (`logEntry`, `logger.*`) — registar erros, acções importantes e eventos de autenticação
 - Email e PDF gerados pelo servidor cPanel via `servidor-cpanel/send-email.php`
+- Relação com **navel-site** (`c:\navel-site\`): projectos separados; Supabase existe no navel-site mas **não** é usado no AT_Manut — não misturar decisões de arquitectura entre os dois
 
 ## Imagens e ícones
 
@@ -101,8 +104,19 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ## Persistência de dados
 
-- Chaves localStorage: `atm_clientes`, `atm_categorias`, `atm_subcategorias`, `atm_checklist`, `atm_maquinas`, `atm_manutencoes`, `atm_relatorios`, `atm_log`, `atm_app_version`
-- Depois de alterar `DataContext.jsx`, verificar que o novo campo tem lazy initializer e `useEffect` de sincronização
+**Fonte de verdade:** MySQL no cPanel — acedido via `apiService.js` → `data.php`
+
+**Cache offline (localStorage):** usado apenas quando sem ligação ao servidor
+
+| Chave | Conteúdo |
+|---|---|
+| `atm_cache_v1` | Snapshot dos dados do servidor (TTL 30 dias) |
+| `atm_sync_queue` | Fila de operações offline pendentes |
+| `atm_app_version` | Versão para cache busting |
+| `atm_api_token` | JWT em `sessionStorage` (não localStorage) |
+
+- Depois de alterar `DataContext.jsx`, verificar que a operação usa `persist()` que chama `apiCall` (online) ou `enqueue` (offline)
+- **Não** adicionar novos slices de estado que só vivam em `localStorage` — os dados devem sempre sincronizar com o MySQL
 
 ## Localizações no disco
 
@@ -145,6 +159,27 @@ git push origin v{versão}
 
 Incrementar `APP_VERSION` em `src/config/version.js` **sempre** que houver um novo deployment.
 Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas funcionalidades.
+
+## Testes E2E (Playwright)
+
+A app tem **137 testes automatizados** em `tests/e2e/` que cobrem todos os fluxos e perfis.
+
+```powershell
+# Pré-requisito: servidor de desenvolvimento a correr
+npm run dev
+
+# Executar toda a suite
+npx playwright test tests/e2e/
+
+# Ficheiro específico
+npx playwright test tests/e2e/04-manutencoes.spec.js
+```
+
+**Regras:**
+- Correr a suite antes de qualquer build importante (`npx playwright test tests/e2e/`)
+- Os testes usam mock de API — não precisam de servidor real, apenas do `npm run dev`
+- Ao alterar seletores CSS usados nos testes, actualizar `tests/e2e/helpers.js` e os specs afectados
+- Documentação completa: `docs/TESTES-E2E.md`
 
 ## Rodapé em relatórios
 
