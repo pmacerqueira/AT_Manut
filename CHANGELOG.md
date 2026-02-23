@@ -4,6 +4,18 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.1] — 2026-02-23 — Ciclo KAESER anual · Badge de tipo na lista · Posição no formulário
+
+### Ciclo KAESER — lógica anual completa
+- **`SEQUENCIA_KAESER`** em `DataContext`: sequência de 12 posições `['A','B','A','C','A','B','A','C','A','B','A','D']` (ciclo 12 anos)
+- **`tipoKaeserNaPosicao(pos)`**, **`proximaPosicaoKaeser(pos)`**, **`descricaoCicloKaeser(pos)`** — helpers exportados
+- **`ExecutarManutencaoModal`**: auto-sugere tipo A/B/C/D pelo `posicaoKaeser` da máquina; após concluir avança automaticamente a posição no ciclo via `updateMaquina`
+- **`MaquinaFormModal`**: campo "Posição actual no ciclo KAESER" (select com Ano 1–12 e tipo correspondente); inicializa em 0 para novos compressores; sincroniza com dados existentes em modo editar
+- **`Manutencoes.jsx`**: badge `KAESER X` (cor primária) junto ao status em todas as manutenções de compressores não concluídas, mostrando o tipo esperado para a próxima manutenção
+- **Dados mock**: compressores nas máquinas de exemplo incluem `posicaoKaeser` representativa
+
+---
+
 ## [1.8.0] — 2026-02-23 — Ordens de trabalho · Plano de peças KAESER · Relatório de frota
 
 ### Ordens de trabalho (Work Orders)

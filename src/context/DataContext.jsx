@@ -389,12 +389,38 @@ export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub1', 'sub2', 'sub4', 'sub5',
 // Subcategorias de compressores KAESER (suportam planos A/B/C/D)
 export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub14', 'sub15']
 
-// Intervalos de manutenção KAESER (horas de serviço)
+// Intervalos de manutenção KAESER (horas de serviço de referência)
 export const INTERVALOS_KAESER = {
   A: { horas: 3000,  label: 'Tipo A — 3.000h / 1 ano'  },
-  B: { horas: 6000,  label: 'Tipo B — 6.000h'          },
-  C: { horas: 12000, label: 'Tipo C — 12.000h'         },
-  D: { horas: 36000, label: 'Tipo D — 36.000h'         },
+  B: { horas: 6000,  label: 'Tipo B — 6.000h / 2 anos' },
+  C: { horas: 12000, label: 'Tipo C — 12.000h / 4 anos'},
+  D: { horas: 36000, label: 'Tipo D — 36.000h / 12 anos'},
+}
+
+/**
+ * Sequência de manutenção KAESER (ciclo de 12 anos / ~36.000h nos Açores).
+ * Uma manutenção por ano seguindo esta ordem — independentemente das horas exactas.
+ * Posição 0=Ano1 (A), 1=Ano2 (B), 2=Ano3 (A), 3=Ano4 (C), ..., 11=Ano12 (D).
+ * Após D o ciclo recomeça em A (posição 0).
+ */
+export const SEQUENCIA_KAESER = ['A', 'B', 'A', 'C', 'A', 'B', 'A', 'C', 'A', 'B', 'A', 'D']
+
+/** Devolve o tipo KAESER para a posição dada (0-11, com wrap automático). */
+export function tipoKaeserNaPosicao(posicao) {
+  const pos = ((posicao ?? 0) % SEQUENCIA_KAESER.length + SEQUENCIA_KAESER.length) % SEQUENCIA_KAESER.length
+  return SEQUENCIA_KAESER[pos]
+}
+
+/** Devolve a próxima posição no ciclo (0-11) após concluir a posição actual. */
+export function proximaPosicaoKaeser(posicaoAtual) {
+  return ((posicaoAtual ?? 0) + 1) % SEQUENCIA_KAESER.length
+}
+
+/** Descrição legível da posição no ciclo: "Ano 3 de 12 — Tipo A" */
+export function descricaoCicloKaeser(posicao) {
+  const pos  = ((posicao ?? 0) % SEQUENCIA_KAESER.length + SEQUENCIA_KAESER.length) % SEQUENCIA_KAESER.length
+  const tipo = SEQUENCIA_KAESER[pos]
+  return `Tipo ${tipo} — Ano ${pos + 1} de 12`
 }
 
 // Plano de referência KAESER ASK 28T (extraído do manual)
@@ -453,26 +479,26 @@ export const TIPOS_DOCUMENTO = [
 const initialMaquinas = [
   // Cliente 1 — Mecânica Bettencourt: elevador ligeiros + comp. parafuso
   { id: 'm01', clienteNif: '511234567', subcategoriaId: 'sub1', periodicidadeManut: 'anual',      marca: 'Navel',         modelo: 'EV-4P',      numeroSerie: 'NAV-EV-001',   anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-001', proximaManut: '2026-12-10', documentos: [], ultimaManutencaoData: '2025-12-10', horasTotaisAcumuladas: 1340, horasServicoAcumuladas: 1265 },
-  { id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub5', periodicidadeManut: 'trimestral', marca: 'Atlas Copco',  modelo: 'GA-22',      numeroSerie: 'AC-GA22-002',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-002', proximaManut: '2026-01-15', documentos: [], ultimaManutencaoData: '2025-10-15', horasTotaisAcumuladas: 520, horasServicoAcumuladas: 488 },
+  { id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub5', periodicidadeManut: 'anual', marca: 'Atlas Copco',  modelo: 'GA-22',      numeroSerie: 'AC-GA22-002',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-002', proximaManut: '2026-01-15', documentos: [], ultimaManutencaoData: '2025-10-15', horasTotaisAcumuladas: 520, horasServicoAcumuladas: 488, posicaoKaeser: 3 },
   // Cliente 2 — Auto Serviço Ribeira: elevador hidráulico + gerador
   { id: 'm03', clienteNif: '512345678', subcategoriaId: 'sub2', periodicidadeManut: 'anual',      marca: 'Navel',         modelo: 'EH-2C',      numeroSerie: 'NAV-EH-003',   anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-003', proximaManut: '2027-01-08', documentos: [], ultimaManutencaoData: '2026-01-08', horasTotaisAcumuladas: 980, horasServicoAcumuladas: 924 },
   { id: 'm04', clienteNif: '512345678', subcategoriaId: 'sub7', periodicidadeManut: 'semestral',  marca: 'Perkins',       modelo: '404D-22',    numeroSerie: 'PRK-404-004',  anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-004', proximaManut: '2026-07-20', documentos: [], ultimaManutencaoData: '2026-01-20', horasTotaisAcumuladas: 830, horasServicoAcumuladas: 790 },
   // Cliente 3 — Oficina Sousa & Filhos: tesoura + pistão + equilibrador
   { id: 'm05', clienteNif: '513456789', subcategoriaId: 'sub4', periodicidadeManut: 'anual',      marca: 'Navel',         modelo: 'TES-5T',     numeroSerie: 'NAV-TES-005',  anoFabrico: 2019, numeroDocumentoVenda: 'FV-2019-005', proximaManut: '2027-01-22', documentos: [], ultimaManutencaoData: '2026-01-22', horasTotaisAcumuladas: 2250, horasServicoAcumuladas: 2110 },
-  { id: 'm06', clienteNif: '513456789', subcategoriaId: 'sub6', periodicidadeManut: 'trimestral', marca: 'Abac',          modelo: 'B30 FM',     numeroSerie: 'ABA-B30-006',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-006', proximaManut: '2026-02-01', documentos: [], ultimaManutencaoData: '2025-11-01' },
+  { id: 'm06', clienteNif: '513456789', subcategoriaId: 'sub6', periodicidadeManut: 'anual',      marca: 'Abac',          modelo: 'B30 FM',     numeroSerie: 'ABA-B30-006',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-006', proximaManut: '2026-02-01', documentos: [], ultimaManutencaoData: '2025-11-01', posicaoKaeser: 1 },
   { id: 'm07', clienteNif: '513456789', subcategoriaId: 'sub8', periodicidadeManut: 'semestral',  marca: 'Corghi',        modelo: 'Artiglio 46', numeroSerie: 'COR-A46-007', anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-007', proximaManut: '2026-08-05', documentos: [], ultimaManutencaoData: '2026-02-05' },
   // Cliente 4 — Transportes Melo: muda pneus + elev. pesados hidráulico
   { id: 'm08', clienteNif: '514567890', subcategoriaId: 'sub9', periodicidadeManut: 'semestral',  marca: 'Hofmann',       modelo: 'Monty 4200', numeroSerie: 'HOF-M4200-008', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-008', proximaManut: '2026-08-12', documentos: [], ultimaManutencaoData: '2026-02-12' },
   { id: 'm09', clienteNif: '514567890', subcategoriaId: 'sub12', periodicidadeManut: 'anual',     marca: 'Navel',         modelo: 'EH-P4',      numeroSerie: 'NAV-EHP4-009', anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-009', proximaManut: '2027-02-12', documentos: [], ultimaManutencaoData: '2026-02-12', horasTotaisAcumuladas: 1100, horasServicoAcumuladas: 1045 },
   // Cliente 5 — Mecânica Faial: elev. pesados eletromec. + comp. portátil
   { id: 'm10', clienteNif: '515678901', subcategoriaId: 'sub13', periodicidadeManut: 'anual',     marca: 'Navel',         modelo: 'EM-P4',      numeroSerie: 'NAV-EMP4-010', anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-010', proximaManut: '2026-12-05', documentos: [], ultimaManutencaoData: '2025-12-05' },
-  { id: 'm11', clienteNif: '515678901', subcategoriaId: 'sub10', periodicidadeManut: 'trimestral', marca: 'Atlas Copco', modelo: 'XAS 47',     numeroSerie: 'AC-XAS47-011', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-011', proximaManut: '2026-02-10', documentos: [], ultimaManutencaoData: '2025-11-10', horasTotaisAcumuladas: 210, horasServicoAcumuladas: 198 },
+  { id: 'm11', clienteNif: '515678901', subcategoriaId: 'sub10', periodicidadeManut: 'anual',      marca: 'Atlas Copco', modelo: 'XAS 47',     numeroSerie: 'AC-XAS47-011', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-011', proximaManut: '2026-02-10', documentos: [], ultimaManutencaoData: '2025-11-10', horasTotaisAcumuladas: 210, horasServicoAcumuladas: 198, posicaoKaeser: 0 },
   // Cliente 6 — Auto Pico: blower + comp. parafuso c/ secador
-  { id: 'm12', clienteNif: '516789012', subcategoriaId: 'sub11', periodicidadeManut: 'trimestral', marca: 'Rietschle',   modelo: 'SVC 150',    numeroSerie: 'RIE-SVC-012',  anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-012', proximaManut: '2026-05-15', documentos: [], ultimaManutencaoData: '2025-11-15', horasTotaisAcumuladas: 3400, horasServicoAcumuladas: 3210 },
-  { id: 'm13', clienteNif: '516789012', subcategoriaId: 'sub14', periodicidadeManut: 'trimestral', marca: 'Atlas Copco', modelo: 'CD-11',      numeroSerie: 'AC-CD11-013',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-013', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-12-15', horasTotaisAcumuladas: 680, horasServicoAcumuladas: 645 },
+  { id: 'm12', clienteNif: '516789012', subcategoriaId: 'sub11', periodicidadeManut: 'anual',      marca: 'Rietschle',   modelo: 'SVC 150',    numeroSerie: 'RIE-SVC-012',  anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-012', proximaManut: '2026-05-15', documentos: [], ultimaManutencaoData: '2025-11-15', horasTotaisAcumuladas: 3400, horasServicoAcumuladas: 3210, posicaoKaeser: 4 },
+  { id: 'm13', clienteNif: '516789012', subcategoriaId: 'sub14', periodicidadeManut: 'anual',      marca: 'Atlas Copco', modelo: 'CD-11',      numeroSerie: 'AC-CD11-013',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-013', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-12-15', horasTotaisAcumuladas: 680, horasServicoAcumuladas: 645, posicaoKaeser: 2 },
   // Cliente 7 — Serviços Técnicos Açores: comp. alta pressão + secador
-  { id: 'm14', clienteNif: '517890123', subcategoriaId: 'sub15', periodicidadeManut: 'trimestral', marca: 'Bauer',       modelo: 'PE-100',     numeroSerie: 'BAU-PE100-014', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-014', proximaManut: '2026-06-10', documentos: [], ultimaManutencaoData: '2025-12-10' },
-  { id: 'm15', clienteNif: '517890123', subcategoriaId: 'sub16', periodicidadeManut: 'trimestral', marca: 'Atlas Copco', modelo: 'FD-50',      numeroSerie: 'AC-FD50-015',  anoFabrico: 2024, numeroDocumentoVenda: 'FV-2024-015', proximaManut: '2026-04-20', documentos: [], ultimaManutencaoData: '2025-10-20' },
+  { id: 'm14', clienteNif: '517890123', subcategoriaId: 'sub15', periodicidadeManut: 'anual',      marca: 'Bauer',       modelo: 'PE-100',     numeroSerie: 'BAU-PE100-014', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-014', proximaManut: '2026-06-10', documentos: [], ultimaManutencaoData: '2025-12-10', posicaoKaeser: 0 },
+  { id: 'm15', clienteNif: '517890123', subcategoriaId: 'sub16', periodicidadeManut: 'anual',      marca: 'Atlas Copco', modelo: 'FD-50',      numeroSerie: 'AC-FD50-015',  anoFabrico: 2024, numeroDocumentoVenda: 'FV-2024-015', proximaManut: '2026-04-20', documentos: [], ultimaManutencaoData: '2025-10-20', posicaoKaeser: 1 },
   // Cliente 8 — Oficina Graciosa: elevador + compressor
   { id: 'm16', clienteNif: '518901234', subcategoriaId: 'sub1', periodicidadeManut: 'anual',      marca: 'Navel',         modelo: 'EV-2P',      numeroSerie: 'NAV-EV-016',   anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-016', proximaManut: '2026-01-25', documentos: [], ultimaManutencaoData: '2025-01-25' },
   // Cliente 9 — Mecânica Flores: gerador

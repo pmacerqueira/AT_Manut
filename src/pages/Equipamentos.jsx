@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
@@ -193,9 +193,16 @@ export default function Equipamentos() {
                             <strong>{sub?.nome || ''} — {m.marca} {m.modelo}</strong>
                             <span className="text-muted equip-num-serie">Nº Série: {m.numeroSerie}</span>
                           </div>
-                          <span className="badge badge-danger">
-                            Próx. manut.: {format(new Date(m.proximaManut), 'd MMM yyyy', { locale: pt })}
-                          </span>
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
+                              <span className="badge kaeser-tipo-badge" title={`Próxima: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}>
+                                KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                              </span>
+                            )}
+                            <span className="badge badge-danger">
+                              Próx. manut.: {format(new Date(m.proximaManut), 'd MMM yyyy', { locale: pt })}
+                            </span>
+                          </div>
                         </div>
                         <div className="actions">
                           <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
@@ -289,6 +296,11 @@ export default function Equipamentos() {
                       <div>
                         <strong>{m.marca} {m.modelo}</strong>
                         <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
+                        {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
+                          <span className="badge kaeser-tipo-badge" title={`Ciclo KAESER — próxima manutenção: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}>
+                            KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                          </span>
+                        )}
                         {m.ultimaManutencaoData && (
                           <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85em' }}>
                             · Última manut.: {format(new Date(m.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}

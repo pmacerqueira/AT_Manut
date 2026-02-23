@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER } from '../context/DataContext'
+import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER, SEQUENCIA_KAESER, tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../context/DataContext'
 import { TECNICOS } from '../config/users'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
@@ -148,7 +148,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     checklistItems.forEach(it => {
       checklistRespostas[it.id] = existingRel?.checklistRespostas?.[it.id] ?? ''
     })
-    const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? ''
+    // Auto-sugerir tipo pelo ciclo da máquina (posicaoKaeser), com fallback ao relatório existente
+    const isCompressorMaq = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
+    const tipoAutoCiclo = isCompressorMaq && maq.posicaoKaeser != null
+      ? tipoKaeserNaPosicao(maq.posicaoKaeser)
+      : ''
+    const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
     const pecasExistentes = existingRel?.pecasUsadas ?? []
     // Pré-carregar peças do plano se houver tipo definido e ainda não houver peças no relatório
     const pecasUsadas = pecasExistentes.length > 0
@@ -363,6 +368,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (temContadorHoras && (form.horasTotais !== '' || form.horasServico !== '')) {
       if (form.horasTotais !== '') updateMaqData.horasTotaisAcumuladas = Number(form.horasTotais)
       if (form.horasServico !== '') updateMaqData.horasServicoAcumuladas = Number(form.horasServico)
+    }
+    // Avançar posição no ciclo KAESER após concluir manutenção de compressor
+    if (isCompressor && form.tipoManutKaeser && maq.posicaoKaeser != null) {
+      updateMaqData.posicaoKaeser = proximaPosicaoKaeser(maq.posicaoKaeser)
     }
     // Se for montagem com periodicidade: calcular datas e verificar conflitos antes de confirmar
     if (manutencaoAtual.tipo === 'montagem' && manutencaoAtual.periodicidade) {
@@ -675,6 +684,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             <div className="form-section">
               <label>
                 Tipo de manutenção (A/B/C/D)
+                {maq?.posicaoKaeser != null && (
+                  <span className="kaeser-ciclo-hint">
+                    Ciclo: {descricaoCicloKaeser(maq.posicaoKaeser)}
+                    {' '}· Próximo ciclo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
+                  </span>
+                )}
                 <select
                   value={form.tipoManutKaeser}
                   onChange={e => {
@@ -687,7 +702,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 >
                   <option value="">Periódica (sem plano específico)</option>
                   {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
-                    <option key={tipo} value={tipo}>{info.label}</option>
+                    <option key={tipo} value={tipo}>
+                      {info.label}
+                      {maq?.posicaoKaeser != null && tipoKaeserNaPosicao(maq.posicaoKaeser) === tipo ? ' ✓ (sugerido)' : ''}
+                    </option>
                   ))}
                 </select>
               </label>

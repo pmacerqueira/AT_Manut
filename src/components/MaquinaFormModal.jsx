@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useData } from '../context/DataContext'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from './Toast'
@@ -11,6 +11,7 @@ const isElevadores = (getCategoria, categoriaId) => {
 }
 
 const isCompressorParafuso = (subcategoriaId) => ['sub5', 'sub14'].includes(subcategoriaId)
+const isCompressor = (subcategoriaId) => SUBCATEGORIAS_COMPRESSOR.includes(subcategoriaId)
 const temContadorHoras = (subcategoriaId) => SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(subcategoriaId)
 
 export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLocked, maquina, onSave }) {
@@ -43,6 +44,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     refFiltroOleo: '',
     refFiltroSeparador: '',
     refFiltroAr: '',
+    posicaoKaeser: null,
   })
   const subcategoriasFiltradas = form.categoriaId ? getSubcategoriasByCategoria(form.categoriaId) : []
 
@@ -74,6 +76,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: '',
         refFiltroSeparador: '',
         refFiltroAr: '',
+        posicaoKaeser: isCompressor(subId) ? 0 : null,
       })
     } else if (maquina) {
       const sub = getSubcategoria(maquina.subcategoriaId)
@@ -97,6 +100,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: maquina.refFiltroOleo || '',
         refFiltroSeparador: maquina.refFiltroSeparador || '',
         refFiltroAr: maquina.refFiltroAr || '',
+        posicaoKaeser: maquina.posicaoKaeser ?? (isCompressor(maquina.subcategoriaId) ? 0 : null),
       })
     }
   }, [isOpen, mode, clienteNifLocked, maquina, categorias, clientes, getSubcategoriasByCategoria, getSubcategoria, getCategoria, INTERVALOS])
@@ -223,6 +227,33 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
               </div>
             )
           })()}
+          {isCompressor(form.subcategoriaId) && (
+            <div className="form-section">
+              <h3>Ciclo de manutenção KAESER (A/B/C/D)</h3>
+              <p className="horas-info">
+                Sequência anual: A → B → A → C → A → B → A → C → A → B → A → D (ciclo de 12 anos)
+              </p>
+              <label>
+                Posição actual no ciclo (0 = Ano 1 Tipo A, 1 = Ano 2 Tipo B, ...)
+                <select
+                  value={form.posicaoKaeser ?? 0}
+                  onChange={e => setForm(f => ({ ...f, posicaoKaeser: Number(e.target.value) }))}
+                >
+                  {SEQUENCIA_KAESER.map((tipo, idx) => (
+                    <option key={idx} value={idx}>
+                      Ano {idx + 1} — Tipo {tipo}
+                      {idx === (form.posicaoKaeser ?? 0) ? ' (actual)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {form.posicaoKaeser != null && (
+                <p className="horas-info" style={{ marginTop: '0.25rem' }}>
+                  <strong>Próxima manutenção:</strong> {descricaoCicloKaeser((form.posicaoKaeser + 1) % SEQUENCIA_KAESER.length)}
+                </p>
+              )}
+            </div>
+          )}
           {isCompressorParafuso(form.subcategoriaId) && (
             <div className="form-section consumiveis-section">
               <h3>Consumíveis (manutenção regular)</h3>

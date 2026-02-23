@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
+import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import SignaturePad from '../components/SignaturePad'
 import RelatorioView from '../components/RelatorioView'
@@ -413,9 +413,14 @@ export default function Manutencoes() {
                   <div className="mc-strip" />
 
                   <div className="mc-body">
-                    {/* Linha 1: tipo + badge + número */}
+                    {/* Linha 1: tipo + badge + número + badge KAESER */}
                     <div className="mc-top">
                       <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
+                      {maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId) && maq.posicaoKaeser != null && !isConcluida && (
+                        <span className="badge kaeser-tipo-badge" title={`Próxima manutenção KAESER: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}>
+                          KAESER {tipoKaeserNaPosicao(maq.posicaoKaeser)}
+                        </span>
+                      )}
                       <span className="mc-tipo-label">
                         {m.tipo === 'montagem' ? 'Montagem' : 'Periódica'}
                         {rel?.numeroRelatorio && <span className="mc-num"> · {rel.numeroRelatorio}</span>}

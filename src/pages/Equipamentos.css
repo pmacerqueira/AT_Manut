@@ -1,4 +1,19 @@
 /* Estilos específicos de Equipamentos - estilos comuns em index.css */
+
+/* Badge de tipo KAESER (A/B/C/D) na lista de equipamentos */
+.kaeser-tipo-badge {
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
 .maquina-row-info {
   display: flex;
   flex-wrap: wrap;
