@@ -32,7 +32,7 @@ export default function Layout({ children }) {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="logo-card" onClick={closeSidebar} title="Ir para o início">
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Navel" className="logo-img" />
+            <img src={`${import.meta.env.BASE_URL}logo-navel.png`} alt="Navel" className="logo-img" />
           </Link>
         </div>
         <nav className="nav">

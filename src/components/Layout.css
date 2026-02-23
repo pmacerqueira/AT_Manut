@@ -71,7 +71,7 @@
   justify-content: center;
   background: #fff;
   border-radius: 14px;
-  padding: 1.5rem 2.5rem;
+  padding: 1.25rem 2rem;
   text-decoration: none;
   transition: opacity 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
@@ -83,9 +83,10 @@
 
 .logo-img {
   display: block;
-  max-width: 120px;
+  width: 100%;
+  max-width: 112px;
   height: auto;
-  max-height: 44px;
+  max-height: 34px;
   object-fit: contain;
   object-position: center;
 }
