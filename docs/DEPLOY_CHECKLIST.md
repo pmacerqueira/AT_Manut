@@ -1,5 +1,7 @@
 # Checklist de Deploy — AT_Manut
 
+> Última revisão: 2026-02-23 — v1.6.2
+
 ## Resumo da verificação da base de dados
 
 | Tabela        | Conteúdo setup.sql | Seed mock | Referências |
@@ -91,6 +93,28 @@ Enviar `dist_upload.zip` para o cPanel (File Manager → Upload → Extract em `
 
 ### Variáveis de ambiente
 - Garantir que `VITE_API_BASE_URL` aponta para a API no cPanel (ex.: `https://navel.pt/api`)
+
+---
+
+## Fluxo completo de deployment (resumo)
+
+```powershell
+# 1. Verificar lints nos ficheiros editados
+# 2. Incrementar APP_VERSION em src/config/version.js
+# 3. Build
+npm run build   # prebuild corre optimize-images automaticamente
+# 4. Gerar zip
+Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+# 5. Actualizar CHANGELOG.md
+# 6. Commit + tag + push
+git add -A
+git commit -m "v{versão} - resumo"
+git tag -a v{versão} -m "Release v{versão}"
+git push origin master
+git push origin v{versão}
+# 7. Upload dist_upload.zip → cPanel → public_html/manut/ (extrair)
+# 8. Upload servidor-cpanel/send-email.php → cPanel → public_html/api/
+```
 
 ---
 

@@ -1,56 +1,123 @@
-# Navel - Planeamento de Manutenções Preventivas
+# AT_Manut — Navel Manutenções Preventivas
 
-Aplicação React para apoio ao planeamento de manutenções preventivas de equipamentos comercializados pela Navel.
+Aplicação web PWA para gestão de manutenções preventivas de equipamentos comercializados pela **Navel-Açores, Lda**.
+
+**Versão actual:** `v1.6.2` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+
+---
 
 ## Funcionalidades
 
-- **Login** – autenticação com Admin ou Técnico Navel (roles distintos)
-- **Dashboard** – visão geral com contadores e alertas
-- **Clientes** – empresas e proprietários de equipamentos
-- **Categorias** – tipos de máquinas, subcategorias e checklists de conformidade
-- **Equipamentos** – registo e gestão dos equipamentos Navel
-- **Manutenções** – planeamento, agendamento e histórico
-- **Calendário** – visualização mensal das manutenções
+| Módulo | Descrição | Estado |
+|--------|-----------|--------|
+| **Login** | Autenticação JWT com dois perfis (Admin / ATecnica) | ✅ |
+| **Dashboard** | KPIs, "O meu dia", alertas proactivos de conformidade | ✅ |
+| **Clientes** | CRUD com validação de email obrigatório e badge "Sem email" | ✅ |
+| **Equipamentos** | Gestão hierárquica (Categoria → Subcategoria → Máquina), QR Code | ✅ |
+| **Manutenções** | Planeamento, execução com checklist+assinatura, reagendamento automático | ✅ |
+| **Agendamento** | Formulário de nova manutenção com validação de data (feriados Açores) | ✅ |
+| **Calendário** | Visualização mensal de manutenções | ✅ |
+| **Relatórios** | PDF individual + histórico completo por máquina em PDF | ✅ |
+| **Email** | Envio automático de relatório + lembretes de conformidade | ✅ |
+| **Definições** | Backup/restauro, configuração de dias de aviso de alertas | ✅ |
+| **Logs** | Registo de sistema (acções, erros, eventos de autenticação) | ✅ |
+| **PWA** | Instalável no ecrã inicial, offline-first com cache + sync queue | ✅ |
 
-## Credenciais (produção MySQL)
+---
 
-| Utilizador | Password     | Role   |
-|------------|--------------|--------|
-| `Admin`    | `admin123%`  | Admin  |
-| `ATecnica` | `tecnica123%`| Técnico|
+## Credenciais
 
-## Como executar
+| Utilizador | Password      | Role    |
+|------------|---------------|---------|
+| `Admin`    | `admin123%`   | Admin   |
+| `ATecnica` | `tecnica123%` | Técnico |
 
-```bash
+> As credenciais são verificadas pelo backend PHP/MySQL no cPanel.
+> A sessão usa JWT em `sessionStorage` — termina ao fechar o browser.
+
+---
+
+## Desenvolvimento local
+
+```powershell
 # Instalar dependências
 npm install
 
-# Modo desenvolvimento (browser)
+# Servidor de desenvolvimento (http://localhost:5173)
 npm run dev
 
-# Build para produção
+# Build de produção (inclui optimize-images automaticamente)
 npm run build
 
 # Preview do build
 npm run preview
+
+# Correr testes E2E (requer npm run dev a correr)
+npx playwright test tests/e2e/
 ```
 
-Após `npm run dev`, abra o browser em `http://localhost:5173`.
+---
 
 ## Tecnologias
 
-- React 19 + Vite
-- React Router DOM
-- date-fns (datas em português)
-- Lucide React (ícones)
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React 19 + Vite + React Router (basename `/manut`) |
+| Ícones | Lucide React |
+| Datas | date-fns (localização `pt`) |
+| QR Code | qrcode (geração) |
+| PDF | jsPDF + html2canvas |
+| Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
+| Testes | Playwright E2E — 88 testes automatizados |
+| Imagens | sharp (optimize-images via script prebuild) |
 
-## Git / GitHub
+---
 
-Repositório: `https://github.com/pmacerqueira/AT_Manut`
+## Arquitectura de dados
 
-Após cada build fechado: commit, tag de versão e push. Ver `.cursor/rules/at-manut-workflow.mdc` para o fluxo completo.
+- **Fonte de verdade:** MySQL no cPanel via `api/data.php`
+- **Cache offline:** `localStorage` (chaves `atm_*`) com TTL 30 dias
+- **Autenticação:** JWT em `sessionStorage` (sessão expira ao fechar janela)
+- **Fila de sync:** `atm_sync_queue` — operações offline enviadas ao reconectar
+- **Configuração:** `atm_config_alertas` (dias de aviso), `atm_alertas_dismiss` (dispensar modal)
+
+---
+
+## Deployment
+
+```powershell
+# 1. Build
+npm run build
+
+# 2. Zip para upload cPanel (public_html/manut/)
+Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+
+# 3. Push para GitHub
+git add -A
+git commit -m "v{versão} - resumo"
+git tag -a v{versão} -m "Release v{versão}"
+git push origin master
+git push origin v{versão}
+
+# 4. Upload manual dist_upload.zip para cPanel → public_html/manut/
+# 5. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
+```
+
+Ver `docs/DEPLOY_CHECKLIST.md` para lista completa de verificação.
+
+---
 
 ## Documentação
 
-- **[DOCUMENTACAO.md](./DOCUMENTACAO.md)** – Estrutura do projeto, modelo de dados, autenticação, rotas, fluxos Montagem/Manutenção, histórico de alterações
-- **[DESENVOLVIMENTO.md](./DESENVOLVIMENTO.md)** – Guia para desenvolvimento futuro, convenções, ficheiros por funcionalidade, implementações pendentes
+| Documento | Conteúdo |
+|-----------|----------|
+| [`CHANGELOG.md`](./CHANGELOG.md) | Histórico de versões e alterações |
+| [`DOCUMENTACAO.md`](./DOCUMENTACAO.md) | Modelo de dados, rotas, fluxos detalhados |
+| [`DESENVOLVIMENTO.md`](./DESENVOLVIMENTO.md) | Guia para desenvolvimento futuro |
+| [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Estado actual e próximas funcionalidades |
+| [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md) | Suite de testes Playwright (88 testes) |
+| [`docs/MANUAL-UX-UI.md`](./docs/MANUAL-UX-UI.md) | Directrizes de UX/UI obrigatórias |
+| [`docs/IMAGENS-E-ICONES.md`](./docs/IMAGENS-E-ICONES.md) | Gestão de imagens e ícones |
+| [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) | Checklist de deployment |
+| [`docs/GIT-SETUP.md`](./docs/GIT-SETUP.md) | Configuração Git/GitHub |
+| [`servidor-cpanel/INSTRUCOES_CPANEL.md`](./servidor-cpanel/INSTRUCOES_CPANEL.md) | Configuração do backend PHP |

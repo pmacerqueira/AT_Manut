@@ -1,342 +1,316 @@
-# Navel Manutenções – Documentação do Projeto
+# AT_Manut — Documentação Técnica
 
-**Data da documentação:** 20 de fevereiro de 2026  
-**Versão:** 1.4  
-**Última atualização:** 22 de fevereiro de 2026
+**Versão:** 1.6.2 · **Última actualização:** 2026-02-23
 
 ---
 
 ## 1. Visão Geral
 
-Aplicação React para planeamento e gestão de manutenções preventivas de equipamentos Navel (elevadores, compressores, geradores, equipamentos de trabalho em pneus). Inclui autenticação com dois níveis de utilizadores (Admin e Técnico Navel) e controlo de permissões.
+Aplicação web PWA para gestão de manutenções preventivas de equipamentos Navel (elevadores, compressores, geradores, equipamentos de trabalho em altura). Dois perfis de utilizador com permissões bem separadas.
 
-### 1.1 Dois Fluxos de Negócio
+### Dois fluxos de negócio
 
-| Fluxo | Descrição | Check-list | Relatório |
-|-------|-----------|------------|-----------|
-| **A) Montagem** | Instalação de equipamento nas instalações do cliente | Igual em ambos | Informação própria (a definir) |
-| **B) Manutenção periódica** | Manutenção aos equipamentos do cliente | Igual em ambos | Mais dados; outro conteúdo (a definir) |
-
-O campo `tipo` em cada manutenção distingue os fluxos: `montagem` ou `preventiva`. A checklist de verificação é a mesma; os relatórios e dados adicionais divergem (implementação futura).
+| Tipo | `tipo` | Descrição | Consequência |
+|------|--------|-----------|--------------|
+| **Montagem** | `montagem` | Instalação de equipamento nas instalações do cliente | Cria as primeiras manutenções periódicas para os próximos 2 anos |
+| **Manutenção periódica** | `periodica` | Manutenção de conformidade às periodicidades legais | Recalcula as manutenções futuras a partir da data de conclusão |
 
 ---
 
-## 2. Stack Tecnológica
+## 2. Stack tecnológica
 
-- **React 19** + **Vite 7**
-- **React Router DOM 7**
-- **date-fns** (formatação de datas)
-- **lucide-react** (ícones)
-- **bcryptjs** (hash de passwords)
-- **jsPDF** (geração de PDF – dependência disponível)
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React 19 + Vite + React Router DOM (basename `/manut`) |
+| Ícones | Lucide React |
+| Datas | date-fns (`pt` locale) + `datasAzores.js` (feriados Açores) |
+| QR Code | `qrcode` (geração) |
+| PDF | jsPDF + html2canvas |
+| Sanitização HTML | DOMPurify |
+| Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
+| Testes | Playwright E2E — 88 testes (specs 10–11) + 137 testes base (specs 01–09) |
+| Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---
 
-## 3. Estrutura do Projeto
+## 3. Estrutura do projecto
 
 ```
 c:\AT_Manut\
-├── DOCUMENTACAO.md          # Este ficheiro – documentação principal
-├── DESENVOLVIMENTO.md       # Guia para desenvolvimento futuro
-├── package.json
-├── vite.config.js
-├── index.html
-└── src/
-    ├── main.jsx
-    ├── App.jsx
-    ├── App.css
-    ├── index.css            # Estilos globais, page-header, btn-back, modais, etc.
-    │
-    ├── config/
-    │   └── users.js         # Utilizadores, roles, password hashes (bcrypt)
-    │
-    ├── context/
-    │   ├── AuthContext.jsx  # Autenticação, login, logout
-    │   └── DataContext.jsx  # Dados (clientes, maquinas, manutencoes, relatorios)
-    │
-    ├── hooks/
-    │   ├── usePermissions.js # canDelete, canEditManutencao, isAdmin
-    │   └── useMediaQuery.js  # Deteção mobile (media queries)
-    │
-    ├── components/
-    │   ├── Layout.jsx           # Sidebar fixa, menu, links, user + logout
-    │   ├── Layout.css
-    │   ├── ProtectedRoute.jsx   # Redireciona para /login se não autenticado
-    │   ├── SignaturePad.jsx     # Canvas para assinatura manuscrita
-    │   ├── SignaturePad.css
-    │   ├── RelatorioView.jsx    # Visualização do relatório com assinatura
-    │   ├── RelatorioView.css
-    │   ├── ExecutarManutencaoModal.jsx  # Modal de execução (checklist, relatório)
-    │   ├── MaquinaFormModal.jsx         # Formulário máquina
-    │   ├── DocumentacaoModal.jsx        # Documentação de equipamento
-    │   ├── EnviarEmailModal.jsx
-    │   └── EnviarDocumentoModal.jsx
-    │
-    ├── pages/
-    │   ├── Login.jsx, Login.css
-    │   ├── Dashboard.jsx, Dashboard.css   # Cartões, calendário, action sheet
-    │   ├── Agendamento.jsx, Agendamento.css  # Cliente→Equipamento→Tipo→Data/Hora
-    │   ├── Manutencoes.jsx, Manutencoes.css  # Lista, executar, relatório
-    │   ├── Clientes.jsx, Clientes.css
-    │   ├── Equipamentos.jsx, Equipamentos.css
-    │   ├── Categorias.jsx, Categorias.css
-    │   └── Calendario.jsx, Calendario.css
-    │
-    ├── utils/
-    │   ├── relatorioHtml.js      # Geração HTML do relatório
-    │   ├── gerarPdfRelatorio.js  # Export PDF (jsPDF)
-    │   └── sanitize.js           # Sanitização de HTML
-    │
-    └── constants/
-        └── relatorio.js          # Declaração obrigatória (relatórios)
+├── src/
+│   ├── main.jsx                        # Ponto de entrada
+│   ├── App.jsx                         # Rotas + Layout
+│   │
+│   ├── config/
+│   │   ├── users.js                    # Utilizadores e roles (verificados no servidor)
+│   │   ├── version.js                  # APP_VERSION, APP_FOOTER_TEXT
+│   │   ├── alertasConfig.js            # getDiasAviso(), getManutencoesPendentesAlertas()
+│   │   └── emailConfig.js              # configuração de email
+│   │
+│   ├── context/
+│   │   ├── AuthContext.jsx             # Login/logout, JWT, user, isAdmin
+│   │   ├── DataContext.jsx             # Estado global: CRUD de todas as entidades
+│   │   └── GlobalLoadingContext.jsx    # Overlay de carregamento
+│   │
+│   ├── hooks/
+│   │   ├── usePermissions.js           # canDelete, canEditManutencao, isAdmin
+│   │   ├── useMediaQuery.js            # Detecção mobile
+│   │   └── useDebounce.js             # Debounce para pesquisa
+│   │
+│   ├── components/
+│   │   ├── Layout.jsx / .css           # Sidebar, menu, logout
+│   │   ├── ProtectedRoute.jsx          # Redirect se não autenticado
+│   │   ├── Toast.jsx / .css            # Notificações (useToast, showToast)
+│   │   ├── Breadcrumbs.jsx / .css      # Navegação contextual
+│   │   ├── OfflineBanner.jsx / .css    # Indicador de conectividade
+│   │   ├── InstallPrompt.jsx / .css    # Prompt PWA
+│   │   ├── SignaturePad.jsx / .css     # Canvas de assinatura
+│   │   ├── RelatorioView.jsx / .css    # Visualização de relatório
+│   │   ├── ExecutarManutencaoModal.jsx # Modal de execução (checklist+assinatura+email)
+│   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
+│   │   ├── DocumentacaoModal.jsx       # Documentação de equipamento
+│   │   ├── EnviarEmailModal.jsx        # Envio de email
+│   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
+│   │   ├── QrEtiquetaModal.jsx / .css  # QR Code + etiqueta 90×50mm
+│   │   └── AlertaProactivoModal.jsx / .css  # Modal proactivo de alertas (Admin)
+│   │
+│   ├── pages/
+│   │   ├── Login.jsx / .css
+│   │   ├── Dashboard.jsx / .css        # KPIs, "O meu dia", alertas, calendar
+│   │   ├── Clientes.jsx / .css         # CRUD + badge "Sem email"
+│   │   ├── Equipamentos.jsx / .css     # Hierarquia Cat→Sub→Máq, QR, Histórico PDF
+│   │   ├── Manutencoes.jsx / .css      # Lista, filtros, execução
+│   │   ├── Agendamento.jsx / .css      # Nova manutenção
+│   │   ├── Calendario.jsx / .css       # Vista mensal
+│   │   ├── Categorias.jsx / .css       # CRUD categorias/subcategorias/checklist
+│   │   ├── Definicoes.jsx / .css       # Backup, restauro, config alertas
+│   │   └── Logs.jsx / .css             # Log de sistema
+│   │
+│   ├── services/
+│   │   ├── apiService.js               # Chamadas ao backend PHP/MySQL
+│   │   ├── emailService.js             # enviarRelatorio, enviarLembreteEmail
+│   │   ├── localCache.js               # Cache de dados do servidor (TTL 30 dias)
+│   │   └── syncQueue.js                # Fila de operações offline → sync
+│   │
+│   ├── utils/
+│   │   ├── relatorioHtml.js            # HTML do relatório individual
+│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF)
+│   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
+│   │   ├── datasAzores.js              # Feriados dos Açores, dias úteis
+│   │   ├── diasUteis.js               # Cálculo de dias úteis
+│   │   ├── logger.js                   # logEntry, logger.action/error/fatal
+│   │   └── sanitize.js                 # DOMPurify wrapper
+│   │
+│   └── constants/
+│       ├── assets.js                   # ASSETS.LOGO, ASSETS.LOGO_ICON
+│       └── relatorio.js                # Constantes de relatório
+│
+├── servidor-cpanel/
+│   ├── send-email.php                  # Backend: envio de email + PDF
+│   ├── INSTRUCOES_CPANEL.md
+│   └── MIGRACAO_MYSQL.md
+│
+├── tests/e2e/
+│   ├── helpers.js                      # Utilitários partilhados + dados mock (MC)
+│   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Suite base (137 testes)
+│   ├── 10-etapas-evolucao.spec.js      # Vista meu dia, alertas, QR, PDF (48 testes)
+│   └── 11-blocos-abc.spec.js           # Email, config, reagendamento, modal (40 testes)
+│
+├── scripts/
+│   └── optimize-images.js              # Optimização automática de imagens (prebuild)
+│
+├── docs/                               # Documentação técnica
+├── public/                             # Assets públicos (logo, favicon, manifest)
+└── dist/                               # Build de produção (gerado por npm run build)
 ```
 
 ---
 
-## 4. Autenticação e Utilizadores
+## 4. Autenticação e permissões
 
-### 4.1 Roles
+### Fluxo de autenticação
+1. Utilizador não autenticado → redirecionado para `/manut/login`
+2. Login com username + password → POST para `api/data.php` → JWT
+3. JWT guardado em `sessionStorage` (chave: `atm_api_token`)
+4. `ProtectedRoute.jsx` verifica token em cada rota protegida
+5. Sessão termina ao fechar a janela do browser
 
-| Role    | Descrição         | Eliminar registos | Editar manutenções assinadas |
-|---------|-------------------|-------------------|------------------------------|
-| `admin` | Administrador     | Sim               | Sim                          |
-| `tecnico` | Técnico Navel   | Não               | Não                          |
+### Roles
 
-### 4.2 Credenciais de Demo
+| Role | Credenciais (produção) | Capacidades |
+|------|------------------------|-------------|
+| `admin` | `Admin` / `admin123%` | Tudo — CRUD completo, Definições, Logs, config alertas |
+| `tecnico` | `ATecnica` / `tecnica123%` | Ver e executar manutenções, ver relatórios, calendário |
 
-| Utilizador    | Password   | Role   |
-|---------------|------------|--------|
-| `admin`       | `admin123` | admin  |
-| `joao.santos` | `navel2024`| tecnico|
-| `maria.oliveira` | `navel2024` | tecnico |
+### Permissões detalhadas
 
-### 4.3 Fluxo de Autenticação
-
-1. Sem sessão → redirecionamento para `/login`
-2. Login com username + password → validação com bcrypt
-3. Sessão guardada em `localStorage` (chave: `navel_auth_session`)
-4. Refresh da página mantém a sessão
+| Acção | Admin | ATecnica |
+|-------|-------|----------|
+| Criar/editar clientes | ✅ | ❌ |
+| Criar/editar equipamentos | ✅ | ❌ |
+| Criar/editar categorias | ✅ | ❌ |
+| Agendar manutenções | ✅ | ❌ |
+| Executar manutenções | ✅ | ✅ |
+| Ver relatórios | ✅ | ✅ |
+| Eliminar registos | ✅ | ❌ |
+| Editar manutenção assinada | ✅ | ❌ |
+| Aceder a Definições | ✅ | ❌ |
+| Aceder a Logs | ✅ | ❌ |
+| Ver modal de alertas proactivos | ✅ | ❌ |
+| Ver secção "Alertas de conformidade" nas Definições | ✅ | ❌ |
 
 ---
 
-## 5. Modelo de Dados
+## 5. Modelo de dados
 
-### 5.1 Entidades Principais
+### Chaves localStorage
 
-- **Clientes** – NIF, nome, morada, CP, localidade, telefone, email  
-- **Categorias** – Nome, intervalo de manutenção (trimestral/semestral/anual)  
-- **Subcategorias** – Tipo de máquina por categoria (ex.: elevador 2 colunas)  
-- **ChecklistItems** – Itens de verificação por subcategoria (conformidade legal)  
-- **Máquinas** – Por cliente: marca, modelo, Nº série, ano, subcategoria, periodicidade  
-- **Manutenções** – Data, técnico, status (pendente/agendada/concluída)  
-- **Relatórios** – Ligados a manutenções; campo `assinadoPeloCliente`
+| Chave | Conteúdo |
+|-------|----------|
+| `atm_clientes` | Array de clientes |
+| `atm_maquinas` | Array de máquinas |
+| `atm_manutencoes` | Array de manutenções |
+| `atm_relatorios` | Array de relatórios |
+| `atm_categorias` | Array de categorias |
+| `atm_subcategorias` | Array de subcategorias |
+| `atm_checklist` | Array de itens de checklist |
+| `atm_log` | Array de entradas de log |
+| `atm_app_version` | Versão instalada (detecção de upgrade) |
+| `atm_config_alertas` | `{ diasAviso: 7 }` — configuração de alertas |
+| `atm_alertas_dismiss` | Data ISO do último dismiss do modal proactivo |
+| `atm_cache_v1` | Cache de dados do servidor (TTL 30 dias) |
+| `atm_sync_queue` | Fila de operações offline pendentes |
 
-### 5.2 Relatório e Assinatura do Cliente
+### Entidades principais
 
-Cada manutenção concluída pode ter um relatório com:
+**Clientes:**
+```json
+{ "id": "c01", "nif": "501234567", "nome": "Empresa Lda", "morada": "...",
+  "codigoPostal": "...", "localidade": "...", "telefone": "...", "email": "..." }
+```
 
-- **dataCriacao** – data/hora de criação do relatório (ISO)
-- **dataAssinatura** – data/hora em que o cliente assinou (ISO)
-- **nomeAssinante** – nome de quem assinou (preenchido pelo técnico, para garantir legibilidade)
-- **assinaturaDigital** – imagem base64 da assinatura manuscrita (capturada em canvas)
+**Máquinas:**
+```json
+{ "id": "m01", "clienteId": "c01", "subcategoriaId": "sc01",
+  "marca": "Otis", "modelo": "GeN2", "numeroSerie": "SN001",
+  "ano": "2020", "localizacao": "...", "periodicidadeManut": "anual" }
+```
 
-O técnico abre «Registar assinatura», preenche o nome de quem assinou e o cliente desenha a assinatura no quadro. As datas são registadas automaticamente.
+**Manutenções:**
+```json
+{ "id": "mt01", "maquinaId": "m01", "tipo": "periodica",
+  "data": "2026-03-15", "hora": "09:00", "tecnico": "Admin",
+  "status": "pendente", "observacoes": "" }
+```
 
-### 5.3 Regra de Assinatura
-
-Quando um **relatório** está assinado pelo cliente (`assinadoPeloCliente: true`), a **manutenção** associada **só pode ser editada pelo Admin**. Técnicos veem ícone de cadeado e não têm botão de edição.
+**Relatórios:**
+```json
+{ "id": "r01", "manutencaoId": "mt01", "dataCriacao": "2026-03-15T10:00:00Z",
+  "nomeAssinante": "João Silva", "assinaturaDigital": "data:image/png;base64,...",
+  "assinadoPeloCliente": true, "dataAssinatura": "2026-03-15T10:05:00Z",
+  "checklistItems": [...], "fotos": [...], "horasServico": 2 }
+```
 
 ---
 
 ## 6. Rotas
 
-| Path           | Página      | Proteção   |
-|----------------|-------------|------------|
-| `/login`       | Login       | Pública    |
-| `/`            | Dashboard   | Protegida  |
-| `/clientes`    | Clientes    | Protegida  |
-| `/categorias`  | Categorias  | Protegida (Admin) |
-| `/equipamentos`| Equipamentos| Protegida  |
-| `/manutencoes` | Manutenções | Protegida  |
-| `/agendamento` | Agendamento | Protegida  |
-| `/calendario`  | Calendário  | Protegida  |
-
-Todas as páginas (exceto Login) incluem o botão **«Voltar atrás»** no cabeçalho, que executa `navigate(-1)`.
+| Path (com basename /manut) | Página | Acesso |
+|---------------------------|--------|--------|
+| `/manut/login` | Login | Pública |
+| `/manut/` | Dashboard | Todos |
+| `/manut/clientes` | Clientes | Admin |
+| `/manut/equipamentos` | Equipamentos | Todos |
+| `/manut/manutencoes` | Manutenções | Todos |
+| `/manut/agendamento` | Agendamento | Admin |
+| `/manut/calendario` | Calendário | Todos |
+| `/manut/categorias` | Categorias | Admin |
+| `/manut/definicoes` | Definições | Admin |
+| `/manut/logs` | Logs | Admin |
 
 ---
 
-## 7. Ficheiros Críticos – Descrição
+## 7. Fluxos de negócio
 
-### 7.1 `src/config/users.js`
+### Fluxo de execução de manutenção
+1. Manutenção pendente → botão "Executar" (`.btn-executar-manut`)
+2. `ExecutarManutencaoModal` abre com:
+   - Checklist de conformidade (itens da subcategoria)
+   - Campo técnico (select)
+   - Nome do assinante
+   - Canvas de assinatura digital
+   - Campo de fotos (opcional)
+   - Horas de serviço (opcional)
+3. Submit → valida checklist + assinatura → guarda relatório + atualiza manutenção
+4. **Se periódica:** `recalcularPeriodicasAposExecucao` recalcula próximas 2 anos
+5. **Se email disponível:** envia relatório PDF por email automaticamente
 
-```javascript
-// Exporta ROLES (ADMIN, TECNICO) e USERS
-// Cada user: id, username, nome, role, passwordHash (bcrypt)
+### Reagendamento automático (Bloco B — v1.6.0)
+Após execução de qualquer manutenção (montagem ou periódica):
+1. Obtém a `periodicidadeManut` da máquina (anual, semestral, trimestral)
+2. Remove todas as manutenções futuras pendentes da máquina
+3. Recria manutenções para os próximos 2 anos, espaçadas pela periodicidade
+4. Data base = data de conclusão do relatório recém-criado
+
+### Modal de alertas proactivos (Bloco C — v1.6.0)
+1. Dashboard monta → `useEffect` verifica:
+   - É Admin?
+   - `atm_alertas_dismiss` ≠ hoje?
+   - `getManutencoesPendentesAlertas(manutencoes, maquinas, clientes, diasAviso)` retorna resultados?
+2. Se sim → `AlertaProactivoModal` abre
+3. Agrupa manutenções por cliente
+4. "Dispensar hoje" → `localStorage.setItem('atm_alertas_dismiss', hoje)`
+5. "Fechar" → fecha sem marcar → volta a aparecer na próxima visita ao Dashboard
+
+---
+
+## 8. Backend PHP (cPanel)
+
+**Localização:** `public_html/api/send-email.php`
+
+**Tipos de email suportados:**
+- `relatorio` — envio do relatório PDF após execução
+- `lembrete` — lembrete de conformidade X dias antes do vencimento
+
+**Formato do pedido:**
+```json
+{
+  "tipo": "lembrete",
+  "destinatario": "cliente@email.pt",
+  "nomeCliente": "Empresa Lda",
+  "maquina": "Otis GeN2 (SN001)",
+  "diasRestantes": 5,
+  "dataVencimento": "2026-03-01"
+}
 ```
 
-### 7.2 `src/context/AuthContext.jsx`
-
-- `AuthProvider` – envolve a app
-- `useAuth()` – retorna: `user`, `isAdmin`, `isAuthenticated`, `hydrated`, `login`, `logout`
-- Sessão persistida em localStorage
-
-### 7.3 `src/context/DataContext.jsx`
-
-- Estado: clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios
-- Funções CRUD para todas as entidades
-- `getRelatorioByManutencao(manutencaoId)` – para verificar se está assinado
-
-### 7.4 `src/hooks/usePermissions.js`
-
-- `canDelete` – `true` apenas para Admin
-- `canEditManutencao(manutencaoId)` – `false` para Técnicos se relatório assinado
-- `isManutencaoAssinada(manutencaoId)` – auxiliar
-
-### 7.5 `src/components/ProtectedRoute.jsx`
-
-- Verifica se o utilizador está autenticado
-- Redireciona para `/login` se não estiver
-- Estado `hydrated` evita flash antes de carregar sessão
-
 ---
 
-## 8. Comandos
+## 9. Logger
 
-```bash
-# Instalar dependências
-npm install
+```js
+import { logger } from '../utils/logger'
 
-# Desenvolvimento
-npm run dev
+// Acção concluída com sucesso
+logger.action('Componente', 'nomeOperacao', 'Descrição', { dados: 'opcionais' })
 
-# Build de produção
-npm run build
+// Erro recuperável
+logger.error('Componente', 'nomeOperacao', 'Mensagem', { stack: err.stack?.slice(0,400) })
 
-# Preview do build
-npm run preview
+// Erro irrecuperável (crash)
+logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,600) })
 ```
 
----
-
-## 9. Dados Iniciais (Seed)
-
-- 3 clientes (Indústria Silva, Metalúrgica Costa, Automotiva Norte)
-- 4 categorias (Elevadores, Compressores, Geradores, Equipamentos de pneus)
-- Subcategorias e checklists predefinidos (EN 1493, Kaeser, etc.)
-- Manutenção m1 com relatório assinado (para testar restrição de edição para Técnicos)
+**Nunca logar:** passwords, tokens JWT, dados pessoais completos, conteúdo de fotos (base64).
 
 ---
 
-## 10. Página de Agendamento (`/agendamento`)
+## 10. Versão e rodapé
 
-Fluxo do formulário:
-1. **Cliente** – seleção com pesquisa por nome, NIF, morada ou localidade (campo com ícone lupa)
-2. **Equipamento** – combobox só aparece após escolher cliente; lista as máquinas desse cliente
-3. **Tipo** – Montagem ou Manutenção periódica (`tipo`: `montagem` | `preventiva`)
-4. **Data (DD-MM-AAAA)** e **Hora (HH:MM)**
-
-Regras:
-- Se o dia escolhido já tiver manutenções agendadas, é apresentado modal com sugestão de próximo dia livre
-- Validação de data e hora; `addManutencao` do contexto para criar a manutenção
-
----
-
-## 11. Dashboard Mobile e Manutenções
-
-- **Dashboard**: cartões Em atraso / Próximas / Executadas; calendário; action sheet ao clicar (Ver manutenção / Executar manutenção)
-- **Manutenções**: título «Manutenções»; filtros Em atraso / Próximas / Executadas; botões «Ocultar executadas» e «+ Nova manutenção»; lista por defeito Em atraso e Próximas; «Ver todas» mostra Executadas
-- **Botão Agendar NOVO**: verde fluorescente (#39ff14), link para `/agendamento`
-- **Botão Executar**: verde fluorescente, ícone Play + «Executar»
-
----
-
-## 12. Alterações Desta Sessão (17 Feb 2025)
-
-### 12.1 Fluxos Montagem / Manutenção Periódica
-
-- Campo `tipo` em manutenções: `montagem` | `preventiva`
-- Formulário Agendamento com combo Tipo (Montagem / Manutenção periódica)
-- Check-list igual em ambos; relatórios e dados adicionais divergem (a implementar)
-
-### 12.2 Agendamento
-
-- Pesquisa de cliente com ícone lupa e filtro em tempo real
-- Combobox de equipamentos por cliente
-- Sugestão de data alternativa quando o dia já tem agendamentos
-
-### 12.3 Navegação
-
-- Botão «Voltar atrás» em todos os painéis (Dashboard, Manutenções, Equipamentos, Clientes, Categorias, Calendário, Agendamento)
-- Estilo `.btn-back` em `index.css`
-
-### 12.4 Outras
-
-- Otimizações de CSS; AuthContext; permissões por role; assinatura digital em relatórios
-
----
-
-## 13. Segurança (Notas)
-
-- Passwords guardadas com hash bcrypt (10 rounds)
-- Validação de sessão ao carregar (localStorage)
-- Em produção: usar backend com API autenticada; nunca confiar apenas no frontend para regras críticas
-
----
-
-## 14. Relatório e Assinatura
-
-- **SignaturePad** – componente canvas para assinatura manuscrita (mouse/touch)
-- **RelatorioView** – mostra dados da manutenção, declaração, nome do assinante, data/hora, imagem da assinatura
-- A partir de Manutenções (status concluída): botão «Registar assinatura» ou «Ver relatório»
-- O técnico preenche o nome de quem assinou; o cliente assina no quadro; as datas são registadas automaticamente
-
-## 15. API e Deploy
-
-### 15.1 Endpoints no Servidor (public_html/api/)
-
-| Ficheiro | URL | Uso |
-|----------|-----|-----|
-| `data.php` | https://www.navel.pt/api/data.php | CRUD de dados (clientes, máquinas, manutenções, etc.) |
-| `send-email.php` | https://www.navel.pt/api/send-email.php | Relatórios com PDF (FPDF), auth_token obrigatório |
-| `send-report.php` | https://www.navel.pt/api/send-report.php | Envio de relatórios/documentos HTML por email (EnviarEmailModal, EnviarDocumentoModal) |
-
-### 15.2 Estrutura servidor-cpanel (para deploy)
-
-```
-servidor-cpanel/
-├── api/
-│   ├── config.php, db.php, data.php
-│   ├── send-report.php    # Envio de HTML por email
-│   └── fpdf184/           # FPDF para PDFs
-├── send-email.php         # Relatórios com PDF (raiz ou api/)
-└── log-receiver.php
+```js
+// src/config/version.js
+export const APP_VERSION = '1.6.2'
+export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
 ```
 
-### 15.3 Variáveis de Ambiente
-
-- `VITE_API_BASE_URL` (opcional): URL base da API, ex. `https://www.navel.pt`. Se vazio, usa `window.location.origin`.
-- Os modais EnviarEmailModal e EnviarDocumentoModal chamam `{API_BASE}/api/send-report.php`.
-
-### 15.4 App em Produção
-
-- **URL da app**: https://www.navel.pt/manut/
-- **API**: https://www.navel.pt/api/data.php (PDO + MySQL)
-- **Base de dados**: navel_atmanut (cPanel)
-- **Deploy**: `npm run build` → extrair `dist/*` para `public_html/manut/`
-
-### 15.5 Localizações no Disco
-
-| Projeto      | Caminho local      |
-|--------------|--------------------|
-| AT_Manut     | `c:\AT_Manut\`     |
-| Website Navel| `c:\navel-site\`   |
-
----
-
-## 16. Próximos Passos Sugeridos
-
-- **Relatórios por tipo**: conteúdo diferente para Montagem vs Manutenção periódica
-- **Formulário Manutenção**: fluxo B exige mais campos na execução; fluxo A usa mesma checklist
-- Persistência em backend (API REST)
-- Geração de PDF do relatório com assinatura digital (jsPDF)
-- Gestão de utilizadores pelo Admin (CRUD de técnicos)
+**Regra:** Incrementar `APP_VERSION` em cada deployment. Usar `APP_FOOTER_TEXT` em todos os relatórios, PDF e emails.
