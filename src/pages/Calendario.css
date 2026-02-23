@@ -177,3 +177,15 @@
   .calendar-grid { min-height: min(320px, 50dvh); }
   .calendar-day { min-height: min(80px, 10dvh); }
 }
+
+/* Ecrãs estreitos: day-number com área de toque adequada */
+@media (max-width: 600px) {
+  .calendar-day {
+    padding: 0.35rem;
+  }
+  .calendar-legend {
+    gap: 0.75rem;
+    font-size: 0.82em;
+    flex-wrap: wrap;
+  }
+}

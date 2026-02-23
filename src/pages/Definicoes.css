@@ -172,5 +172,11 @@
   .def-page { padding: 1rem 0.75rem 3rem; gap: 1rem; }
   .def-section { padding: 1rem; }
   .def-stat-card--size { grid-column: span 1; }
-  .def-btn { width: 100%; justify-content: center; }
+  .def-btn { width: 100%; justify-content: center; min-height: 44px; }
+  .def-title { font-size: clamp(1.1rem, 5vw, 1.35rem); }
+}
+
+/* Landscape: menos padding vertical */
+@media (max-width: 768px) and (orientation: landscape) {
+  .def-page { padding: 0.75rem 1rem 2rem; }
 }

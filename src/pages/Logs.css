@@ -43,7 +43,7 @@
   min-width: 4.5rem;
 }
 
-.log-stat-val          { font-size: 1.35rem; font-weight: 700; line-height: 1; }
+.log-stat-val          { font-size: clamp(1rem, 4vw, 1.35rem); font-weight: 700; line-height: 1; }
 .log-stat-val--sm      { font-size: 0.88rem; }
 .log-stat-lbl          { font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 

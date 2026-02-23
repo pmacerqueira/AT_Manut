@@ -1,5 +1,5 @@
 .agendamento-page {
-  max-width: 480px;
+  max-width: min(480px, 100%);
 }
 
 .agendamento-header {

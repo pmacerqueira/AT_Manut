@@ -154,7 +154,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
 
 .page { max-width: 1200px; margin: 0 auto; padding: 0; }
-.page h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+.page h1 { margin: 0 0 0.25rem; font-size: clamp(1.25rem, 4vw, 1.5rem); }
 .page-sub { margin: 0 0 1rem; color: var(--color-text-muted); font-size: 0.9em; }
 .page-header {
   display: flex;
@@ -199,7 +199,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   cursor: pointer;
   padding: 0.35rem 0.5rem;
   line-height: 1;
-  min-height: auto;
+  min-height: var(--touch-min);
   flex-shrink: 0;
 }
 .search-bar .search-clear:hover { color: var(--color-text); }
@@ -374,6 +374,17 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   padding: 0;
   transition: background 0.15s;
   -webkit-tap-highlight-color: transparent;
+}
+/* Em touch/mobile: botão maior para ser fácil de tocar */
+@media (max-width: 1024px) {
+  .foto-remover {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    top: 2px;
+    right: 2px;
+  }
 }
 .foto-remover:hover { background: var(--color-danger); }
 .fotos-vazio { font-size: 0.82rem; color: var(--color-text-muted); margin: 0; }
@@ -696,4 +707,19 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   .modal { padding: 0.6rem 0.85rem; }
   .doc-lista { max-height: min(200px, 45dvh); }
   .maquinas-lista { max-height: min(200px, 45dvh); }
+  /* Fotos em landscape: menos colunas, thumbnails maiores para toque */
+  .fotos-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+}
+
+/* ── Reduzir animações quando o utilizador prefere menos movimento ── */
+@media (prefers-reduced-motion: reduce) {
+  .page-loader-spinner {
+    animation: none;
+    border: 3px solid var(--color-accent);
+    opacity: 0.6;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

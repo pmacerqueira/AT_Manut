@@ -31,6 +31,10 @@ dist_upload.zip
 # OS
 Thumbs.db
 
+# Playwright test artifacts
+test-results/
+playwright-report/
+
 # Dados extraídos do Filosoft (contém dados de clientes)
 clientes-filosoft.csv
 clientes-filosoft.json

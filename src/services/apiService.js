@@ -101,6 +101,14 @@ export async function apiLogin(username, password) {
   return json.data  // { token, expiresAt, user }
 }
 
+/**
+ * Chamada directa à API — usada pelo processQueue do syncQueue.
+ * Exposta para não duplicar a lógica de fetch/auth/error handling.
+ */
+export async function apiCall(resource, action, opts = {}) {
+  return call(resource, action, opts)
+}
+
 // ── CRUD genérico ─────────────────────────────────────────────────────────────
 
 const crud = (resource) => ({

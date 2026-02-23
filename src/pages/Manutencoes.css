@@ -336,7 +336,7 @@
   font-size: 0.82em;
   font-weight: 700;
   cursor: pointer;
-  min-height: 2rem;
+  min-height: var(--touch-min);
   flex-shrink: 0;
   transition: background 0.15s, transform 0.1s;
 }
@@ -352,19 +352,22 @@
     padding-bottom: 1.5rem;
   }
   .checklist-respostas { max-height: min(280px, 40dvh); }
-  .btn-simnao { padding: 0.45rem 0.85rem; min-height: 2.5rem; min-width: 2.5rem; }
+  .btn-simnao { padding: 0.45rem 0.85rem; min-height: var(--touch-min); min-width: var(--touch-min); }
   /* Melhorar legibilidade do card */
   .mc-tipo-label { font-size: 0.78em; }
   .mc-sub { font-size: 0.78em; }
   .mc-info { font-size: 0.8em; }
   .mc-meta { font-size: 0.82em; }
-  .mc-btn-primary { font-size: 0.88em; min-height: 2.5rem; }
+  .mc-btn-primary { font-size: 0.88em; min-height: var(--touch-min); }
   .num-servico { font-size: 0.78em; }
-  /* Touch targets na tabela (caso esteja visível em tablets largos) */
+}
+
+/* Tablet com toque: tabela visível mas icon-btns com área de toque adequada */
+@media (max-width: 1024px) {
   .manutencoes-table .data-table .icon-btn,
   .manutencoes-table .data-table .icon-btn.readonly {
-    min-width: 2.25rem !important;
-    min-height: 2.25rem !important;
+    min-width: var(--touch-min) !important;
+    min-height: var(--touch-min) !important;
   }
 }
 @media (max-width: 480px) {

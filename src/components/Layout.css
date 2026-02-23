@@ -260,3 +260,28 @@
   to   { transform: rotate(360deg); }
 }
 
+/* Landscape mobile: reduzir padding inferior do conteúdo e FAB mais compacto */
+@media (max-width: 768px) and (orientation: landscape) {
+  .main {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0));
+  }
+  .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+    bottom: calc(env(safe-area-inset-bottom, 0.5rem) + 0.5rem);
+    right: calc(env(safe-area-inset-right, 0.5rem) + 0.5rem);
+  }
+  /* Botão Sair mobile: compacto em landscape */
+  .logout-btn-mobile {
+    top: calc(0.5rem + env(safe-area-inset-top, 0));
+    right: calc(0.5rem + env(safe-area-inset-right, 0));
+  }
+}
+
+/* Reduzir movimento: sem transição de abertura da sidebar */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}
+

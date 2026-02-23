@@ -1,11 +1,14 @@
 /**
  * DataContext – Estado global da aplicação.
  * Os dados são carregados da API (MySQL no cPanel) e sincronizados em tempo real.
+ * Suporta modo offline: cache local (localStorage) + fila de sincronização.
  * Estrutura: clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios.
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios } from '../utils/diasUteis'
 import { logger } from '../utils/logger'
+import { saveCache, loadCache } from '../services/localCache'
+import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
 
 const DataContext = createContext(null)
 
@@ -509,31 +512,84 @@ export function DataProvider({ children }) {
   const [relatorios,    setRelatorios]    = useState([])
   const [loading,       setLoading]       = useState(true)
 
+  // ── Estado de conectividade e sincronização ────────────────────────────────
+  const [isOnline,     setIsOnline]     = useState(navigator.onLine)
+  const [syncPending,  setSyncPending]  = useState(() => queueSize())
+  const [isSyncing,    setIsSyncing]    = useState(false)
+
   // ── Fetch inicial e re-fetch ao recuperar o foco da janela ────────────────
   const fetchTodos = useCallback(async () => {
     const { isTokenValid, fetchTodosOsDados } = await import('../services/apiService')
     if (!isTokenValid()) { setLoading(false); return }
     try {
       const d = await fetchTodosOsDados()
-      setClientes(d.clientes      ?? [])
-      setCategorias(d.categorias  ?? [])
+      setClientes(d.clientes           ?? [])
+      setCategorias(d.categorias       ?? [])
       setSubcategorias(d.subcategorias ?? [])
       setChecklistItems(d.checklistItems ?? [])
-      setMaquinas(d.maquinas      ?? [])
-      setManutencoes(d.manutencoes?? [])
-      setRelatorios(d.relatorios  ?? [])
+      setMaquinas(d.maquinas           ?? [])
+      setManutencoes(d.manutencoes     ?? [])
+      setRelatorios(d.relatorios       ?? [])
+      // Guardar snapshot no cache para uso offline
+      saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
         clientes: (d.clientes ?? []).length,
         maquinas: (d.maquinas ?? []).length,
         manutencoes: (d.manutencoes ?? []).length,
       })
     } catch (err) {
-      console.error('[DataContext] fetchTodos:', err)
-      logger.error('DataContext', 'fetchTodos', err.message || 'Falha ao carregar dados', { stack: err.stack?.slice(0, 400) })
+      const isNetErr = !err.status
+      if (isNetErr) {
+        // Sem ligação — tentar cache local
+        const cache = loadCache()
+        if (cache?.data) {
+          const d = cache.data
+          setClientes(d.clientes           ?? [])
+          setCategorias(d.categorias       ?? [])
+          setSubcategorias(d.subcategorias ?? [])
+          setChecklistItems(d.checklistItems ?? [])
+          setMaquinas(d.maquinas           ?? [])
+          setManutencoes(d.manutencoes     ?? [])
+          setRelatorios(d.relatorios       ?? [])
+          logger.info('DataContext', 'fetchTodos', 'Dados carregados do cache local (offline)', {
+            cacheAge: Math.round((Date.now() - cache.ts) / 60000) + ' min',
+          })
+        } else {
+          logger.warn('DataContext', 'fetchTodos', 'Offline e sem cache local — sem dados disponíveis')
+        }
+      } else {
+        logger.error('DataContext', 'fetchTodos', err.message || 'Falha ao carregar dados', { stack: err.stack?.slice(0, 400) })
+      }
     } finally {
       setLoading(false)
     }
   }, [])
+
+  // ── Processar fila de sync e actualizar dados quando volta online ─────────
+  const processSync = useCallback(async () => {
+    const { isTokenValid, apiCall } = await import('../services/apiService')
+    if (!navigator.onLine || !isTokenValid()) return { processed: 0, failed: 0 }
+    setIsSyncing(true)
+    try {
+      const result = await processQueue((resource, action, opts) => apiCall(resource, action, opts))
+      setSyncPending(queueSize())
+      if (result.processed > 0) {
+        await fetchTodos()
+        logger.action('DataContext', 'processSync',
+          `${result.processed} operação(ões) sincronizadas com o servidor`, result)
+      }
+      if (result.failed > 0) {
+        logger.warn('DataContext', 'processSync',
+          `${result.failed} operação(ões) rejeitadas pelo servidor (removidas da fila)`, result)
+      }
+      return result
+    } catch (err) {
+      logger.error('DataContext', 'processSync', err.message || 'Erro ao sincronizar', { stack: err.stack?.slice(0, 300) })
+      return { processed: 0, failed: 0 }
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [fetchTodos])
 
   useEffect(() => {
     fetchTodos()
@@ -541,6 +597,29 @@ export function DataProvider({ children }) {
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [fetchTodos])
+
+  // ── Listeners: online/offline + evento de login ───────────────────────────
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true)
+      // Ao voltar online: processar fila pendente e refrescar dados
+      await processSync()
+    }
+    const handleOffline = () => setIsOnline(false)
+    // Disparado pelo AuthContext após login bem-sucedido
+    const handleLogin = async () => {
+      await processSync()
+      await fetchTodos()
+    }
+    window.addEventListener('online',    handleOnline)
+    window.addEventListener('offline',   handleOffline)
+    window.addEventListener('atm:login', handleLogin)
+    return () => {
+      window.removeEventListener('online',    handleOnline)
+      window.removeEventListener('offline',   handleOffline)
+      window.removeEventListener('atm:login', handleLogin)
+    }
+  }, [processSync, fetchTodos])
 
   const getSubcategoria = useCallback((id) => subcategorias.find(s => s.id === id), [subcategorias])
   const getCategoria = useCallback((id) => categorias.find(c => c.id === id), [categorias])
@@ -570,14 +649,48 @@ export function DataProvider({ children }) {
     return getIntervaloDiasBySubcategoria(maquina?.subcategoriaId)
   }, [getIntervaloDiasBySubcategoria])
 
-  // ── Helper: chama API em background sem bloquear a UI ────────────────────────
-  const persist = useCallback(async (apiFn, rollback) => {
+  // ── Helper: chama API em background; se offline, enfileira para sync ────────
+  // Assinatura: persist(apiFn, queueDescriptor, rollback?)
+  //   apiFn          — função async que chama a API
+  //   queueDescriptor — { resource, action, id?, data? } — para enfileirar offline
+  //   rollback        — função chamada em erro de servidor (não em erro de rede)
+  const persist = useCallback(async (apiFn, queueDescriptor, rollback) => {
+    const offline = !navigator.onLine
+
+    if (offline) {
+      // Offline: enfileirar operação para sync posterior
+      if (queueDescriptor) {
+        const result = enqueue(queueDescriptor)
+        if (result.ok) {
+          setSyncPending(prev => prev + 1)
+          logger.info('DataContext', 'persist',
+            `Operação enfileirada offline (${queueDescriptor.resource}/${queueDescriptor.action})`)
+        } else {
+          logger.warn('DataContext', 'persist',
+            `Fila offline cheia — operação ${queueDescriptor.resource}/${queueDescriptor.action} não guardada`)
+          if (rollback) rollback()
+        }
+      }
+      return
+    }
+
     try {
       await apiFn()
     } catch (err) {
-      console.error('[DataContext] persist error:', err)
-      logger.error('DataContext', 'persist', err.message || 'Falha ao guardar dados', { stack: err.stack?.slice(0, 400) })
-      if (rollback) rollback()
+      const isNetErr = !err.status // erros de rede não têm status HTTP
+      if (isNetErr && queueDescriptor) {
+        // Perdeu ligação durante a chamada — enfileirar
+        const result = enqueue(queueDescriptor)
+        if (result.ok) {
+          setSyncPending(prev => prev + 1)
+          setIsOnline(false)
+        } else if (rollback) {
+          rollback()
+        }
+      } else {
+        logger.error('DataContext', 'persist', err.message || 'Falha ao guardar dados', { stack: err.stack?.slice(0, 400) })
+        if (rollback) rollback()
+      }
     }
   }, [])
 
@@ -587,7 +700,8 @@ export function DataProvider({ children }) {
     const novo = { ...s, id }
     setSubcategorias(prev => [...prev, novo])
     import('../services/apiService').then(({ apiSubcategorias }) =>
-      persist(() => apiSubcategorias.create(novo))
+      persist(() => apiSubcategorias.create(novo),
+              { resource: 'subcategorias', action: 'create', data: novo })
     )
     return id
   }, [persist])
@@ -595,7 +709,8 @@ export function DataProvider({ children }) {
   const updateSubcategoria = useCallback((id, data) => {
     setSubcategorias(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
     import('../services/apiService').then(({ apiSubcategorias }) =>
-      persist(() => apiSubcategorias.update(id, data))
+      persist(() => apiSubcategorias.update(id, data),
+              { resource: 'subcategorias', action: 'update', id, data })
     )
   }, [persist])
 
@@ -604,7 +719,8 @@ export function DataProvider({ children }) {
     setSubcategorias(prev => prev.filter(s => s.id !== id))
     setChecklistItems(prev => prev.filter(c => c.subcategoriaId !== id))
     import('../services/apiService').then(({ apiSubcategorias }) =>
-      persist(() => apiSubcategorias.remove(id))
+      persist(() => apiSubcategorias.remove(id),
+              { resource: 'subcategorias', action: 'delete', id })
     )
     return true
   }, [maquinas, persist])
@@ -615,7 +731,8 @@ export function DataProvider({ children }) {
     const novo = { ...item, id }
     setChecklistItems(prev => [...prev, novo])
     import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.create(novo))
+      persist(() => apiChecklistItems.create(novo),
+              { resource: 'checklistItems', action: 'create', data: novo })
     )
     return id
   }, [persist])
@@ -623,14 +740,16 @@ export function DataProvider({ children }) {
   const updateChecklistItem = useCallback((id, data) => {
     setChecklistItems(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
     import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.update(id, data))
+      persist(() => apiChecklistItems.update(id, data),
+              { resource: 'checklistItems', action: 'update', id, data })
     )
   }, [persist])
 
   const removeChecklistItem = useCallback((id) => {
     setChecklistItems(prev => prev.filter(c => c.id !== id))
     import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.remove(id))
+      persist(() => apiChecklistItems.remove(id),
+              { resource: 'checklistItems', action: 'delete', id })
     )
   }, [persist])
 
@@ -643,7 +762,8 @@ export function DataProvider({ children }) {
     setClientes(prev => [...prev, novo])
     logger.action('DataContext', 'addCliente', `Cliente "${c.nome || '—'}" adicionado`, { nif })
     import('../services/apiService').then(({ apiClientes }) =>
-      persist(() => apiClientes.create(novo))
+      persist(() => apiClientes.create(novo),
+              { resource: 'clientes', action: 'create', data: novo })
     )
     return nif
   }, [clientes, persist])
@@ -652,8 +772,11 @@ export function DataProvider({ children }) {
     setClientes(prev => prev.map(c => c.nif === nif ? { ...c, ...data } : c))
     const cli = clientes.find(c => c.nif === nif)
     if (cli) {
+      const merged = { ...cli, ...data }
+      const recId  = cli.id ?? nif
       import('../services/apiService').then(({ apiClientes }) =>
-        persist(() => apiClientes.update(cli.id ?? nif, { ...cli, ...data }))
+        persist(() => apiClientes.update(recId, merged),
+                { resource: 'clientes', action: 'update', id: recId, data: merged })
       )
     }
   }, [clientes, persist])
@@ -668,8 +791,10 @@ export function DataProvider({ children }) {
     setManutencoes(prev => prev.filter(m => !maqIds.includes(m.maquinaId)))
     setRelatorios(prev => prev.filter(r => !manutIds.includes(r.manutencaoId)))
     if (cli) {
+      const recId = cli.id ?? nif
       import('../services/apiService').then(({ apiClientes }) =>
-        persist(() => apiClientes.remove(cli.id ?? nif))
+        persist(() => apiClientes.remove(recId),
+                { resource: 'clientes', action: 'delete', id: recId })
       )
     }
   }, [clientes, maquinas, manutencoes, persist])
@@ -680,7 +805,8 @@ export function DataProvider({ children }) {
     const novo = { ...c, id }
     setCategorias(prev => [...prev, novo])
     import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.create(novo))
+      persist(() => apiCategorias.create(novo),
+              { resource: 'categorias', action: 'create', data: novo })
     )
     return id
   }, [persist])
@@ -688,7 +814,8 @@ export function DataProvider({ children }) {
   const updateCategoria = useCallback((id, data) => {
     setCategorias(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
     import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.update(id, data))
+      persist(() => apiCategorias.update(id, data),
+              { resource: 'categorias', action: 'update', id, data })
     )
   }, [persist])
 
@@ -696,7 +823,8 @@ export function DataProvider({ children }) {
     if (subcategorias.some(s => s.categoriaId === id)) return false
     setCategorias(prev => prev.filter(c => c.id !== id))
     import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.remove(id))
+      persist(() => apiCategorias.remove(id),
+              { resource: 'categorias', action: 'delete', id })
     )
     return true
   }, [subcategorias, persist])
@@ -709,7 +837,8 @@ export function DataProvider({ children }) {
     setMaquinas(prev => [...prev, novo])
     logger.action('DataContext', 'addMaquina', `Equipamento "${m.marca} ${m.modelo || ''}" adicionado`, { id, clienteNif: novo.clienteNif })
     import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.create(novo))
+      persist(() => apiMaquinas.create(novo),
+              { resource: 'maquinas', action: 'create', data: novo })
     )
     return id
   }, [persist])
@@ -724,7 +853,8 @@ export function DataProvider({ children }) {
     }))
     if (maqAtual) {
       import('../services/apiService').then(({ apiMaquinas }) =>
-        persist(() => apiMaquinas.update(maquinaId, maqAtual))
+        persist(() => apiMaquinas.update(maquinaId, maqAtual),
+                { resource: 'maquinas', action: 'update', id: maquinaId, data: maqAtual })
       )
     }
     return id
@@ -739,7 +869,8 @@ export function DataProvider({ children }) {
     }))
     if (maqAtual) {
       import('../services/apiService').then(({ apiMaquinas }) =>
-        persist(() => apiMaquinas.update(maquinaId, maqAtual))
+        persist(() => apiMaquinas.update(maquinaId, maqAtual),
+                { resource: 'maquinas', action: 'update', id: maquinaId, data: maqAtual })
       )
     }
   }, [persist])
@@ -747,7 +878,8 @@ export function DataProvider({ children }) {
   const updateMaquina = useCallback((id, data) => {
     setMaquinas(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
     import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.update(id, data))
+      persist(() => apiMaquinas.update(id, data),
+              { resource: 'maquinas', action: 'update', id, data })
     )
   }, [persist])
 
@@ -757,7 +889,8 @@ export function DataProvider({ children }) {
     setManutencoes(prev => prev.filter(m => m.maquinaId !== id))
     setRelatorios(prev => prev.filter(r => !maqManutIds.includes(r.manutencaoId)))
     import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.remove(id))
+      persist(() => apiMaquinas.remove(id),
+              { resource: 'maquinas', action: 'delete', id })
     )
   }, [manutencoes, persist])
 
@@ -768,7 +901,8 @@ export function DataProvider({ children }) {
     setManutencoes(prev => [...prev, novo])
     logger.action('DataContext', 'addManutencao', `Manutenção agendada (maquinaId: ${m.maquinaId})`, { id, maquinaId: m.maquinaId, data: m.data })
     import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.create(novo))
+      persist(() => apiManutencoes.create(novo),
+              { resource: 'manutencoes', action: 'create', data: novo })
     )
     return id
   }, [persist])
@@ -776,7 +910,8 @@ export function DataProvider({ children }) {
   const updateManutencao = useCallback((id, data) => {
     setManutencoes(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
     import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.update(id, data))
+      persist(() => apiManutencoes.update(id, data),
+              { resource: 'manutencoes', action: 'update', id, data })
     )
   }, [persist])
 
@@ -784,7 +919,8 @@ export function DataProvider({ children }) {
     setManutencoes(prev => prev.filter(m => m.id !== id))
     setRelatorios(prev => prev.filter(r => r.manutencaoId !== id))
     import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.remove(id))
+      persist(() => apiManutencoes.remove(id),
+              { resource: 'manutencoes', action: 'delete', id })
     )
   }, [persist])
 
@@ -813,7 +949,8 @@ export function DataProvider({ children }) {
     const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
     setRelatorios(prev => [...prev, novo])
     import('../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.create(novo))
+      persist(() => apiRelatorios.create(novo),
+              { resource: 'relatorios', action: 'create', data: novo })
     )
     return { id, numeroRelatorio }
   }, [manutencoes, relatorios, persist])
@@ -821,7 +958,8 @@ export function DataProvider({ children }) {
   const updateRelatorio = useCallback((id, data) => {
     setRelatorios(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
     import('../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.update(id, data))
+      persist(() => apiRelatorios.update(id, data),
+              { resource: 'relatorios', action: 'update', id, data })
     )
   }, [persist])
 
@@ -903,7 +1041,8 @@ export function DataProvider({ children }) {
     if (!novas?.length) return 0
     setManutencoes(prev => [...prev, ...novas])
     import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.bulkCreate(novas))
+      persist(() => apiManutencoes.bulkCreate(novas),
+              { resource: 'manutencoes', action: 'bulk_create', data: novas })
     )
     return novas.length
   }, [persist])
@@ -988,6 +1127,10 @@ export function DataProvider({ children }) {
   const value = useMemo(() => ({
     loading,
     refreshData: fetchTodos,
+    isOnline,
+    syncPending,
+    isSyncing,
+    processSync,
     INTERVALOS,
     categorias,
     subcategorias,
@@ -1044,6 +1187,7 @@ export function DataProvider({ children }) {
     prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas,
     exportarDados, restaurarDados,
     loading, fetchTodos,
+    isOnline, syncPending, isSyncing, processSync,
   ])
 
   return (

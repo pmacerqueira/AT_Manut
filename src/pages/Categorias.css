@@ -24,11 +24,18 @@
 }
 
 .expand-btn {
+  position: relative;
   padding: 0.4rem !important;
   min-width: 2rem !important;
   min-height: 2rem !important;
   background: transparent !important;
   color: var(--color-text-muted) !important;
+}
+/* Área de toque expandida sem alterar o layout visual (WCAG 2.5.5) */
+.expand-btn::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
 }
 .expand-btn:hover { color: var(--color-text) !important; }
 .expand-btn.sub { margin-left: 0.75rem; }
@@ -253,9 +260,12 @@
   .add-form form { flex-direction: column; gap: 0.5rem; }
   .add-form-inline input { min-width: 0; }
   .add-form-inline form { flex-wrap: wrap; }
-  .checklist-header button.small { min-height: 2.5rem; font-size: 0.9em; }
+  .checklist-header button.small { min-height: var(--touch-min); font-size: 0.9em; }
   .checklist-item { font-size: 0.9em; }
   .badge-intervalo,
   .badge-count { font-size: 0.78em; }
-  .btn-add-sub { font-size: 0.9em; min-height: 2.5rem; }
+  .btn-add-sub { font-size: 0.9em; min-height: var(--touch-min); }
+  /* Inputs inline: sem min-width para não causar overflow */
+  .edit-form-inline input,
+  .edit-form-inline select { min-width: 0; width: 100%; }
 }

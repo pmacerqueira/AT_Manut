@@ -7,6 +7,7 @@ import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { LayoutDashboard, Users, FolderTree, Cpu, Wrench, Calendar, LogOut, Menu, X, CalendarPlus, ScrollText, Settings, RefreshCw } from 'lucide-react'
 import Breadcrumbs from './Breadcrumbs'
+import OfflineBanner from './OfflineBanner'
 import './Layout.css'
 
 export default function Layout({ children }) {
@@ -98,6 +99,7 @@ export default function Layout({ children }) {
           )
           : (
             <>
+              <OfflineBanner />
               <Breadcrumbs />
               <div className="main-content">
                 {children}

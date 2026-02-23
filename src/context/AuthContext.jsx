@@ -56,6 +56,8 @@ export function AuthProvider({ children }) {
       }
       setSession(sess)
       logger.action('AuthContext', 'login', `Utilizador "${result.user.username}" (${result.user.role}) autenticado`)
+      // Notificar DataContext para processar fila offline e refrescar dados
+      window.dispatchEvent(new Event('atm:login'))
       return true
     } catch (err) {
       const msg = err.status === 401
