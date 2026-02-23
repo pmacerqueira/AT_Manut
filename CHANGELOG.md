@@ -4,6 +4,27 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.5.1] — 2026-02-23 — Histórico completo em PDF por máquina (Etapa 4)
+
+### Nova funcionalidade — Histórico PDF por máquina
+- Botão `FileText` adicionado em cada linha de equipamento (todas as vistas: normal e em atraso)
+- Gera e abre uma nova janela com o histórico completo em PDF/impressão via `window.print()`
+- **Conteúdo do PDF:**
+  - Cabeçalho Navel com logotipo e dados da empresa
+  - Ficha do equipamento: marca/modelo, nº série, subcategoria/categoria, localização, cliente (nome, NIF, morada), próxima manutenção
+  - Bloco de estatísticas globais: Total | Executadas | Agendadas | Em atraso | Última execução
+  - Tabela histórica completa (mais recente primeiro): data, tipo, estado (com badge colorido), técnico, assinado por, observações (truncadas a 90 chars)
+  - Última assinatura registada (imagem manuscrita + nome + data)
+  - Rodapé Navel em todas as páginas
+- Indicador de carregamento (`useGlobalLoading`) durante geração
+- `@media print` com `table-header-group` para repetição de cabeçalho em múltiplas páginas
+
+### Ficheiros criados/modificados
+- `src/utils/gerarHtmlHistoricoMaquina.js` — novo gerador HTML do histórico
+- `src/pages/Equipamentos.jsx` — botão "Histórico PDF", estado `loadingHistorico`, `handleHistoricoPdf()`
+
+---
+
 ## [1.5.0] — 2026-02-23 — "O meu dia" + Alertas de conformidade + QR Code por máquina
 
 ### Etapa 1 — Vista "O meu dia" (Dashboard)

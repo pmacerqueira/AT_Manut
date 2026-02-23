@@ -6,9 +6,12 @@ import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
-import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode } from 'lucide-react'
+import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText } from 'lucide-react'
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
+import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
+import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { format, isBefore } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
@@ -22,10 +25,13 @@ export default function Equipamentos() {
     INTERVALOS,
     getSubcategoriasByCategoria,
     getSubcategoria,
+    manutencoes,
+    relatorios,
     removeMaquina,
   } = useData()
   const { canDelete, isAdmin } = usePermissions()
   const { showToast } = useToast()
+  const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const [view, setView] = useState('categorias')
   const [selectedCategoria, setSelectedCategoria] = useState(null)
   const [selectedSubcategoria, setSelectedSubcategoria] = useState(null)
@@ -33,11 +39,37 @@ export default function Equipamentos() {
   const [modalDoc, setModalDoc] = useState(null)
   const [modalExecucao, setModalExecucao] = useState(null)
   const [modalQr, setModalQr] = useState(null)
+  const [loadingHistorico, setLoadingHistorico] = useState(null) // id da máquina a gerar
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const filterAtraso = searchParams.get('filter') === 'atraso' // whitelist: apenas 'atraso' é aceite
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
+
+  const handleHistoricoPdf = (maquina) => {
+    setLoadingHistorico(maquina.id)
+    showGlobalLoading()
+    try {
+      const sub      = getSubcategoria(maquina.subcategoriaId)
+      const cat      = sub ? categorias.find(c => c.id === sub.categoriaId) : null
+      const cli      = getCliente(maquina.clienteNif)
+      const manutsMaq = manutencoes.filter(m => m.maquinaId === maquina.id)
+      const html = gerarHtmlHistoricoMaquina({
+        maquina,
+        cliente:      cli,
+        subcategoria: sub,
+        categoria:    cat,
+        manutencoes:  manutsMaq,
+        relatorios,
+      })
+      imprimirOuGuardarPdf(html)
+    } catch (err) {
+      showToast('Erro ao gerar histórico PDF.', 'error')
+    } finally {
+      hideGlobalLoading()
+      setLoadingHistorico(null)
+    }
+  }
   const maquinasEmAtraso = maquinas.filter(e => isBefore(new Date(e.proximaManut), new Date()))
 
   const handleCategoriaClick = (cat) => {
@@ -128,6 +160,7 @@ export default function Equipamentos() {
                           <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
                             <Play size={12} /> Executar
                           </button>
+                          <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                           {isAdmin && (
@@ -219,6 +252,7 @@ export default function Equipamentos() {
                         )}
                       </div>
                       <div className="actions">
+                        <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                         {isAdmin && (
