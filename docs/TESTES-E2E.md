@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 88 testes automatizados cobrindo todos os fluxos, perfis de utilizador e funcionalidades.
-> Última revisão: 2026-02-23 — v1.6.2
+> 230+ testes automatizados cobrindo todos os fluxos, perfis de utilizador e funcionalidades.
+> Última revisão: 2026-02-23 — v1.7.0
 
 ---
 
@@ -18,11 +18,14 @@
 | `07-permissions.spec.js` | 20 | RBAC Admin vs ATecnica, rotas protegidas |
 | `08-equipamentos-categorias.spec.js` | 18 | Equipamentos, categorias CRUD inline, calendário |
 | `09-edge-cases.spec.js` | 27 | Fotos, assinatura, modais, mobile, estado vazio |
-| `10-etapas-evolucao.spec.js` | 48 | Vista "O meu dia", alertas badge, QR Code, Histórico PDF |
+| `10-etapas-evolucao.spec.js` | 48 | Vista "O meu dia", alertas badge, QR Code etiqueta, Histórico PDF |
 | `11-blocos-abc.spec.js` | 40 | Email clientes, config alertas, reagendamento, modal proactivo |
-| **Total** | **225** | **100% dos fluxos da aplicação** |
+| `12-v170-features.spec.js` | 42 | Pesquisa global, Leitor QR, Modo campo, Métricas, localStorage |
+| **Total** | **270** | **100% dos fluxos da aplicação** |
 
-> **Nota:** Os specs 01–09 (137 testes base) e os specs 10–11 (88 testes de evolução) formam a suite completa. Os specs 10–11 são os mais relevantes para as funcionalidades recentes (v1.5–v1.6).
+> **Specs 01–09** (140 testes): cobertura base do núcleo da aplicação.
+> **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
+> **Spec 12** (42 testes): funcionalidades v1.7.0 (pesquisa, leitor QR, modo campo, métricas, localStorage).
 
 ---
 

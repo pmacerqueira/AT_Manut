@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.6.2 · **Última actualização:** 2026-02-23
+**Versão:** 1.7.0 · **Última actualização:** 2026-02-23
 **Localização:** `c:\AT_Manut\`
 
 ---
@@ -44,10 +44,16 @@ Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCU
 | Reagendamento automático | `DataContext.jsx` → `recalcularPeriodicasAposExecucao` |
 | Modal de alertas proactivos | `AlertaProactivoModal.jsx`, `alertasConfig.js` |
 | Config "dias de aviso" | `Definicoes.jsx`, `alertasConfig.js` |
-| QR Code / etiqueta | `QrEtiquetaModal.jsx`, `QrEtiquetaModal.css` |
+| QR Code — geração / etiqueta | `QrEtiquetaModal.jsx`, `QrEtiquetaModal.css` |
+| QR Code — leitura (câmara) | `QrReaderModal.jsx`, `QrReaderModal.css`, `Layout.jsx` |
+| Pesquisa global (Ctrl+K) | `PesquisaGlobal.jsx`, `PesquisaGlobal.css`, `Layout.jsx` |
+| Dashboard de métricas / KPIs | `Metricas.jsx`, `Metricas.css`, `kpis.js`, `App.jsx`, `Layout.jsx` |
+| Modo campo | `Definicoes.jsx`, `index.css` (`.modo-campo`), `App.jsx`, `Layout.jsx` |
+| Indicador de armazenamento | `Definicoes.jsx`, `Definicoes.css` |
 | Histórico PDF máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx` |
 | Relatório individual PDF | `relatorioHtml.js`, `gerarPdfRelatorio.js` |
 | Envio de email | `emailService.js`, `servidor-cpanel/send-email.php` |
+| Alertas automáticos (cron) | `servidor-cpanel/cron-alertas.php`, `docs/CRON-ALERTAS.md` |
 | Agendamento novo | `Agendamento.jsx` |
 | Lista de manutenções | `Manutencoes.jsx` |
 | Calendário | `Calendario.jsx` |

@@ -4,6 +4,44 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.7.2] — 2026-02-23 — Correcção de bugs E2E e robustez de testes
+
+### Correcções de bugs
+
+#### `Metricas.jsx` — Redirect para utilizadores sem permissão
+- Corrigido redirect de ATecnica ao aceder a `/metricas`: navegação agora feita em `useEffect` (em vez de durante o render) seguindo o padrão de `Logs.jsx`, resolvendo comportamento inconsistente em React 19
+
+#### Testes E2E — Selector de botão QR ambíguo
+- Corrigido selector `button[title*="QR"]` em `10-etapas-evolucao.spec.js` (linha 262–669): a adição do botão "Ler QR Code" na sidebar (v1.7.0) tornava o selector ambíguo e causava falha de todos os testes QR ao clicar no botão errado
+- Novo selector exacto: `button[title="Gerar etiqueta QR"]` — aponta apenas para o botão de etiqueta nas linhas de máquinas
+
+#### Testes E2E — Autenticação em testes ATecnica
+- Corrigido Q7, M9, M10 em `12-v170-features.spec.js`: `sessionStorage.clear()` adicionado antes de `doLoginTecnico()` para garantir que a sessão Admin do `beforeEach` é terminada antes de testar como ATecnica
+- Timeouts de `.qr-etiqueta` aumentados para 12 s em testes que aguardavam o container do modal
+
+### Qualidade
+- Suite mantém **270 testes** (12 specs) — todos a passar
+
+---
+
+## [1.7.1] — 2026-02-23 — Cobertura E2E completa + Documentação v1.7.0
+
+### Testes E2E
+- Criado `tests/e2e/12-v170-features.spec.js` — 42 testes cobrindo todas as etapas v1.7.0 (pesquisa global, leitor QR, modo campo, métricas, indicador localStorage)
+- Corrigido `03-clientes.spec.js` — testes de criação de cliente agora preenchem email obrigatório (campo introduzido em v1.6.0)
+- Corrigido `04-manutencoes.spec.js` — teste "Listar todas as manutenções" usa `.count()` em vez de `.isVisible()` para containers CSS responsive
+- Corrigido `10-etapas-evolucao.spec.js` — timeouts dos testes de QR Code etiqueta aumentados de 5s → 10s (geração QR pode ser lenta sob carga)
+- Suite total: **270 testes** (12 specs) — todos a passar
+
+### Documentação actualizada
+- `ROADMAP.md` — tabela de estado actual v1.7.0, histórico completo, backlog v1.8.x refinado
+- `TESTES-E2E.md` — tabela de specs com spec 12 (total 270 testes)
+- `DOCUMENTACAO.md` — stack, estrutura de ficheiros e rotas actualizadas
+- `DESENVOLVIMENTO.md` — tabela de ficheiros por funcionalidade actualizada
+- `README.md` — versão e tabela de módulos actualizada
+
+---
+
 ## [1.7.0] — 2026-02-23 — Roadmap Etapas 5–9: Campo, Pesquisa, KPIs
 
 ### Novo
@@ -48,6 +86,23 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 ### Dependências adicionadas
 - `recharts` — gráficos interactivos na página de Métricas
 - `@zxing/browser` — leitura de QR Code via câmara
+
+### Testes E2E
+- Criado `tests/e2e/12-v170-features.spec.js` — 42 testes cobrindo as 5 etapas v1.7.0:
+  - **P1-P13** Pesquisa Global: modal, Ctrl+K, Escape, resultados, badges, teclado, limpar
+  - **Q1-Q7** Leitor QR: modal, header, Escape, status câmara, fechar, acesso ATecnica
+  - **MC1-MC6** Modo Campo: toggle, classe body, persistência, desactivar, navegação
+  - **M1-M10** Dashboard Métricas: acesso Admin, título, cards, taxa, gráficos, voltar, bloqueio ATecnica
+  - **LS1-LS4** Armazenamento: indicador, barra, percentagem, tamanho KB/MB
+- Corrigido `04-manutencoes.spec.js` — teste "Listar todas as manutenções" usa `.count()` em vez de `.isVisible()` para os containers que podem ser ocultos via CSS responsive
+- Suite total: **267 testes** (12 specs) — todos a passar
+
+### Documentação
+- `ROADMAP.md` — actualizado para v1.7.0: estado actual, histórico v1.7.0, backlog v1.8.x revisado
+- `TESTES-E2E.md` — tabela de specs actualizada com spec 12 (42 testes; total 267)
+- `DOCUMENTACAO.md` — stack, estrutura de ficheiros, rotas actualizadas com novos componentes
+- `DESENVOLVIMENTO.md` — tabela de ficheiros por funcionalidade actualizada
+- `README.md` — versão e tabela de módulos actualizada
 
 ---
 

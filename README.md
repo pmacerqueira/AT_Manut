@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.6.2` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.7.0` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 
@@ -19,7 +19,12 @@ Aplicação web PWA para gestão de manutenções preventivas de equipamentos co
 | **Calendário** | Visualização mensal de manutenções | ✅ |
 | **Relatórios** | PDF individual + histórico completo por máquina em PDF | ✅ |
 | **Email** | Envio automático de relatório + lembretes de conformidade | ✅ |
-| **Definições** | Backup/restauro, configuração de dias de aviso de alertas | ✅ |
+| **Alertas automáticos** | Cron job diário no cPanel — envia lembretes X dias antes do vencimento | ✅ |
+| **Pesquisa global** | `Ctrl+K` — pesquisa instantânea em clientes, máquinas e manutenções | ✅ |
+| **Leitor QR** | Câmara abre ficha da máquina directamente ao ler o QR Code | ✅ |
+| **Métricas / KPIs** | Taxa de cumprimento, gráficos mensais, top clientes em atraso (Admin) | ✅ |
+| **Modo campo** | Alto contraste para uso exterior, persistido nas Definições | ✅ |
+| **Definições** | Backup/restauro, config alertas, modo campo, indicador de armazenamento | ✅ |
 | **Logs** | Registo de sistema (acções, erros, eventos de autenticação) | ✅ |
 | **PWA** | Instalável no ecrã inicial, offline-first com cache + sync queue | ✅ |
 

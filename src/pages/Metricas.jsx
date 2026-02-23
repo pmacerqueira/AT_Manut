@@ -6,7 +6,7 @@
  *
  * Acesso: Admin apenas.
  */
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
@@ -40,8 +40,10 @@ export default function Metricas() {
   const navigate        = useNavigate()
   const { clientes, maquinas, manutencoes, relatorios } = useData()
 
-  // Redirige se não for admin
-  if (!isAdmin) { navigate('/', { replace: true }); return null }
+  // Redirige se não for admin (useEffect para não chamar navigate durante render)
+  useEffect(() => {
+    if (!isAdmin) navigate('/', { replace: true })
+  }, [isAdmin, navigate])
 
   // ── Cálculo de KPIs (memorizados) ────────────────────────────────────────
   const resumo       = useMemo(() => calcResumoCounts({ clientes, maquinas, manutencoes, relatorios }), [clientes, maquinas, manutencoes, relatorios])
@@ -49,6 +51,9 @@ export default function Metricas() {
   const semanas      = useMemo(() => calcProximasSemanas({ manutencoes, semanas: 8 }), [manutencoes])
   const topAtraso    = useMemo(() => calcTopClientesAtraso({ clientes, maquinas }), [clientes, maquinas])
   const evolucao     = useMemo(() => calcEvolucaoMensal({ manutencoes, meses: 6 }), [manutencoes])
+
+  // Enquanto o useEffect não redirige, não renderizar para utilizadores sem permissão
+  if (!isAdmin) return null
 
   // ── Cor da taxa de cumprimento ────────────────────────────────────────────
   const txClass = cumprimento.percentagem === null

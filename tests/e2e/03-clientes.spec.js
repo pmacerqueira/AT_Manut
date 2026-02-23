@@ -82,11 +82,10 @@ test.describe('Clientes — Admin', () => {
     await page.locator('button').filter({ hasText: /novo cliente/i }).first().click()
     await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 4000 })
 
-    // Preencher formulário
-    const inputs = page.locator('.modal input')
-    await inputs.nth(0).fill('510000001')   // NIF
-    await inputs.nth(1).fill('Auto Teste Lda') // Nome
-    await inputs.nth(2).fill('Rua do Teste, 1') // Morada (se existir)
+    // Preencher campos obrigatórios (NIF, Nome, Email)
+    await page.locator('.modal input[placeholder*="123456789"]').fill('510000001')
+    await page.locator('.modal input[placeholder*="Razão social"]').fill('Auto Teste Lda')
+    await page.locator('.modal input[type="email"]').fill('teste@autoteste.pt')
 
     // Submeter
     await page.locator('.modal button[type="submit"]').click()
@@ -105,13 +104,13 @@ test.describe('Clientes — Admin', () => {
     await page.locator('button').filter({ hasText: /novo cliente/i }).first().click()
     await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 4000 })
 
-    // Usar NIF já existente no mock
-    const inputs = page.locator('.modal input')
-    await inputs.nth(0).fill('511234567') // NIF já existente
-    await inputs.nth(1).fill('Duplicado Lda')
+    // Usar NIF já existente no mock — preencher todos os campos obrigatórios
+    await page.locator('.modal input[placeholder*="123456789"]').fill('511234567') // NIF duplicado
+    await page.locator('.modal input[placeholder*="Razão social"]').fill('Duplicado Lda')
+    await page.locator('.modal input[type="email"]').fill('duplicado@teste.pt')
     await page.locator('.modal button[type="submit"]').click()
 
-    // Deve aparecer mensagem de erro
+    // Deve aparecer mensagem de erro sobre NIF duplicado
     await expect(
       page.locator('.form-erro, .error-message, [class*="erro"]').filter({ hasText: /NIF|já existe/i }).first()
     ).toBeVisible({ timeout: 3000 })

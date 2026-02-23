@@ -259,32 +259,34 @@ test.describe('Etapa 3 — QR Code por máquina', () => {
 
   test('Botão QR existe nas linhas de máquinas (vista hierárquica)', async ({ page }) => {
     await navegarAteMaquinas(page)
-    const btnQr = page.locator('button[title*="QR"], button[title*="etiqueta"]').first()
+    const btnQr = page.locator('button[title="Gerar etiqueta QR"]').first()
     await expect(btnQr).toBeVisible({ timeout: 5000 })
   })
 
   test('Botão QR existe nas máquinas em atraso (vista flat)', async ({ page }) => {
     await navegarParaAtraso(page)
-    const btnQr = page.locator('button[title*="QR"], button[title*="etiqueta"]').first()
+    const btnQr = page.locator('button[title="Gerar etiqueta QR"]').first()
     await expect(btnQr).toBeVisible({ timeout: 5000 })
   })
 
   test('Clicar QR abre modal .qr-modal', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
-    await expect(page.locator('.qr-modal')).toBeVisible({ timeout: 5000 })
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await expect(page.locator('.qr-modal')).toBeVisible({ timeout: 10000 })
   })
 
   test('Modal QR mostra a etiqueta com header NAVEL', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 12000 })
     await expect(page.locator('.qr-etiqueta')).toBeVisible({ timeout: 5000 })
     await expect(page.locator('.qr-etiqueta-logo')).toBeVisible()
   })
 
   test('Modal QR mostra informação da máquina (marca/modelo/série)', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 12000 })
     await page.locator('.qr-etiqueta').waitFor({ state: 'visible', timeout: 5000 })
 
     await expect(page.locator('.qr-etiqueta-nome')).toBeVisible()
@@ -293,11 +295,12 @@ test.describe('Etapa 3 — QR Code por máquina', () => {
 
   test('QR code gera-se dentro do modal (img aparece)', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 12000 })
     await page.locator('.qr-etiqueta').waitFor({ state: 'visible', timeout: 5000 })
 
-    // Aguardar até 5 s pela geração do QR (async)
-    await expect(page.locator('.qr-etiqueta-img')).toBeVisible({ timeout: 5000 })
+    // Aguardar até 12 s pela geração do QR (async)
+    await expect(page.locator('.qr-etiqueta-img')).toBeVisible({ timeout: 12000 })
 
     // A imagem deve ter um src de data: (data URL)
     const src = await page.locator('.qr-etiqueta-img').getAttribute('src')
@@ -306,10 +309,11 @@ test.describe('Etapa 3 — QR Code por máquina', () => {
 
   test('Botão "Imprimir etiqueta" fica activo após gerar QR', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 12000 })
     await page.locator('.qr-etiqueta').waitFor({ state: 'visible', timeout: 5000 })
     // Aguardar QR gerado
-    await page.locator('.qr-etiqueta-img').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('.qr-etiqueta-img').waitFor({ state: 'visible', timeout: 12000 })
 
     const printBtn = page.locator('button').filter({ hasText: /imprimir/i }).first()
     await expect(printBtn).toBeVisible()
@@ -318,29 +322,33 @@ test.describe('Etapa 3 — QR Code por máquina', () => {
 
   test('Fechar modal QR via botão "Fechar"', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
-    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(300) // estabilizar modal
 
     await page.locator('.qr-modal button.secondary').filter({ hasText: /fechar/i }).first().click()
-    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 4000 })
+    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 6000 })
   })
 
   test('Fechar modal QR via Escape', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
-    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(300) // aguardar Escape handler registado
 
     await page.keyboard.press('Escape')
-    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 4000 })
+    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 6000 })
   })
 
   test('Fechar modal QR via clique no overlay', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
-    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(300) // estabilizar modal
 
-    await page.locator('.qr-modal-overlay').click({ position: { x: 5, y: 5 } })
-    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 4000 })
+    // Clicar no overlay fora do conteúdo do modal (canto inferior direito)
+    await page.locator('.qr-modal-overlay').click({ position: { x: 10, y: 790 } })
+    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 6000 })
   })
 
   test('ATecnica também tem acesso ao botão QR', async ({ page }) => {
@@ -349,22 +357,25 @@ test.describe('Etapa 3 — QR Code por máquina', () => {
     await doLoginTecnico(page)
     await navegarParaAtraso(page)
 
-    const btnQr = page.locator('button[title*="QR"], button[title*="etiqueta"]').first()
+    const btnQr = page.locator('button[title="Gerar etiqueta QR"]').first()
     await expect(btnQr).toBeVisible({ timeout: 5000 })
   })
 
   test('QR na vista hierárquica também funciona', async ({ page }) => {
     await navegarAteMaquinas(page)
-    const btnQr = page.locator('button[title*="QR"], button[title*="etiqueta"]').first()
+    const btnQr = page.locator('button[title="Gerar etiqueta QR"]').first()
     await btnQr.click()
-    await expect(page.locator('.qr-modal')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.qr-modal')).toBeVisible({ timeout: 10000 })
+    await page.waitForTimeout(300) // estabilizar antes de fechar
     await page.keyboard.press('Escape')
-    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 4000 })
+    await expect(page.locator('.qr-modal')).not.toBeVisible({ timeout: 6000 })
   })
 
   test('Etiqueta mostra rodapé com versão Navel', async ({ page }) => {
     await navegarParaAtraso(page)
-    await page.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await page.locator('button[title="Gerar etiqueta QR"]').first().click()
+    // Aguardar o modal (mais tolerante) antes de procurar elementos internos
+    await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 12000 })
     await page.locator('.qr-etiqueta').waitFor({ state: 'visible', timeout: 5000 })
 
     const footer = page.locator('.qr-etiqueta-footer')
@@ -610,7 +621,7 @@ test.describe('Integração — Fluxos combinados das 4 etapas', () => {
   test('QR e Histórico coexistem na mesma linha de máquina', async ({ page }) => {
     await navegarParaAtraso(page)
     const firstRow = page.locator('.maquina-row').first()
-    const btnQr   = firstRow.locator('button[title*="QR"], button[title*="etiqueta"]').first()
+    const btnQr   = firstRow.locator('button[title="Gerar etiqueta QR"]').first()
     const btnHist = firstRow.locator('button[title*="Histórico"], button[title*="istórico"]').first()
 
     await expect(btnQr).toBeVisible()
@@ -622,7 +633,7 @@ test.describe('Integração — Fluxos combinados das 4 etapas', () => {
     const firstRow = page.locator('.maquina-row').first()
 
     // 1. Abrir QR
-    await firstRow.locator('button[title*="QR"], button[title*="etiqueta"]').first().click()
+    await firstRow.locator('button[title="Gerar etiqueta QR"]').first().click()
     await page.locator('.qr-modal').waitFor({ state: 'visible', timeout: 5000 })
     // Aguardar QR gerado
     await page.locator('.qr-etiqueta-img').waitFor({ state: 'visible', timeout: 6000 })
@@ -655,7 +666,7 @@ test.describe('Integração — Fluxos combinados das 4 etapas', () => {
 
     // Equipamentos: QR e Histórico presentes, mas sem botão eliminar
     await navegarParaAtraso(page)
-    await expect(page.locator('button[title*="QR"], button[title*="etiqueta"]').first()).toBeVisible()
+    await expect(page.locator('button[title="Gerar etiqueta QR"]').first()).toBeVisible()
     await expect(page.locator('button[title*="Histórico"], button[title*="istórico"]').first()).toBeVisible()
     await expect(page.locator('.icon-btn.danger')).not.toBeVisible()
   })

@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.6.2 · **Última actualização:** 2026-02-23
+**Versão:** 1.7.0 · **Última actualização:** 2026-02-23
 
 ---
 
@@ -24,11 +24,14 @@ Aplicação web PWA para gestão de manutenções preventivas de equipamentos Na
 | Frontend | React 19 + Vite + React Router DOM (basename `/manut`) |
 | Ícones | Lucide React |
 | Datas | date-fns (`pt` locale) + `datasAzores.js` (feriados Açores) |
-| QR Code | `qrcode` (geração) |
+| QR Code — geração | `qrcode` (etiqueta 90×50mm) |
+| QR Code — leitura | `@zxing/browser` (câmara, `QrReaderModal.jsx`) |
+| Gráficos KPIs | `recharts` (`Metricas.jsx`) |
 | PDF | jsPDF + html2canvas |
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
-| Testes | Playwright E2E — 88 testes (specs 10–11) + 137 testes base (specs 01–09) |
+| Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
+| Testes | Playwright E2E — 267 testes (12 specs) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---
@@ -58,7 +61,7 @@ c:\AT_Manut\
 │   │   └── useDebounce.js             # Debounce para pesquisa
 │   │
 │   ├── components/
-│   │   ├── Layout.jsx / .css           # Sidebar, menu, logout
+│   │   ├── Layout.jsx / .css           # Sidebar, menu, logout, Ctrl+K, Ler QR, modo campo
 │   │   ├── ProtectedRoute.jsx          # Redirect se não autenticado
 │   │   ├── Toast.jsx / .css            # Notificações (useToast, showToast)
 │   │   ├── Breadcrumbs.jsx / .css      # Navegação contextual
@@ -72,18 +75,21 @@ c:\AT_Manut\
 │   │   ├── EnviarEmailModal.jsx        # Envio de email
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
 │   │   ├── QrEtiquetaModal.jsx / .css  # QR Code + etiqueta 90×50mm
+│   │   ├── QrReaderModal.jsx / .css    # Leitura QR por câmara (@zxing/browser)
+│   │   ├── PesquisaGlobal.jsx / .css   # Pesquisa global Ctrl+K (clientes+maquinas+manut.)
 │   │   └── AlertaProactivoModal.jsx / .css  # Modal proactivo de alertas (Admin)
 │   │
 │   ├── pages/
 │   │   ├── Login.jsx / .css
 │   │   ├── Dashboard.jsx / .css        # KPIs, "O meu dia", alertas, calendar
 │   │   ├── Clientes.jsx / .css         # CRUD + badge "Sem email"
-│   │   ├── Equipamentos.jsx / .css     # Hierarquia Cat→Sub→Máq, QR, Histórico PDF
+│   │   ├── Equipamentos.jsx / .css     # Hierarquia Cat→Sub→Máq, QR, Histórico PDF; recebe ?maquina=ID
 │   │   ├── Manutencoes.jsx / .css      # Lista, filtros, execução
 │   │   ├── Agendamento.jsx / .css      # Nova manutenção
 │   │   ├── Calendario.jsx / .css       # Vista mensal
 │   │   ├── Categorias.jsx / .css       # CRUD categorias/subcategorias/checklist
-│   │   ├── Definicoes.jsx / .css       # Backup, restauro, config alertas
+│   │   ├── Definicoes.jsx / .css       # Backup, restauro, config alertas, modo campo, uso LS
+│   │   ├── Metricas.jsx / .css         # Dashboard KPIs: taxa, gráficos, top clientes (Admin)
 │   │   └── Logs.jsx / .css             # Log de sistema
 │   │
 │   ├── services/
@@ -96,6 +102,7 @@ c:\AT_Manut\
 │   │   ├── relatorioHtml.js            # HTML do relatório individual
 │   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF)
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
+│   │   ├── kpis.js                     # calcResumoCounts, calcTaxaCumprimento, calcEvolucaoMensal…
 │   │   ├── datasAzores.js              # Feriados dos Açores, dias úteis
 │   │   ├── diasUteis.js               # Cálculo de dias úteis
 │   │   ├── logger.js                   # logEntry, logger.action/error/fatal
@@ -107,6 +114,7 @@ c:\AT_Manut\
 │
 ├── servidor-cpanel/
 │   ├── send-email.php                  # Backend: envio de email + PDF
+│   ├── cron-alertas.php                # Cron diário: lembretes automáticos + log alertas_log
 │   ├── INSTRUCOES_CPANEL.md
 │   └── MIGRACAO_MYSQL.md
 │
@@ -114,7 +122,8 @@ c:\AT_Manut\
 │   ├── helpers.js                      # Utilitários partilhados + dados mock (MC)
 │   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Suite base (137 testes)
 │   ├── 10-etapas-evolucao.spec.js      # Vista meu dia, alertas, QR, PDF (48 testes)
-│   └── 11-blocos-abc.spec.js           # Email, config, reagendamento, modal (40 testes)
+│   ├── 11-blocos-abc.spec.js           # Email, config, reagendamento, modal (40 testes)
+│   └── 12-v170-features.spec.js        # Pesquisa, QR leitor, modo campo, métricas, LS (42 testes)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
@@ -225,8 +234,9 @@ c:\AT_Manut\
 | `/manut/agendamento` | Agendamento | Admin |
 | `/manut/calendario` | Calendário | Todos |
 | `/manut/categorias` | Categorias | Admin |
-| `/manut/definicoes` | Definições | Admin |
-| `/manut/logs` | Logs | Admin |
+| `/manut/definicoes` | Definições (backup, alertas, modo campo, armazenamento) | Admin |
+| `/manut/metricas` | Dashboard KPIs e métricas da frota | Admin |
+| `/manut/logs` | Logs de sistema | Admin |
 
 ---
 
