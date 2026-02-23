@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
@@ -41,8 +41,46 @@ export default function Equipamentos() {
   const [modalQr, setModalQr] = useState(null)
   const [loadingHistorico, setLoadingHistorico] = useState(null) // id da máquina a gerar
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const filterAtraso = searchParams.get('filter') === 'atraso' // whitelist: apenas 'atraso' é aceite
+
+  // Abrir ficha directamente via ?maquina=ID (QR Code ou pesquisa global)
+  useEffect(() => {
+    const maqId = searchParams.get('maquina')
+    if (!maqId) return
+    const maq = maquinas.find(m => m.id === maqId)
+    if (!maq) return
+    // Navegar até à subcategoria da máquina e seleccioná-la
+    const sub = getSubcategoria(maq.subcategoriaId)
+    if (sub) {
+      const cat = categorias.find(c => c.id === sub.categoriaId)
+      if (cat) {
+        setSelectedCategoria(cat)
+        setSelectedSubcategoria(sub)
+        setView('maquinas')
+      }
+    }
+    // Limpar o param para não re-activar no próximo render
+    setSearchParams(prev => { prev.delete('maquina'); return prev }, { replace: true })
+  }, [maquinas]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Highlight via state (pesquisa global) — apenas scroll visual, sem abrir modal
+  useEffect(() => {
+    const hId = location.state?.highlightId
+    if (!hId) return
+    const maq = maquinas.find(m => m.id === hId)
+    if (!maq) return
+    const sub = getSubcategoria(maq.subcategoriaId)
+    if (sub) {
+      const cat = categorias.find(c => c.id === sub.categoriaId)
+      if (cat) {
+        setSelectedCategoria(cat)
+        setSelectedSubcategoria(sub)
+        setView('maquinas')
+      }
+    }
+  }, [location.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
 

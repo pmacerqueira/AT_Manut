@@ -136,7 +136,6 @@ try {
             maq.marca       AS maquina_marca,
             maq.modelo      AS maquina_modelo,
             maq.numero_serie AS maquina_serie,
-            maq.localizacao AS maquina_local,
             c.id            AS cliente_id,
             c.nome          AS cliente_nome,
             c.email         AS cliente_email,
@@ -180,7 +179,6 @@ foreach ($manutencoes as $row) {
     $data_manut    = $row['data_manut'];
     $maquina_info  = trim($row['maquina_marca'] . ' ' . $row['maquina_modelo']);
     if ($row['maquina_serie']) $maquina_info .= ' (S/N: ' . $row['maquina_serie'] . ')';
-    if ($row['maquina_local']) $maquina_info .= ' — ' . $row['maquina_local'];
 
     // Verificar se já enviámos lembrete para esta manutenção recentemente
     try {

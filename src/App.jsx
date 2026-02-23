@@ -1,4 +1,4 @@
-import { lazy, Suspense, Component } from 'react'
+import { lazy, Suspense, Component, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -54,6 +54,7 @@ const Calendario   = lazy(() => import('./pages/Calendario'))
 const Agendamento  = lazy(() => import('./pages/Agendamento'))
 const Logs         = lazy(() => import('./pages/Logs'))
 const Definicoes   = lazy(() => import('./pages/Definicoes'))
+const Metricas     = lazy(() => import('./pages/Metricas'))
 
 function PageLoader() {
   return (
@@ -65,6 +66,18 @@ function PageLoader() {
 }
 
 function App() {
+  // Aplicar/remover classe de Modo Campo no <body> conforme persistência em localStorage
+  useEffect(() => {
+    const aplicar = () => {
+      const activo = localStorage.getItem('atm_modo_campo') === 'true'
+      document.body.classList.toggle('modo-campo', activo)
+    }
+    aplicar()
+    // Reactivo quando outra aba altera o localStorage
+    window.addEventListener('storage', aplicar)
+    return () => window.removeEventListener('storage', aplicar)
+  }, [])
+
   return (
     <ErrorBoundary>
       <Routes>
@@ -86,6 +99,7 @@ function App() {
                       <Route path="/agendamento" element={<Agendamento />} />
                       <Route path="/logs" element={<Logs />} />
                       <Route path="/definicoes" element={<Definicoes />} />
+                      <Route path="/metricas" element={<Metricas />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </Suspense>

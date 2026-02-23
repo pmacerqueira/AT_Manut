@@ -218,6 +218,114 @@
   margin-top: 0.25rem;
 }
 
+/* ── localStorage usage bar ────────────────────────────────────────────────── */
+.def-ls-usage {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.def-ls-usage-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.def-ls-usage-header svg { flex-shrink: 0; }
+.def-ls-usage-header span:nth-child(2) { flex: 1; }
+.def-ls-usage-val { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+.def-ls-usage-pct { color: var(--color-text-muted); font-weight: 400; }
+
+.def-ls-bar {
+  height: 6px;
+  background: var(--color-bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.def-ls-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.def-ls-bar-fill--warn  { background: var(--color-warning); }
+.def-ls-bar-fill--crit  { background: var(--color-danger); }
+
+.def-ls-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--color-warning);
+  margin: 0;
+}
+
+/* ── Modo campo toggle ────────────────────────────────────────────────────── */
+.def-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+}
+
+.def-toggle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.def-toggle-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.def-toggle-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.def-toggle-btn {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-border);
+  border-radius: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.def-toggle-btn--on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.def-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.def-toggle-btn--on .def-toggle-thumb {
+  transform: translateX(22px);
+}
+
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .def-page { padding: 1rem 0.75rem 3rem; gap: 1rem; }

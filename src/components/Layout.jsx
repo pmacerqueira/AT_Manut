@@ -1,23 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { APP_FOOTER_TEXT } from '../config/version'
 import InstallPrompt from './InstallPrompt'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { LayoutDashboard, Users, FolderTree, Cpu, Wrench, Calendar, LogOut, Menu, X, CalendarPlus, ScrollText, Settings, RefreshCw } from 'lucide-react'
+import {
+  LayoutDashboard, Users, FolderTree, Cpu, Wrench,
+  Calendar, LogOut, Menu, X, CalendarPlus, ScrollText,
+  Settings, RefreshCw, Search, QrCode, BarChart2,
+} from 'lucide-react'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
+import PesquisaGlobal from './PesquisaGlobal'
+import QrReaderModal from './QrReaderModal'
 import './Layout.css'
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth()
-  const { isAdmin } = usePermissions()
-  const { loading, refreshData } = useData()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user, logout }   = useAuth()
+  const { isAdmin }        = usePermissions()
+  const { loading }        = useData()
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [pesquisaOpen, setPesquisaOpen] = useState(false)
+  const [qrReaderOpen, setQrReaderOpen] = useState(false)
   const location = useLocation()
 
   const closeSidebar = () => setSidebarOpen(false)
+
+  // Atalho de teclado Ctrl+K / Cmd+K para pesquisa global
+  const handleGlobalKey = useCallback((e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault()
+      setPesquisaOpen(p => !p)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleGlobalKey)
+    return () => document.removeEventListener('keydown', handleGlobalKey)
+  }, [handleGlobalKey])
 
   return (
     <div className="layout">
@@ -35,6 +56,21 @@ export default function Layout({ children }) {
             <img src={`${import.meta.env.BASE_URL}logo-navel.png`} alt="Navel" className="logo-img" />
           </Link>
         </div>
+
+        {/* Barra de pesquisa rápida */}
+        <div className="sidebar-search">
+          <button
+            type="button"
+            className="sidebar-search-btn"
+            onClick={() => { closeSidebar(); setPesquisaOpen(true) }}
+            title="Pesquisa global (Ctrl+K)"
+          >
+            <Search size={15} />
+            <span>Pesquisar…</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+        </div>
+
         <nav className="nav">
           <NavLink to="/" className={location.pathname === '/' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <LayoutDashboard size={20} />
@@ -66,6 +102,24 @@ export default function Layout({ children }) {
             <Calendar size={20} />
             <span>Calendário</span>
           </NavLink>
+
+          {/* Separador para ferramentas de campo */}
+          <button
+            type="button"
+            className="nav-link nav-link--qr"
+            onClick={() => { closeSidebar(); setQrReaderOpen(true) }}
+            title="Ler QR Code de equipamento"
+          >
+            <QrCode size={20} />
+            <span>Ler QR Code</span>
+          </button>
+
+          {isAdmin && (
+            <NavLink to="/metricas" className={location.pathname === '/metricas' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
+              <BarChart2 size={20} />
+              <span>Métricas</span>
+            </NavLink>
+          )}
           {isAdmin && (
             <NavLink to="/logs" className={location.pathname === '/logs' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
               <ScrollText size={20} />
@@ -112,6 +166,10 @@ export default function Layout({ children }) {
           )
         }
       </main>
+
+      {/* Modais globais — fora do <main> para z-index correcto */}
+      {pesquisaOpen && <PesquisaGlobal onClose={() => setPesquisaOpen(false)} />}
+      <QrReaderModal isOpen={qrReaderOpen} onClose={() => setQrReaderOpen(false)} />
     </div>
   )
 }

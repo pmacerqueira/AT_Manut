@@ -1,0 +1,243 @@
+.pq-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: clamp(3.5rem, 10vh, 7rem);
+  animation: pq-fade 0.12s ease;
+}
+
+@keyframes pq-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.pq-modal {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: min(620px, calc(100vw - 1.5rem));
+  overflow: hidden;
+  animation: pq-slide 0.14s ease;
+}
+
+@keyframes pq-slide {
+  from { transform: translateY(-8px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ─── Input row ─── */
+.pq-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pq-search-icon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.pq-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: var(--color-text);
+  font-family: inherit;
+  min-width: 0;
+}
+
+.pq-input::placeholder { color: var(--color-text-muted); }
+
+.pq-clear,
+.pq-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.4rem;
+  border-radius: 5px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.pq-clear:hover,
+.pq-close:hover {
+  color: var(--color-text);
+  background: var(--color-bg-card);
+}
+
+.pq-close kbd {
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* ─── Results list ─── */
+.pq-results {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.pq-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.pq-item:hover,
+.pq-item--selected {
+  background: var(--color-bg-card);
+}
+
+/* Type badge */
+.pq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 88px;
+  justify-content: flex-start;
+}
+
+.pq-badge--cliente    { background: rgba(0, 163, 224, 0.15); color: var(--color-accent); }
+.pq-badge--maquina    { background: rgba(34, 197, 94, 0.15);  color: var(--color-success); }
+.pq-badge--manutencao { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+
+/* Content */
+.pq-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.pq-titulo {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pq-sub {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pq-arrow {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.pq-item:hover .pq-arrow,
+.pq-item--selected .pq-arrow {
+  opacity: 1;
+  color: var(--color-accent);
+}
+
+/* Empty */
+.pq-empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: 2rem 1rem;
+}
+
+.pq-empty em { font-style: normal; color: var(--color-text); }
+
+/* Hint (estado inicial) */
+.pq-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: var(--color-text-muted);
+}
+
+.pq-hint-icon {
+  opacity: 0.25;
+  color: var(--color-text);
+}
+
+.pq-hint p {
+  margin: 0;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.pq-shortcuts {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+  font-size: 0.77rem;
+}
+
+.pq-shortcuts span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pq-shortcuts kbd {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.72rem;
+  font-family: monospace;
+  color: var(--color-text-muted);
+}
+
+/* Modo campo: badges maiores */
+body.modo-campo .pq-badge {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+  min-width: 96px;
+}
+
+body.modo-campo .pq-titulo { font-size: 1rem; }
+body.modo-campo .pq-sub    { font-size: 0.82rem; }
+body.modo-campo .pq-item   { padding: 0.75rem 0.85rem; }

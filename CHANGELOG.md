@@ -4,6 +4,53 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.7.0] — 2026-02-23 — Roadmap Etapas 5–9: Campo, Pesquisa, KPIs
+
+### Novo
+
+#### Etapa 7 — Pesquisa global (Ctrl+K)
+- `PesquisaGlobal.jsx` — modal de pesquisa instantânea acessível em qualquer página
+- Pesquisa simultânea em Clientes (nome, NIF, email), Equipamentos (marca, modelo, S/N) e Manutenções (tipo, data, status, técnico)
+- Resultados agrupados por tipo com badges coloridos e navegação por teclado (↑↓ Enter)
+- Atalho global `Ctrl+K` / `Cmd+K` — registado em `Layout.jsx`
+- Barra de pesquisa visível na sidebar; botão `Esc` para fechar
+- Clique em resultado navega para a página correspondente (`/clientes`, `/equipamentos`, `/manutencoes`) com `state.highlightId`
+
+#### Etapa 5 — Leitor de QR Code via câmara
+- `QrReaderModal.jsx` — modal com feed de câmara usando `@zxing/browser`
+- Prefere câmara traseira em dispositivos móveis; fallback para câmara disponível
+- Ao ler QR da app (`?maquina=ID`): navega directamente para `/equipamentos?maquina=ID`
+- QRs externos: mostra o texto lido com opção "Abrir link"
+- Botão "Ler QR Code" na sidebar (disponível a Admin e ATecnica)
+- `Equipamentos.jsx` — lê `?maquina=` e `location.state.highlightId` para abrir automaticamente a subcategoria da máquina
+
+#### Etapa 8 — Modo campo (alto contraste)
+- Tema de alto contraste em `index.css` (`.modo-campo`) — fundo claro, texto preto, bordas nítidas
+- Textos e botões maiores (106% base, min-height 46px)
+- Indicador visual "☀ MODO CAMPO" na sidebar quando activo
+- Toggle em `Definições` → "Modo campo" com estado persistido em `atm_modo_campo`
+- `App.jsx` — aplica/remove a classe `.modo-campo` no `<body>` no mount e em alterações cross-tab
+
+#### Etapa 6 — Dashboard de KPIs e métricas (Admin)
+- `src/utils/kpis.js` — funções de cálculo: resumo de contagens, taxa de cumprimento (12 meses), próximas 8 semanas, top clientes em atraso, evolução mensal, MTBF
+- `src/pages/Metricas.jsx` — nova página com:
+  - Cards de resumo (clientes, equipamentos, manutenções, relatórios, em atraso, sem email)
+  - Taxa de cumprimento com indicador circular (verde/amarelo/vermelho)
+  - Gráfico de linha — evolução mensal das manutenções (6 meses) com `recharts`
+  - Gráfico de barras empilhadas — próximas 8 semanas (pendentes + agendadas)
+  - Tabela top 5 clientes com equipamentos em atraso
+- Nova rota `/metricas` em `App.jsx`; link "Métricas" na sidebar (Admin)
+
+#### Etapa 9 — Melhorias ao armazenamento (Definições)
+- Indicador visual de uso do localStorage: barra de progresso com % e alerta quando > 70%
+- Cálculo de uso total (todos os keys `atm_*`) com estimativa de quota de 5 MB
+
+### Dependências adicionadas
+- `recharts` — gráficos interactivos na página de Métricas
+- `@zxing/browser` — leitura de QR Code via câmara
+
+---
+
 ## [1.6.2] — 2026-02-23 — Cobertura E2E completa (Etapas 1-4 + Blocos A+B+C)
 
 ### Corrigido

@@ -723,3 +723,80 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MODO CAMPO — Alto contraste para uso ao ar livre / com luvas
+   Activado via toggle em Definições → persiste em localStorage
+   ═══════════════════════════════════════════════════════════════ */
+body.modo-campo {
+  --color-bg:           #f0f2f5;
+  --color-bg-card:      #ffffff;
+  --color-bg-elevated:  #e4e8ed;
+  --color-text:         #0a0e14;
+  --color-text-muted:   #3a4455;
+  --color-border:       #b0bbcc;
+  --color-accent:       #005fa3;
+  --color-accent-hover: #004a82;
+  --color-accent-muted: rgba(0, 95, 163, 0.12);
+  --color-success:      #15803d;
+  --color-warning:      #b45309;
+  --color-danger:       #b91c1c;
+  --shadow:             0 4px 20px rgba(0, 0, 0, 0.12);
+  font-size: 106%;
+}
+
+body.modo-campo .btn,
+body.modo-campo button,
+body.modo-campo .nav-link,
+body.modo-campo input,
+body.modo-campo select,
+body.modo-campo textarea {
+  min-height: 46px;
+}
+
+body.modo-campo .nav-link {
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+body.modo-campo .sidebar {
+  border-right-color: var(--color-border);
+}
+
+/* Indicador visual de modo campo activo na sidebar */
+body.modo-campo .sidebar-header::after {
+  content: '☀ MODO CAMPO';
+  display: block;
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-warning);
+  background: rgba(180, 83, 9, 0.1);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+}
+
+/* Cards e listas: mais espaçamento */
+body.modo-campo .cliente-card,
+body.modo-campo .maquina-card,
+body.modo-campo .manut-card {
+  padding: 1rem 1.1rem;
+}
+
+/* Texto principal das listas maior */
+body.modo-campo .cliente-nome,
+body.modo-campo .maquina-nome,
+body.modo-campo .manut-titulo {
+  font-size: 1.05rem;
+}
+
+/* Badges maiores */
+body.modo-campo .badge,
+body.modo-campo .status-badge,
+body.modo-campo .tag {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.55rem;
+}

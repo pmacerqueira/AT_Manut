@@ -14,7 +14,7 @@ import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { logger } from '../utils/logger'
 import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
-import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell } from 'lucide-react'
+import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive } from 'lucide-react'
 import './Definicoes.css'
 
 export default function Definicoes() {
@@ -27,8 +27,17 @@ export default function Definicoes() {
   const fileInputRef = useRef(null)
   const [importing,    setImporting]   = useState(false)
   const [lastExport,   setLastExport]  = useState(() => localStorage.getItem('atm_last_export') ?? null)
-  const [diasAviso,    setDiasAvisoUI] = useState(() => getDiasAviso())
+  const [diasAviso,     setDiasAvisoUI]  = useState(() => getDiasAviso())
   const [diasAvisoErro, setDiasAvisoErro] = useState('')
+  const [modoCampo,     setModoCampoUI]  = useState(() => localStorage.getItem('atm_modo_campo') === 'true')
+
+  const handleToggleModoCampo = (activo) => {
+    setModoCampoUI(activo)
+    localStorage.setItem('atm_modo_campo', String(activo))
+    document.body.classList.toggle('modo-campo', activo)
+    logger.action('Definicoes', 'modoCampo', activo ? 'Modo campo activado' : 'Modo campo desactivado')
+    showToast(activo ? 'Modo campo activado.' : 'Modo campo desactivado.', 'success')
+  }
 
   const handleSalvarAlertas = () => {
     const v = parseInt(diasAviso, 10)
@@ -54,7 +63,19 @@ export default function Definicoes() {
     { label: 'Relatórios',  value: relatorios.length },
   ]
 
-  // Estima tamanho do backup em KB
+  // Estima tamanho total e percentagem de uso do localStorage
+  const calcUsageLS = () => {
+    const ALL_KEYS = Object.keys(localStorage)
+    const bytes = ALL_KEYS.reduce((acc, k) => acc + ((localStorage.getItem(k)?.length ?? 0) * 2), 0) // UTF-16: 2 bytes/char
+    const QUOTA_BYTES = 5 * 1024 * 1024 // 5 MB (estimativa conservadora)
+    const pct  = Math.min(100, Math.round((bytes / QUOTA_BYTES) * 100))
+    const fmt  = bytes < 1024 ? `${bytes} B`
+               : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB`
+               : `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+    return { bytes, pct, fmt }
+  }
+
+  // Estima tamanho do backup em KB (só dados da app)
   const estimarTamanho = () => {
     const keys = ['atm_clientes','atm_categorias','atm_subcategorias','atm_checklist','atm_maquinas','atm_manutencoes','atm_relatorios']
     const bytes = keys.reduce((acc, k) => acc + (localStorage.getItem(k)?.length ?? 0), 0)
@@ -64,6 +85,8 @@ export default function Definicoes() {
         ? `${(bytes / 1024).toFixed(1)} KB`
         : `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
+
+  const lsUsage = calcUsageLS()
 
   // ── Exportar ────────────────────────────────────────────────────────────────
   const handleExportar = () => {
@@ -185,6 +208,56 @@ export default function Definicoes() {
             <span className="def-stat-val">{estimarTamanho()}</span>
             <span className="def-stat-lbl">Tamanho estimado</span>
           </div>
+        </div>
+
+        {/* Indicador de uso do localStorage */}
+        <div className="def-ls-usage">
+          <div className="def-ls-usage-header">
+            <HardDrive size={14} />
+            <span>Espaço em localStorage</span>
+            <span className="def-ls-usage-val">{lsUsage.fmt} <span className="def-ls-usage-pct">({lsUsage.pct}%)</span></span>
+          </div>
+          <div className="def-ls-bar">
+            <div
+              className={`def-ls-bar-fill ${lsUsage.pct >= 85 ? 'def-ls-bar-fill--crit' : lsUsage.pct >= 60 ? 'def-ls-bar-fill--warn' : ''}`}
+              style={{ width: `${lsUsage.pct}%` }}
+            />
+          </div>
+          {lsUsage.pct >= 70 && (
+            <p className="def-ls-aviso">
+              <AlertTriangle size={13} />
+              Armazenamento a atingir o limite. Exporta um backup e considera limpar dados antigos.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Modo campo */}
+      <section className="def-section">
+        <h2 className="def-section-title">
+          <Sun size={17} />
+          Modo campo
+        </h2>
+        <p className="def-section-desc">
+          Activa um tema de alto contraste optimizado para uso ao ar livre (luz solar intensa, luvas).
+          O texto e botões ficam maiores e o esquema de cores passa a claro para máxima legibilidade.
+        </p>
+        <div className="def-toggle-row">
+          <div className="def-toggle-info">
+            <span className="def-toggle-label">Alto contraste / ecrã exterior</span>
+            <span className="def-toggle-sub">
+              {modoCampo ? '☀ Activo — tema claro de alto contraste' : 'Inactivo — tema escuro padrão'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={`def-toggle-btn ${modoCampo ? 'def-toggle-btn--on' : ''}`}
+            onClick={() => handleToggleModoCampo(!modoCampo)}
+            aria-pressed={modoCampo}
+            aria-label="Activar/desactivar modo campo"
+          >
+            <span className="def-toggle-thumb" />
+          </button>
         </div>
       </section>
 
