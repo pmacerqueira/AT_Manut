@@ -4,6 +4,27 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.3] — 2026-02-23 — Relatório KAESER completo: bloco de equipamento, ciclo visual, consumíveis sem limite de páginas
+
+### Relatório de manutenção — Compressor KAESER
+- **Título adaptado**: "Relatório de Manutenção — Compressor" para equipamentos KAESER
+- **Bloco KAESER** (novo, antes dos dados gerais):
+  - Header colorido com o tipo de manutenção efectuada (ex: `Manutenção KAESER — Tipo A · Anual 3000h`)
+  - Fabricante, modelo, número de série (em destaque) e ano de fabrico
+  - Horas totais acumuladas + horas de serviço (se disponíveis)
+  - Ciclo efectuado + próxima manutenção
+  - **Sequência visual do ciclo de 12 anos** — círculos coloridos por estado (passado / actual / próximo / futuro)
+- **Checklist** em coluna única para KAESER (mais legível, sem truncagem), com contador de pontos
+- **Tabela de consumíveis** melhorada:
+  - Cabeçalho dinâmico: `Consumíveis e peças — Manutenção Tipo X · Anual`
+  - Cabeçalhos de grupo a cor: ✓ Utilizados (verde) / ✗ Não substituídos (cinza)
+  - Rodapé resumo: "N artigos utilizados · M não substituídos · X no plano"
+  - `page-break-before` separa a tabela de consumíveis dos dados gerais em relatórios longos
+  - `page-break-inside: avoid` em cada linha — sem cortes a meio de artigos
+- **Suporte a múltiplas páginas**: sem qualquer limite; o relatório cresce conforme o número de itens
+
+---
+
 ## [1.8.2] — 2026-02-23 — Plano de consumíveis por máquina · Checklist de execução · Relatório discriminado
 
 ### Fluxo de criação de compressor KAESER
