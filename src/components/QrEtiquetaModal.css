@@ -1,11 +1,15 @@
-/* ── QrEtiquetaModal ───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   QrEtiquetaModal
+   Etiqueta: 90 × 50 mm (padrão asset-tag industrial)
+   Preview no ecrã a ~3× (270px × 150px área interna)
+   ═══════════════════════════════════════════════════════════════════ */
 
-.qr-modal-overlay {
-  z-index: 1100;
-}
+/* ── Modal wrapper ─────────────────────────────────────────────────── */
+
+.qr-modal-overlay { z-index: 1100; }
 
 .qr-modal {
-  max-width: 480px;
+  max-width: 540px;
   width: 100%;
 }
 
@@ -17,8 +21,13 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.qr-modal-body {
-  padding: 1.25rem;
+.qr-modal-body { padding: 1.25rem; }
+
+.qr-modal-hint {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
 }
 
 .qr-modal-actions {
@@ -28,143 +37,258 @@
   margin-top: 1.25rem;
 }
 
-/* ── Etiqueta ────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════
+   ETIQUETA — ecrã (preview ~3×)
+   Tamanho real impressão: 90mm × 50mm
+   Preview ecrã: 450px × 250px
+   ══════════════════════════════════════════════════════════════════════ */
 
 .qr-etiqueta {
+  /* Layout: duas colunas + rodapé em full-width */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "left right"
+    "footer footer";
+
   background: #ffffff;
-  border: 2px solid #1e3a5f;
+  border: 2px solid #0d2340;
   border-radius: 10px;
   overflow: hidden;
-  width: 100%;
-  max-width: 340px;
+  width: 450px;
+  height: 250px;
   margin: 0 auto;
   font-family: 'Segoe UI', Arial, sans-serif;
-  color: #1a1a1a;
+  color: #0d2340;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
 
-.qr-etiqueta-header {
-  background: #1e3a5f;
-  color: #ffffff;
+/* ── Coluna esquerda ───────────────────────────────────────────────── */
+
+.qr-etiqueta-left {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px 10px 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.qr-etiqueta-logo-wrap {
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.85rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  margin-bottom: 8px;
 }
 
-.qr-etiqueta-marca {
-  font-weight: 800;
-  font-size: 0.88rem;
-  letter-spacing: 0.08em;
+.qr-etiqueta-logo {
+  max-height: 30px;
+  max-width: 130px;
+  width: auto;
+  object-fit: contain;
+  object-position: left center;
+  /* garantir fundo branco caso o logo tenha transparência */
+  background: #fff;
 }
 
-.qr-etiqueta-divider {
-  width: 1px;
-  height: 14px;
-  background: rgba(255,255,255,0.4);
+.qr-etiqueta-sep {
+  width: 40px;
+  height: 2px;
+  background: #0d2340;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
-.qr-etiqueta-sub {
-  opacity: 0.9;
-  font-size: 0.75rem;
+.qr-etiqueta-type {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1e5fa8;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.qr-etiqueta-body {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem;
-}
-
-.qr-etiqueta-img {
-  width: 100px;
-  height: 100px;
-  flex-shrink: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-}
-
-.qr-etiqueta-loading {
-  width: 100px;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: #9ca3af;
-  border: 1px dashed #d1d5db;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.qr-etiqueta-info {
+.qr-etiqueta-machine {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
 }
 
 .qr-etiqueta-nome {
+  font-size: 0.95rem;
   font-weight: 700;
-  font-size: 0.92rem;
-  margin-bottom: 0.25rem;
-  line-height: 1.3;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .qr-etiqueta-serie {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #374151;
-  margin-bottom: 0.2rem;
 }
 
 .qr-etiqueta-cliente {
-  font-size: 0.78rem;
-  color: #6b7280;
-  margin-bottom: 0.15rem;
+  font-size: 0.74rem;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .qr-etiqueta-local {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #9ca3af;
   font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/* ── Coluna direita: QR ────────────────────────────────────────────── */
+
+.qr-etiqueta-right {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px 8px 0;
+  flex-shrink: 0;
+}
+
+.qr-etiqueta-img {
+  width: 148px;
+  height: 148px;
+  display: block;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.qr-etiqueta-loading {
+  width: 148px;
+  height: 148px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #9ca3af;
+  border: 1.5px dashed #d1d5db;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.qr-etiqueta-scan-hint {
+  font-size: 0.6rem;
+  color: #9ca3af;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Rodapé ────────────────────────────────────────────────────────── */
 
 .qr-etiqueta-footer {
-  background: #f3f4f6;
-  border-top: 1px solid #e5e7eb;
+  grid-area: footer;
+  background: #0d2340;
+  color: rgba(255,255,255,0.75);
   text-align: center;
-  font-size: 0.68rem;
-  color: #9ca3af;
-  padding: 0.35rem;
-  letter-spacing: 0.02em;
+  font-size: 0.62rem;
+  padding: 5px;
+  letter-spacing: 0.05em;
 }
 
-/* ── Print ───────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════
+   IMPRESSÃO — 90 × 50 mm (formato ISO asset-tag)
+   Configurar a impressora para "Nenhum" margens e tamanho personalizado
+   ══════════════════════════════════════════════════════════════════════ */
 
 @media print {
-  /* Esconder tudo excepto a etiqueta */
-  body * { visibility: hidden !important; }
-  .qr-etiqueta,
+  @page {
+    size: 90mm 50mm;
+    margin: 0;
+  }
+
+  /* Esconder absolutamente tudo excepto a etiqueta */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body > * { display: none !important; }
+
+  /* Tornar a etiqueta visível e ocupar a página inteira */
+  .qr-etiqueta {
+    display: grid !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 90mm !important;
+    height: 50mm !important;
+    border: 1.5pt solid #0d2340 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
   .qr-etiqueta * { visibility: visible !important; }
 
-  .qr-etiqueta {
-    position: fixed !important;
-    top: 20mm !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 80mm !important;
-    max-width: 80mm !important;
-    border: 2px solid #1e3a5f !important;
-    box-shadow: none !important;
-    border-radius: 6px !important;
+  /* Dimensões da coluna esquerda */
+  .qr-etiqueta-left {
+    padding: 4mm 3mm 3mm 4mm !important;
+  }
+
+  .qr-etiqueta-logo {
+    max-height: 9mm !important;
+    max-width: 38mm !important;
+  }
+
+  .qr-etiqueta-logo-wrap { height: 10mm !important; margin-bottom: 2mm !important; }
+
+  .qr-etiqueta-sep { margin-bottom: 2mm !important; }
+
+  .qr-etiqueta-nome  { font-size: 8pt !important; }
+  .qr-etiqueta-serie { font-size: 6.5pt !important; }
+  .qr-etiqueta-cliente { font-size: 6pt !important; }
+  .qr-etiqueta-type  { font-size: 5.5pt !important; margin-bottom: 1.5mm !important; }
+
+  /* QR code: 33mm × 33mm na impressão */
+  .qr-etiqueta-right {
+    padding: 3mm 3.5mm 2mm 0 !important;
+    gap: 1.5mm !important;
   }
 
   .qr-etiqueta-img {
-    width: 28mm !important;
-    height: 28mm !important;
+    width: 33mm !important;
+    height: 33mm !important;
+    border-radius: 2px !important;
   }
 
+  .qr-etiqueta-loading {
+    width: 33mm !important;
+    height: 33mm !important;
+  }
+
+  .qr-etiqueta-scan-hint { font-size: 5pt !important; }
+
+  .qr-etiqueta-footer {
+    font-size: 5pt !important;
+    padding: 1.5mm !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  /* Ocultar tudo o resto */
   .no-print { display: none !important; }
 }
