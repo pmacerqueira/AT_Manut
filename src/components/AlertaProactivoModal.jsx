@@ -40,7 +40,8 @@ export default function AlertaProactivoModal({ isOpen, alertas, onDismiss, onClo
   }, [alertas])
 
   const toggleExpand = (nif) => {
-    setExpandidos(prev => ({ ...prev, [nif]: !prev[nif] }))
+    // "?? true" porque o estado inicial é undefined (não false)
+    setExpandidos(prev => ({ ...prev, [nif]: !(prev[nif] ?? true) }))
   }
 
   const fmtDias = (n) => {

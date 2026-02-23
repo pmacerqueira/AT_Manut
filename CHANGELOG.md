@@ -4,6 +4,23 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.6.1] — 2026-02-23 — Correções pós-teste E2E v1.6.0
+
+### Corrigido
+- `AlertaProactivoModal.jsx` — bug em `toggleExpand`: `!undefined = true` impedia o primeiro colapso de grupo; corrigido para `!(prev[nif] ?? true)` para usar o valor por omissão correcto
+- `Clientes.jsx` — removido atributo HTML `required` do input de email (mantida apenas a validação JS em `handleSubmit`) para evitar que a validação nativa do browser bloqueasse o handler antes de mostrar a mensagem de erro personalizada
+- `playwright.config.js` — porta `baseURL` actualizada para 5173 (alinhada com Vite dev server actual)
+
+### Testes E2E adicionados
+- `tests/e2e/11-blocos-abc.spec.js` — 40 testes cobrindo todos os pontos dos Blocos A, B e C:
+  - Bloco A (7): badge "Sem email", email obrigatório no formulário, indicador `*`, sucesso com email, edição sem email, Definições com configuração de dias
+  - Bloco A Definições (7): secção visível, input padrão 7 dias, guardar 14 dias, persistência localStorage, validação 0/61, acesso ATecnica
+  - Bloco B (4): reagendamento após execução periódica, botão "Executar manutenção" em desktop, sem reagendamento para montagem, pré-condição periodicidadeManut
+  - Bloco C (16): modal aparece/não aparece nas condições certas, botões Fechar/Dispensar, persistência dismiss, ATecnica sem modal, envio email, feedback erro, grupos expansíveis, badge contagem
+  - Integração (4): fluxos combinados A+B+C
+
+---
+
 ## [1.6.0] — 2026-02-23 — Alertas de conformidade v2 (Blocos A + B + C)
 
 ### Bloco A — Email obrigatório em clientes + configuração de alertas

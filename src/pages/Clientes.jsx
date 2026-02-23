@@ -473,7 +473,7 @@ export default function Clientes() {
               </div>
               <div className="form-row">
                 <label>Telefone<input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} /></label>
-                <label>Email <span className="required">*</span><input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@cliente.pt" /></label>
+                <label>Email <span className="required">*</span><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@cliente.pt" /></label>
               </div>
               <div className="form-actions">
                 <button type="button" className="secondary" onClick={() => setModal(null)}>Cancelar</button>
