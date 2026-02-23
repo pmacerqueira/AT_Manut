@@ -7,7 +7,10 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle, FileBarChart } from 'lucide-react'
+import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
+import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { safeHttpUrl } from '../utils/sanitize'
 import { format } from 'date-fns'
@@ -22,6 +25,7 @@ export default function Clientes() {
     clientes,
     maquinas,
     manutencoes,
+    relatorios,
     addCliente,
     updateCliente,
     removeCliente,
@@ -32,6 +36,7 @@ export default function Clientes() {
   } = useData()
   const { canDelete, canEditCliente, canAddCliente, isAdmin } = usePermissions()
   const { showToast } = useToast()
+  const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const navigate = useNavigate()
   const [modal, setModal] = useState(null)
   const [fichaCliente, setFichaCliente] = useState(null)
@@ -102,6 +107,31 @@ export default function Clientes() {
 
   const getMaquinasCount = (nif) => maquinas.filter(m => m.clienteNif === nif).length
   const getMaquinasDoCliente = (nif) => maquinas.filter(m => m.clienteNif === nif)
+
+  const handleRelatorioFrota = async (cliente) => {
+    const maqsCliente = getMaquinasDoCliente(cliente.nif)
+    if (maqsCliente.length === 0) {
+      showToast('Este cliente não tem equipamentos registados.', 'warning')
+      return
+    }
+    showGlobalLoading()
+    try {
+      const html = gerarRelatorioFrotaHtml(
+        cliente,
+        maqsCliente,
+        manutencoes,
+        relatorios ?? [],
+        getSubcategoria,
+        { logoUrl: `${import.meta.env.BASE_URL}logo.png` }
+      )
+      const nomeArquivo = `frota_${cliente.nif}_${new Date().toISOString().slice(0, 10)}.pdf`
+      await imprimirOuGuardarPdf(html, nomeArquivo)
+    } catch (err) {
+      showToast('Erro ao gerar relatório de frota.', 'error', 4000)
+    } finally {
+      hideGlobalLoading()
+    }
+  }
 
   const maquinasCliente = fichaCliente ? getMaquinasDoCliente(fichaCliente.nif) : []
   const categoriasComMaquinas = maquinasCliente.reduce((acc, m) => {
@@ -209,6 +239,9 @@ export default function Clientes() {
                 </td>
                 <td data-label="Máquinas">{getMaquinasCount(c.nif)}</td>
                 <td className="actions" data-label="">
+                  {getMaquinasCount(c.nif) > 0 && (
+                    <button className="icon-btn secondary" onClick={() => handleRelatorioFrota(c)} title="Relatório executivo de frota (PDF)"><FileBarChart size={16} /></button>
+                  )}
                   {canEditCliente && (
                     <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
                   )}
@@ -225,7 +258,14 @@ export default function Clientes() {
       {modal === 'ficha' && fichaCliente && (
         <div className="modal-overlay modal-ficha-overlay" onClick={closeFicha}>
           <div className="modal modal-ficha-cliente" onClick={e => e.stopPropagation()}>
-            <h2>Ficha do cliente — {fichaCliente.nome}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <h2 style={{ margin: 0 }}>Ficha do cliente — {fichaCliente.nome}</h2>
+              {maquinasCliente.length > 0 && (
+                <button className="btn secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }} onClick={() => handleRelatorioFrota(fichaCliente)} title="Relatório executivo de frota (PDF)">
+                  <FileBarChart size={15} /> Relatório de frota
+                </button>
+              )}
+            </div>
             <div className="ficha-cliente-dados">
               <p><strong>NIF:</strong> {fichaCliente.nif} · <strong>Morada:</strong> {fichaCliente.morada || '—'}</p>
               <p><strong>Localidade:</strong> {fichaCliente.codigoPostal} {fichaCliente.localidade} · <strong>Telefone:</strong> {fichaCliente.telefone || '—'} · <strong>Email:</strong> {fichaCliente.email || '—'}</p>

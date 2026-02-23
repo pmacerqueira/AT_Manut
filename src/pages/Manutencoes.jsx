@@ -13,7 +13,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import SignaturePad from '../components/SignaturePad'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, FolderOpen, Paperclip, X, CheckCircle, Wrench, Play, FileDown, ArrowLeft, Mail } from 'lucide-react'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, FolderOpen, Paperclip, X, CheckCircle, Wrench, Play, FileDown, ArrowLeft, Mail, Zap, Clock } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores } from '../utils/datasAzores'
 import { safeHttpUrl } from '../utils/sanitize'
@@ -24,10 +24,11 @@ import { enviarRelatorioEmail } from '../services/emailService'
 import { logger } from '../utils/logger'
 import './Manutencoes.css'
 
-const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', emAtraso: 'Em atraso', proxima: 'Próxima' }
+const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', em_progresso: 'Em progresso', emAtraso: 'Em atraso', proxima: 'Próxima' }
 
 const getDisplayStatus = (m) => {
-  if (m.status === 'concluida') return 'concluida'
+  if (m.status === 'concluida')    return 'concluida'
+  if (m.status === 'em_progresso') return 'em_progresso'
   const dataManut = startOfDay(new Date(m.data))
   const hoje = startOfDay(new Date())
   return isBefore(dataManut, hoje) ? 'emAtraso' : 'proxima'
@@ -41,6 +42,7 @@ export default function Manutencoes() {
     addManutencao,
     updateManutencao,
     removeManutencao,
+    iniciarManutencao,
     updateMaquina,
     addRelatorio,
     updateRelatorio,
@@ -554,7 +556,12 @@ export default function Manutencoes() {
                       <td className="actions" data-label="">
                         <div className="actions-inner">
                           {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') && (
-                            <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Executar manutenção">
+                            <button className="icon-btn btn-iniciar-manut" onClick={() => iniciarManutencao(m.id)} title="Iniciar manutenção (registar início)">
+                              <Zap size={16} />
+                            </button>
+                          )}
+                          {!isConcluida && (m.status === 'pendente' || m.status === 'agendada' || m.status === 'em_progresso') && (
+                            <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Executar / concluir manutenção">
                               <Play size={16} />
                             </button>
                           )}
@@ -640,6 +647,7 @@ export default function Manutencoes() {
                   >
                     <option value="pendente">Pendente</option>
                     <option value="agendada">Agendada</option>
+                    <option value="em_progresso">Em progresso</option>
                     <option value="concluida">Executada</option>
                   </select>
                 </label>

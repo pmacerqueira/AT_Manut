@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
+import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER } from '../context/DataContext'
 import { TECNICOS } from '../config/users'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
@@ -79,6 +79,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     getChecklistBySubcategoria,
     getSubcategoria,
     updateMaquina,
+    getPecasPlanoByMaquina,
   } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -90,6 +91,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     horasServico: '',
     tecnico: '',
     nomeAssinante: '',
+    tipoManutKaeser: '',
+    pecasUsadas: [],
   })
   const [fotos, setFotos] = useState([])
   const [fotoCarregando, setFotoCarregando] = useState(false)
@@ -113,13 +116,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
   const temContadorHoras = maq && SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq.subcategoriaId)
+  const isCompressor = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
 
   useEffect(() => {
     if (!isOpen) return
     let m = manutencao
     if (!m && maq) {
       const existente = manutencoes.find(
-        x => x.maquinaId === maq.id && (x.status === 'pendente' || x.status === 'agendada')
+        x => x.maquinaId === maq.id && (x.status === 'pendente' || x.status === 'agendada' || x.status === 'em_progresso')
       )
       if (existente) {
         m = existente
@@ -144,6 +148,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     checklistItems.forEach(it => {
       checklistRespostas[it.id] = existingRel?.checklistRespostas?.[it.id] ?? ''
     })
+    const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? ''
+    const pecasExistentes = existingRel?.pecasUsadas ?? []
+    // Pré-carregar peças do plano se houver tipo definido e ainda não houver peças no relatório
+    const pecasUsadas = pecasExistentes.length > 0
+      ? pecasExistentes
+      : (tipoManutKaeser && maq
+          ? (getPecasPlanoByMaquina(maq.id, tipoManutKaeser) ?? []).map(p => ({ ...p, quantidadeUsada: p.quantidade }))
+          : [])
     setForm({
       checklistRespostas,
       notas: (existingRel?.notas ?? '').slice(0, 300),
@@ -151,6 +163,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       horasServico: '',
       tecnico: existingRel?.tecnico ?? '',
       nomeAssinante: existingRel?.nomeAssinante ?? '',
+      tipoManutKaeser,
+      pecasUsadas,
     })
     setFotos(existingRel?.fotos ?? [])
     setErroChecklist('')
@@ -315,6 +329,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       assinaturaDigital: assinaturaDataUrl,
       dataAssinatura: now,
       dataCriacao: rel?.dataCriacao ?? now,
+      ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
+      ...(form.pecasUsadas.length > 0 && { pecasUsadas: form.pecasUsadas }),
     }
 
     // Gravar/actualizar o relatório e obter o numeroRelatorio definitivo.
@@ -651,6 +667,88 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
                   placeholder="Ex: 1180" />
               </label>
+            </div>
+          )}
+
+          {/* ── Tipo de manutenção KAESER ── */}
+          {isCompressor && manutencaoAtual?.tipo !== 'montagem' && (
+            <div className="form-section">
+              <label>
+                Tipo de manutenção (A/B/C/D)
+                <select
+                  value={form.tipoManutKaeser}
+                  onChange={e => {
+                    const tipo = e.target.value
+                    const novasPecas = tipo && maq
+                      ? (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, quantidadeUsada: p.quantidade }))
+                      : []
+                    setForm(f => ({ ...f, tipoManutKaeser: tipo, pecasUsadas: novasPecas }))
+                  }}
+                >
+                  <option value="">Periódica (sem plano específico)</option>
+                  {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
+                    <option key={tipo} value={tipo}>{info.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {/* ── Peças e consumíveis utilizados ── */}
+          {(form.pecasUsadas.length > 0 || (isCompressor && form.tipoManutKaeser)) && (
+            <div className="form-section">
+              <h3>Peças e consumíveis utilizados</h3>
+              {form.pecasUsadas.length === 0 ? (
+                <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                  Nenhum plano configurado para este tipo. Adicione peças abaixo ou configure o plano em Equipamentos.
+                </p>
+              ) : (
+                <div className="pecas-usadas-lista">
+                  {form.pecasUsadas.map((p, idx) => (
+                    <div key={p.id ?? idx} className="peca-usada-row">
+                      {p.posicao && <span className="peca-pos">{p.posicao}</span>}
+                      <span className="peca-codigo">{p.codigoArtigo}</span>
+                      <span className="peca-desc">{p.descricao}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        className="peca-qty-input"
+                        value={p.quantidadeUsada ?? p.quantidade}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0
+                          setForm(f => ({
+                            ...f,
+                            pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, quantidadeUsada: val } : pp)
+                          }))
+                        }}
+                        title="Quantidade utilizada"
+                      />
+                      <span className="peca-un">{p.unidade}</span>
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        style={{ padding: '2px 5px' }}
+                        onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))}
+                        title="Remover desta lista"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn-link-checklist"
+                style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}
+                onClick={() => setForm(f => ({
+                  ...f,
+                  pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: '', quantidadeUsada: 1, unidade: 'PÇ', manual: true }]
+                }))}
+              >
+                + Adicionar peça manualmente
+              </button>
             </div>
           )}
 

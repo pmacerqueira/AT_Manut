@@ -123,6 +123,16 @@ section{margin-bottom:9px}
 
 /* ── Rodapé ── */
 .rpt-footer{margin-top:8px;padding-top:6px;border-top:1px solid var(--borda);display:flex;justify-content:space-between;font-size:8.5px;color:var(--muted)}
+
+/* ── Peças e consumíveis ── */
+.pecas-table{width:100%;border-collapse:collapse;font-size:9.5px}
+.pecas-table th{background:var(--azul);color:#fff;padding:3px 5px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.04em}
+.pecas-table td{padding:2.5px 5px;border-bottom:1px solid #edf2f7;vertical-align:middle}
+.pecas-table tr:nth-child(even) td{background:var(--cinza)}
+.pecas-table .cell-pos{width:55px;color:var(--muted);font-family:monospace;font-size:8.5px}
+.pecas-table .cell-code{width:130px;font-family:monospace;font-size:8.5px}
+.pecas-table .cell-qty{width:45px;text-align:right}
+.pecas-table .cell-un{width:40px}
 </style>
 </head>
 <body>
@@ -211,6 +221,30 @@ section{margin-bottom:9px}
       html += `</div>`
     }
     html += `</section>`
+  }
+
+  // Secção de peças e consumíveis
+  if (relatorio.pecasUsadas?.length > 0) {
+    const tipoLabel = relatorio.tipoManutKaeser ? ` — Manutenção Tipo ${relatorio.tipoManutKaeser}` : ''
+    html += `
+<section>
+  <div class="rpt-section-title">Peças e consumíveis utilizados${tipoLabel}</div>
+  <table class="pecas-table">
+    <thead>
+      <tr><th>Pos.</th><th>Código artigo</th><th>Descrição</th><th>Qtd.</th><th>Un.</th></tr>
+    </thead>
+    <tbody>
+      ${relatorio.pecasUsadas.map(p => `
+      <tr>
+        <td class="cell-pos">${esc(p.posicao ?? '—')}</td>
+        <td class="cell-code">${esc(p.codigoArtigo)}</td>
+        <td>${esc(p.descricao)}</td>
+        <td class="cell-qty">${p.quantidadeUsada ?? p.quantidade}</td>
+        <td class="cell-un">${esc(p.unidade)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+</section>`
   }
 
   html += `

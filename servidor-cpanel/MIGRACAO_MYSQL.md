@@ -75,3 +75,63 @@ Os ficheiros existentes (`send-email.php`, `log-receiver.php`) permanecem em `pu
 - **Erro 500 ao fazer login:** Verifica as credenciais em `config.php` e os logs PHP (cPanel → Errors)
 - **Sessão expirada:** O token JWT dura 8 horas; faz logout e login de novo
 - **CORS:** O PHP já envia os cabeçalhos correctos; se houver problemas, confirma que estás em `https://www.navel.pt` ou `https://navel.pt`
+
+---
+
+## 7. Alterações de esquema — v1.8.0 (Ordens de trabalho + Peças e consumíveis)
+
+### 7.1 Tabela `manutencoes` — novos campos
+
+Executar em **phpMyAdmin → SQL**:
+
+```sql
+-- Suporte a Ordens de Trabalho (status em_progresso + rastreio de tempo)
+ALTER TABLE manutencoes
+  ADD COLUMN inicio_execucao DATETIME     NULL COMMENT 'Data/hora de início da execução (status em_progresso)',
+  ADD COLUMN fim_execucao    DATETIME     NULL COMMENT 'Data/hora de conclusão (preenchido ao concluir)',
+  ADD COLUMN tipo_manut_kaeser CHAR(1)    NULL COMMENT 'Tipo de manutenção KAESER: A, B, C ou D';
+
+-- Permitir o novo valor no campo status
+-- (Se a coluna for ENUM, alterar; se for VARCHAR, já suporta)
+-- Verificar primeiro: SHOW COLUMNS FROM manutencoes LIKE 'status';
+-- Se for ENUM:
+ALTER TABLE manutencoes
+  MODIFY COLUMN status ENUM('pendente','agendada','em_progresso','concluida') NOT NULL DEFAULT 'pendente';
+```
+
+### 7.2 Tabela `relatorios` — novos campos
+
+```sql
+-- Peças e consumíveis utilizados (JSON) e tipo de manutenção
+ALTER TABLE relatorios
+  ADD COLUMN pecas_usadas      JSON NULL COMMENT 'Array de peças utilizadas: [{codigoArtigo, descricao, quantidadeUsada, unidade, posicao}]',
+  ADD COLUMN tipo_manut_kaeser CHAR(1) NULL COMMENT 'Tipo de manutenção KAESER: A, B, C ou D';
+```
+
+### 7.3 Nova tabela `pecas_plano` (Planos de peças por máquina)
+
+> **Nota:** A tabela `pecas_plano` é gerida em `localStorage` (`atm_pecas_plano`) e **não requer** tabela MySQL na versão atual. Fica documentada aqui para futura migração opcional.
+
+```sql
+-- Criação futura (opcional) — planos de peças por máquina
+CREATE TABLE IF NOT EXISTS pecas_plano (
+  id             VARCHAR(40)  NOT NULL PRIMARY KEY,
+  maquina_id     VARCHAR(40)  NOT NULL REFERENCES maquinas(id) ON DELETE CASCADE,
+  tipo_manut     VARCHAR(20)  NOT NULL COMMENT 'A, B, C, D ou periodica',
+  posicao        VARCHAR(20)  NULL,
+  codigo_artigo  VARCHAR(60)  NOT NULL,
+  descricao      VARCHAR(200) NOT NULL,
+  quantidade     DECIMAL(8,2) NOT NULL DEFAULT 1,
+  unidade        VARCHAR(10)  NOT NULL DEFAULT 'PÇ',
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_maquina_tipo (maquina_id, tipo_manut)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 7.4 Actualizar `data.php` — suporte aos novos campos
+
+No ficheiro `servidor-cpanel/api/data.php`, verificar que as queries de INSERT/UPDATE para `manutencoes` e `relatorios` incluem os novos campos:
+
+- `manutencoes`: mapear `inicioExecucao → inicio_execucao`, `tipoManutKaeser → tipo_manut_kaeser`
+- `relatorios`: mapear `pecasUsadas → pecas_usadas` (JSON encode), `tipoManutKaeser → tipo_manut_kaeser`
+- No SELECT, fazer `json_decode` em `pecas_usadas` antes de retornar

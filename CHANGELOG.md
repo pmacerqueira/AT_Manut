@@ -4,6 +4,50 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.0] — 2026-02-23 — Ordens de trabalho · Plano de peças KAESER · Relatório de frota
+
+### Ordens de trabalho (Work Orders)
+- **Novo status `em_progresso`** no ciclo de vida de manutenções (pendente → em_progresso → concluída)
+- **Botão "Iniciar" (⚡)** em `Manutencoes.jsx` — regista `inicioExecucao` (ISO) na manutenção
+- **Badge laranja "Em progresso"** na lista de manutenções
+- `iniciarManutencao()` em `DataContext` — `updateManutencao` atómico com timestamp
+- Modal de execução aceita manutenções `em_progresso` (não só pendente/agendada)
+- Formulário de edição inclui `em_progresso` no dropdown de status
+
+### Plano de peças e consumíveis KAESER
+- **`KAESER_PLANO_ASK_28T`** em `DataContext` — plano completo extraído dos PDFs de serviço:
+  - Tipo A (3.000h/1 ano): 2 artigos  |  Tipo B (6.000h): 3 artigos
+  - Tipo C (12.000h): 10 artigos       |  Tipo D (36.000h): 18 artigos
+- **`INTERVALOS_KAESER`** e **`SUBCATEGORIAS_COMPRESSOR`** exportados do DataContext
+- **`atm_pecas_plano`** — novo estado persistido em `localStorage` com CRUD completo:
+  `addPecaPlano`, `addPecasPlanoLote`, `updatePecaPlano`, `removePecaPlano`, `removePecasPlanoByMaquina`, `getPecasPlanoByMaquina`
+- **`PecasPlanoModal.jsx`** — modal Admin com tabs A/B/C/D + Periódica, importação do template KAESER ASK 28T, CRUD inline
+- Botão **"Plano de peças"** (📦) em `Equipamentos.jsx` por máquina (Admin only)
+- Eliminação de máquina cascata para `pecasPlano`
+
+### Execução com peças
+- **`ExecutarManutencaoModal.jsx`** — nova secção "Peças e consumíveis utilizados":
+  - Dropdown tipo A/B/C/D (compressores) — auto-carrega plano configurado
+  - Ajuste de quantidade por peça, remoção e adição manual
+  - `pecasUsadas` e `tipoManutKaeser` guardados no relatório
+- **`relatorioHtml.js`** — nova secção "Peças e consumíveis utilizados" no HTML/PDF do relatório
+
+### Relatório Executivo de Frota (novo)
+- **`gerarRelatorioFrota.js`** — HTML/PDF com:
+  - KPIs de frota: total de equipamentos, taxa de cumprimento, em atraso, por instalar
+  - Tabela completa de frota com estado por máquina (Conforme / Em atraso / Por instalar)
+  - Secção destacada de manutenções em atraso com dias de atraso
+  - Rodapé `APP_FOOTER_TEXT` e data de geração
+- Botão **"Relatório de frota"** (📊) em `Clientes.jsx` — na tabela e na ficha do cliente
+
+### Documentação técnica
+- **`servidor-cpanel/MIGRACAO_MYSQL.md`** — secção 7 com scripts SQL para:
+  - `ALTER TABLE manutencoes` (inicio_execucao, tipo_manut_kaeser, status ENUM actualizado)
+  - `ALTER TABLE relatorios` (pecas_usadas JSON, tipo_manut_kaeser)
+  - `CREATE TABLE pecas_plano` (preparação para migração futura de localStorage → MySQL)
+
+---
+
 ## [1.7.3] — 2026-02-23 — Optimizações de performance + Mock de dados grande
 
 ### Performance — Bundle splitting

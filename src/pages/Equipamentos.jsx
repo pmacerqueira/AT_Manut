@@ -6,7 +6,9 @@ import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
-import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText } from 'lucide-react'
+import PecasPlanoModal from '../components/PecasPlanoModal'
+import '../components/PecasPlanoModal.css'
+import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen } from 'lucide-react'
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
@@ -39,6 +41,7 @@ export default function Equipamentos() {
   const [modalDoc, setModalDoc] = useState(null)
   const [modalExecucao, setModalExecucao] = useState(null)
   const [modalQr, setModalQr] = useState(null)
+  const [modalPecas, setModalPecas] = useState(null)
   const [loadingHistorico, setLoadingHistorico] = useState(null) // id da máquina a gerar
   const navigate = useNavigate()
   const location = useLocation()
@@ -202,7 +205,10 @@ export default function Equipamentos() {
                           <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                           {isAdmin && (
-                            <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                            <>
+                              <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
+                              <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -294,7 +300,10 @@ export default function Equipamentos() {
                         <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                         {isAdmin && (
-                          <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                          <>
+                            <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
+                            <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                          </>
                         )}
                         {canDelete && (
                           <button className="icon-btn danger" onClick={() => { removeMaquina(m.id); showToast('Equipamento eliminado.', 'info') }} title="Eliminar"><Trash2 size={16} /></button>
@@ -338,6 +347,12 @@ export default function Equipamentos() {
           maquina={modalExecucao.maquina}
         />
       )}
+
+      <PecasPlanoModal
+        isOpen={!!modalPecas}
+        onClose={() => setModalPecas(null)}
+        maquina={modalPecas}
+      />
     </div>
   )
 }

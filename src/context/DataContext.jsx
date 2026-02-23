@@ -386,6 +386,59 @@ const initialClientes = [
 // Subcategorias com contador de horas (elétricos, diesel/gasolina)
 export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub1', 'sub2', 'sub4', 'sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub12', 'sub13', 'sub14', 'sub15', 'sub16']
 
+// Subcategorias de compressores KAESER (suportam planos A/B/C/D)
+export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub14', 'sub15']
+
+// Intervalos de manutenção KAESER (horas de serviço)
+export const INTERVALOS_KAESER = {
+  A: { horas: 3000,  label: 'Tipo A — 3.000h / 1 ano'  },
+  B: { horas: 6000,  label: 'Tipo B — 6.000h'          },
+  C: { horas: 12000, label: 'Tipo C — 12.000h'         },
+  D: { horas: 36000, label: 'Tipo D — 36.000h'         },
+}
+
+// Plano de referência KAESER ASK 28T (extraído do manual)
+// Formato: { tipoManut, posicao, codigoArtigo, descricao, quantidade, unidade }
+export const KAESER_PLANO_ASK_28T = [
+  // Tipo A — 3.000h / 1 ano
+  { tipoManut: 'A', posicao: '0512', codigoArtigo: '490111.00030', descricao: 'SET filtro compressor sem FSÓ', quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',           quantidade: 3, unidade: 'PÇ' },
+  // Tipo B — 6.000h
+  { tipoManut: 'B', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',      quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'B', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',           quantidade: 3, unidade: 'PÇ' },
+  { tipoManut: 'B', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.', quantidade: 1, unidade: 'PÇ' },
+  // Tipo C — 12.000h
+  { tipoManut: 'C', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',         quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',              quantidade: 3, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '1801', codigoArtigo: '6.4832.0',     descricao: 'Correia de accionamento',          quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '2022', codigoArtigo: '401819.0',     descricao: 'Jogo manutenção válvula RPM',      quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '2042', codigoArtigo: '404249.0',     descricao: 'Jogo manutenção válv. entrada',    quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '2062', codigoArtigo: '400994.00020', descricao: 'Jogo manutenção/Válvula comb.',    quantidade: 1, unidade: 'TER' },
+  { tipoManut: 'C', posicao: '2102', codigoArtigo: '400706.00010', descricao: 'Jogo manutenção válvula CV',       quantidade: 1, unidade: 'TER' },
+  { tipoManut: 'C', posicao: '4451', codigoArtigo: '402533.0',     descricao: 'KIT manutenção rolamentos 6209',   quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '4701', codigoArtigo: '6.0034.00010', descricao: 'Rolamento rígido de esferas 60',   quantidade: 2, unidade: 'PÇ' },
+  { tipoManut: 'C', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.',   quantidade: 1, unidade: 'PÇ' },
+  // Tipo D — 36.000h
+  { tipoManut: 'D', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',         quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',              quantidade: 3, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '1801', codigoArtigo: '6.4832.0',     descricao: 'Correia de accionamento',          quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '2024', codigoArtigo: '401820.1',     descricao: 'Jogo revisão válvula RPM',         quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '2044', codigoArtigo: '404250.0',     descricao: 'Jogo revisão válvula entrada',     quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '2064', codigoArtigo: '403284.00010', descricao: 'Jogo revisão/Válvula comb.',       quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '2104', codigoArtigo: '400707.00010', descricao: 'Jogo revisão válvula CV',          quantidade: 1, unidade: 'TER' },
+  { tipoManut: 'D', posicao: '4451', codigoArtigo: '402533.0',     descricao: 'KIT manutenção rolamentos 6209',   quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '4701', codigoArtigo: '6.0034.00010', descricao: 'Rolamento rígido de esferas 60',   quantidade: 2, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '4920', codigoArtigo: '9.9351.0',     descricao: 'Unidade de ventilador axial Ø3',   quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '4930', codigoArtigo: '7.2751.00031', descricao: 'Ventilador do armário comando',    quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7140', codigoArtigo: '8.2772.0',     descricao: 'Tubo flexível (7140)',             quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7150', codigoArtigo: '8.2772.0',     descricao: 'Tubo flexível (7150)',             quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7190', codigoArtigo: '8.2333.10040', descricao: 'Tubo flexível (7190)',             quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7350', codigoArtigo: '403803.0',     descricao: 'Jogo conduto de comando',          quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7365', codigoArtigo: '212229.00070', descricao: 'Tubo de descarga condensação',     quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '7563', codigoArtigo: '8.1928.1',     descricao: 'Tubo flexível (7563)',             quantidade: 1, unidade: 'PÇ' },
+  { tipoManut: 'D', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.',   quantidade: 1, unidade: 'PÇ' },
+]
+
 // Tipos de documentação técnica por máquina (cumprimento legal obrigatório)
 export const TIPOS_DOCUMENTO = [
   { id: 'manual_utilizador', label: 'Manual do Utilizador' },
@@ -510,6 +563,9 @@ export function DataProvider({ children }) {
   const [maquinas,      setMaquinas]      = useState([])
   const [manutencoes,   setManutencoes]   = useState([])
   const [relatorios,    setRelatorios]    = useState([])
+  const [pecasPlano,    setPecasPlano]    = useState(() => {
+    try { return JSON.parse(localStorage.getItem('atm_pecas_plano') ?? '[]') } catch { return [] }
+  })
   const [loading,       setLoading]       = useState(true)
 
   // ── Estado de conectividade e sincronização ────────────────────────────────
@@ -888,6 +944,7 @@ export function DataProvider({ children }) {
     setMaquinas(prev => prev.filter(m => m.id !== id))
     setManutencoes(prev => prev.filter(m => m.maquinaId !== id))
     setRelatorios(prev => prev.filter(r => !maqManutIds.includes(r.manutencaoId)))
+    setPecasPlano(prev => prev.filter(p => p.maquinaId !== id))
     import('../services/apiService').then(({ apiMaquinas }) =>
       persist(() => apiMaquinas.remove(id),
               { resource: 'maquinas', action: 'delete', id })
@@ -1129,6 +1186,50 @@ export function DataProvider({ children }) {
     return novaCount
   }, [persist])
 
+  // ── Persistência local de pecasPlano ─────────────────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('atm_pecas_plano', JSON.stringify(pecasPlano))
+  }, [pecasPlano])
+
+  // ── Peças e consumíveis — plano por máquina ───────────────────────────────────
+  const addPecaPlano = useCallback((peca) => {
+    const id = 'pp' + Date.now()
+    const nova = { ...peca, id }
+    setPecasPlano(prev => [...prev, nova])
+    return id
+  }, [])
+
+  const addPecasPlanoLote = useCallback((pecas) => {
+    const novas = pecas.map((p, i) => ({ ...p, id: 'pp' + (Date.now() + i) }))
+    setPecasPlano(prev => [...prev, ...novas])
+    return novas.map(p => p.id)
+  }, [])
+
+  const updatePecaPlano = useCallback((id, data) => {
+    setPecasPlano(prev => prev.map(p => p.id === id ? { ...p, ...data } : p))
+  }, [])
+
+  const removePecaPlano = useCallback((id) => {
+    setPecasPlano(prev => prev.filter(p => p.id !== id))
+  }, [])
+
+  const removePecasPlanoByMaquina = useCallback((maquinaId) => {
+    setPecasPlano(prev => prev.filter(p => p.maquinaId !== maquinaId))
+  }, [])
+
+  const getPecasPlanoByMaquina = useCallback((maquinaId, tipoManut = null) => {
+    return pecasPlano
+      .filter(p => p.maquinaId === maquinaId && (tipoManut === null || p.tipoManut === tipoManut))
+      .sort((a, b) => (a.posicao ?? '').localeCompare(b.posicao ?? ''))
+  }, [pecasPlano])
+
+  // ── Ordens de trabalho — iniciar manutenção ───────────────────────────────────
+  const iniciarManutencao = useCallback((id) => {
+    const inicioExecucao = new Date().toISOString()
+    updateManutencao(id, { status: 'em_progresso', inicioExecucao })
+    logger.action('DataContext', 'iniciarManutencao', `Manutenção ${id} iniciada`, { inicioExecucao })
+  }, [updateManutencao])
+
   // ── Backup / Restore ──────────────────────────────────────────────────────────
 
   /**
@@ -1217,6 +1318,7 @@ export function DataProvider({ children }) {
     maquinas,
     manutencoes,
     relatorios,
+    pecasPlano,
     getIntervaloDias,
     getIntervaloDiasBySubcategoria,
     getIntervaloDiasByMaquina,
@@ -1244,15 +1346,23 @@ export function DataProvider({ children }) {
     addManutencao,
     updateManutencao,
     removeManutencao,
+    iniciarManutencao,
     addRelatorio,
     updateRelatorio,
     getRelatorioByManutencao,
     prepararManutencoesPeriodicas,
     confirmarManutencoesPeriodicas,
+    recalcularPeriodicasAposExecucao,
+    addPecaPlano,
+    addPecasPlanoLote,
+    updatePecaPlano,
+    removePecaPlano,
+    removePecasPlanoByMaquina,
+    getPecasPlanoByMaquina,
     exportarDados,
     restaurarDados,
   }), [
-    INTERVALOS, categorias, subcategorias, checklistItems, clientes, maquinas, manutencoes, relatorios,
+    INTERVALOS, categorias, subcategorias, checklistItems, clientes, maquinas, manutencoes, relatorios, pecasPlano,
     getIntervaloDias, getIntervaloDiasBySubcategoria, getIntervaloDiasByMaquina,
     getSubcategoria, getCategoria, getSubcategoriasByCategoria, getChecklistBySubcategoria,
     addSubcategoria, updateSubcategoria, removeSubcategoria,
@@ -1260,9 +1370,10 @@ export function DataProvider({ children }) {
     addCategoria, updateCategoria, removeCategoria,
     addCliente, updateCliente, removeCliente,
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
-    addManutencao, updateManutencao, removeManutencao,
+    addManutencao, updateManutencao, removeManutencao, iniciarManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
     prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao,
+    addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,
     loading, fetchTodos,
     isOnline, syncPending, isSyncing, processSync,
