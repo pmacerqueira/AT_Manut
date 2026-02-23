@@ -13,6 +13,7 @@ import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { EMAIL_CONFIG, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
+import { marcarAlertaEnviado } from '../config/alertasConfig'
 
 // ── Resize de foto com compressão adaptativa ─────────────────────────────────
 //
@@ -204,6 +205,93 @@ export async function enviarRelatorioEmail({
   return {
     ok:       true,
     message:  `Cliente de email aberto para ${emailDestinatario}. Anexe o PDF e envie.\n(Endpoint PHP não configurado — ver src/config/emailConfig.js)`,
+    isMailto: true,
+  }
+}
+
+// ── Lembrete de manutenção próxima ───────────────────────────────────────────
+
+/**
+ * Envia lembretes de manutenções próximas para um cliente.
+ *
+ * @param {object} params
+ * @param {string} params.emailDestinatario   - Email do cliente
+ * @param {string} params.clienteNome         - Nome do cliente
+ * @param {Array}  params.alertas             - Array de { maquina, manutencao, diasRestantes }
+ * @param {string} [params.logoUrl]           - URL do logótipo para o email
+ * @returns {Promise<{ ok: boolean, message: string }>}
+ */
+export async function enviarLembreteEmail({ emailDestinatario, clienteNome, alertas, logoUrl = '' }) {
+  if (!emailDestinatario?.trim()) {
+    return { ok: false, message: 'Endereço de email em falta.' }
+  }
+  if (!alertas?.length) {
+    return { ok: false, message: 'Sem manutenções a notificar.' }
+  }
+
+  const alertasJson = JSON.stringify(
+    alertas.map(a => ({
+      maquina:       `${a.maquina?.marca ?? ''} ${a.maquina?.modelo ?? ''}`.trim(),
+      serie:         a.maquina?.numeroSerie ?? '',
+      data:          a.manutencao?.data ?? '',
+      diasRestantes: a.diasRestantes,
+    }))
+  )
+
+  if (isEmailConfigured()) {
+    try {
+      const payload = {
+        auth_token:     EMAIL_CONFIG.AUTH_TOKEN,
+        app_version:    APP_VERSION,
+        tipo_email:     'lembrete',
+        to_email:       emailDestinatario.trim(),
+        to_name:        clienteNome,
+        alertas_json:   alertasJson,
+        logo_url:       logoUrl,
+      }
+
+      const response = await fetch(EMAIL_CONFIG.ENDPOINT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      })
+
+      const json = await response.json().catch(() => ({ ok: false, message: `HTTP ${response.status}` }))
+
+      if (response.ok && json.ok) {
+        // Registar alertas como enviados
+        alertas.forEach(a => marcarAlertaEnviado(a.maquina?.id, a.manutencao?.data))
+        logger.action('emailService', 'sendLembrete',
+          `Lembrete enviado para ${emailDestinatario} (${alertas.length} manutenção/ões)`,
+          { destinatario: emailDestinatario, n: alertas.length })
+        return { ok: true, message: `Lembrete enviado para ${emailDestinatario}.` }
+      }
+
+      const errMsg = json.message ?? `Erro no servidor de email (HTTP ${response.status}).`
+      logger.error('emailService', 'sendLembrete', errMsg, { destinatario: emailDestinatario })
+      return { ok: false, message: errMsg }
+    } catch (err) {
+      logger.error('emailService', 'sendLembrete', `Erro de rede: ${err.message}`, { errorMessage: err.message })
+      return { ok: false, message: `Não foi possível contactar o servidor. (${err.message})` }
+    }
+  }
+
+  // Fallback: mailto:
+  const subjectFallback = encodeURIComponent(`Lembrete: Manutenções programadas — ${clienteNome}`)
+  const bodyFallback    = encodeURIComponent(
+    `Exmo(a) Sr(a) ${clienteNome},\n\n` +
+    `Informamos que tem as seguintes manutenções programadas:\n\n` +
+    alertas.map(a =>
+      `• ${a.maquina?.marca ?? ''} ${a.maquina?.modelo ?? ''} (S/N: ${a.maquina?.numeroSerie ?? '—'})` +
+      ` — Data: ${a.manutencao?.data ?? '?'} (daqui a ${a.diasRestantes} dia(s))`
+    ).join('\n') +
+    `\n\nCom os melhores cumprimentos,\nNAVEL-AÇORES\n296 205 290 / 296 630 120`
+  )
+  window.open(`mailto:${emailDestinatario}?subject=${subjectFallback}&body=${bodyFallback}`, '_blank')
+  alertas.forEach(a => marcarAlertaEnviado(a.maquina?.id, a.manutencao?.data))
+  return {
+    ok:       true,
+    message:  `Cliente de email aberto para ${emailDestinatario}.`,
     isMailto: true,
   }
 }

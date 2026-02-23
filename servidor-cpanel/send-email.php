@@ -160,6 +160,7 @@ $g = function($key, $default = '') use ($_data) {
 
 // ── Campos ────────────────────────────────────────────────────────────────────
 $token           = $g('auth_token');
+$tipo_email      = $g('tipo_email', 'relatorio');   // 'relatorio' | 'lembrete'
 $to_email        = $g('to_email');
 $to_name         = $g('to_name');
 $num_rel         = $g('numero_relatorio');
@@ -197,6 +198,128 @@ foreach (['to_name', 'equipamento', 'tecnico', 'assinado_por', 'notas'] as $v) {
     $$v = mb_substr(strip_tags(str_replace(["\r", "\n", "\0"], '', $$v)), 0, 500, 'UTF-8');
 }
 $to_email = str_replace(["\r", "\n", "\0"], '', $to_email);
+
+// ══ Lembrete de manutenção próxima ══════════════════════════════════════════
+if ($tipo_email === 'lembrete') {
+    $alertas_json  = $g('alertas_json');
+    $alertas       = [];
+    if ($alertas_json) {
+        $dec = json_decode($alertas_json, true);
+        if (is_array($dec)) $alertas = $dec;
+    }
+    if (empty($alertas)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => 'Sem manutenções para notificar.']);
+        exit;
+    }
+
+    $to_name_safe = mb_substr(strip_tags($to_name), 0, 120, 'UTF-8');
+    $app_ver      = $g('app_version', '1.6.0');
+
+    // Construir linhas da tabela
+    $linhas_html = '';
+    foreach ($alertas as $a) {
+        $maq     = mb_substr(strip_tags($a['maquina']  ?? '—'), 0, 120, 'UTF-8');
+        $serie   = mb_substr(strip_tags($a['serie']    ?? '—'), 0, 60,  'UTF-8');
+        $data    = mb_substr(strip_tags($a['data']     ?? '—'), 0, 20,  'UTF-8');
+        $dias    = (int)($a['diasRestantes'] ?? 0);
+
+        if ($dias === 0)    { $dias_txt = 'Hoje'; $cor = '#dc2626'; }
+        elseif ($dias <= 2) { $dias_txt = "Amanhã / $dias dias"; $cor = '#c2410c'; }
+        elseif ($dias <= 7) { $dias_txt = "Daqui a $dias dias"; $cor = '#a16207'; }
+        else                { $dias_txt = "Daqui a $dias dias"; $cor = '#166534'; }
+
+        $linhas_html .= "
+        <tr>
+          <td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#111827;'>$maq</td>
+          <td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:0.85em;'>$serie</td>
+          <td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#374151;'>$data</td>
+          <td style='padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:700;color:$cor;white-space:nowrap;'>$dias_txt</td>
+        </tr>";
+    }
+
+    $subject  = "=?UTF-8?B?" . base64_encode("Lembrete: Manutenções programadas — $to_name_safe") . "?=";
+    $html_body = "<!DOCTYPE html><html lang='pt'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;'>
+<table width='100%' cellpadding='0' cellspacing='0' style='background:#f9fafb;padding:24px 16px;'>
+  <tr><td align='center'>
+    <table width='560' cellpadding='0' cellspacing='0' style='background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:100%;'>
+
+      <!-- Cabeçalho -->
+      <tr>
+        <td style='background:#1a4880;padding:22px 28px;'>
+          <p style='margin:0;font-size:1.15em;font-weight:700;color:#fff;'>NAVEL-AÇORES, Lda</p>
+          <p style='margin:4px 0 0;font-size:0.8em;color:#bfdbfe;'>AT_Manut v$app_ver · Gestão de Manutenções</p>
+        </td>
+      </tr>
+
+      <!-- Saudação -->
+      <tr>
+        <td style='padding:24px 28px 16px;'>
+          <p style='margin:0;font-size:1em;color:#111827;'>Exmo(a) Sr(a) <strong>$to_name_safe</strong>,</p>
+          <p style='margin:10px 0 0;font-size:0.9em;color:#374151;line-height:1.5;'>
+            Informamos que tem as seguintes manutenções programadas nos próximos dias para os equipamentos Navel
+            instalados na sua empresa. Por favor confirme a disponibilidade com a nossa equipa técnica.
+          </p>
+        </td>
+      </tr>
+
+      <!-- Tabela de manutenções -->
+      <tr>
+        <td style='padding:0 28px 20px;'>
+          <table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:0.85em;'>
+            <thead>
+              <tr style='background:#f3f4f6;'>
+                <th style='padding:9px 12px;text-align:left;color:#374151;font-weight:700;'>Equipamento</th>
+                <th style='padding:9px 12px;text-align:left;color:#374151;font-weight:700;'>N.º série</th>
+                <th style='padding:9px 12px;text-align:left;color:#374151;font-weight:700;'>Data prevista</th>
+                <th style='padding:9px 12px;text-align:left;color:#374151;font-weight:700;'>Prazo</th>
+              </tr>
+            </thead>
+            <tbody>
+              $linhas_html
+            </tbody>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Contacto -->
+      <tr>
+        <td style='padding:0 28px 24px;'>
+          <p style='margin:0;font-size:0.85em;color:#6b7280;line-height:1.5;'>
+            Para agendar ou esclarecer qualquer questão, contacte-nos:<br>
+            <strong>296 205 290 / 296 630 120</strong> · <a href='mailto:geral@navel.pt' style='color:#1a4880;'>geral@navel.pt</a>
+          </p>
+        </td>
+      </tr>
+
+      <!-- Rodapé -->
+      <tr>
+        <td style='background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;font-size:0.75em;color:#9ca3af;text-align:center;'>
+          Navel-Açores, Lda — Todos os direitos reservados · AT_Manut v$app_ver
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>";
+
+    $headers  = "MIME-Version: 1.0\r\n";
+    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+    $headers .= "From: =?UTF-8?B?" . base64_encode('NAVEL-AÇORES · AT_Manut') . "?= <" . FROM_EMAIL . ">\r\n";
+    $headers .= "Reply-To: " . REPLY_TO . "\r\n";
+    $headers .= "Cc: " . REPLY_TO . "\r\n";   // CC sempre ao admin
+    $headers .= "X-Mailer: AT_Manut/$app_ver\r\n";
+
+    $ok = @mail($to_email, $subject, $html_body, $headers);
+    if ($ok) {
+        echo json_encode(['ok' => true, 'message' => "Lembrete enviado para $to_email."]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'message' => 'Falha ao enviar email (mail() retornou false).']);
+    }
+    exit;
+}
 
 // Checklist
 $checklist = [];

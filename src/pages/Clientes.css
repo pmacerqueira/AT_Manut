@@ -50,3 +50,18 @@
   .clientes-table .data-table th:nth-child(4),
   .clientes-table .data-table td:nth-child(4) { min-width: 3.5rem; }
 }
+
+/* Badge de aviso para clientes sem email */
+.sem-email-aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78em;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  white-space: nowrap;
+  cursor: help;
+}

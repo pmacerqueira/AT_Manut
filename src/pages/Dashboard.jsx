@@ -2,7 +2,7 @@
  * Dashboard – Visão geral: cartões Em atraso/Próximas/Executadas, calendário, action sheet.
  * Mobile: layout simplificado; link para Agendar NOVO e Manutenções.
  */
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -24,6 +24,8 @@ import {
 } from 'date-fns'
 import { getHojeAzores } from '../utils/datasAzores'
 import RelatorioView from '../components/RelatorioView'
+import AlertaProactivoModal from '../components/AlertaProactivoModal'
+import { getManutencoesPendentesAlertas, getDiasAviso, isAlertsModalDismissedToday, dismissAlertsModalToday } from '../config/alertasConfig'
 import './Dashboard.css'
 import { pt } from 'date-fns/locale'
 
@@ -38,6 +40,24 @@ export default function Dashboard() {
   const [selectedDay, setSelectedDay] = useState(null)
   const [agendarDay, setAgendarDay] = useState(null)
   const [viewingManutencao, setViewingManutencao] = useState(null)
+
+  // ── Alertas proactivos de conformidade (Admin) ────────────────────────────
+  const [alertasProactivos, setAlertasProactivos] = useState([])
+  const [showAlertaModal, setShowAlertaModal]     = useState(false)
+  const alertaChecked = useRef(false)
+
+  useEffect(() => {
+    if (!isAdmin || alertaChecked.current) return
+    alertaChecked.current = true
+    if (isAlertsModalDismissedToday()) return
+    const dias  = getDiasAviso()
+    const items = getManutencoesPendentesAlertas(manutencoes, maquinas, clientes, dias)
+    if (items.length > 0) {
+      setAlertasProactivos(items)
+      setShowAlertaModal(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   const pendentes = useMemo(() =>
     manutencoes.filter(m => m.status === 'pendente' || m.status === 'agendada'),
@@ -124,6 +144,17 @@ export default function Dashboard() {
         <h1>Dashboard</h1>
         <div className="dashboard-header-spacer" aria-hidden="true" />
       </div>
+
+      {/* Modal de alertas de conformidade (Admin, início de sessão) */}
+      <AlertaProactivoModal
+        isOpen={showAlertaModal}
+        alertas={alertasProactivos}
+        onClose={() => setShowAlertaModal(false)}
+        onDismiss={() => {
+          dismissAlertsModalToday()
+          setShowAlertaModal(false)
+        }}
+      />
 
       <div className="cards-row cards-row-mobile">
         <Link

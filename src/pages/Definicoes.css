@@ -167,6 +167,57 @@
 }
 .def-btn--secondary:hover:not(:disabled) { background: #e5e7eb; }
 
+.def-btn--sm {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  min-height: 36px;
+}
+
+/* ── Alertas de conformidade ────────────────────────────────────────────────── */
+.def-alerta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 340px;
+}
+.def-alerta-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+.def-alerta-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.def-alerta-input {
+  width: 80px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+  color: #111827;
+}
+.def-alerta-input:focus {
+  outline: 2px solid #1a4880;
+  outline-offset: 1px;
+}
+.def-alerta-unit {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+.def-alerta-erro {
+  font-size: 0.82rem;
+  color: #dc2626;
+  margin: 0;
+}
+.def-section-desc--hint {
+  color: #6b7280;
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .def-page { padding: 1rem 0.75rem 3rem; gap: 1rem; }

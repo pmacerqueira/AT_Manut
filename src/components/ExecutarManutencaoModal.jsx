@@ -74,6 +74,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     getRelatorioByManutencao,
     prepararManutencoesPeriodicas,
     confirmarManutencoesPeriodicas,
+    recalcularPeriodicasAposExecucao,
     getIntervaloDiasByMaquina,
     getChecklistBySubcategoria,
     getSubcategoria,
@@ -371,6 +372,17 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     updateMaquina(maq.id, updateMaqData)
+
+    // Bloco B: reagendar manutenções periódicas futuras a partir da data de execução real
+    if (manutencaoAtual.tipo === 'periodica' && maq.periodicidadeManut) {
+      const n = recalcularPeriodicasAposExecucao(maq.id, maq.periodicidadeManut, hoje, form.tecnico)
+      if (n > 0) {
+        logger.action('ExecutarManutencaoModal', 'reagendarPeriodicas',
+          `${n} periódicas reagendadas para ${maq.marca ?? ''} ${maq.modelo ?? ''} a partir de ${hoje}`,
+          { maquinaId: maq.id, periodicidade: maq.periodicidadeManut, n })
+        showToast(`${n} manutenções futuras reagendadas a partir de hoje.`, 'info', 2500)
+      }
+    }
 
     // Enviar email se endereço preenchido, e depois navegar
     const enviarEmail = async (relFinal, manutFinal) => {

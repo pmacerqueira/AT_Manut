@@ -13,7 +13,8 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { logger } from '../utils/logger'
-import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield } from 'lucide-react'
+import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
+import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell } from 'lucide-react'
 import './Definicoes.css'
 
 export default function Definicoes() {
@@ -24,8 +25,22 @@ export default function Definicoes() {
   const { exportarDados, restaurarDados, clientes, maquinas, manutencoes, relatorios } = useData()
 
   const fileInputRef = useRef(null)
-  const [importing,  setImporting]  = useState(false)
-  const [lastExport, setLastExport] = useState(() => localStorage.getItem('atm_last_export') ?? null)
+  const [importing,    setImporting]   = useState(false)
+  const [lastExport,   setLastExport]  = useState(() => localStorage.getItem('atm_last_export') ?? null)
+  const [diasAviso,    setDiasAvisoUI] = useState(() => getDiasAviso())
+  const [diasAvisoErro, setDiasAvisoErro] = useState('')
+
+  const handleSalvarAlertas = () => {
+    const v = parseInt(diasAviso, 10)
+    if (!Number.isFinite(v) || v < 1 || v > 60) {
+      setDiasAvisoErro('Introduza um valor entre 1 e 60 dias.')
+      return
+    }
+    setDiasAvisoErro('')
+    setDiasAviso(v)
+    logger.action('Definicoes', 'salvarAlertas', `Dias de aviso definidos para ${v} dia(s)`)
+    showToast(`Alertas configurados: aviso com ${v} dia(s) de antecedência.`, 'success')
+  }
 
   useEffect(() => {
     if (!isAdmin) navigate('/', { replace: true })
@@ -171,6 +186,44 @@ export default function Definicoes() {
             <span className="def-stat-lbl">Tamanho estimado</span>
           </div>
         </div>
+      </section>
+
+      {/* Alertas de conformidade */}
+      <section className="def-section">
+        <h2 className="def-section-title">
+          <Bell size={17} />
+          Alertas de conformidade
+        </h2>
+        <p className="def-section-desc">
+          Define com quantos dias de antecedência a aplicação deve alertar para manutenções próximas
+          e enviar lembretes automáticos ao cliente e ao administrador.
+        </p>
+        <div className="def-alerta-row">
+          <label className="def-alerta-label" htmlFor="diasAviso">
+            Dias de aviso antecipado
+          </label>
+          <div className="def-alerta-input-wrap">
+            <input
+              id="diasAviso"
+              type="number"
+              min={1}
+              max={60}
+              value={diasAviso}
+              onChange={e => { setDiasAvisoErro(''); setDiasAvisoUI(e.target.value) }}
+              className="def-alerta-input"
+            />
+            <span className="def-alerta-unit">dias</span>
+          </div>
+          {diasAvisoErro && <p className="def-alerta-erro">{diasAvisoErro}</p>}
+          <button type="button" className="def-btn def-btn--primary def-btn--sm" onClick={handleSalvarAlertas}>
+            <CheckCircle size={16} />
+            Guardar configuração
+          </button>
+        </div>
+        <p className="def-section-desc def-section-desc--hint">
+          O alerta é apresentado ao <strong>Administrador</strong> no início da sessão e pode ser enviado
+          por email ao cliente registado em cada máquina. Padrão recomendado: <strong>7 dias</strong>.
+        </p>
       </section>
 
       {/* Backup */}

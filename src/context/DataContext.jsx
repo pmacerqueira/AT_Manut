@@ -1051,6 +1051,84 @@ export function DataProvider({ children }) {
     return relatorios.find(r => r.manutencaoId === manutencaoId)
   }, [relatorios])
 
+  /**
+   * Bloco B — Recalcular manutenções periódicas futuras após execução de uma periódica.
+   *
+   * Faz tudo atomicamente dentro do setManutencoes:
+   *  1. Remove as futuras pendentes/agendadas da máquina (posterior à data de execução)
+   *  2. Gera novas a partir da data de execução real, para 3 anos
+   *
+   * @returns {number} número de novas manutenções criadas
+   */
+  const recalcularPeriodicasAposExecucao = useCallback((maquinaId, periodicidade, dataExecucao, tecnico) => {
+    if (!periodicidade || !INTERVALOS[periodicidade]) return 0
+
+    const intervaloDias = INTERVALOS[periodicidade].dias
+    const dataBaseMs    = new Date(dataExecucao + 'T12:00:00').getTime()
+    const limiteMs      = dataBaseMs + 3 * 365.25 * 24 * 3600 * 1000
+    const anoInicio     = new Date(dataExecucao).getFullYear()
+    const anoFim        = new Date(limiteMs).getFullYear()
+    const feriadosSet   = buildFeriadosSet(anoInicio, anoFim)
+
+    let novaCount = 0
+
+    setManutencoes(prev => {
+      // 1. Mantém apenas as manutenções que NÃO são futuras pendentes/agendadas desta máquina
+      const semFuturas = prev.filter(m =>
+        !(m.maquinaId === maquinaId &&
+          (m.status === 'pendente' || m.status === 'agendada') &&
+          m.data > dataExecucao)
+      )
+
+      // 2. Dias já ocupados (sem as removidas)
+      const diasOcupados = new Set(
+        semFuturas
+          .filter(m => m.status === 'agendada' || m.status === 'pendente')
+          .map(m => m.data)
+      )
+
+      // 3. Gerar novas manutenções
+      const base  = Date.now()
+      const novas = []
+      let d = new Date(dataExecucao + 'T12:00:00')
+
+      while (true) {
+        d = new Date(d.getTime() + intervaloDias * 24 * 3600 * 1000)
+        if (d.getTime() > limiteMs) break
+        const { data: dAjustada } = encontrarDiaLivre(d, feriadosSet, diasOcupados)
+        const iso = [
+          dAjustada.getFullYear(),
+          String(dAjustada.getMonth() + 1).padStart(2, '0'),
+          String(dAjustada.getDate()).padStart(2, '0'),
+        ].join('-')
+        novas.push({
+          id:           `mp${base}_${novas.length + 1}`,
+          maquinaId,
+          tipo:         'periodica',
+          periodicidade,
+          data:         iso,
+          tecnico:      tecnico || '',
+          status:       'agendada',
+          observacoes:  'Reagendamento automático pós-execução periódica.',
+        })
+        diasOcupados.add(iso)
+      }
+
+      novaCount = novas.length
+
+      if (novas.length > 0) {
+        import('../services/apiService').then(({ apiManutencoes }) =>
+          persist(() => apiManutencoes.bulkCreate(novas),
+                  { resource: 'manutencoes', action: 'recalc_periodicas', data: novas })
+        )
+      }
+
+      return [...semFuturas, ...novas]
+    })
+
+    return novaCount
+  }, [persist])
+
   // ── Backup / Restore ──────────────────────────────────────────────────────────
 
   /**
@@ -1184,7 +1262,7 @@ export function DataProvider({ children }) {
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
     addManutencao, updateManutencao, removeManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
-    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas,
+    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao,
     exportarDados, restaurarDados,
     loading, fetchTodos,
     isOnline, syncPending, isSyncing, processSync,

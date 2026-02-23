@@ -1,0 +1,281 @@
+/* AlertaProactivoModal.css */
+
+.alerta-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1rem;
+}
+
+.alerta-modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 560px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Cabeçalho ──────────────────────────────────────────────────────────────── */
+.alerta-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fffbeb;
+}
+
+.alerta-header-icon {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  background: #fde68a;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alerta-header-text { flex: 1; }
+
+.alerta-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.alerta-subtitulo {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.alerta-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.alerta-close:hover { background: #f3f4f6; color: #111827; }
+
+/* ── Corpo ──────────────────────────────────────────────────────────────────── */
+.alerta-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Grupo (por cliente) ────────────────────────────────────────────────────── */
+.alerta-grupo {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.alerta-grupo-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  background: #f9fafb;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a4880;
+  transition: background 0.12s;
+}
+.alerta-grupo-header:hover { background: #f0f4fb; }
+
+.alerta-grupo-nome { flex: 1; }
+
+.alerta-grupo-count {
+  background: #1a4880;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+}
+
+/* ── Itens ──────────────────────────────────────────────────────────────────── */
+.alerta-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.alerta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.82rem;
+}
+.alerta-item:last-child { border-bottom: none; }
+
+.alerta-item-icon { color: #9ca3af; flex-shrink: 0; }
+
+.alerta-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+.alerta-item-maquina { font-weight: 600; color: #111827; }
+.alerta-item-serie   { font-size: 0.75rem; color: #9ca3af; }
+
+.alerta-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+.alerta-item-data {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Urgência */
+.alerta-item-dias {
+  font-size: 0.73rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+.alerta-item-dias.urgency-hoje    { background: #fef2f2; color: #dc2626; }
+.alerta-item-dias.urgency-critico { background: #fff7ed; color: #c2410c; }
+.alerta-item-dias.urgency-proximo { background: #fefce8; color: #a16207; }
+.alerta-item-dias.urgency-normal  { background: #f0fdf4; color: #16a34a; }
+
+/* Fundo colorido por urgência */
+.alerta-item.urgency-hoje    { background: #fef2f2; }
+.alerta-item.urgency-critico { background: #fff7ed; }
+.alerta-item.urgency-proximo { background: #fefce8; }
+.alerta-item.urgency-normal  { background: #fff; }
+
+/* ── Acções do grupo ────────────────────────────────────────────────────────── */
+.alerta-grupo-actions {
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fff;
+}
+
+.alerta-btn-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #1a4880;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.alerta-btn-email:hover:not(:disabled) { background: #15396b; }
+.alerta-btn-email:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.alerta-sem-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+}
+
+.alerta-ja-enviado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #166534;
+  background: #f0fdf4;
+  border-radius: 5px;
+  padding: 0.3rem 0.65rem;
+}
+
+/* ── Rodapé ─────────────────────────────────────────────────────────────────── */
+.alerta-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.alerta-btn-dispensar {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.alerta-btn-dispensar:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.alerta-btn-fechar {
+  background: #1a4880;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.alerta-btn-fechar:hover { background: #15396b; }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .alerta-modal {
+    max-height: 90vh;
+    border-radius: 12px 12px 0 0;
+    align-self: flex-end;
+  }
+  .alerta-overlay { align-items: flex-end; padding: 0; }
+  .alerta-btn-email { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
+  .alerta-footer { gap: 0.5rem; }
+}

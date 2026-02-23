@@ -4,6 +4,50 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.6.0] — 2026-02-23 — Alertas de conformidade v2 (Blocos A + B + C)
+
+### Bloco A — Email obrigatório em clientes + configuração de alertas
+
+- **Email obrigatório** na criação e edição de clientes: campo marcado com `*`, validação JavaScript com mensagem clara
+- **Badge de aviso** (`⚠ Sem email`) na tabela de clientes para registos existentes sem email — permite identificar rapidamente quem precisa de actualização
+- **Secção "Alertas de conformidade"** nas Definições (Admin): input numérico para "Dias de aviso antecipado" (1–60 dias, padrão: 7), com persistência em `atm_config_alertas`
+- Novo módulo `src/config/alertasConfig.js` com utilitários: `getDiasAviso`, `setDiasAviso`, `isAlertsModalDismissedToday`, `dismissAlertsModalToday`, `getAlertasEnviados`, `marcarAlertaEnviado`, `foiAlertaEnviadoHoje`, `getManutencoesPendentesAlertas`
+
+### Bloco B — Reagendamento automático de periódicas após execução
+
+- Ao concluir uma manutenção do tipo `periodica`, se a máquina tem `periodicidadeManut` definida:
+  1. Remove automaticamente todas as manutenções futuras pendentes/agendadas dessa máquina
+  2. Recalcula e cria novas manutenções para 3 anos a partir da data de execução real
+  3. Respeita feriados e dias úteis (mesma lógica da criação pós-montagem)
+  4. Mostra toast informativo com o número de periódicas reagendadas
+- Implementado como operação atómica no `DataContext` (`recalcularPeriodicasAposExecucao`) — sem race conditions
+
+### Bloco C — Modal de alertas proactivos no início de sessão (Admin)
+
+- Ao carregar o Dashboard, o Admin vê automaticamente um modal com as manutenções programadas dentro do prazo de aviso configurado
+- Modal agrupa manutenções por cliente, com código de cores por urgência (hoje / 1-2 dias / 3-5 dias / restantes)
+- Por cada cliente: botão "Enviar lembrete por email" — envia directamente para o email do cliente com CC para `geral@navel.pt`
+- "Dispensar hoje" regista a dispensa diária e não mostra o modal novamente até à próxima sessão
+- Registo de alertas já enviados hoje (`atm_alertas_enviados`) — evita duplicados
+- Aviso visual se o cliente não tiver email registado
+- **`servidor-cpanel/send-email.php`** alargado com tipo `lembrete`: gera email HTML profissional com tabela de equipamentos, datas e urgência; CC automático ao admin
+
+### Ficheiros criados/modificados
+- `src/config/alertasConfig.js` — novo módulo de configuração e utilitários
+- `src/pages/Clientes.jsx` — email required + badge sem email
+- `src/pages/Clientes.css` — estilo `.sem-email-aviso`
+- `src/pages/Definicoes.jsx` — secção "Alertas de conformidade"
+- `src/pages/Definicoes.css` — estilos `.def-alerta-*`
+- `src/context/DataContext.jsx` — `recalcularPeriodicasAposExecucao` (exposto)
+- `src/components/ExecutarManutencaoModal.jsx` — Bloco B integrado
+- `src/services/emailService.js` — `enviarLembreteEmail` adicionado
+- `src/components/AlertaProactivoModal.jsx` — novo componente
+- `src/components/AlertaProactivoModal.css` — estilos do modal
+- `src/pages/Dashboard.jsx` — integração do modal de alertas
+- `servidor-cpanel/send-email.php` — suporte a `tipo_email: lembrete`
+
+---
+
 ## [1.5.1] — 2026-02-23 — Histórico completo em PDF por máquina (Etapa 4)
 
 ### Nova funcionalidade — Histórico PDF por máquina

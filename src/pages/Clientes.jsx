@@ -7,7 +7,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle } from 'lucide-react'
 import { useDebounce } from '../hooks/useDebounce'
 import { safeHttpUrl } from '../utils/sanitize'
 import { format } from 'date-fns'
@@ -83,6 +83,10 @@ export default function Clientes() {
   const handleSubmit = (e) => {
     e.preventDefault()
     setErro('')
+    if (!form.email?.trim()) {
+      setErro('O email do cliente é obrigatório para envio de lembretes e relatórios.')
+      return
+    }
     if (modal === 'add') {
       const nif = addCliente(form)
       if (nif === null) { setErro('Já existe um cliente com este NIF.'); return }
@@ -195,7 +199,14 @@ export default function Clientes() {
                 <td data-label="Morada">{c.morada || '—'}</td>
                 <td data-label="Localidade">{c.localidade || '—'}</td>
                 <td data-label="Telefone">{c.telefone || '—'}</td>
-                <td data-label="Email">{c.email || '—'}</td>
+                <td data-label="Email">
+                  {c.email
+                    ? c.email
+                    : <span className="sem-email-aviso" title="Email em falta — edite o cliente para corrigir">
+                        <AlertTriangle size={13} /> Sem email
+                      </span>
+                  }
+                </td>
                 <td data-label="Máquinas">{getMaquinasCount(c.nif)}</td>
                 <td className="actions" data-label="">
                   {canEditCliente && (
@@ -462,7 +473,7 @@ export default function Clientes() {
               </div>
               <div className="form-row">
                 <label>Telefone<input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} /></label>
-                <label>Email<input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></label>
+                <label>Email <span className="required">*</span><input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@cliente.pt" /></label>
               </div>
               <div className="form-actions">
                 <button type="button" className="secondary" onClick={() => setModal(null)}>Cancelar</button>
