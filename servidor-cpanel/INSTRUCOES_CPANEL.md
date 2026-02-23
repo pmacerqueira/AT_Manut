@@ -16,19 +16,23 @@ credenciais SMTP, não precisa de instalar nada extra.
 3. Abrir a pasta `api/`
 4. Clicar **Carregar** → fazer upload dos ficheiros:
    - `send-email.php` (de `servidor-cpanel/send-email.php`)
-   - `fpdf.php` (de `servidor-cpanel/fpdf184/fpdf.php` — necessário para gerar PDF com assinatura e fotos)
+   - `fpdf.php` (de `servidor-cpanel/api/fpdf.php` — necessário para gerar PDF com assinatura e fotos)
    - `send-report.php` (de `servidor-cpanel/api/send-report.php`)
-   - `data.php`, `db.php`, `config.php` (de `servidor-cpanel/api/`)
+   - `data.php`, `db.php`, `config.php`, `atm_log.php` (de `servidor-cpanel/api/`)
+   - Pasta `font/` completa (de `servidor-cpanel/api/font/` — fontes usadas pelo FPDF)
 5. Verificar permissões: **clicar no ficheiro → Permissions → 644**
 
 Estrutura final no servidor:
 ```
 public_html/
   api/
-    send-email.php    ← relatórios com PDF
-    send-report.php   ← envio de HTML (EnviarEmailModal, EnviarDocumentoModal)
-    data.php, db.php, config.php
-  send-contact.php    ← já existia
+    send-email.php       ← relatórios com PDF e lembretes de conformidade
+    send-report.php      ← envio de HTML (EnviarEmailModal, EnviarDocumentoModal)
+    data.php, db.php, config.php, atm_log.php
+    fpdf.php             ← biblioteca FPDF (geração de PDF no servidor)
+    font/                ← fontes FPDF (Helvetica, Courier, etc.)
+    log-receiver.php     ← receptor de logs do frontend
+  send-contact.php       ← já existia
   index.html
   ...
 ```
