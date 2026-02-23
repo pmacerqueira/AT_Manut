@@ -193,7 +193,15 @@ npx playwright test tests/e2e/12-v170-features.spec.js
 4. Adicionar entrada ao `CHANGELOG.md` com secções: Correcções, Qualidade (contagem), Documentação actualizada
 5. `git add -A` + commit + push
 
-> Ver regra global `post-e2e-docs-workflow.mdc` para o padrão completo reutilizável em todos os projectos.
+> Ver regra global `post-e2e-docs-workflow.mdc` para o workflow completo: pré-desenvolvimento, guarda de regressões, padrões React, performance, análise de logs e documentação pós-E2E.
+
+## Performance — pontos críticos do AT_Manut
+
+- **KPIs (`kpis.js`):** todos os cálculos chamados em `Metricas.jsx` devem estar em `useMemo` — nunca recalcular em cada render
+- **Listas longas (`Manutencoes.jsx`, `Clientes.jsx`):** filtrar e ordenar uma única vez por render cycle; não encadear `.filter().filter().sort()`
+- **`DataContext.jsx`:** lazy initializers em todos os `useState` com `localStorage`; nunca ler `localStorage` fora do initializer
+- **Fetch (`apiService.js`):** dados em cache (TTL 30 dias) são servidos imediatamente; fetch em background apenas se cache expirado
+- **Build:** após `npm run build` verificar chunks — alertar se algum chunk > 500KB (usar `React.lazy` para rotas não-críticas como `Metricas`, `Logs`)
 
 ## Rodapé em relatórios
 
