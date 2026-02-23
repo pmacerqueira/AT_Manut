@@ -94,10 +94,10 @@ export const MC = {
       data: '2026-06-15', tecnico: 'Aldevino Costa',
       status: 'agendada', observacoes: '',
     },
-    // mt20: montagem pendente
+    // mt20: montagem pendente (data afastada para não disparar modal de alertas nos testes)
     {
       id: 'mt20', maquinaId: 'm02', tipo: 'montagem',
-      data: '2026-03-01', tecnico: '',
+      data: '2026-04-01', tecnico: '',
       status: 'pendente', observacoes: '',
     },
   ],

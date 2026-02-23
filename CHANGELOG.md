@@ -4,6 +4,18 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.6.2] — 2026-02-23 — Cobertura E2E completa (Etapas 1-4 + Blocos A+B+C)
+
+### Corrigido
+- `QrEtiquetaModal.jsx` — adicionado handler de tecla Escape para fechar o modal (UX + E2E fix); sem este handler, 3 testes do spec 10 falhavam por o Playwright pressionar Escape sem efeito
+- `tests/e2e/helpers.js` — data de `mt20` alterada de `2026-03-01` para `2026-04-01` nos dados mock base; a data anterior coincidia com o limite de 7 dias do alerta proactivo e activava o modal em testes do spec 10 que não o esperavam, causando bloqueio de UI
+
+### Testes
+- Confirmada cobertura E2E completa: **spec 10** (48 testes — Etapas 1 a 4) + **spec 11** (40 testes — Blocos A+B+C) = **88/88 a passar**
+- Todos os objectivos do roadmap validados com isolamento correcto entre specs
+
+---
+
 ## [1.6.1] — 2026-02-23 — Correções pós-teste E2E v1.6.0
 
 ### Corrigido

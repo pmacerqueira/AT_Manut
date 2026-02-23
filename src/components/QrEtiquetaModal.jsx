@@ -25,6 +25,14 @@ export default function QrEtiquetaModal({ isOpen, onClose, maquina, subcategoria
     }).then(setQrDataUrl).catch(() => setQrDataUrl(null))
   }, [isOpen, maquina])
 
+  // Fechar com Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+
   if (!isOpen || !maquina) return null
 
   const logoSrc = `${import.meta.env.BASE_URL}logo-navel.png`
