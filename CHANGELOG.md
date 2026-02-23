@@ -4,6 +4,33 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.5.0] — 2026-02-23 — "O meu dia" + Alertas de conformidade + QR Code por máquina
+
+### Etapa 1 — Vista "O meu dia" (Dashboard)
+- Novo painel no Dashboard com todas as manutenções pendentes para hoje e em atraso
+- Para o ATecnica: destaque visual com barra lateral azul e título "O meu dia"
+- Para o Admin: visível mas menos destacado ("Hoje")
+- Cada item mostra: equipamento, cliente, badge "Xd atraso" e botão directo "Executar"
+- Se não há intervenções: mensagem amigável com ícone "Sem intervenções pendentes para hoje!"
+
+### Etapa 2 — Alertas de conformidade
+- Card "Em atraso" pulsa com animação de anel vermelho quando há manutenções há mais de 7 dias
+- Sub-label "⚠ Há X dias!" no card para alertar visualmente o utilizador
+- Cálculo automático de `diasMaxAtraso` (diferença em dias desde a manutenção mais antiga em atraso)
+
+### Etapa 3 — QR Code por máquina
+- Novo botão QR (`QrCode` icon) em cada linha de equipamento (em todas as vistas: normal e em atraso)
+- Modal `QrEtiquetaModal` com etiqueta formatada: cabeçalho NAVEL azul, QR code 100×100 px, marca/modelo, nº série, cliente
+- QR codifica URL directo da app: `https://www.navel.pt/manut/equipamentos?maquina={id}`
+- Botão "Imprimir etiqueta" usa `window.print()` com CSS de impressão dedicado (apenas a etiqueta, formato 80mm)
+- Câmara nativa do telemóvel lê o QR e abre directamente a ficha no browser — zero código extra necessário (Opção A)
+
+### Infra-estrutura
+- Dependência adicionada: `qrcode` (geração de QR code no browser via canvas → data URL)
+- `APP_VERSION` actualizado para `1.5.0`
+
+---
+
 ## [1.4.1] — 2026-02-23 — Logotipo Navel na sidebar + correcções de documentação
 
 ### Interface

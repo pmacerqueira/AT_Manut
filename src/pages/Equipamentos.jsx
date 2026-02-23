@@ -6,7 +6,9 @@ import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
-import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play } from 'lucide-react'
+import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode } from 'lucide-react'
+import QrEtiquetaModal from '../components/QrEtiquetaModal'
+import '../components/QrEtiquetaModal.css'
 import { format, isBefore } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
@@ -30,6 +32,7 @@ export default function Equipamentos() {
   const [modalEdit, setModalEdit] = useState(null)
   const [modalDoc, setModalDoc] = useState(null)
   const [modalExecucao, setModalExecucao] = useState(null)
+  const [modalQr, setModalQr] = useState(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const filterAtraso = searchParams.get('filter') === 'atraso' // whitelist: apenas 'atraso' é aceite
@@ -125,6 +128,7 @@ export default function Equipamentos() {
                           <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
                             <Play size={12} /> Executar
                           </button>
+                          <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                           {isAdmin && (
                             <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
@@ -215,6 +219,7 @@ export default function Equipamentos() {
                         )}
                       </div>
                       <div className="actions">
+                        <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
                         {isAdmin && (
                           <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
@@ -244,6 +249,14 @@ export default function Equipamentos() {
       )}
 
       <DocumentacaoModal isOpen={!!modalDoc} onClose={() => setModalDoc(null)} maquina={modalDoc} />
+
+      <QrEtiquetaModal
+        isOpen={!!modalQr}
+        onClose={() => setModalQr(null)}
+        maquina={modalQr}
+        subcategoria={modalQr ? getSubcategoria(modalQr.subcategoriaId) : null}
+        cliente={modalQr ? getCliente(modalQr.clienteNif) : null}
+      />
 
       {modalExecucao && (
         <ExecutarManutencaoModal

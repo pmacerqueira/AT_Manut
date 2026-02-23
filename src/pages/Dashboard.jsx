@@ -5,8 +5,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import { logger } from '../utils/logger'
-import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft } from 'lucide-react'
+import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper } from 'lucide-react'
 // Search e Play mantidos para uso no day-panel
 import {
   format,
@@ -28,6 +29,8 @@ import { pt } from 'date-fns/locale'
 
 export default function Dashboard() {
   const { maquinas, manutencoes, clientes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria } = useData()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const getMaquina = (id) => maquinas.find(m => m.id === id)
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
   const navigate = useNavigate()
@@ -51,6 +54,21 @@ export default function Dashboard() {
   const proximas = useMemo(() =>
     pendentes.filter(m => !isBefore(new Date(m.data), new Date())),
   [pendentes])
+
+  // "O meu dia" — manutenções pendentes de hoje e em atraso, ordenadas por data
+  const hoje = getHojeAzores()
+  const paraHoje = useMemo(() =>
+    manutencoes
+      .filter(m => (m.status === 'pendente' || m.status === 'agendada') && m.data <= hoje)
+      .sort((a, b) => a.data.localeCompare(b.data)),
+  [manutencoes, hoje])
+
+  // Etapa 2 — Alerta de conformidade: dias máximos em atraso
+  const diasMaxAtraso = useMemo(() => {
+    if (emAtraso.length === 0) return 0
+    const oldest = emAtraso.reduce((min, m) => m.data < min ? m.data : min, emAtraso[0].data)
+    return Math.floor((new Date() - new Date(oldest)) / (1000 * 60 * 60 * 24))
+  }, [emAtraso])
 
   // Pré-calcula índice de manutenções por data (string yyyy-MM-dd) para acesso O(1)
   const manutByDate = useMemo(() => {
@@ -108,11 +126,17 @@ export default function Dashboard() {
       </div>
 
       <div className="cards-row cards-row-mobile">
-        <Link to="/manutencoes?filter=atraso" className="card stat-card stat-card-link stat-card-mobile stat-card-red">
+        <Link
+          to="/manutencoes?filter=atraso"
+          className={`card stat-card stat-card-link stat-card-mobile stat-card-red${diasMaxAtraso >= 7 ? ' stat-card-pulse' : ''}`}
+        >
           <AlertTriangle size={24} className="stat-icon" />
           <div>
             <span className="stat-value">{emAtraso.length}</span>
             <span className="stat-label">Em atraso</span>
+            {diasMaxAtraso >= 7 && (
+              <span className="stat-alerta-dias">⚠ Há {diasMaxAtraso} dias!</span>
+            )}
           </div>
         </Link>
         <Link to="/manutencoes?filter=proximas" className="card stat-card stat-card-link stat-card-mobile stat-card-yellow">
@@ -129,6 +153,63 @@ export default function Dashboard() {
             <span className="stat-label">Executadas</span>
           </div>
         </Link>
+      </div>
+
+      {/* ── Etapa 1: O meu dia ─────────────────────────────────────────── */}
+      <div className={`meu-dia-section card${!isAdmin ? ' meu-dia-destaque' : ''}`}>
+        <div className="meu-dia-header">
+          <div className="meu-dia-titulo">
+            <Clock size={18} />
+            <span>{isAdmin ? 'Hoje' : 'O meu dia'}</span>
+            <span className="meu-dia-data">
+              {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Atlantic/Azores' })}
+            </span>
+          </div>
+          {paraHoje.length > 0 && (
+            <span className="badge badge-danger">{paraHoje.length} pendente{paraHoje.length > 1 ? 's' : ''}</span>
+          )}
+        </div>
+
+        {paraHoje.length === 0 ? (
+          <div className="meu-dia-vazio">
+            <PartyPopper size={22} />
+            <span>Sem intervenções pendentes para hoje!</span>
+          </div>
+        ) : (
+          <ul className="meu-dia-lista">
+            {paraHoje.map(m => {
+              const maq = getMaquina(m.maquinaId)
+              const sub = getSubcategoria(maq?.subcategoriaId)
+              const cli = maq ? getCliente(maq.clienteNif) : null
+              const diasAtraso = Math.floor((new Date() - new Date(m.data)) / (1000 * 60 * 60 * 24))
+              const filtro = isBefore(new Date(m.data), new Date()) ? 'atraso' : 'proximas'
+              return (
+                <li key={m.id} className="meu-dia-item">
+                  <div className="meu-dia-item-info">
+                    <span className="meu-dia-item-nome">
+                      {sub?.nome ? `${sub.nome} — ` : ''}{maq?.marca} {maq?.modelo}
+                    </span>
+                    <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
+                  </div>
+                  <div className="meu-dia-item-right">
+                    {diasAtraso > 0 && (
+                      <span className="badge badge-danger meu-dia-badge-atraso">
+                        {diasAtraso}d atraso
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn primary btn-sm"
+                      onClick={() => navigate(`/manutencoes?filter=${filtro}`, { state: { openExecucaoId: m.id } })}
+                    >
+                      <Play size={13} /> Executar
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
 
       <div className="dashboard-grid">
