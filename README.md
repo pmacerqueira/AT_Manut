@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.7.0` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.7.2` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 
@@ -73,7 +73,9 @@ npx playwright test tests/e2e/
 | QR Code | qrcode (geração) |
 | PDF | jsPDF + html2canvas |
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
-| Testes | Playwright E2E — 88 testes automatizados |
+| Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
+| Gráficos KPIs | recharts (`Metricas.jsx`) |
+| Testes | Playwright E2E — 270 testes (12 specs) |
 | Imagens | sharp (optimize-images via script prebuild) |
 
 ---
@@ -120,7 +122,7 @@ Ver `docs/DEPLOY_CHECKLIST.md` para lista completa de verificação.
 | [`DOCUMENTACAO.md`](./DOCUMENTACAO.md) | Modelo de dados, rotas, fluxos detalhados |
 | [`DESENVOLVIMENTO.md`](./DESENVOLVIMENTO.md) | Guia para desenvolvimento futuro |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Estado actual e próximas funcionalidades |
-| [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md) | Suite de testes Playwright (88 testes) |
+| [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md) | Suite de testes Playwright (270 testes, 12 specs) |
 | [`docs/MANUAL-UX-UI.md`](./docs/MANUAL-UX-UI.md) | Directrizes de UX/UI obrigatórias |
 | [`docs/IMAGENS-E-ICONES.md`](./docs/IMAGENS-E-ICONES.md) | Gestão de imagens e ícones |
 | [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) | Checklist de deployment |

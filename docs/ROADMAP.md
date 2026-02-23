@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-02-23 — v1.7.0
+> Última revisão: 2026-02-23 — v1.7.2
 
 ---
 
-## Estado actual (v1.7.0) — O que está implementado
+## Estado actual (v1.7.2) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -33,7 +33,7 @@
 | Autenticação JWT | Admin / ATecnica, sessão por janela, roles separados | v1.0 |
 | Offline-first | Cache localStorage, fila de sync, OfflineBanner | v1.3.0 |
 | PWA instalável | Ícone no ecrã inicial, manifest, ícones optimizados | v1.4.1 |
-| Suite de testes E2E | 230+ testes Playwright (12 specs) | v1.7.0 |
+| Suite de testes E2E | 270 testes Playwright (12 specs) | v1.7.2 |
 | Log de sistema | Acções, erros, eventos de autenticação | v1.0 |
 | Breadcrumbs | Navegação hierárquica contextual | v1.2.0 |
 | Responsividade | Mobile/tablet/landscape optimizado | v1.2.0 |
@@ -68,7 +68,18 @@
 - `QrEtiquetaModal.jsx`: handler de Escape adicionado (UX fix + fix de 3 testes E2E)
 - `helpers.js` (testes): data `mt20` movida para isolamento correcto entre specs
 - `playwright.config.js`: `baseURL` corrigido para `http://localhost:5173`
-- E2E total: 88 testes a passar
+- E2E specs 01–11: 228 testes a passar
+
+---
+
+### v1.7.1/v1.7.2 — E2E: cobertura v1.7.0 + correcções de robustez
+**Implementado:** 2026-02-23
+
+- Criado `12-v170-features.spec.js` (42 testes) para cobertura completa dos 5 features do v1.7.0
+- **Bug `Metricas.jsx`:** redirect de ATecnica movido para `useEffect` (evitar `navigate()` durante render em React 19)
+- **Selector QR ambíguo:** substituição de `button[title*="QR"]` pelo selector exacto `button[title="Gerar etiqueta QR"]` — o botão sidebar adicionado em v1.7.0 tornava o selector ambíguo
+- **Sessão Auth isolada:** `sessionStorage.clear()` antes de `doLoginTecnico()` em testes que partilham `beforeEach` Admin
+- E2E total: **270 testes** (12 specs) — 100% a passar
 
 ---
 
@@ -157,7 +168,7 @@
 - **Pesquisa global Ctrl+K** — encontra qualquer entidade em milissegundos
 - **Dashboard KPIs executivo** — taxa de cumprimento, gráficos, top clientes em atraso
 - **Modo campo** — alto contraste para técnicos ao sol
-- **230+ testes E2E** — cobertura total de fluxos e perfis de utilizador
+- **270 testes E2E** — cobertura total de fluxos e perfis de utilizador
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 
 ---
@@ -175,4 +186,4 @@
 
 ---
 
-*Última actualização: 2026-02-23 — v1.7.0*
+*Última actualização: 2026-02-23 — v1.7.2*

@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 230+ testes automatizados cobrindo todos os fluxos, perfis de utilizador e funcionalidades.
-> Última revisão: 2026-02-23 — v1.7.0
+> 270 testes automatizados cobrindo todos os fluxos, perfis de utilizador e funcionalidades.
+> Última revisão: 2026-02-23 — v1.7.2
 
 ---
 
@@ -265,6 +265,18 @@ async function loginAdminSemAlertas(page) {
 **Problema:** A lista de manutenções tem dois layouts no DOM (tabela desktop, cards mobile). Playwright pode resolver para o elemento escondido.
 **Solução:** Usar seletores de classe específica (`.manutencoes-table tbody tr`, `.btn-executar-manut`).
 
+### Selector QR ambíguo após v1.7.0 (corrigido em v1.7.2)
+**Problema:** O v1.7.0 adicionou o botão "Ler QR Code de equipamento" na sidebar. O selector original `button[title*="QR"], button[title*="etiqueta"]` tornava-se ambíguo — `.first()` apanhava o botão da sidebar em vez do botão de etiqueta da máquina, abrindo `QrReaderModal` em vez de `QrEtiquetaModal`. Todos os testes QR do spec 10 falhavam.
+**Solução:** Selector exacto `button[title="Gerar etiqueta QR"]` em todos os locais do spec 10.
+
+### Sessão Admin persistente em testes ATecnica (corrigido em v1.7.2)
+**Problema:** `beforeEach` fazia login como Admin e guardava JWT no `sessionStorage`. Quando um teste chamava `doLoginTecnico()`, o `Login.jsx` detectava sessão activa e redirecionava sem processar o novo login — o utilizador ficava como Admin.
+**Solução:** `await page.evaluate(() => sessionStorage.clear())` antes de cada `doLoginTecnico()` em testes que partilham `beforeEach` de Admin (spec 12, testes Q7, M9, M10).
+
+### `navigate()` durante render em `Metricas.jsx` (corrigido em v1.7.2)
+**Problema:** O redirect de ATecnica era feito directamente no corpo da função (`if (!isAdmin) { navigate('/') }`), o que é um anti-pattern em React 19 — pode não ser executado de forma consistente, e M9 falhava ao verificar que o URL não continha `/metricas`.
+**Solução:** Redirect movido para `useEffect(() => { if (!isAdmin) navigate('/') }, [isAdmin, navigate])`, alinhado com o padrão de `Logs.jsx`.
+
 ---
 
 ## Configuração (`playwright.config.js`)
@@ -272,18 +284,22 @@ async function loginAdminSemAlertas(page) {
 ```js
 {
   testDir: './tests',
-  timeout: 30_000,           // 30 s por teste
-  retries: 2,                // 2 retries em CI
-  workers: 1,                // 1 worker (testes partilham browser state)
+  timeout: 45000,            // 45 s por teste (permite testes lentos de QR e PDF)
+  retries: 1,                // 1 retry por teste falhado
   use: {
     baseURL: 'http://localhost:5173',
     headless: true,
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: 1280, height: 800 },
+    actionTimeout: 10000,    // 10 s por acção individual
+    navigationTimeout: 15000,
     screenshot: 'only-on-failure',
     video: 'on-first-retry'
   }
 }
 ```
+
+> **Workers:** Por omissão usa 2 workers em paralelo. Para debugging usar `--workers=1`.  
+> **Servidor de desenvolvimento:** Deve estar a correr em `http://localhost:5173` antes de executar os testes.
 
 ---
 
@@ -312,4 +328,4 @@ Regra: **não usar `required` em campos com validação customizada JS** — rem
 
 ---
 
-*Última actualização: 2026-02-23 — v1.6.2*
+*Última actualização: 2026-02-23 — v1.7.2*

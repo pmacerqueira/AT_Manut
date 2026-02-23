@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.7.0 · **Última actualização:** 2026-02-23
+**Versão:** 1.7.2 · **Última actualização:** 2026-02-23
 
 ---
 
@@ -31,7 +31,7 @@ Aplicação web PWA para gestão de manutenções preventivas de equipamentos Na
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — 267 testes (12 specs) |
+| Testes | Playwright E2E — 270 testes (12 specs) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---

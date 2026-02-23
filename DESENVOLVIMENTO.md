@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.7.0 · **Última actualização:** 2026-02-23
+**Versão:** 1.7.2 · **Última actualização:** 2026-02-23
 **Localização:** `c:\AT_Manut\`
 
 ---

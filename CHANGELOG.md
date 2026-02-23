@@ -22,6 +22,12 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 ### Qualidade
 - Suite mantém **270 testes** (12 specs) — todos a passar
 
+### Documentação actualizada
+- `docs/TESTES-E2E.md` — novos problemas técnicos documentados (selector QR, sessão auth, `navigate` durante render); config `playwright.config.js` corrigida; versão actualizada para v1.7.2
+- `docs/ROADMAP.md` — v1.7.1/v1.7.2 adicionados ao histórico; contagem E2E 270; versão actualizada
+- `README.md` — versão v1.7.2, tabela de tecnologias com leitor QR e recharts, contagem 270 testes
+- `DOCUMENTACAO.md` + `DESENVOLVIMENTO.md` — versão v1.7.2, contagem 270 testes
+
 ---
 
 ## [1.7.1] — 2026-02-23 — Cobertura E2E completa + Documentação v1.7.0
