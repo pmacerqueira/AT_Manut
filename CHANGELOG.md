@@ -4,6 +4,32 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.7.3] — 2026-02-23 — Optimizações de performance + Mock de dados grande
+
+### Performance — Bundle splitting
+- **`vite.config.js`:** `manualChunks` para `recharts`, `dompurify`, `qrcode` — eliminam-se do bundle inicial
+- **`Metricas.js`:** 381 KB → **13 KB** (−96.6%) — `recharts` só carregado ao visitar `/metricas`
+- **`Equipamentos.js`:** 47 KB → **22 KB** (−53%) — DOMPurify extraído para chunk próprio
+- **`vendor-qr`** (qrcode, 25 KB) e **`vendor-purify`** (DOMPurify, 22 KB): chunks lazy separados
+
+### Robustez de rede
+- **`apiService.js`:** `AbortController` com timeout 15s em todas as chamadas API (`call` e `apiLogin`)
+- Erro de timeout com `status: 408` e mensagem clara registada no log de sistema
+- Protege contra rede lenta no cPanel (Açores) — sem pendurar indefinidamente
+
+### Testes de performance (novo spec 13)
+- Criado `tests/e2e/mock-large.js` — 240 registos realistas (20 clientes açorianos, 60 máquinas, 120 manutenções, 40 relatórios)
+- Criado `tests/e2e/13-performance.spec.js` — 15 testes de carga e escalabilidade:
+  - Limiares de render: Dashboard < 5s, Métricas < 6s, Pesquisa < 2s
+  - Valida KPIs com dados volumosos, filtros, pesquisa global, badge "Sem email", indicador localStorage
+  - Testa separadamente a estrutura do dataset ML (contagens e regras de isolamento)
+
+### Qualidade
+- Suite: **285 testes** (13 specs) — todos a passar
+- Confirmado: `useMemo` em todos os KPIs e `React.lazy` em todas as rotas já estavam implementados
+
+---
+
 ## [1.7.2] — 2026-02-23 — Correcção de bugs E2E e robustez de testes
 
 ### Correcções de bugs

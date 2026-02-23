@@ -14,8 +14,9 @@
 
 import { logger } from '../utils/logger'
 
-const API_URL = 'https://www.navel.pt/api/data.php'
+const API_URL   = 'https://www.navel.pt/api/data.php'
 const TOKEN_KEY = 'atm_api_token'
+const TIMEOUT_MS = 15000  // 15s — protege contra rede lenta no cPanel
 
 // ── Token (sessionStorage: sessão termina ao fechar janela/separador) ──────────
 
@@ -46,16 +47,28 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
   if (id)   body.id   = id
   if (data) body.data = data
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
   let resp
   try {
     resp = await fetch(API_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
+      signal:  controller.signal,
     })
   } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutErr = new Error(`Timeout: API não respondeu em ${TIMEOUT_MS / 1000}s (${resource}/${action})`)
+      timeoutErr.status = 408
+      logger.error('apiService', 'call', timeoutErr.message, { resource, action })
+      throw timeoutErr
+    }
     logger.error('apiService', 'call', `Falha de rede ao contactar API (${resource}/${action})`, { msg: err?.message })
     throw err
+  } finally {
+    clearTimeout(timer)
   }
 
   const json = await resp.json().catch(() => ({ ok: false, message: `HTTP ${resp.status}` }))
@@ -77,16 +90,29 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
 
 export async function apiLogin(username, password) {
   const body = { _t: '', r: 'auth', action: 'login', username, password }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
   let resp
   try {
     resp = await fetch(API_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
+      signal:  controller.signal,
     })
   } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutErr = new Error(`Timeout: servidor não respondeu ao login em ${TIMEOUT_MS / 1000}s`)
+      timeoutErr.status = 408
+      logger.error('apiService', 'login', timeoutErr.message, {})
+      throw timeoutErr
+    }
     logger.error('apiService', 'login', 'Falha de rede ao contactar API de login', { msg: err?.message })
     throw err
+  } finally {
+    clearTimeout(timer)
   }
   const json = await resp.json().catch(() => ({ ok: false, message: `HTTP ${resp.status}` }))
   if (!json.ok) {

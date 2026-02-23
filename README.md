@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.7.2` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.7.3` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 

@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 270 testes automatizados cobrindo todos os fluxos, perfis de utilizador e funcionalidades.
-> Última revisão: 2026-02-23 — v1.7.2
+> 285 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
+> Última revisão: 2026-02-23 — v1.7.3
 
 ---
 
@@ -21,11 +21,13 @@
 | `10-etapas-evolucao.spec.js` | 48 | Vista "O meu dia", alertas badge, QR Code etiqueta, Histórico PDF |
 | `11-blocos-abc.spec.js` | 40 | Email clientes, config alertas, reagendamento, modal proactivo |
 | `12-v170-features.spec.js` | 42 | Pesquisa global, Leitor QR, Modo campo, Métricas, localStorage |
-| **Total** | **270** | **100% dos fluxos da aplicação** |
+| `13-performance.spec.js` | 15 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
+| **Total** | **285** | **100% dos fluxos da aplicação + escalabilidade** |
 
 > **Specs 01–09** (140 testes): cobertura base do núcleo da aplicação.
 > **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
 > **Spec 12** (42 testes): funcionalidades v1.7.0 (pesquisa, leitor QR, modo campo, métricas, localStorage).
+> **Spec 13** (15 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
 
 ---
 
@@ -328,4 +330,4 @@ Regra: **não usar `required` em campos com validação customizada JS** — rem
 
 ---
 
-*Última actualização: 2026-02-23 — v1.7.2*
+*Última actualização: 2026-02-23 — v1.7.3*
