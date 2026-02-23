@@ -162,24 +162,38 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A app tem **137 testes automatizados** em `tests/e2e/` que cobrem todos os fluxos e perfis.
+A suite tem **270 testes** (12 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
 
 ```powershell
 # Pré-requisito: servidor de desenvolvimento a correr
-npm run dev
+npm run dev   # http://localhost:5173
 
-# Executar toda a suite
+# Suite completa
 npx playwright test tests/e2e/
 
-# Ficheiro específico
-npx playwright test tests/e2e/04-manutencoes.spec.js
+# Spec específico
+npx playwright test tests/e2e/12-v170-features.spec.js
 ```
 
 **Regras:**
-- Correr a suite antes de qualquer build importante (`npx playwright test tests/e2e/`)
-- Os testes usam mock de API — não precisam de servidor real, apenas do `npm run dev`
+- Correr a suite antes de qualquer build importante
+- Os testes usam mock de API (`setupApiMock`) — não precisam de servidor real
 - Ao alterar seletores CSS usados nos testes, actualizar `tests/e2e/helpers.js` e os specs afectados
-- Documentação completa: `docs/TESTES-E2E.md`
+- Não usar `button[title*="QR"]` (ambíguo) — usar selector exacto `button[title="Gerar etiqueta QR"]`
+- Isolamento de sessão: `await page.evaluate(() => sessionStorage.clear())` antes de `doLoginTecnico()` quando o `beforeEach` faz login como Admin
+- Nunca usar `navigate()` directamente no corpo de um componente React — sempre dentro de `useEffect`
+
+## Fluxo pós-testes E2E — Documentação obrigatória
+
+**Após cada ciclo de testes E2E** (novos testes, correcções, novas funcionalidades), executar sempre:
+
+1. Actualizar `APP_VERSION` em `src/config/version.js`
+2. Actualizar contagem de testes em: `README.md`, `docs/TESTES-E2E.md`, `docs/ROADMAP.md`, `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`
+3. Documentar bugs corrigidos na secção "Problemas técnicos documentados" de `docs/TESTES-E2E.md`
+4. Adicionar entrada ao `CHANGELOG.md` com secções: Correcções, Qualidade (contagem), Documentação actualizada
+5. `git add -A` + commit + push
+
+> Ver regra global `post-e2e-docs-workflow.mdc` para o padrão completo reutilizável em todos os projectos.
 
 ## Rodapé em relatórios
 
