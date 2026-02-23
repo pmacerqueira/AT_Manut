@@ -4,6 +4,29 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.2] — 2026-02-23 — Plano de consumíveis por máquina · Checklist de execução · Relatório discriminado
+
+### Fluxo de criação de compressor KAESER
+- **`MaquinaFormModal`** passa a retornar `(maqData, modo)` no `onSave`, permitindo que o chamador saiba qual máquina foi criada e em que modo
+- **`Clientes.jsx`**: após criar um compressor KAESER, `PecasPlanoModal` abre automaticamente para configurar o plano da nova máquina
+- **`PecasPlanoModal`**: novo prop `modoInicial` — mostra banner de boas-vindas a orientar o utilizador a configurar o plano (via template ou inserção manual), apenas quando o plano ainda está vazio
+
+### Checklist de consumíveis na execução
+- **`ExecutarManutencaoModal`**: secção "Consumíveis e peças" completamente redesenhada como checklist visual
+  - Cada item tem checkbox **Sim/Não** (✓ verde / fundo neutro barrado)
+  - Botões **"✓ Marcar todos"** e **"✗ Desmarcar todos"** no cabeçalho da secção
+  - Itens do plano carregam com `usado: true` por defeito (podem ser desmarcados)
+  - "Adicionar consumível manualmente" cria item com `usado: true`
+  - Campo `usado: boolean` substitui `quantidadeUsada: number` (formato interno)
+
+### Relatório de manutenção — consumíveis discriminados
+- **`relatorioHtml.js`**: secção "Consumíveis e peças" mostra dois grupos:
+  - **Utilizados** (✓ fundo verde claro) — itens com `usado: true`
+  - **Não utilizados** (✗ fundo cinza, texto riscado) — itens com `usado: false`
+  - Compatibilidade retroactiva: relatórios antigos com `quantidadeUsada` são convertidos automaticamente
+
+---
+
 ## [1.8.1] — 2026-02-23 — Ciclo KAESER anual · Badge de tipo na lista · Posição no formulário
 
 ### Ciclo KAESER — lógica anual completa

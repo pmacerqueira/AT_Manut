@@ -457,40 +457,116 @@
   .modal-fotos-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
 }
 
-/* ── Peças e consumíveis utilizados (ExecutarManutencaoModal) ── */
-.pecas-usadas-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.25rem;
-}
-
-.peca-usada-row {
+/* ── Consumíveis e peças — checklist (ExecutarManutencaoModal) ── */
+.pecas-checklist-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.pecas-checklist-header h3 {
+  margin: 0;
+}
+
+.pecas-checklist-actions {
+  display: flex;
   gap: 0.4rem;
-  padding: 0.3rem 0.5rem;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.btn-checklist-all {
+  font-size: 0.75rem;
+  padding: 0.22rem 0.7rem;
   border-radius: 5px;
+  border: 1px solid;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.btn-marcar {
+  background: rgba(34,197,94,0.1);
+  color: #16a34a;
+  border-color: rgba(34,197,94,0.35);
+}
+.btn-marcar:hover { background: rgba(34,197,94,0.2); }
+
+.btn-desmarcar {
+  background: rgba(239,68,68,0.08);
+  color: #dc2626;
+  border-color: rgba(239,68,68,0.3);
+}
+.btn-desmarcar:hover { background: rgba(239,68,68,0.15); }
+
+.pecas-checklist-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+
+.peca-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.15s;
   font-size: 0.82rem;
-  flex-wrap: nowrap;
-  overflow: hidden;
+}
+
+.peca-checklist-row.peca-usada {
+  background: rgba(34,197,94,0.07);
+  border-color: rgba(34,197,94,0.28);
+}
+
+.peca-checklist-row.peca-nao-usada {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  opacity: 0.62;
+}
+
+.peca-checklist-row.peca-nao-usada .peca-checklist-info {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.peca-checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+.peca-checklist-info {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .peca-pos {
   font-family: monospace;
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   color: var(--color-text-muted);
-  min-width: 42px;
   flex-shrink: 0;
+  background: var(--color-bg-secondary);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
 }
 
 .peca-codigo {
   font-family: monospace;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--color-primary);
-  min-width: 110px;
   flex-shrink: 0;
 }
 
@@ -499,29 +575,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 80px;
 }
 
-.peca-qty-input {
-  width: 58px;
-  padding: 0.2rem 0.35rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  font-size: 0.82rem;
-  text-align: right;
-  background: var(--color-bg);
-  color: var(--color-text);
-  flex-shrink: 0;
-}
-
-.peca-un {
-  min-width: 30px;
+.peca-qty-un {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   flex-shrink: 0;
+  font-weight: 600;
+}
+
+.peca-remove-btn {
+  flex-shrink: 0;
+  padding: 2px 4px !important;
+  margin-left: auto;
 }
 
 @media (max-width: 540px) {
-  .peca-usada-row { flex-wrap: wrap; }
-  .peca-codigo { min-width: unset; }
-  .peca-desc { min-width: 100%; order: -1; }
+  .peca-checklist-info { flex-wrap: wrap; }
+  .peca-codigo, .peca-pos { min-width: unset; }
+  .peca-desc { min-width: 100%; }
 }

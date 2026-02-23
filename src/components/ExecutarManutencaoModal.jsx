@@ -155,11 +155,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       : ''
     const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
     const pecasExistentes = existingRel?.pecasUsadas ?? []
+    // Normalizar formato antigo (quantidadeUsada) para novo (usado: bool)
+    const normalizarPecas = (lista) => lista.map(p =>
+      'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
+    )
     // Pré-carregar peças do plano se houver tipo definido e ainda não houver peças no relatório
     const pecasUsadas = pecasExistentes.length > 0
-      ? pecasExistentes
+      ? normalizarPecas(pecasExistentes)
       : (tipoManutKaeser && maq
-          ? (getPecasPlanoByMaquina(maq.id, tipoManutKaeser) ?? []).map(p => ({ ...p, quantidadeUsada: p.quantidade }))
+          ? (getPecasPlanoByMaquina(maq.id, tipoManutKaeser) ?? []).map(p => ({ ...p, usado: true }))
           : [])
     setForm({
       checklistRespostas,
@@ -695,7 +699,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   onChange={e => {
                     const tipo = e.target.value
                     const novasPecas = tipo && maq
-                      ? (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, quantidadeUsada: p.quantidade }))
+                      ? (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, usado: true }))
                       : []
                     setForm(f => ({ ...f, tipoManutKaeser: tipo, pecasUsadas: novasPecas }))
                   }}
@@ -712,60 +716,82 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </div>
           )}
 
-          {/* ── Peças e consumíveis utilizados ── */}
+          {/* ── Consumíveis e peças — checklist ── */}
           {(form.pecasUsadas.length > 0 || (isCompressor && form.tipoManutKaeser)) && (
             <div className="form-section">
-              <h3>Peças e consumíveis utilizados</h3>
+              <div className="pecas-checklist-header">
+                <h3>Consumíveis e peças</h3>
+                {form.pecasUsadas.length > 0 && (
+                  <div className="pecas-checklist-actions">
+                    <button
+                      type="button"
+                      className="btn-checklist-all btn-marcar"
+                      onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map(p => ({ ...p, usado: true })) }))}
+                    >
+                      ✓ Marcar todos
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-checklist-all btn-desmarcar"
+                      onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map(p => ({ ...p, usado: false })) }))}
+                    >
+                      ✗ Desmarcar todos
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {form.pecasUsadas.length === 0 ? (
                 <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                  Nenhum plano configurado para este tipo. Adicione peças abaixo ou configure o plano em Equipamentos.
+                  Nenhum plano configurado para este tipo. Adicione consumíveis abaixo ou configure o plano em Equipamentos → Plano de peças.
                 </p>
               ) : (
-                <div className="pecas-usadas-lista">
+                <div className="pecas-checklist-lista">
                   {form.pecasUsadas.map((p, idx) => (
-                    <div key={p.id ?? idx} className="peca-usada-row">
-                      {p.posicao && <span className="peca-pos">{p.posicao}</span>}
-                      <span className="peca-codigo">{p.codigoArtigo}</span>
-                      <span className="peca-desc">{p.descricao}</span>
+                    <label
+                      key={p.id ?? idx}
+                      className={`peca-checklist-row${p.usado ? ' peca-usada' : ' peca-nao-usada'}`}
+                    >
                       <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        className="peca-qty-input"
-                        value={p.quantidadeUsada ?? p.quantidade}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0
-                          setForm(f => ({
-                            ...f,
-                            pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, quantidadeUsada: val } : pp)
-                          }))
-                        }}
-                        title="Quantidade utilizada"
+                        type="checkbox"
+                        checked={!!p.usado}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, usado: e.target.checked } : pp)
+                        }))}
+                        className="peca-checkbox"
                       />
-                      <span className="peca-un">{p.unidade}</span>
-                      <button
-                        type="button"
-                        className="icon-btn danger"
-                        style={{ padding: '2px 5px' }}
-                        onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))}
-                        title="Remover desta lista"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
+                      <span className="peca-checklist-info">
+                        {p.posicao && <span className="peca-pos">{p.posicao}</span>}
+                        {p.codigoArtigo && <span className="peca-codigo">{p.codigoArtigo}</span>}
+                        <span className="peca-desc">{p.descricao || '—'}</span>
+                        <span className="peca-qty-un">{p.quantidade} {p.unidade}</span>
+                      </span>
+                      {p.manual && (
+                        <button
+                          type="button"
+                          className="icon-btn danger peca-remove-btn"
+                          onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))}
+                          title="Remover"
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
+                    </label>
                   ))}
                 </div>
               )}
+
               <button
                 type="button"
                 className="btn-link-checklist"
                 style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}
                 onClick={() => setForm(f => ({
                   ...f,
-                  pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: '', quantidadeUsada: 1, unidade: 'PÇ', manual: true }]
+                  pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: 'Item manual', quantidade: 1, unidade: 'PÇ', usado: true, manual: true }]
                 }))}
               >
-                + Adicionar peça manualmente
+                + Adicionar consumível manualmente
               </button>
             </div>
           )}

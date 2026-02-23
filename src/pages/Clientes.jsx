@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData, TIPOS_DOCUMENTO } from '../context/DataContext'
+import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import MaquinaFormModal from '../components/MaquinaFormModal'
+import PecasPlanoModal from '../components/PecasPlanoModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
@@ -16,6 +17,7 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
+import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada' }
@@ -45,6 +47,7 @@ export default function Clientes() {
   const [fichaSubcategoria, setFichaSubcategoria] = useState(null)
   const [fichaMaquina, setFichaMaquina] = useState(null)
   const [modalMaquina, setModalMaquina] = useState(null)
+  const [modalPecasAuto, setModalPecasAuto] = useState(null) // auto-aberto ao criar compressor KAESER
   const [modalDoc, setModalDoc] = useState(null)
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalEmail, setModalEmail] = useState(null)
@@ -448,8 +451,27 @@ export default function Clientes() {
       )}
 
       {modalMaquina && (
-        <MaquinaFormModal isOpen onClose={() => setModalMaquina(null)} mode={modalMaquina.mode} clienteNifLocked={modalMaquina.clienteNif} maquina={modalMaquina.maquina} />
+        <MaquinaFormModal
+          isOpen
+          onClose={() => setModalMaquina(null)}
+          mode={modalMaquina.mode}
+          clienteNifLocked={modalMaquina.clienteNif}
+          maquina={modalMaquina.maquina}
+          onSave={(maqData, modo) => {
+            if (modo === 'add' && maqData && SUBCATEGORIAS_COMPRESSOR.includes(maqData.subcategoriaId)) {
+              // Abrir automaticamente o plano de consumíveis para o novo compressor
+              setModalPecasAuto(maqData)
+            }
+          }}
+        />
       )}
+
+      <PecasPlanoModal
+        isOpen={!!modalPecasAuto}
+        onClose={() => setModalPecasAuto(null)}
+        maquina={modalPecasAuto}
+        modoInicial
+      />
 
       <DocumentacaoModal isOpen={!!modalDoc} onClose={() => setModalDoc(null)} maquina={modalDoc} />
 

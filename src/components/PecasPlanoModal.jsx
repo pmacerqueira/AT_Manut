@@ -21,7 +21,7 @@ const UNIDADES = ['PÇ', 'TER', 'L', 'KG', 'M', 'UN']
 
 const PECA_VAZIA = { posicao: '', codigoArtigo: '', descricao: '', quantidade: 1, unidade: 'PÇ' }
 
-export default function PecasPlanoModal({ isOpen, onClose, maquina }) {
+export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial = false }) {
   const { getPecasPlanoByMaquina, addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getSubcategoria } = useData()
   const { showToast } = useToast()
   const [tipoAtivo, setTipoAtivo] = useState('A')
@@ -132,6 +132,17 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina }) {
           })}
           <span className="tab-total">{totalMaquina > 0 ? `${totalMaquina} peças no total` : 'Sem peças configuradas'}</span>
         </div>
+
+        {/* Banner de boas-vindas — primeiro setup do plano */}
+        {modoInicial && totalMaquina === 0 && (
+          <div className="modal-pecas-boas-vindas">
+            <strong>Equipamento criado!</strong>
+            {isCompressor
+              ? <> Configure agora o plano de consumíveis deste compressor para cada tipo de manutenção (A, B, C, D). Use <em>"Importar template"</em> para pré-preencher com o modelo de referência e ajuste os artigos ao número de série desta máquina.</>
+              : <> Configure os consumíveis recomendados para as manutenções periódicas deste equipamento.</>
+            }
+          </div>
+        )}
 
         {/* Importar template KAESER (só para compressores) */}
         {isCompressor && tipoAtivo !== 'periodica' && (

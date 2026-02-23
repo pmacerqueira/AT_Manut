@@ -109,13 +109,14 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     e.preventDefault()
     const { categoriaId: _cid, id, ...payload } = form
     if (mode === 'add') {
-      addMaquina(payload)
+      const novoId = addMaquina(payload)
       showToast('Equipamento adicionado com sucesso.', 'success')
+      onSave?.({ id: novoId, ...payload }, 'add')
     } else {
       updateMaquina(id, payload)
       showToast('Equipamento actualizado com sucesso.', 'success')
+      onSave?.({ id, ...payload }, 'edit')
     }
-    onSave?.()
     onClose()
   }
 

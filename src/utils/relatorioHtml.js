@@ -128,11 +128,16 @@ section{margin-bottom:9px}
 .pecas-table{width:100%;border-collapse:collapse;font-size:9.5px}
 .pecas-table th{background:var(--azul);color:#fff;padding:3px 5px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.04em}
 .pecas-table td{padding:2.5px 5px;border-bottom:1px solid #edf2f7;vertical-align:middle}
-.pecas-table tr:nth-child(even) td{background:var(--cinza)}
-.pecas-table .cell-pos{width:55px;color:var(--muted);font-family:monospace;font-size:8.5px}
-.pecas-table .cell-code{width:130px;font-family:monospace;font-size:8.5px}
-.pecas-table .cell-qty{width:45px;text-align:right}
-.pecas-table .cell-un{width:40px}
+.pecas-table tr.row-usado td{background:#f0fdf4}
+.pecas-table tr.row-nao-usado td{background:#fafafa;color:#9ca3af}
+.pecas-table tr.row-nao-usado .cell-desc{text-decoration:line-through}
+.pecas-table .cell-status{width:22px;text-align:center;font-size:10px}
+.pecas-table .cell-pos{width:50px;color:var(--muted);font-family:monospace;font-size:8.5px}
+.pecas-table .cell-code{width:120px;font-family:monospace;font-size:8.5px}
+.pecas-table .cell-desc{}
+.pecas-table .cell-qty{width:38px;text-align:right}
+.pecas-table .cell-un{width:35px}
+.pecas-secao-label{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:6px 0 3px}
 </style>
 </head>
 <body>
@@ -223,25 +228,40 @@ section{margin-bottom:9px}
     html += `</section>`
   }
 
-  // Secção de peças e consumíveis
+  // Secção de peças e consumíveis (suporta formato novo: usado:bool; e legado: quantidadeUsada)
   if (relatorio.pecasUsadas?.length > 0) {
     const tipoLabel = relatorio.tipoManutKaeser ? ` — Manutenção Tipo ${relatorio.tipoManutKaeser}` : ''
+    const normalizar = (p) => {
+      if ('usado' in p) return p
+      // formato legado: quantidadeUsada > 0 → usado
+      return { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
+    }
+    const pecas = relatorio.pecasUsadas.map(normalizar)
+    const usadas    = pecas.filter(p => p.usado)
+    const naoUsadas = pecas.filter(p => !p.usado)
+
+    const linhaHtml = (p, rowClass) => `
+      <tr class="${rowClass}">
+        <td class="cell-status">${rowClass === 'row-usado' ? '✓' : '✗'}</td>
+        <td class="cell-pos">${esc(p.posicao ?? '')}</td>
+        <td class="cell-code">${esc(p.codigoArtigo ?? '')}</td>
+        <td class="cell-desc">${esc(p.descricao ?? '')}</td>
+        <td class="cell-qty">${p.quantidade ?? ''}</td>
+        <td class="cell-un">${esc(p.unidade ?? '')}</td>
+      </tr>`
+
     html += `
 <section>
-  <div class="rpt-section-title">Peças e consumíveis utilizados${tipoLabel}</div>
+  <div class="rpt-section-title">Consumíveis e peças${tipoLabel}</div>
   <table class="pecas-table">
     <thead>
-      <tr><th>Pos.</th><th>Código artigo</th><th>Descrição</th><th>Qtd.</th><th>Un.</th></tr>
+      <tr><th></th><th>Pos.</th><th>Código artigo</th><th>Descrição</th><th>Qtd.</th><th>Un.</th></tr>
     </thead>
     <tbody>
-      ${relatorio.pecasUsadas.map(p => `
-      <tr>
-        <td class="cell-pos">${esc(p.posicao ?? '—')}</td>
-        <td class="cell-code">${esc(p.codigoArtigo)}</td>
-        <td>${esc(p.descricao)}</td>
-        <td class="cell-qty">${p.quantidadeUsada ?? p.quantidade}</td>
-        <td class="cell-un">${esc(p.unidade)}</td>
-      </tr>`).join('')}
+      ${usadas.length > 0 ? `<tr><td colspan="6" class="pecas-secao-label">Utilizados (${usadas.length})</td></tr>` : ''}
+      ${usadas.map(p => linhaHtml(p, 'row-usado')).join('')}
+      ${naoUsadas.length > 0 ? `<tr><td colspan="6" class="pecas-secao-label">Não utilizados (${naoUsadas.length})</td></tr>` : ''}
+      ${naoUsadas.map(p => linhaHtml(p, 'row-nao-usado')).join('')}
     </tbody>
   </table>
 </section>`
