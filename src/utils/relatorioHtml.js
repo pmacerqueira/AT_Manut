@@ -9,12 +9,12 @@ import { DECLARACAO_CLIENTE } from '../constants/relatorio'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
 import {
-  SUBCATEGORIAS_COMPRESSOR,
   INTERVALOS_KAESER,
   SEQUENCIA_KAESER,
   tipoKaeserNaPosicao,
   proximaPosicaoKaeser,
   descricaoCicloKaeser,
+  isKaeserMarca,
 } from '../context/DataContext'
 
 const EMPRESA = {
@@ -32,10 +32,12 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
   const logoSrc = logoUrl ?? '/manut/logo.png'
   const esc = escapeHtml
 
-  // ── Detecção KAESER ──
+  // ── Detecção KAESER — baseada na marca da máquina (não na subcategoria)
+  // KAESER é exclusivo da categoria Compressores; outras marcas (Fini, ECF, IES, LaPadana)
+  // também são compressores mas não usam o formato de relatório KAESER dedicado.
   const isKaeser = !!(
     relatorio.tipoManutKaeser ||
-    (maquina?.posicaoKaeser != null && SUBCATEGORIAS_COMPRESSOR.includes(maquina?.subcategoriaId))
+    isKaeserMarca(maquina?.marca)
   )
   const tipoKaeser       = relatorio.tipoManutKaeser ?? ''
   const infoTipoKaeser   = tipoKaeser ? INTERVALOS_KAESER[tipoKaeser] : null

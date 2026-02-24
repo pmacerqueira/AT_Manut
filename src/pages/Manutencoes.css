@@ -118,7 +118,7 @@
 .badge-concluida { background: rgba(34, 197, 94, 0.2); color: var(--color-success); white-space: nowrap; }
 .badge-em_progresso { background: rgba(249, 115, 22, 0.18); color: #f97316; white-space: nowrap; font-weight: 600; }
 
-/* Badge tipo KAESER na lista de manutenções */
+/* Badge de ciclo de manutenção para compressores */
 .badge.kaeser-tipo-badge {
   background: rgba(var(--color-primary-rgb, 59,130,246), 0.12);
   color: var(--color-primary);
@@ -128,6 +128,13 @@
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
   letter-spacing: 0.03em;
+}
+/* Variante para compressores não KAESER (Fini, ECF, IES, LaPadana) */
+.badge.kaeser-tipo-badge--outro {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.3);
+  font-weight: 600;
 }
 
 /* Hint do ciclo KAESER no modal de execução */

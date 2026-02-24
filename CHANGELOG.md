@@ -4,6 +4,25 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.4] — 2026-02-24 — Marcas correctas · KAESER exclusivo · Migrations MySQL
+
+### Regra de negócio: KAESER exclusivo de compressores
+- **`isKaeserMarca(marca)`** — detecção por marca (não por subcategoria); KAESER é exclusivo da categoria Compressores
+- **`MARCAS_COMPRESSOR`** e **`MARCAS_ELEVADOR`** — constantes exportadas para sugestão no formulário de máquina
+- **Badges**: "KAESER X" só para marca KAESER; outros compressores (Fini, ECF, IES, LaPadana) mostram "Marca X"
+- **PecasPlanoModal**: template de importação KAESER ASK 28T apenas para máquinas com marca KAESER
+- **relatorioHtml.js**: bloco KAESER no relatório baseado em `marca === 'KAESER'`
+
+### Dados e migrations
+- **Mock data** (DataContext): marcas actualizadas — compressores: KAESER, Fini, ECF, IES, LaPadana; elevadores: Cascos, Ravaglioli, Space, Kroftools, TwinBusch, Sunshine, Werther, Velyen
+- **seed_mock_data.sql**: v1.8.4 com marcas correctas e coluna `posicao_kaeser`
+- **MIGRACAO_MYSQL.md**: 7.3b (posicao_kaeser em maquinas), 7.3c (UPDATEs de marcas)
+
+### Testes E2E
+- **14-kaeser-features.spec.js**: ajustes de locators (K5.3, K6.1, K9.2) para maior robustez
+
+---
+
 ## [1.8.3] — 2026-02-23 — Relatório KAESER completo: bloco de equipamento, ciclo visual, consumíveis sem limite de páginas
 
 ### Relatório de manutenção — Compressor KAESER

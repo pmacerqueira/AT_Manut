@@ -4,7 +4,7 @@
  * Admin pode adicionar, editar, remover peças e importar plano de referência KAESER.
  */
 import { useState, useMemo } from 'react'
-import { useData, KAESER_PLANO_ASK_28T, INTERVALOS_KAESER, SUBCATEGORIAS_COMPRESSOR } from '../context/DataContext'
+import { useData, KAESER_PLANO_ASK_28T, INTERVALOS_KAESER, SUBCATEGORIAS_COMPRESSOR, isKaeserMarca } from '../context/DataContext'
 import { useToast } from './Toast'
 import { Plus, Trash2, Download, X, Save, ChevronDown, ChevronUp, PackageOpen } from 'lucide-react'
 import './PecasPlanoModal.css'
@@ -30,8 +30,9 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
   const [formEdit, setFormEdit] = useState(PECA_VAZIA)
   const [confirmarLimpar, setConfirmarLimpar] = useState(false)
 
-  const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
+  const sub          = maquina ? getSubcategoria(maquina.subcategoriaId) : null
   const isCompressor = maquina && SUBCATEGORIAS_COMPRESSOR.includes(maquina.subcategoriaId)
+  const isKaeser     = maquina && isKaeserMarca(maquina.marca)
 
   // Tipos a mostrar: A/B/C/D para compressores, só "periódica" para outros
   const tiposVisiveis = isCompressor ? TIPOS_MANUT : TIPOS_MANUT.filter(t => t.id === 'periodica')
@@ -144,8 +145,8 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
           </div>
         )}
 
-        {/* Importar template KAESER (só para compressores) */}
-        {isCompressor && tipoAtivo !== 'periodica' && (
+        {/* Importar template KAESER ASK 28T — exclusivo para máquinas KAESER */}
+        {isKaeser && tipoAtivo !== 'periodica' && (
           <div className="modal-pecas-import">
             <span className="import-hint">
               Template de referência disponível: <strong>KAESER ASK 28T</strong> — {INTERVALOS_KAESER[tipoAtivo]?.label}
@@ -161,7 +162,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
           {pecasTipo.length === 0 ? (
             <p className="modal-pecas-vazio">
               Sem peças configuradas para <strong>Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo}</strong>.
-              {isCompressor && tipoAtivo !== 'periodica' && ' Use "Importar template" para pré-preencher.'}
+              {isKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template" para pré-preencher a partir do plano KAESER ASK 28T.'}
             </p>
           ) : (
             <table className="tabela-pecas">

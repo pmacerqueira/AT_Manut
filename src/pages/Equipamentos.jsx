@@ -195,8 +195,11 @@ export default function Equipamentos() {
                           </div>
                           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                             {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
-                              <span className="badge kaeser-tipo-badge" title={`Próxima: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}>
-                                KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                              <span
+                                className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
+                                title={`Próxima manutenção Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
+                              >
+                                {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
                               </span>
                             )}
                             <span className="badge badge-danger">
@@ -297,8 +300,11 @@ export default function Equipamentos() {
                         <strong>{m.marca} {m.modelo}</strong>
                         <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
                         {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
-                          <span className="badge kaeser-tipo-badge" title={`Ciclo KAESER — próxima manutenção: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}>
-                            KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                          <span
+                            className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
+                            title={`Ciclo de manutenção — próximo: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
+                          >
+                            {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
                           </span>
                         )}
                         {m.ultimaManutencaoData && (

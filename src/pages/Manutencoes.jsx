@@ -417,8 +417,11 @@ export default function Manutencoes() {
                     <div className="mc-top">
                       <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
                       {maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId) && maq.posicaoKaeser != null && !isConcluida && (
-                        <span className="badge kaeser-tipo-badge" title={`Próxima manutenção KAESER: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}>
-                          KAESER {tipoKaeserNaPosicao(maq.posicaoKaeser)}
+                        <span
+                          className={`badge kaeser-tipo-badge${maq.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
+                          title={`Próxima manutenção ${maq.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : 'compressor'}: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}
+                        >
+                          {maq.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : maq.marca} {tipoKaeserNaPosicao(maq.posicaoKaeser)}
                         </span>
                       )}
                       <span className="mc-tipo-label">

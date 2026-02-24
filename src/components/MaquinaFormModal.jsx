@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useData } from '../context/DataContext'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser, MARCAS_COMPRESSOR, MARCAS_ELEVADOR } from '../context/DataContext'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from './Toast'
@@ -186,7 +186,17 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           <div className="form-row">
             <label>
               Marca
-              <input value={form.marca} onChange={e => setForm(f => ({ ...f, marca: e.target.value }))} placeholder="Ex: Navel" />
+              <input
+                value={form.marca}
+                onChange={e => setForm(f => ({ ...f, marca: e.target.value }))}
+                placeholder={isCompressor(form.subcategoriaId) ? 'Ex: KAESER, Fini, ECF…' : 'Ex: Cascos, Ravaglioli…'}
+                list="marcas-sugestoes"
+              />
+              <datalist id="marcas-sugestoes">
+                {(isCompressor(form.subcategoriaId) ? MARCAS_COMPRESSOR : MARCAS_ELEVADOR).map(m => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </label>
             <label>
               Modelo
