@@ -50,6 +50,7 @@ export const MC = {
   subcategorias: [
     { id: 'sub1', categoriaId: 'cat1', nome: 'Elevador electromecânico de ligeiros' },
     { id: 'sub2', categoriaId: 'cat1', nome: 'Elevador electro-hidráulico de 2 colunas' },
+    { id: 'sub5', categoriaId: 'cat2', nome: 'Compressor de parafuso' },
   ],
   checklistItems: [
     // Periódica sub1 (3 itens para simplificar testes)
@@ -72,6 +73,12 @@ export const MC = {
       id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub2',
       periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EH-2C',
       numeroSerie: 'NAV-002', anoFabrico: 2025, documentos: [],
+      proximaManut: null, ultimaManutencaoData: null,
+    },
+    {
+      id: 'm03', clienteNif: '511234567', subcategoriaId: 'sub5',
+      periodicidadeManut: 'trimestral', marca: 'KAESER', modelo: 'Sigma 7',
+      numeroSerie: 'KS-003', anoFabrico: 2023, documentos: [],
       proximaManut: null, ultimaManutencaoData: null,
     },
   ],
@@ -202,6 +209,51 @@ export async function doLogin(page, { username = 'Admin', password = 'admin123' 
 
 export async function doLoginAdmin(page)   { return doLogin(page, { username: 'Admin',    password: 'admin123' }) }
 export async function doLoginTecnico(page) { return doLogin(page, { username: 'ATecnica', password: 'tecnico123' }) }
+
+/**
+ * Dispensar o modal de alertas de conformidade (evita sobreposição em testes).
+ * Chamar após login, antes de navegar para páginas onde o modal poderia aparecer.
+ */
+export function dismissAlertasModal(page) {
+  return page.evaluate(() => {
+    localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
+  })
+}
+
+/**
+ * Login Admin + dispensar alertas + navegar.
+ * Padrão para testes que não precisam do modal de alertas (evita flakiness).
+ * @param {Page} page
+ * @param {object} opts
+ *   path       — rota após /manut (ex: '/' → /manut/, '/clientes' → /manut/clientes)
+ *   customData — dados mock customizados para setupApiMock
+ */
+export async function loginAdminSemAlertas(page, { path = '/', customData } = {}) {
+  await setupApiMock(page, customData ? { customData } : {})
+  await doLoginAdmin(page)
+  await dismissAlertasModal(page)
+  await page.evaluate(() => localStorage.removeItem('atm_modo_campo'))
+  const url = path === '/' ? '/manut/' : `/manut${path.startsWith('/') ? path : '/' + path}`
+  await page.goto(url)
+  await page.waitForLoadState('domcontentloaded')
+  await page.waitForTimeout(800)
+}
+
+/**
+ * Selector robusto para botão Editar (evita confusão com Relatório frota, etc.).
+ * Preferir button[title="Editar"] em vez de .icon-btn.secondary.
+ */
+export const SELETOR_BOTAO_EDITAR = 'button[title="Editar"]'
+
+/**
+ * Obter input de formulário pelo texto do label (mais robusto que .nth()).
+ * @param {Page} page
+ * @param {string} labelText — texto do label (ex: 'Nome do Cliente')
+ * @param {string} scope — selector do container (default '.modal')
+ */
+export function getInputByLabel(page, labelText, scope = '.modal') {
+  return page.locator(`${scope} label`).filter({ hasText: labelText }).locator('input')
+}
 
 // ── Acções no checklist ───────────────────────────────────────────────────────
 

@@ -72,7 +72,7 @@ npx playwright test tests/e2e/ -g "QR Code"
 ### `helpers.js` — utilitários partilhados
 
 ```js
-import { setupApiMock, doLoginAdmin, doLoginTecnico, MC } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, getInputByLabel, SELETOR_BOTAO_EDITAR, MC } from './helpers.js'
 
 // Interceptar API com dados mock (isola testes do servidor real)
 await setupApiMock(page)
@@ -82,12 +82,24 @@ await setupApiMock(page, { customData: MC_COM_ALERTA })  // dados customizados
 await doLoginAdmin(page)
 await doLoginTecnico(page)
 
+// Login Admin SEM modal de alertas (evita flakiness — preferir em specs gerais)
+await loginAdminSemAlertas(page, { path: '/' })           // → /manut/
+await loginAdminSemAlertas(page, { path: '/clientes' })    // → /manut/clientes
+
 // Preencher modal de execução de manutenção
 await fillExecucaoModal(page)
 
 // Assertar Toast (ephemeral — usar com cautela)
 await expectToast(page, /texto/, 5000)
 ```
+
+### Padrões de selectors (evitar flakiness)
+
+| Situação | Evitar | Preferir |
+|----------|--------|----------|
+| Botão Editar | `.icon-btn.secondary` (pode apanhar Relatório frota) | `SELETOR_BOTAO_EDITAR` ou `button[title="Editar"]` |
+| Campo de formulário | `input.nth(1)` (ordem pode mudar) | `getInputByLabel(page, 'Nome do Cliente')` |
+| Modal de alertas | Deixar aparecer (bloqueia interacção) | `dismissAlertasModal(page)` ou `loginAdminSemAlertas()` |
 
 ### Dados mock (`MC` — Mock Constants)
 
@@ -133,14 +145,8 @@ async function loginAdminComAlertas(page, customData = MC_COM_ALERTA) {
   await page.waitForTimeout(1500)
 }
 
-// Login como Admin SEM modal de alertas (dismiss definido)
-async function loginAdminSemAlertas(page) {
-  await setupApiMock(page)
-  await doLoginAdmin(page)
-  await page.evaluate(() => {
-    localStorage.setItem('atm_alertas_dismiss', new Date().toISOString().slice(0,10))
-  })
-}
+// Login como Admin SEM modal de alertas — helper exportado em helpers.js
+await loginAdminSemAlertas(page, { path: '/clientes' })  // path = rota após /manut
 ```
 
 ---

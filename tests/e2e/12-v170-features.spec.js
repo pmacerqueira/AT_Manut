@@ -9,22 +9,7 @@
  *  - Etapa 9: Indicador de uso do localStorage em Definições
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, MC } from './helpers.js'
-
-// ── Helpers locais ─────────────────────────────────────────────────────────
-
-async function loginAdminSemAlertas(page) {
-  await setupApiMock(page)
-  await doLoginAdmin(page)
-  // Dispensar alertas se aparecerem
-  await page.evaluate(() => {
-    localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
-    localStorage.removeItem('atm_modo_campo')
-  })
-  await page.goto('/manut/')
-  await page.waitForLoadState('domcontentloaded')
-  await page.waitForTimeout(800)
-}
+import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, MC } from './helpers.js'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ETAPA 7 — Pesquisa Global
@@ -200,6 +185,27 @@ test.describe('Leitor QR Code (Etapa 5)', () => {
     await page.waitForTimeout(800)
     const btn = page.locator('.nav-link--qr')
     await expect(btn).toBeVisible()
+  })
+
+  // Mock da câmara: 1 etiqueta por categoria (m01=Elevadores, m03=Compressores)
+  test('Q8 — Simular QR m01 (Elevadores) → navega para ficha da máquina', async ({ page }) => {
+    await page.evaluate(() => { window.__E2E_SIMULATE_QR = 'm01' })
+    await page.locator('.nav-link--qr').click()
+    await expect(page.locator('.qrr-modal')).toBeVisible()
+    await page.waitForTimeout(1200) // processar() tem setTimeout 800ms antes de navegar
+    await expect(page.locator('.qrr-modal')).not.toBeVisible()
+    await expect(page).toHaveURL(/\/manut\/equipamentos/)
+    await expect(page.locator('.maquina-row').filter({ hasText: 'Navel EV-4P' })).toBeVisible()
+  })
+
+  test('Q9 — Simular QR m03 (Compressores) → navega para ficha da máquina', async ({ page }) => {
+    await page.evaluate(() => { window.__E2E_SIMULATE_QR = 'm03' })
+    await page.locator('.nav-link--qr').click()
+    await expect(page.locator('.qrr-modal')).toBeVisible()
+    await page.waitForTimeout(1200)
+    await expect(page.locator('.qrr-modal')).not.toBeVisible()
+    await expect(page).toHaveURL(/\/manut\/equipamentos/)
+    await expect(page.locator('.maquina-row').filter({ hasText: 'KAESER Sigma 7' })).toBeVisible()
   })
 })
 

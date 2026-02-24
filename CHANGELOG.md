@@ -4,6 +4,17 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.5] — 2026-02-24 — Importação de planos KAESER a partir de PDF
+
+### Plano de peças — importar PDF por máquina
+- **Botão "Importar template para esta máquina"** — abre o explorador de ficheiros para escolher um PDF do plano KAESER
+- **Parser** `parseKaeserPlanoPdf.js` — extrai secções A, B, C e D do texto do PDF (posição, código, descrição, quantidade, unidade)
+- **Integração pdf-parse** — leitura de PDF no browser com `pdf-parse` (mehmet-kozan); worker `pdf.worker.mjs` em `public/` com `PDFParse.setWorker()` para compatibilidade
+- Substitui o plano existente da máquina e adiciona todas as peças em lote; toast com resumo por tipo (A/B/C/D)
+- Apenas visível para compressores KAESER (tabs A/B/C/D)
+
+---
+
 ## [1.8.4] — 2026-02-24 — Marcas correctas · KAESER exclusivo · Migrations MySQL
 
 ### Regra de negócio: KAESER exclusivo de compressores

@@ -1,12 +1,14 @@
 /**
  * PecasPlanoModal — Gestão do plano de peças e consumíveis por máquina.
  * Suporta tipos de manutenção A/B/C/D (KAESER) e Periódica (outros equipamentos).
- * Admin pode adicionar, editar, remover peças e importar plano de referência KAESER.
+ * KAESER: importar plano a partir de PDF (explorador de ficheiros).
  */
-import { useState, useMemo } from 'react'
-import { useData, KAESER_PLANO_ASK_28T, INTERVALOS_KAESER, SUBCATEGORIAS_COMPRESSOR, isKaeserMarca } from '../context/DataContext'
+import { useState, useMemo, useRef } from 'react'
+import { useData, SUBCATEGORIAS_COMPRESSOR, isKaeserMarca } from '../context/DataContext'
 import { useToast } from './Toast'
-import { Plus, Trash2, Download, X, Save, ChevronDown, ChevronUp, PackageOpen } from 'lucide-react'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
+import { parseKaeserPlanoPdf } from '../utils/parseKaeserPlanoPdf'
+import { Plus, Trash2, Upload, X, Save, ChevronDown, PackageOpen } from 'lucide-react'
 import './PecasPlanoModal.css'
 
 const TIPOS_MANUT = [
@@ -24,6 +26,8 @@ const PECA_VAZIA = { posicao: '', codigoArtigo: '', descricao: '', quantidade: 1
 export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial = false }) {
   const { getPecasPlanoByMaquina, addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getSubcategoria } = useData()
   const { showToast } = useToast()
+  const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
+  const fileInputRef = useRef(null)
   const [tipoAtivo, setTipoAtivo] = useState('A')
   const [formNova, setFormNova] = useState(PECA_VAZIA)
   const [editandoId, setEditandoId] = useState(null)
@@ -70,21 +74,50 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
     showToast('Peça actualizada.', 'success')
   }
 
-  const handleImportarKaeser = () => {
-    const planoComMaquina = KAESER_PLANO_ASK_28T
-      .filter(p => p.tipoManut === tipoAtivo)
-      .map(p => ({ ...p, maquinaId: maquina.id }))
+  const handleImportarPdf = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !maquina) return
+    e.target.value = ''
 
-    if (planoComMaquina.length === 0) {
-      showToast('Não existe plano de referência KAESER ASK 28T para o tipo ' + tipoAtivo + '.', 'info')
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('Seleccione um ficheiro PDF.', 'warning')
       return
     }
 
-    // Remove as peças existentes deste tipo e substitui pelo template
-    const existentes = getPecasPlanoByMaquina(maquina.id, tipoAtivo)
-    existentes.forEach(p => removePecaPlano(p.id))
-    addPecasPlanoLote(planoComMaquina)
-    showToast(`${planoComMaquina.length} peças importadas do template KAESER ASK 28T (Tipo ${tipoAtivo}).`, 'success')
+    showGlobalLoading()
+    try {
+      const { PDFParse } = await import('pdf-parse')
+      // Worker obrigatório no browser (pdfjs-dist)
+      PDFParse.setWorker(`${import.meta.env.BASE_URL}pdf.worker.mjs`)
+      const arrayBuffer = await file.arrayBuffer()
+      const parser = new PDFParse({ data: new Uint8Array(arrayBuffer) })
+      const { text } = await parser.getText()
+      parser.destroy?.()
+
+      const parsed = parseKaeserPlanoPdf(text || '')
+      const todas = []
+      for (const tipo of ['A', 'B', 'C', 'D']) {
+        for (const p of parsed[tipo] || []) {
+          todas.push({ ...p, maquinaId: maquina.id, tipoManut: tipo })
+        }
+      }
+
+      if (todas.length === 0) {
+        showToast('Não foi possível extrair peças do PDF. Verifique se o formato é um plano KAESER A/B/C/D.', 'warning')
+        return
+      }
+
+      // Substituir plano existente
+      removePecasPlanoByMaquina(maquina.id)
+      addPecasPlanoLote(todas)
+      const porTipo = { A: 0, B: 0, C: 0, D: 0 }
+      todas.forEach(p => { porTipo[p.tipoManut] = (porTipo[p.tipoManut] || 0) + 1 })
+      showToast(`${todas.length} peças importadas (A: ${porTipo.A}, B: ${porTipo.B}, C: ${porTipo.C}, D: ${porTipo.D}).`, 'success')
+    } catch (err) {
+      showToast(`Erro ao ler PDF: ${err?.message || 'desconhecido'}`, 'error')
+    } finally {
+      hideGlobalLoading()
+    }
   }
 
   const handleLimparTipo = () => {
@@ -145,14 +178,26 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
           </div>
         )}
 
-        {/* Importar template KAESER ASK 28T — exclusivo para máquinas KAESER */}
+        {/* Importar plano KAESER a partir de PDF — exclusivo para máquinas KAESER */}
         {isKaeser && tipoAtivo !== 'periodica' && (
           <div className="modal-pecas-import">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              className="hidden-file-input"
+              onChange={handleImportarPdf}
+              aria-label="Seleccionar PDF do plano de manutenção"
+            />
             <span className="import-hint">
-              Template de referência disponível: <strong>KAESER ASK 28T</strong> — {INTERVALOS_KAESER[tipoAtivo]?.label}
+              Selecione o PDF do plano de manutenção desta máquina (formato KAESER A/B/C/D).
             </span>
-            <button type="button" className="btn btn-sm secondary" onClick={handleImportarKaeser}>
-              <Download size={14} /> Importar template
+            <button
+              type="button"
+              className="btn btn-sm primary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={14} /> Importar template para esta máquina
             </button>
           </div>
         )}
@@ -162,7 +207,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
           {pecasTipo.length === 0 ? (
             <p className="modal-pecas-vazio">
               Sem peças configuradas para <strong>Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo}</strong>.
-              {isKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template" para pré-preencher a partir do plano KAESER ASK 28T.'}
+              {isKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template para esta máquina" para carregar o plano a partir de um PDF.'}
             </p>
           ) : (
             <table className="tabela-pecas">

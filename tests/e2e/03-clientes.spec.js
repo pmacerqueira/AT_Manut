@@ -2,18 +2,14 @@
  * 03-clientes.spec.js — Gestão de clientes: CRUD (Admin) + permissões (ATecnica)
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, MC } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, getInputByLabel, SELETOR_BOTAO_EDITAR, MC } from './helpers.js'
 
 // ── Admin ───────────────────────────────────────────────────────────────────
 
 test.describe('Clientes — Admin', () => {
 
   test.beforeEach(async ({ page }) => {
-    await setupApiMock(page)
-    await doLoginAdmin(page)
-    await page.goto('/manut/clientes')
-    await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(800)
+    await loginAdminSemAlertas(page, { path: '/clientes' })
   })
 
   test('Lista de clientes é visível', async ({ page }) => {
@@ -117,23 +113,20 @@ test.describe('Clientes — Admin', () => {
   })
 
   test('Editar cliente — guardar alterações', async ({ page }) => {
-    // Clicar no botão de editar do primeiro cliente
-    const editBtn = page.locator('.icon-btn.secondary, button[aria-label*="editar" i], button[title*="editar" i]').first()
+    const editBtn = page.locator(SELETOR_BOTAO_EDITAR).first()
     await expect(editBtn).toBeVisible({ timeout: 5000 })
     await editBtn.click()
 
-    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 4000 })
+    await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 })
 
-    // Alterar o campo Nome
-    const nomeInput = page.locator('.modal input').nth(1)
+    const nomeInput = getInputByLabel(page, 'Nome do Cliente')
     await nomeInput.clear()
     await nomeInput.fill('Mecânica Bettencourt Editada')
 
     await page.locator('.modal button[type="submit"]').click()
-    await page.waitForTimeout(800)
 
-    // Modal deve fechar
-    await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 4000 })
+    // Modal deve fechar (aguardar até 6s — submit + toast + unmount)
+    await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 6000 })
   })
 
   test('Eliminar cliente sem equipamentos → sucesso', async ({ page }) => {

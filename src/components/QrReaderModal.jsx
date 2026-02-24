@@ -41,6 +41,16 @@ export default function QrReaderModal({ isOpen, onClose }) {
     setMensagem('')
     setTextoQr('')
 
+    // E2E: simular leitura de QR (Playwright define window.__E2E_SIMULATE_QR = 'm01')
+    const sim = typeof window !== 'undefined' ? window.__E2E_SIMULATE_QR : null
+    if (typeof sim === 'string' && sim) {
+      window.__E2E_SIMULATE_QR = null // consumir
+      const url = `${window.location.origin}/manut/equipamentos?maquina=${encodeURIComponent(sim)}`
+      setEstado('a-ler')
+      requestAnimationFrame(() => processar(url))
+      return
+    }
+
     let cancelado = false
 
     const iniciar = async () => {
