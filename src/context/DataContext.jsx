@@ -1171,6 +1171,7 @@ export function DataProvider({ children }) {
   const removeReparacao = useCallback((id) => {
     setReparacoes(prev => prev.filter(r => r.id !== id))
     setRelatoriosReparacao(prev => prev.filter(r => r.reparacaoId !== id))
+    logger.action('DataContext', 'removeReparacao', `Reparação ${id} eliminada (e relatório associado)`, { id })
     import('../services/apiService').then(({ apiReparacoes }) =>
       persist(() => apiReparacoes.remove(id),
               { resource: 'reparacoes', action: 'delete', id })
@@ -1198,6 +1199,9 @@ export function DataProvider({ children }) {
 
     const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
     setRelatoriosReparacao(prev => [...prev, novo])
+    logger.action('DataContext', 'addRelatorioReparacao',
+      `Relatório de reparação criado: ${numeroRelatorio}`,
+      { id, reparacaoId: r.reparacaoId, assinado: novo.assinadoPeloCliente })
     import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
       persist(() => apiRelatoriosReparacao.create(novo),
               { resource: 'relatoriosReparacao', action: 'create', data: novo })
@@ -1207,6 +1211,10 @@ export function DataProvider({ children }) {
 
   const updateRelatorioReparacao = useCallback((id, data) => {
     setRelatoriosReparacao(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
+    const tipo = data.assinadoPeloCliente ? 'concluído e assinado' : 'progresso guardado'
+    logger.action('DataContext', 'updateRelatorioReparacao',
+      `Relatório de reparação ${id} actualizado (${tipo})`,
+      { id, assinado: data.assinadoPeloCliente ?? false })
     import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
       persist(() => apiRelatoriosReparacao.update(id, data),
               { resource: 'relatoriosReparacao', action: 'update', id, data })
