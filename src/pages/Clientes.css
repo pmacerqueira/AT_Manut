@@ -1,4 +1,84 @@
-/* Tabela condensada: todos os campos visíveis, máximo de linhas por ecrã */
+/* ── Vista mobile: lista de cartões compactos ── */
+.clientes-mobile-lista {
+  display: none; /* oculto em desktop */
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cliente-mobile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cliente-mobile-card:hover,
+.cliente-mobile-card:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+}
+
+.cliente-mobile-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.cliente-mobile-nome {
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cliente-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cliente-mobile-nif {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.cliente-mobile-loc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.cliente-mobile-loc::before { content: '·'; margin-right: 0.3rem; opacity: 0.5; }
+
+.cliente-mobile-maq {
+  font-size: 0.72rem;
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  font-weight: 600;
+}
+
+.cliente-mobile-chevron {
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .clientes-mobile-lista { display: flex; }
+  .clientes-table { display: none; }
+}
+
+/* ── Tabela condensada: todos os campos visíveis, máximo de linhas por ecrã ── */
 .clientes-table .data-table {
   font-size: 0.85em;
 }
@@ -49,6 +129,38 @@
   .clientes-table .data-table td:nth-child(1) { min-width: 4rem; }
   .clientes-table .data-table th:nth-child(4),
   .clientes-table .data-table td:nth-child(4) { min-width: 3.5rem; }
+}
+
+/* ── Ficha do cliente — header e acções ── */
+.ficha-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.ficha-header .ficha-titulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.ficha-btn-editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+.ficha-btn-frota {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.75rem;
 }
 
 /* Badge de aviso para clientes sem email */

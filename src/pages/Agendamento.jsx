@@ -98,7 +98,9 @@ export default function Agendamento() {
   const searchClienteDebounced = useDebounce(searchCliente, 250)
 
   const clientesComEquipamento = useMemo(() =>
-    clientes.filter(c => maquinas.some(m => m.clienteNif === c.nif)),
+    [...clientes]
+      .filter(c => maquinas.some(m => m.clienteNif === c.nif))
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt')),
   [clientes, maquinas])
 
   const clientesFiltrados = useMemo(() => {

@@ -167,13 +167,17 @@ export default function Clientes() {
 
   const clientesFiltrados = useMemo(() => {
     const q = searchClienteDebounced.trim().toLowerCase()
-    if (!q) return clientes
-    const palavras = q.split(/\s+/).filter(Boolean)
-    return clientes.filter(c => {
-      const nifMatch = (c.nif || '').toLowerCase().includes(q)
-      const nomeMatch = palavras.some(p => (c.nome || '').toLowerCase().includes(p))
-      return nifMatch || nomeMatch
-    })
+    const lista = q
+      ? (() => {
+          const palavras = q.split(/\s+/).filter(Boolean)
+          return clientes.filter(c => {
+            const nifMatch = (c.nif || '').toLowerCase().includes(q)
+            const nomeMatch = palavras.some(p => (c.nome || '').toLowerCase().includes(p))
+            return nifMatch || nomeMatch
+          })
+        })()
+      : clientes
+    return [...lista].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'))
   }, [searchClienteDebounced, clientes])
 
   return (
@@ -206,6 +210,40 @@ export default function Clientes() {
           </button>
         )}
       </div>
+      {/* Lista compacta — mobile */}
+      <div className="clientes-mobile-lista">
+        {clientesFiltrados.map(c => {
+          const nMaq = getMaquinasCount(c.nif)
+          return (
+            <button
+              key={c.nif}
+              type="button"
+              className="cliente-mobile-card"
+              onClick={() => openFicha(c)}
+            >
+              <div className="cliente-mobile-main">
+                <span className="cliente-mobile-nome">{c.nome}</span>
+                <div className="cliente-mobile-meta">
+                  <code className="cliente-mobile-nif">{c.nif}</code>
+                  {c.localidade && <span className="cliente-mobile-loc">{c.localidade}</span>}
+                  <span className="cliente-mobile-maq">{nMaq} máq.</span>
+                  {!c.email && (
+                    <span className="sem-email-aviso" title="Sem email registado">
+                      <AlertTriangle size={11} /> Sem email
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ChevronRight size={16} className="cliente-mobile-chevron" />
+            </button>
+          )
+        })}
+        {clientesFiltrados.length === 0 && (
+          <p className="text-muted" style={{ padding: '1rem 0', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
+        )}
+      </div>
+
+      {/* Tabela completa — desktop */}
       <div className="table-card card clientes-table">
         <table className="data-table">
           <thead>
@@ -261,11 +299,15 @@ export default function Clientes() {
       {modal === 'ficha' && fichaCliente && (
         <div className="modal-overlay modal-ficha-overlay" onClick={closeFicha}>
           <div className="modal modal-ficha-cliente" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <h2 style={{ margin: 0 }}>Ficha do cliente — {fichaCliente.nome}</h2>
-              {maquinasCliente.length > 0 && (
-                <button className="btn secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }} onClick={() => handleRelatorioFrota(fichaCliente)} title="Relatório executivo de frota (PDF)">
-                  <FileBarChart size={15} /> Relatório de frota
+            <div className="ficha-header">
+              <h2 className="ficha-titulo">{fichaCliente.nome}</h2>
+              {canEditCliente && (
+                <button
+                  className="btn secondary ficha-btn-editar"
+                  onClick={() => { closeFicha(); openEdit(fichaCliente) }}
+                  title="Editar dados do cliente"
+                >
+                  <Pencil size={14} /> Editar
                 </button>
               )}
             </div>
@@ -273,6 +315,15 @@ export default function Clientes() {
               <p><strong>NIF:</strong> {fichaCliente.nif} · <strong>Morada:</strong> {fichaCliente.morada || '—'}</p>
               <p><strong>Localidade:</strong> {fichaCliente.codigoPostal} {fichaCliente.localidade} · <strong>Telefone:</strong> {fichaCliente.telefone || '—'} · <strong>Email:</strong> {fichaCliente.email || '—'}</p>
             </div>
+            {maquinasCliente.length > 0 && (
+              <button
+                className="btn secondary ficha-btn-frota"
+                onClick={() => handleRelatorioFrota(fichaCliente)}
+                title="Relatório executivo de frota (PDF)"
+              >
+                <FileBarChart size={15} /> Relatório de frota
+              </button>
+            )}
 
             {maquinasCliente.length === 0 ? (
               <div className="ficha-empty">

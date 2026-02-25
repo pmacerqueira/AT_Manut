@@ -4,14 +4,44 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.6] — 2026-02-25 — Melhorias de UX mobile: clientes, categorias e scroll
+
+### Lista de clientes — mobile
+- **Vista de cartões compactos** (≤640px) em substituição da tabela — cada cartão mostra nome, NIF, localidade, nº de máquinas e badge "Sem email"
+- **Cartão inteiro clicável** → abre ficha do cliente
+- **Ficha do cliente** redesenhada: nome maior (bold), botão **"Editar"** visível para Admin, botão "Relatório de frota" abaixo dos dados (não no header)
+- Dados do cliente (morada, telefone, email) em fonte mais discreta
+
+### Categorias e subcategorias de equipamentos
+- Cards **centrados**, fonte reduzida, padding compacto — aspeto mais moderno
+- Mobile: **duas colunas** em vez de uma (ocupa menos espaço vertical)
+- Seta `ChevronRight` removida (deslocada com layout centrado)
+
+### Ordenação de clientes
+- Lista de clientes, seleção em Agendamento e select no formulário de máquina — sempre **A→Z por nome**
+
+### Dashboard — nomes de equipamento
+- `.meu-dia-item-nome`: máximo 2 linhas com reticências — sem overflow para fora do cartão
+
+### Correção global: dupla barra de scroll em todos os modais
+- `.modal-overlay` → scroll único (`overflow-y: auto`)
+- `body:has(.modal-overlay)` → `overflow: hidden` — bloqueia scroll da página por trás
+- `.modal` → `overflow-y: visible` — sem scroll duplicado
+- Corrigido em: `modal-relatorio`, `modal-relatorio-form`, `modal-ficha-cliente`
+
+---
+
 ## [1.8.5] — 2026-02-24 — Importação de planos KAESER a partir de PDF
 
-### Plano de peças — importar PDF por máquina
+### Plano de peças — importar PDF por máquina (exclusivo KAESER)
 - **Botão "Importar template para esta máquina"** — abre o explorador de ficheiros para escolher um PDF do plano KAESER
 - **Parser** `parseKaeserPlanoPdf.js` — extrai secções A, B, C e D do texto do PDF (posição, código, descrição, quantidade, unidade)
 - **Integração pdf-parse** — leitura de PDF no browser com `pdf-parse` (mehmet-kozan); worker `pdf.worker.mjs` em `public/` com `PDFParse.setWorker()` para compatibilidade
 - Substitui o plano existente da máquina e adiciona todas as peças em lote; toast com resumo por tipo (A/B/C/D)
-- Apenas visível para compressores KAESER (tabs A/B/C/D)
+
+### Regra de negócio: KAESER vs outras marcas de compressores
+- **KAESER:** tabs A/B/C/D + Periódica; botão de importação PDF visível — planos extraídos dos PDFs oficiais
+- **Outras marcas** (Fini, ECF, IES, LaPadana): apenas tab **Periódica** — consumíveis adicionados manualmente um a um
 
 ---
 

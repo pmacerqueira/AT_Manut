@@ -8,7 +8,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import PecasPlanoModal from '../components/PecasPlanoModal'
 import '../components/PecasPlanoModal.css'
-import { ChevronRight, ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen } from 'lucide-react'
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
@@ -245,7 +245,6 @@ export default function Equipamentos() {
                 const sub = getSubcategoria(m.subcategoriaId)
                 return sub?.categoriaId === cat.id
               }).length} equipamento(s)</p>
-              <ChevronRight size={20} style={{ marginTop: '0.5rem', opacity: 0.6 }} />
             </button>
           ))}
         </div>
@@ -271,7 +270,6 @@ export default function Equipamentos() {
                 >
                   <h3>{sub.nome}</h3>
                   <p>{count} equipamento(s)</p>
-                  <ChevronRight size={20} style={{ marginTop: '0.5rem', opacity: 0.6 }} />
                 </button>
               )
             })}

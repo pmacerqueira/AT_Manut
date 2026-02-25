@@ -136,7 +136,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
               disabled={!!clienteNifLocked}
               className={clienteNifLocked ? 'readonly' : ''}
             >
-              {clientes.map(c => (
+              {[...clientes].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt')).map(c => (
                 <option key={c.nif} value={c.nif}>{c.nome} (NIF: {c.nif})</option>
               ))}
             </select>

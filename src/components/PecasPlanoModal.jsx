@@ -3,7 +3,7 @@
  * Suporta tipos de manutenção A/B/C/D (KAESER) e Periódica (outros equipamentos).
  * KAESER: importar plano a partir de PDF (explorador de ficheiros).
  */
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useData, SUBCATEGORIAS_COMPRESSOR, isKaeserMarca } from '../context/DataContext'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -38,8 +38,15 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
   const isCompressor = maquina && SUBCATEGORIAS_COMPRESSOR.includes(maquina.subcategoriaId)
   const isKaeser     = maquina && isKaeserMarca(maquina.marca)
 
-  // Tipos a mostrar: A/B/C/D para compressores, só "periódica" para outros
-  const tiposVisiveis = isCompressor ? TIPOS_MANUT : TIPOS_MANUT.filter(t => t.id === 'periodica')
+  // Tipos a mostrar: A/B/C/D + Periódica só para KAESER; outras marcas só "periódica" (manual)
+  const tiposVisiveis = isKaeser ? TIPOS_MANUT : TIPOS_MANUT.filter(t => t.id === 'periodica')
+
+  // Garantir que tipoAtivo é válido (ex.: não-KAESER só tem "periodica")
+  useEffect(() => {
+    if (tiposVisiveis.length > 0 && !tiposVisiveis.some(t => t.id === tipoAtivo)) {
+      setTipoAtivo(tiposVisiveis[0].id)
+    }
+  }, [maquina?.id, tiposVisiveis, tipoAtivo])
 
   const pecasTipo = useMemo(
     () => maquina ? getPecasPlanoByMaquina(maquina.id, tipoAtivo) : [],
@@ -171,9 +178,9 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
         {modoInicial && totalMaquina === 0 && (
           <div className="modal-pecas-boas-vindas">
             <strong>Equipamento criado!</strong>
-            {isCompressor
-              ? <> Configure agora o plano de consumíveis deste compressor para cada tipo de manutenção (A, B, C, D). Use <em>"Importar template"</em> para pré-preencher com o modelo de referência e ajuste os artigos ao número de série desta máquina.</>
-              : <> Configure os consumíveis recomendados para as manutenções periódicas deste equipamento.</>
+            {isKaeser
+              ? <> Configure o plano de consumíveis deste compressor KAESER. Use <em>"Importar template para esta máquina"</em> para carregar o plano a partir do PDF e ajuste os artigos ao número de série.</>
+              : <> Configure os consumíveis recomendados para as manutenções periódicas deste equipamento. Adicione cada artigo manualmente.</>
             }
           </div>
         )}
@@ -208,6 +215,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
             <p className="modal-pecas-vazio">
               Sem peças configuradas para <strong>Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo}</strong>.
               {isKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template para esta máquina" para carregar o plano a partir de um PDF.'}
+              {!isKaeser && ' Adicione cada consumível manualmente no formulário abaixo.'}
             </p>
           ) : (
             <table className="tabela-pecas">

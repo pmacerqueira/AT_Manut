@@ -130,15 +130,17 @@ Default: `c:\Planos exemplo kaeser\PARQUE_MAQUINAS_SM12_2601.pdf`
 
 ---
 
-## 5. Próximos passos
+## 5. Estado actual (v1.8.5)
 
+### Implementado
+- Parser `parseKaeserPlanoPdf.js` — extrai A/B/C/D do texto do PDF
+- Botão "Importar template para esta máquina" no `PecasPlanoModal` — **exclusivo para marca KAESER**
+- Worker `pdf.worker.mjs` em `public/` com `PDFParse.setWorker()` para compatibilidade browser
+- **Regra de negócio:** compressores de outras marcas (Fini, ECF, IES, LaPadana) mostram apenas tab Periódica — consumíveis adicionados manualmente
+
+### Próximos passos
 1. **Validar** estrutura em mais PDFs (ASK 28T, BSD 72 T, SM15T, etc.)
-2. **Implementar** parser robusto com fallbacks
-3. **Integrar** no `PecasPlanoModal`:
-   - Botão "Importar template para esta máquina"
-   - File input → leitura → parse → `addPecasPlanoLote`
-4. **Remover** ou desactivar o botão actual "Importar template" (KAESER ASK 28T hardcoded)
-5. **Testes E2E** para o fluxo de importação (com PDF de fixture ou mock do FileReader)
+2. **Testes E2E** para o fluxo de importação (com PDF de fixture ou mock do FileReader)
 
 ---
 
@@ -151,3 +153,11 @@ Conforme documentação KAESER:
 - **Tipo D:** 36.000h, 72.000h, 108.000h, …
 
 A aplicação já usa `SEQUENCIA_KAESER` e `INTERVALOS_KAESER` para o ciclo de 12 anos.
+
+---
+
+## 7. Resumo para continuação
+
+**Sessão 2026-02-24:** Implementação completa da importação de PDFs KAESER. Regra de negócio: apenas compressores KAESER têm acesso ao botão de importação e aos tabs A/B/C/D; outras marcas (Fini, ECF, IES, LaPadana) usam apenas Periódica com adição manual de consumíveis um a um.
+
+**Ficheiros principais:** `PecasPlanoModal.jsx`, `parseKaeserPlanoPdf.js`, `public/pdf.worker.mjs`
