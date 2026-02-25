@@ -14,7 +14,8 @@ import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
 import { pt } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye } from 'lucide-react'
+import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History } from 'lucide-react'
+import { usePermissions } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { relatorioParaHtml } from '../utils/relatorioHtml'
@@ -64,6 +65,7 @@ function comprimirFoto(blob) {
 }
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina }) {
+  const { isAdmin } = usePermissions()
   const {
     manutencoes,
     clientes,
@@ -93,6 +95,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     nomeAssinante: '',
     tipoManutKaeser: '',
     pecasUsadas: [],
+    dataRealizacao: '', // Admin only — data histórica (YYYY-MM-DD); vazio = usa data de hoje
   })
   const [fotos, setFotos] = useState([])
   const [fotoCarregando, setFotoCarregando] = useState(false)
@@ -323,8 +326,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     const canvas = canvasRef.current
     const assinaturaDataUrl = canvas ? canvas.toDataURL('image/png') : ''
-    const now  = nowISO()
-    const hoje = getHojeAzores()
+
+    // Admin pode registar manutenções históricas com data retroativa.
+    // Se form.dataRealizacao estiver preenchido (só visível para Admin), usa essa data;
+    // caso contrário usa a data/hora actual — comportamento padrão.
+    const hoje = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : getHojeAzores()
+    const now  = (isAdmin && form.dataRealizacao)
+      ? `${form.dataRealizacao}T12:00:00.000Z`
+      : nowISO()
+
     const dias = getIntervaloDiasByMaquina(maq)
     const proxima = addDays(new Date(hoje), dias)
 
@@ -863,6 +873,28 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </h3>
 
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
+
+            {/* Campo de data histórica — visível apenas para Admin */}
+            {isAdmin && (
+              <div className="form-section-historica">
+                <label className="historica-label">
+                  <History size={14} />
+                  Data de realização
+                  <span className="historica-hint">(preencher apenas para registos históricos — deixar vazio para usar hoje)</span>
+                  <input
+                    type="date"
+                    max={getHojeAzores()}
+                    value={form.dataRealizacao}
+                    onChange={e => setForm(f => ({ ...f, dataRealizacao: e.target.value }))}
+                  />
+                </label>
+                {form.dataRealizacao && (
+                  <p className="historica-aviso">
+                    ⚠ Registo histórico: manutenção, relatório e próxima data serão registados como <strong>{form.dataRealizacao}</strong>
+                  </p>
+                )}
+              </div>
+            )}
 
             <label className="label-required">
               Técnico que realizou a manutenção <span className="req-star">*</span>

@@ -4,6 +4,26 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.7] — 2026-02-25 — Registos históricos (Admin) + script de limpeza de dados
+
+### Datas históricas para Admin — `ExecutarManutencaoModal`
+- Novo campo **"Data de realização"** na secção de assinatura, visível apenas para Admin
+- Quando preenchido com uma data passada, propaga-se automaticamente a **todas** as datas do registo:
+  - `data` da manutenção
+  - `dataAssinatura` e `dataCriacao` do relatório
+  - `ultimaManutencaoData` e `proximaManut` da máquina (calculada a partir da data histórica)
+- Campo tem `max = hoje` (impede datas futuras)
+- Aviso visual em laranja quando a data histórica está preenchida
+- Fluxo normal inalterado para ATecnica e para Admin sem data preenchida
+
+### Script de limpeza de dados de teste
+- Novo ficheiro `servidor-cpanel/limpar-dados-teste.sql` — colar no phpMyAdmin do cPanel
+- Apaga clientes, máquinas, manutenções e relatórios (por esta ordem, respeitando chaves externas)
+- Mantém categorias, subcategorias, checklist_items e users intactos
+- Inclui query de verificação e instruções para limpar o cache localStorage
+
+---
+
 ## [1.8.6] — 2026-02-25 — Melhorias de UX mobile: clientes, categorias e scroll
 
 ### Lista de clientes — mobile
