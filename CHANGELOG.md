@@ -4,6 +4,13 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.8.8] — 2026-02-25 — PWA: suprimir modal de instalação em browsers sem suporte
+
+- `InstallPrompt`: o modal só aparece quando a instalação é genuinamente possível (Chrome/Edge desktop com `beforeinstallprompt`, iOS Safari, Android Chrome)
+- Firefox desktop, Safari desktop e outros browsers sem suporte PWA deixam de ver o modal — evita confusão ao utilizador
+
+---
+
 ## [1.8.7] — 2026-02-25 — Registos históricos (Admin) + script de limpeza de dados
 
 ### Datas históricas para Admin — `ExecutarManutencaoModal`

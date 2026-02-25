@@ -94,10 +94,8 @@ export default function InstallPrompt() {
         } else if (isAndroid()) {
           setPlatform('android')
           setVisible(true)
-        } else {
-          setPlatform('desktop')
-          setVisible(true)
         }
+        // Desktop sem suporte nativo (Firefox, Safari desktop, etc.) → não mostrar modal
       }
     }, 1500)
 
@@ -148,12 +146,10 @@ export default function InstallPrompt() {
           </div>
         )}
 
-        {(platform === 'android' || platform === 'desktop') && !deferredPrompt && (
+        {platform === 'android' && !deferredPrompt && (
           <div className="install-prompt-actions">
             <p className="install-prompt-hint">
-              {platform === 'android'
-                ? 'No Chrome, toque no menu (⋮) e escolha "Adicionar ao ecrã inicial" ou "Instalar aplicação".'
-                : 'No Chrome ou Edge, use o ícone de instalação (⊕) na barra de endereço.'}
+              No Chrome, toque no menu (⋮) e escolha "Adicionar ao ecrã inicial" ou "Instalar aplicação".
             </p>
             <button type="button" className="install-prompt-btn primary" onClick={() => dismiss(true)}>
               Entendi
