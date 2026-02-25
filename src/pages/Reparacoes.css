@@ -1,0 +1,369 @@
+/* ── Reparações — página principal ──────────────────────────────────────── */
+
+.reparacoes-page {
+  padding: 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Cabeçalho */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.page-header-left h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Tabs de filtro */
+.filtros-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.filtro-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 1.5rem;
+  border: 1.5px solid var(--border-color, #e2e8f0);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-secondary, #64748b);
+}
+.filtro-tab:hover {
+  border-color: var(--primary, #3b82f6);
+  color: var(--primary, #3b82f6);
+}
+.filtro-tab.active {
+  background: var(--primary, #3b82f6);
+  border-color: var(--primary, #3b82f6);
+  color: #fff;
+}
+.filtro-tab-count {
+  background: rgba(255,255,255,0.25);
+  border-radius: 1rem;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 1.3rem;
+  text-align: center;
+}
+.filtro-tab:not(.active) .filtro-tab-count {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--text-secondary, #64748b);
+}
+
+/* Tabela */
+.reparacoes-table {
+  overflow-x: auto;
+  padding: 0;
+}
+.reparacoes-table .data-table {
+  font-size: 0.82rem;
+}
+.reparacoes-table .data-table th,
+.reparacoes-table .data-table td {
+  padding: 0.3rem 0.5rem;
+  vertical-align: middle;
+}
+.reparacoes-table .data-table th {
+  font-size: 0.72rem;
+  padding: 0.3rem 0.5rem;
+}
+.reparacoes-table .data-table th:last-child {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+.reparacoes-table .data-table td.actions {
+  display: table-cell !important;
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  vertical-align: middle !important;
+}
+.reparacoes-table .data-table td.actions .actions-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+.reparacoes-table .data-table .icon-btn {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+.row-concluida td {
+  opacity: 0.75;
+}
+
+/* Célula máquina */
+.td-maquina {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.maq-nome  { font-weight: 600; }
+.maq-sub   { font-size: 0.72rem; }
+.td-aviso  { font-size: 0.78rem; color: var(--text-secondary, #64748b); }
+.td-data   { white-space: nowrap; }
+
+/* Botão executar */
+.icon-btn.btn-executar-rep {
+  color: #16a34a !important;
+}
+.icon-btn.btn-executar-rep:hover {
+  color: #fff !important;
+  background: #16a34a !important;
+}
+
+/* Badge origem ISTOBAL */
+.rep-origem-istobal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f97316;
+  letter-spacing: 0.03em;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary, #64748b);
+}
+.empty-icon {
+  opacity: 0.35;
+}
+
+/* ── Modal Nova Reparação ─────────────────────────────────────────────────── */
+
+.modal-nova-rep {
+  max-width: 560px;
+  width: 95vw;
+}
+
+/* ── Modal Relatório Reparação ───────────────────────────────────────────── */
+
+.modal-relatorio-rep {
+  max-width: 680px;
+  width: 97vw;
+}
+
+/* ── Modal Email ─────────────────────────────────────────────────────────── */
+
+.modal-email-rep {
+  max-width: 420px;
+  width: 95vw;
+}
+.email-info {
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary, #64748b);
+}
+
+/* ── Confirm modal ───────────────────────────────────────────────────────── */
+
+.modal-confirm {
+  max-width: 420px;
+  width: 95vw;
+}
+.confirm-details {
+  background: var(--surface-2, #f1f5f9);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  margin: 0.5rem 0;
+}
+
+/* ── Vista Relatório inline ──────────────────────────────────────────────── */
+
+.relatorio-rep-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.rel-section h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #64748b);
+  margin: 0 0 0.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  padding-bottom: 0.25rem;
+}
+.rel-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 1rem;
+  font-size: 0.85rem;
+}
+.rel-label {
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+}
+.pecas-table {
+  font-size: 0.8rem;
+}
+.pecas-table th, .pecas-table td {
+  padding: 0.2rem 0.4rem;
+}
+
+/* ── Form helpers ────────────────────────────────────────────────────────── */
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+.form-row .form-group {
+  flex: 1;
+}
+.required {
+  color: #ef4444;
+}
+.input-error {
+  border-color: #ef4444 !important;
+}
+.field-error {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
+  display: block;
+}
+
+/* ── Cabeçalho com múltiplos botões ─────────────────────────────────────── */
+
+.page-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Modal Mensal ISTOBAL ────────────────────────────────────────────────── */
+
+.modal-mensal-istobal {
+  max-width: 800px;
+  width: 97vw;
+}
+
+.mensal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.mensal-titulo {
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 160px;
+  text-align: center;
+}
+
+.mensal-resumo {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.mensal-stat {
+  flex: 1;
+  min-width: 90px;
+  background: var(--surface-2, #f1f5f9);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.mensal-stat-total {
+  background: var(--surface-3, #e2e8f0);
+}
+.mensal-stat-val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.mensal-stat-lbl {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.mensal-secao {
+  margin-top: 1rem;
+}
+.mensal-secao-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #64748b);
+  margin: 0 0 0.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  padding-bottom: 0.25rem;
+}
+.mensal-table {
+  font-size: 0.8rem;
+}
+.mensal-table th, .mensal-table td {
+  padding: 0.2rem 0.4rem;
+}
+.td-aviso-bold {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mensal-vazio {
+  text-align: center;
+  color: var(--text-secondary, #64748b);
+  padding: 1rem 0;
+  font-size: 0.88rem;
+}
+
+/* ── Responsivo ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .reparacoes-page {
+    padding: 0.5rem;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .reparacoes-table .data-table td:nth-child(4),
+  .reparacoes-table .data-table th:nth-child(4) {
+    display: none;
+  }
+}

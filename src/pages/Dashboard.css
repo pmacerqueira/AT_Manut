@@ -222,6 +222,23 @@ button.stat-card-link:hover {
   padding: 0.15rem 0.45rem;
 }
 
+/* Secção de reparações pendentes no Dashboard */
+.reparacoes-pendentes-section {
+  border-left: 4px solid #f97316;
+}
+.meu-dia-ver-mais {
+  display: block;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-primary, #2563eb);
+  margin-top: 0.6rem;
+  text-decoration: none;
+  padding: 0.3rem;
+}
+.meu-dia-ver-mais:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 480px) {
   .meu-dia-item { flex-direction: column; align-items: flex-start; }
   .meu-dia-item-right { width: 100%; justify-content: flex-end; }
@@ -678,6 +695,10 @@ button.stat-card-link:hover {
 .cards-row-mobile .stat-card-green {
   border-left: 3px solid var(--color-success);
   background: rgba(34, 197, 94, 0.18);
+}
+.cards-row-mobile .stat-card-orange {
+  border-left: 3px solid #f97316;
+  background: rgba(249, 115, 22, 0.14);
 }
 
 /* 3 cartões compactos: Clientes + Equipamentos + Agendar NOVO (uma linha, lado a lado) */

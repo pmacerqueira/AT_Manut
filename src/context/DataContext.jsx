@@ -596,7 +596,9 @@ export function DataProvider({ children }) {
   const [checklistItems,setChecklistItems]= useState([])
   const [maquinas,      setMaquinas]      = useState([])
   const [manutencoes,   setManutencoes]   = useState([])
-  const [relatorios,    setRelatorios]    = useState([])
+  const [relatorios,          setRelatorios]          = useState([])
+  const [reparacoes,          setReparacoes]          = useState([])
+  const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
   const [pecasPlano,    setPecasPlano]    = useState(() => {
     try { return JSON.parse(localStorage.getItem('atm_pecas_plano') ?? '[]') } catch { return [] }
   })
@@ -618,8 +620,10 @@ export function DataProvider({ children }) {
       setSubcategorias(d.subcategorias ?? [])
       setChecklistItems(d.checklistItems ?? [])
       setMaquinas(d.maquinas           ?? [])
-      setManutencoes(d.manutencoes     ?? [])
-      setRelatorios(d.relatorios       ?? [])
+      setManutencoes(d.manutencoes             ?? [])
+      setRelatorios(d.relatorios               ?? [])
+      setReparacoes(d.reparacoes               ?? [])
+      setRelatoriosReparacao(d.relatoriosReparacao ?? [])
       // Guardar snapshot no cache para uso offline
       saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
@@ -639,8 +643,10 @@ export function DataProvider({ children }) {
           setSubcategorias(d.subcategorias ?? [])
           setChecklistItems(d.checklistItems ?? [])
           setMaquinas(d.maquinas           ?? [])
-          setManutencoes(d.manutencoes     ?? [])
-          setRelatorios(d.relatorios       ?? [])
+          setManutencoes(d.manutencoes             ?? [])
+          setRelatorios(d.relatorios               ?? [])
+          setReparacoes(d.reparacoes               ?? [])
+          setRelatoriosReparacao(d.relatoriosReparacao ?? [])
           logger.info('DataContext', 'fetchTodos', 'Dados carregados do cache local (offline)', {
             cacheAge: Math.round((Date.now() - cache.ts) / 60000) + ' min',
           })
@@ -1142,6 +1148,75 @@ export function DataProvider({ children }) {
     return relatorios.find(r => r.manutencaoId === manutencaoId)
   }, [relatorios])
 
+  // ── Reparações ────────────────────────────────────────────────────────────
+  const addReparacao = useCallback((rep) => {
+    const id = 'rep' + Date.now()
+    setReparacoes(prev => [...prev, { ...rep, id }])
+    logger.action('DataContext', 'addReparacao', `Reparação criada (maquinaId: ${rep.maquinaId})`, { id, origem: rep.origem })
+    import('../services/apiService').then(({ apiReparacoes }) =>
+      persist(() => apiReparacoes.create({ ...rep, id }),
+              { resource: 'reparacoes', action: 'create', data: { ...rep, id } })
+    )
+    return id
+  }, [persist])
+
+  const updateReparacao = useCallback((id, data) => {
+    setReparacoes(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
+    import('../services/apiService').then(({ apiReparacoes }) =>
+      persist(() => apiReparacoes.update(id, data),
+              { resource: 'reparacoes', action: 'update', id, data })
+    )
+  }, [persist])
+
+  const removeReparacao = useCallback((id) => {
+    setReparacoes(prev => prev.filter(r => r.id !== id))
+    setRelatoriosReparacao(prev => prev.filter(r => r.reparacaoId !== id))
+    import('../services/apiService').then(({ apiReparacoes }) =>
+      persist(() => apiReparacoes.remove(id),
+              { resource: 'reparacoes', action: 'delete', id })
+    )
+  }, [persist])
+
+  // ── Relatórios de Reparação ───────────────────────────────────────────────
+  const addRelatorioReparacao = useCallback((r) => {
+    const id = 'rr' + Date.now()
+    const dataCriacao = r.dataCriacao ?? new Date().toISOString()
+
+    // Número client-side para resposta imediata; servidor confirma ou gera alternativo.
+    let numeroRelatorio = r.numeroRelatorio
+    if (!numeroRelatorio) {
+      const ano = new Date().getFullYear()
+      const pattern = `${ano}.RP.`
+      const existingNums = relatoriosReparacao
+        .map(rel => rel.numeroRelatorio)
+        .filter(n => typeof n === 'string' && n.startsWith(pattern))
+        .map(n => parseInt(n.split('.')[2] ?? '0', 10))
+        .filter(n => !isNaN(n))
+      const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
+      numeroRelatorio = `${ano}.RP.${String(next).padStart(5, '0')}`
+    }
+
+    const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
+    setRelatoriosReparacao(prev => [...prev, novo])
+    import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
+      persist(() => apiRelatoriosReparacao.create(novo),
+              { resource: 'relatoriosReparacao', action: 'create', data: novo })
+    )
+    return { id, numeroRelatorio }
+  }, [relatoriosReparacao, persist])
+
+  const updateRelatorioReparacao = useCallback((id, data) => {
+    setRelatoriosReparacao(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
+    import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
+      persist(() => apiRelatoriosReparacao.update(id, data),
+              { resource: 'relatoriosReparacao', action: 'update', id, data })
+    )
+  }, [persist])
+
+  const getRelatorioByReparacao = useCallback((reparacaoId) => {
+    return relatoriosReparacao.find(r => r.reparacaoId === reparacaoId)
+  }, [relatoriosReparacao])
+
   /**
    * Bloco B — Recalcular manutenções periódicas futuras após execução de uma periódica.
    *
@@ -1384,6 +1459,14 @@ export function DataProvider({ children }) {
     addRelatorio,
     updateRelatorio,
     getRelatorioByManutencao,
+    reparacoes,
+    relatoriosReparacao,
+    addReparacao,
+    updateReparacao,
+    removeReparacao,
+    addRelatorioReparacao,
+    updateRelatorioReparacao,
+    getRelatorioByReparacao,
     prepararManutencoesPeriodicas,
     confirmarManutencoesPeriodicas,
     recalcularPeriodicasAposExecucao,
@@ -1396,7 +1479,7 @@ export function DataProvider({ children }) {
     exportarDados,
     restaurarDados,
   }), [
-    INTERVALOS, categorias, subcategorias, checklistItems, clientes, maquinas, manutencoes, relatorios, pecasPlano,
+    INTERVALOS, categorias, subcategorias, checklistItems, clientes, maquinas, manutencoes, relatorios, reparacoes, relatoriosReparacao, pecasPlano,
     getIntervaloDias, getIntervaloDiasBySubcategoria, getIntervaloDiasByMaquina,
     getSubcategoria, getCategoria, getSubcategoriasByCategoria, getChecklistBySubcategoria,
     addSubcategoria, updateSubcategoria, removeSubcategoria,
@@ -1406,6 +1489,8 @@ export function DataProvider({ children }) {
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
     addManutencao, updateManutencao, removeManutencao, iniciarManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
+    addReparacao, updateReparacao, removeReparacao,
+    addRelatorioReparacao, updateRelatorioReparacao, getRelatorioByReparacao,
     prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao,
     addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,

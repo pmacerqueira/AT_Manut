@@ -7,7 +7,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { logger } from '../utils/logger'
-import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper } from 'lucide-react'
+import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper, Hammer } from 'lucide-react'
 // Search e Play mantidos para uso no day-panel
 import {
   format,
@@ -30,7 +30,7 @@ import './Dashboard.css'
 import { pt } from 'date-fns/locale'
 
 export default function Dashboard() {
-  const { maquinas, manutencoes, clientes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria } = useData()
+  const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria } = useData()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const getMaquina = (id) => maquinas.find(m => m.id === id)
@@ -74,6 +74,11 @@ export default function Dashboard() {
   const proximas = useMemo(() =>
     pendentes.filter(m => !isBefore(new Date(m.data), new Date())),
   [pendentes])
+
+  // Reparações pendentes (não concluídas)
+  const reparacoesPendentes = useMemo(() =>
+    (reparacoes ?? []).filter(r => r.status !== 'concluida'),
+  [reparacoes])
 
   // "O meu dia" — manutenções pendentes de hoje e em atraso, ordenadas por data
   const hoje = getHojeAzores()
@@ -184,6 +189,13 @@ export default function Dashboard() {
             <span className="stat-label">Executadas</span>
           </div>
         </Link>
+        <Link to="/reparacoes" className={`card stat-card stat-card-link stat-card-mobile stat-card-orange${reparacoesPendentes.length > 0 ? ' stat-card-pulse' : ''}`}>
+          <Hammer size={24} className="stat-icon" />
+          <div>
+            <span className="stat-value">{reparacoesPendentes.length}</span>
+            <span className="stat-label">Reparações</span>
+          </div>
+        </Link>
       </div>
 
       {/* ── Etapa 1: O meu dia ─────────────────────────────────────────── */}
@@ -242,6 +254,51 @@ export default function Dashboard() {
           </ul>
         )}
       </div>
+
+      {/* ── Reparações pendentes ──────────────────────────────────────────── */}
+      {reparacoesPendentes.length > 0 && (
+        <div className="meu-dia-section card reparacoes-pendentes-section">
+          <div className="meu-dia-header">
+            <div className="meu-dia-titulo">
+              <Hammer size={18} />
+              <span>Reparações pendentes</span>
+            </div>
+            <span className="badge badge-warning">{reparacoesPendentes.length} pendente{reparacoesPendentes.length !== 1 ? 's' : ''}</span>
+          </div>
+          <ul className="meu-dia-lista">
+            {reparacoesPendentes.slice(0, 5).map(rep => {
+              const maq = getMaquina(rep.maquinaId)
+              const cli = maq ? getCliente(maq.clienteNif) : null
+              const sub = maq ? getSubcategoria(maq?.subcategoriaId) : null
+              return (
+                <li key={rep.id} className="meu-dia-item">
+                  <div className="meu-dia-item-info">
+                    <span className="meu-dia-item-nome">
+                      {sub?.nome ? `${sub.nome} — ` : ''}{maq?.marca ?? '—'} {maq?.modelo ?? ''}
+                    </span>
+                    <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
+                  </div>
+                  <div className="meu-dia-item-right">
+                    {rep.origem === 'istobal_email' && (
+                      <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>ISTOBAL</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn primary btn-sm"
+                      onClick={() => navigate('/reparacoes')}
+                    >
+                      <Play size={13} /> Ver
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          {reparacoesPendentes.length > 5 && (
+            <Link to="/reparacoes" className="meu-dia-ver-mais">+ {reparacoesPendentes.length - 5} mais reparações</Link>
+          )}
+        </div>
+      )}
 
       <div className="dashboard-grid">
         <div className="card dashboard-calendar-card">

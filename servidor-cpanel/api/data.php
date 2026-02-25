@@ -231,6 +231,18 @@ $RESOURCE_MAP = [
         'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','notas','fotos','ultimo_envio','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
+    'reparacoes' => [
+        'table'      => 'reparacoes',
+        'json_cols'  => [],
+        'allowed'    => ['id','maquina_id','data','tecnico','status','numero_aviso','descricao_avaria','observacoes','origem','criado_em'],
+        'order'      => 'data DESC',
+    ],
+    'relatoriosReparacao' => [
+        'table'      => 'relatorios_reparacao',
+        'json_cols'  => ['checklist_respostas','pecas_usadas','fotos'],
+        'allowed'    => ['id','reparacao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','numero_aviso','descricao_avaria','trabalho_realizado','horas_mao_obra','checklist_respostas','pecas_usadas','fotos','notas','ultimo_envio','criado_em'],
+        'order'      => 'data_criacao DESC',
+    ],
 ];
 
 if (!isset($RESOURCE_MAP[$resource])) {
@@ -316,6 +328,15 @@ switch ($action) {
         if (empty($data)) json_error('Dados em falta.');
 
         if ($resource === 'maquinas') $data = preprocess_maquina($data);
+
+        // Geração de número de relatório de reparação (RP)
+        if ($resource === 'relatoriosReparacao' && empty($data['numeroRelatorio'])) {
+            $ano = date('Y');
+            $sc  = $pdo->prepare("SELECT COUNT(*) FROM relatorios_reparacao WHERE numero_relatorio LIKE ?");
+            $sc->execute(["$ano.RP.%"]);
+            $cnt = (int)$sc->fetchColumn() + 1;
+            $data['numeroRelatorio'] = sprintf('%s.RP.%05d', $ano, $cnt);
+        }
 
         // Geração especial de número de relatório no servidor
         if ($resource === 'relatorios' && empty($data['numeroRelatorio'])) {

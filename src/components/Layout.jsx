@@ -8,7 +8,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import {
   LayoutDashboard, Users, FolderTree, Cpu, Wrench,
   Calendar, LogOut, Menu, X, CalendarPlus, ScrollText,
-  Settings, RefreshCw, Search, QrCode, BarChart2,
+  Settings, RefreshCw, Search, QrCode, BarChart2, Hammer,
 } from 'lucide-react'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
@@ -93,6 +93,10 @@ export default function Layout({ children }) {
           <NavLink to="/manutencoes" className={location.pathname === '/manutencoes' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <Wrench size={20} />
             <span>Manutenções</span>
+          </NavLink>
+          <NavLink to="/reparacoes" className={location.pathname === '/reparacoes' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
+            <Hammer size={20} />
+            <span>Reparações</span>
           </NavLink>
           <NavLink to="/agendamento" className={location.pathname === '/agendamento' ? 'nav-link active' : 'nav-link'} onClick={closeSidebar}>
             <CalendarPlus size={20} />

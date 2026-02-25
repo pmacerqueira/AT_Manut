@@ -4,6 +4,45 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.0] — 2026-02-22 — Módulo Reparações + Integração ISTOBAL
+
+### Novo módulo: Reparações (`/reparacoes`)
+- **Nova página `Reparacoes.jsx`** com lista filtrada (Todas / Pendentes / Em progresso / Concluídas)
+- **Modal "Nova Reparação"**: criação manual com máquina, técnico, data, nº de aviso e descrição de avaria
+- **`ExecutarReparacaoModal.jsx`**: execução da reparação com:
+  - Formulário multi-secção (Dados, Avaria, Trabalho realizado, Peças/Consumíveis, Fotos, Checklist, Assinatura)
+  - **"Guardar progresso"** — salva estado intermédio (`em_progresso`) sem exigir assinatura; utilizador pode reabrir dias depois e retomar
+  - Carregamento automático de dados se já existir rascunho em progresso
+  - Assinatura digital do cliente (canvas touch/mouse)
+  - Campo de data histórica para Admin (retrodatar relatórios)
+  - **Envio automático após assinatura** para `comercial@navel.pt` (sempre) + `isat@istobal.com` (se origem ISTOBAL)
+  - Envio adicional opcional para o cliente
+- **Relatório de reparação** (`relatorioReparacaoHtml.js`) com nº sequencial `AAAA.RP.NNNNN`, peças, horas M.O., assinatura e rodapé Navel
+- **Relatório mensal ISTOBAL**: botão "Mensal ISTOBAL" abre modal com navegação por mês, resumo estatístico (avisos recebidos / concluídos / em curso) e tabela estratificada (ISTOBAL vs. manuais)
+- Badge na nav com contagem de reparações pendentes
+- Stat card no Dashboard com link para `/reparacoes`
+
+### Integração ISTOBAL via email piping (`parse-istobal-email.php`)
+- Script PHP de email piping para cPanel (`public_html/api/parse-istobal-email.php`)
+- Aceita apenas emails de `isat@istobal.com`
+- Extrai campos da tabela HTML (Nº aviso, Nº série, Modelo, Descripción, Fecha, Instalación)
+- Match automático da máquina por número de série → cria reparação associada
+- Se série não encontrada: cria reparação "a aguardar atribuição" com todos os dados extraídos
+- Log em `logs/istobal-email.log` para auditoria
+- Instruções de configuração incluídas no cabeçalho do ficheiro
+
+### Base de dados — migração v1.9.0
+- `servidor-cpanel/migrar-para-v190.sql`: cria tabelas `reparacoes` e `relatorios_reparacao`
+- `servidor-cpanel/api/data.php`: mapeamento das novas tabelas + geração automática de `numeroRelatorio` no formato `AAAA.RP.NNNNN`
+
+### Navegação e contexto
+- `Layout.jsx`: item "Reparações" com ícone Hammer
+- `App.jsx`: rota `/reparacoes` (lazy-loaded)
+- `DataContext.jsx`: estados `reparacoes` + `relatoriosReparacao` com CRUD completo (`addReparacao`, `updateReparacao`, `removeReparacao`, `addRelatorioReparacao`, `updateRelatorioReparacao`, `getRelatorioByReparacao`)
+- `apiService.js`: `apiReparacoes` + `apiRelatoriosReparacao`
+
+---
+
 ## [1.8.8] — 2026-02-25 — PWA: suprimir modal de instalação em browsers sem suporte
 
 - `InstallPrompt`: o modal só aparece quando a instalação é genuinamente possível (Chrome/Edge desktop com `beforeinstallprompt`, iOS Safari, Android Chrome)

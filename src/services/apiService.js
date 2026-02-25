@@ -154,8 +154,10 @@ export const apiCategorias     = crud('categorias')
 export const apiSubcategorias  = crud('subcategorias')
 export const apiChecklistItems = crud('checklistItems')
 export const apiMaquinas       = crud('maquinas')
-export const apiManutencoes    = crud('manutencoes')
-export const apiRelatorios     = crud('relatorios')
+export const apiManutencoes         = crud('manutencoes')
+export const apiRelatorios          = crud('relatorios')
+export const apiReparacoes          = crud('reparacoes')
+export const apiRelatoriosReparacao = crud('relatoriosReparacao')
 
 /** Logs do servidor (apenas Admin) — agrega logs de todos os utilizadores e dispositivos */
 export async function apiLogsList(days = 30) {
@@ -173,6 +175,8 @@ export async function fetchTodosOsDados() {
     maquinas,
     manutencoes,
     relatorios,
+    reparacoes,
+    relatoriosReparacao,
   ] = await Promise.all([
     apiClientes.list(),
     apiCategorias.list(),
@@ -181,6 +185,8 @@ export async function fetchTodosOsDados() {
     apiMaquinas.list(),
     apiManutencoes.list(),
     apiRelatorios.list(),
+    apiReparacoes.list(),
+    apiRelatoriosReparacao.list(),
   ])
-  return { clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios }
+  return { clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios, reparacoes, relatoriosReparacao }
 }
