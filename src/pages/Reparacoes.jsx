@@ -12,6 +12,7 @@ import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
 import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
+import { APP_FOOTER_TEXT } from '../config/version'
 import './Reparacoes.css'
 
 const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -739,33 +740,43 @@ export default function Reparacoes() {
 function RelatorioReparacaoView({ relatorio: rel, reparacao: rep, maquina: maq, cliente: cli }) {
   if (!rel) return <p className="text-muted">Sem relatório disponível.</p>
   const pecas = (() => { try { return JSON.parse(rel.pecasUsadas || '[]') } catch { return [] } })()
-  const checklist = (() => { try { return JSON.parse(rel.checklistRespostas || '{}') } catch { return {} } })()
 
   return (
     <div className="relatorio-rep-view">
+
+      {/* Cabeçalho: máquina e cliente */}
+      {(maq || cli) && (
+        <div className="rel-section rel-section-equipamento">
+          <h3>Equipamento / Cliente</h3>
+          <div className="rel-grid">
+            {maq && <><span className="rel-label">Equipamento</span><span>{maq.marca} {maq.modelo}{maq.numeroSerie ? ` — S/N ${maq.numeroSerie}` : ''}</span></>}
+            {maq?.localizacao && <><span className="rel-label">Localização</span><span>{maq.localizacao}</span></>}
+            {cli && <><span className="rel-label">Cliente</span><span>{cli.nome}</span></>}
+            {cli?.nif && <><span className="rel-label">NIF</span><span>{cli.nif}</span></>}
+            {rel.numeroAviso && <><span className="rel-label">Aviso</span><span>{rel.numeroAviso}</span></>}
+            {rep?.descricaoAvaria && <><span className="rel-label">Descrição avaria</span><span>{rep.descricaoAvaria}</span></>}
+          </div>
+        </div>
+      )}
+
       <div className="rel-section">
-        <h3>Dados gerais</h3>
+        <h3>Dados do relatório</h3>
         <div className="rel-grid">
-          <span className="rel-label">Relatório</span><span>{rel.numeroRelatorio ?? '—'}</span>
+          <span className="rel-label">Relatório nº</span><span>{rel.numeroRelatorio ?? '—'}</span>
           <span className="rel-label">Data</span><span>{rel.dataAssinatura ? formatDataAzores(rel.dataAssinatura) : '—'}</span>
           <span className="rel-label">Técnico</span><span>{rel.tecnico ?? '—'}</span>
           <span className="rel-label">Assinado por</span><span>{rel.nomeAssinante ?? '—'}{rel.assinadoPeloCliente ? ' ✓' : ''}</span>
           <span className="rel-label">Horas M.O.</span><span>{rel.horasMaoObra ?? '—'} h</span>
-          {rel.numeroAviso && <><span className="rel-label">Aviso</span><span>{rel.numeroAviso}</span></>}
         </div>
       </div>
-      {rel.descricaoAvaria && (
-        <div className="rel-section">
-          <h3>Avaria / Problema</h3>
-          <p>{rel.descricaoAvaria}</p>
-        </div>
-      )}
+
       {rel.trabalhoRealizado && (
         <div className="rel-section">
           <h3>Trabalho realizado</h3>
           <p>{rel.trabalhoRealizado}</p>
         </div>
       )}
+
       {pecas.length > 0 && (
         <div className="rel-section">
           <h3>Peças / Consumíveis usados</h3>
@@ -779,12 +790,17 @@ function RelatorioReparacaoView({ relatorio: rel, reparacao: rep, maquina: maq, 
           </table>
         </div>
       )}
+
       {rel.notas && (
         <div className="rel-section">
           <h3>Notas adicionais</h3>
           <p>{rel.notas}</p>
         </div>
       )}
+
+      <div className="rel-footer">
+        <span>{APP_FOOTER_TEXT}</span>
+      </div>
     </div>
   )
 }

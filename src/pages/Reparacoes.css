@@ -235,6 +235,19 @@
 .pecas-table th, .pecas-table td {
   padding: 0.2rem 0.4rem;
 }
+.rel-section-equipamento {
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+.rel-footer {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  font-size: 0.72rem;
+  color: var(--text-tertiary, #94a3b8);
+  text-align: center;
+}
 
 /* ── Form helpers ────────────────────────────────────────────────────────── */
 

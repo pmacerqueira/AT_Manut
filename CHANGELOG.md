@@ -4,6 +4,37 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.3] — 2026-02-26 — Testes E2E avançados Reparações + correcção RelatorioReparacaoView
+
+### Nova suíte de testes E2E — `17-reparacoes-avancado.spec.js`
+- **RA-1** — Matriz completa de permissões Admin vs ATecnica para o módulo Reparações (12 testes)
+- **RA-2** — Fluxo multi-dia realista: criar → guardar progresso → retomar → concluir com materiais e assinatura
+- **RA-3** — Fotos no modal de execução: upload, remoção, contador 0/8, múltiplas fotos, limite de 8, persistência no progresso
+- **RA-4** — Email pós-conclusão: tag Admin sempre, tag ISTOBAL para avisos ES-, tag Cliente quando email disponível, campo manual para clientes sem email
+- **RA-5** — Relatório concluído: dados máquina/cliente, nº sequencial, assinante, materiais, rodapé Navel
+- **RA-6** — Responsividade mobile 375×812: overflow, filtros, tabela, modal nova, modal execução, sidebar
+- **RA-7** — Responsividade tablet 768×1024: overflow, modal mensal, canvas assinatura
+- **RA-8** — Comportamento offline: criação e progresso com rede cortada (graceful degradation), dados mantidos em localStorage
+- **RA-9** — Estados vazios: empty-state com CTA, filtros vazios, select sem máquinas, mensal sem avisos
+- **RA-10** — Data histórica: Admin pode retrodar, ATecnica não vê o campo
+- **RA-11** — Peças e consumíveis: adicionar, remover, aparecem no relatório, linhas vazias filtradas
+- **RA-12** — Checklist corretivo: secção presente, não bloqueia sem itens
+- **RA-13** — Fluxo ISTOBAL completo: badge, aviso ES-, pré-preenchimento, relatório mensal
+- **RA-14** — Relatório mensal com 20 avisos volumosos: render <3s, total horas correcto
+- **RA-15** — Logging: criação e eliminação de reparações registadas nos logs
+
+### Correcções de bugs (revelados pelos testes)
+- **`RelatorioReparacaoView`** não mostrava dados da máquina nem do cliente — adicionada secção "Equipamento / Cliente" com marca, modelo, nº série, localização, nome e NIF do cliente
+- **`RelatorioReparacaoView`** não tinha rodapé Navel — adicionado `.rel-footer` com `APP_FOOTER_TEXT`
+- **`16-reparacoes.spec.js`** — corrigido selector de badges para `tbody .badge` (excluir badge do cabeçalho)
+- **`16-reparacoes.spec.js`** — corrigido teste R5 (sort por data desc: rep05 vem antes de rep02); adicionado `rr-rep05` ao mock data
+- **`16-reparacoes.spec.js`** — corrigido selector da navegação mensal (`.mensal-titulo` em vez de `.mensal-nav-titulo`, `aria-label` nos botões)
+
+### Mock data
+- Adicionado `rr-rep05` (rascunho em progresso para rep05 ISTOBAL) ao `MC.relatoriosReparacao` em `helpers.js`
+
+---
+
 ## [1.9.2] — 2026-02-22 — Materiais por aviso no relatório mensal ISTOBAL + correcção cliente ISTOBAL
 
 ### Melhorias Reparações / ISTOBAL

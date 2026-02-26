@@ -124,6 +124,129 @@ export const MC = {
       ultimoEnvio: '2025-12-10T12:00:00.000Z',
     },
   ],
+
+  // ── Reparações ─────────────────────────────────────────────────────────────
+  reparacoes: [
+    // rep01: pendente — para testar criação e execução
+    {
+      id: 'rep01', maquinaId: 'm01', data: '2026-02-10',
+      tecnico: 'Aurélio Almeida', status: 'pendente',
+      numeroAviso: 'AV-2026-001', descricaoAvaria: 'Elevador não sobe.',
+      observacoes: '', origem: 'manual', criadoEm: '2026-02-10T10:00:00.000Z',
+    },
+    // rep02: em_progresso — para testar retoma do fluxo
+    {
+      id: 'rep02', maquinaId: 'm01', data: '2026-02-12',
+      tecnico: 'Aurélio Almeida', status: 'em_progresso',
+      numeroAviso: 'AV-2026-002', descricaoAvaria: 'Fuga hidráulica.',
+      observacoes: 'Em curso.', origem: 'manual', criadoEm: '2026-02-12T08:00:00.000Z',
+    },
+    // rep03: concluída — para testar visualização de relatório e email
+    {
+      id: 'rep03', maquinaId: 'm01', data: '2026-01-15',
+      tecnico: 'Aurélio Almeida', status: 'concluida',
+      numeroAviso: 'AV-2026-000', descricaoAvaria: 'Sensor defeituoso.',
+      observacoes: '', origem: 'manual', criadoEm: '2026-01-15T09:00:00.000Z',
+    },
+    // rep04: ISTOBAL — aviso ES para testar relatório mensal
+    {
+      id: 'rep04', maquinaId: 'm01', data: '2026-02-05',
+      tecnico: 'Rui Nunes', status: 'concluida',
+      numeroAviso: 'ES-2026-00099', descricaoAvaria: 'Fallo en bomba de alta presión.',
+      observacoes: 'Aviso recebido de isat@istobal.com.', origem: 'istobal_email',
+      criadoEm: '2026-02-05T08:00:00.000Z',
+    },
+    // rep05: ISTOBAL em_progresso — para contar no mensal
+    {
+      id: 'rep05', maquinaId: 'm01', data: '2026-02-18',
+      tecnico: 'Rui Nunes', status: 'em_progresso',
+      numeroAviso: 'ES-2026-00150', descricaoAvaria: 'Error en sensor de posición.',
+      observacoes: 'Em diagnóstico.', origem: 'istobal_email',
+      criadoEm: '2026-02-18T10:00:00.000Z',
+    },
+  ],
+
+  // ── Relatórios de Reparação ────────────────────────────────────────────────
+  relatoriosReparacao: [
+    // rr-rep02: rascunho em progresso (rep02)
+    {
+      id: 'rr-rep02', reparacaoId: 'rep02',
+      numeroRelatorio: null,
+      dataCriacao: '2026-02-12T09:00:00.000Z',
+      dataAssinatura: null,
+      tecnico: 'Aurélio Almeida',
+      nomeAssinante: '',
+      assinadoPeloCliente: false,
+      assinaturaDigital: null,
+      numeroAviso: 'AV-2026-002',
+      descricaoAvaria: 'Fuga hidráulica.',
+      trabalhoRealizado: 'Inspecção inicial efectuada. Desmontagem parcial.',
+      horasMaoObra: 1.5,
+      checklistRespostas: '{}',
+      pecasUsadas: '[{"codigo":"KIT-SEAL-01","descricao":"Kit vedantes hidráulicos","quantidade":1}]',
+      fotos: '[]',
+      notas: 'Aguarda peça para continuar.',
+    },
+    // rr-rep03: concluído e assinado (rep03)
+    {
+      id: 'rr-rep03', reparacaoId: 'rep03',
+      numeroRelatorio: '2026.RP.00001',
+      dataCriacao: '2026-01-15T09:00:00.000Z',
+      dataAssinatura: '2026-01-15T14:00:00.000Z',
+      tecnico: 'Aurélio Almeida',
+      nomeAssinante: 'João Bettencourt',
+      assinadoPeloCliente: true,
+      assinaturaDigital: null,
+      numeroAviso: 'AV-2026-000',
+      descricaoAvaria: 'Sensor defeituoso.',
+      trabalhoRealizado: 'Substituído sensor NTC. Sistema testado OK.',
+      horasMaoObra: 2.0,
+      checklistRespostas: '{"ch1":"sim","ch2":"sim","ch3":"nao"}',
+      pecasUsadas: '[{"codigo":"SENS-NTC-01","descricao":"Sensor NTC temperatura","quantidade":1}]',
+      fotos: '[]',
+      notas: '',
+      ultimoEnvio: '2026-01-15T15:00:00.000Z',
+    },
+    // rr-rep04: relatório ISTOBAL concluído (rep04)
+    {
+      id: 'rr-rep04', reparacaoId: 'rep04',
+      numeroRelatorio: '2026.RP.00002',
+      dataCriacao: '2026-02-05T08:00:00.000Z',
+      dataAssinatura: '2026-02-05T16:00:00.000Z',
+      tecnico: 'Rui Nunes',
+      nomeAssinante: 'Carlos Freitas',
+      assinadoPeloCliente: true,
+      assinaturaDigital: null,
+      numeroAviso: 'ES-2026-00099',
+      descricaoAvaria: 'Fallo en bomba de alta presión.',
+      trabalhoRealizado: 'Substituída bomba de alta pressão. Testada a 120 bar.',
+      horasMaoObra: 3.5,
+      checklistRespostas: '{}',
+      pecasUsadas: '[{"codigo":"IST-PUMP-HP","descricao":"Bomba alta pressão ISTOBAL","quantidade":1},{"codigo":"OR-KIT-02","descricao":"Kit O-Ring","quantidade":1}]',
+      fotos: '[]',
+      notas: '',
+      ultimoEnvio: '2026-02-05T17:00:00.000Z',
+    },
+    // rr-rep05: rascunho em progresso (rep05 ISTOBAL)
+    {
+      id: 'rr-rep05', reparacaoId: 'rep05',
+      numeroRelatorio: null,
+      dataCriacao: '2026-02-18T10:00:00.000Z',
+      dataAssinatura: null,
+      tecnico: 'Rui Nunes',
+      nomeAssinante: '',
+      assinadoPeloCliente: false,
+      assinaturaDigital: null,
+      numeroAviso: 'ES-2026-00150',
+      descricaoAvaria: 'Error en sensor de posición.',
+      trabalhoRealizado: 'Sensor de posição diagnosticado. Aguarda peça de substituição.',
+      horasMaoObra: 1.0,
+      checklistRespostas: '{}',
+      pecasUsadas: '[]',
+      fotos: '[]',
+      notas: 'Peça encomendada.',
+    },
+  ],
 }
 
 // ── Mock API ──────────────────────────────────────────────────────────────────
@@ -370,6 +493,7 @@ export async function goTo(page, section) {
     calendario:   '/calendario',
     logs:         '/logs',
     definicoes:   '/definicoes',
+    reparacoes:   '/reparacoes',
   }
   await page.goto(`/manut${links[section]}`)
   await page.waitForLoadState('domcontentloaded')
