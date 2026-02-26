@@ -14,7 +14,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { getLog, clearLog, exportLogAsText, exportLogAsJson, getLogStats, gerarRelatórioSuporte, flushLogsToServer, logger } from '../utils/logger'
-import { apiLogsList } from '../services/apiService'
+// Import dinâmico — Logs.jsx é lazy; manter apiService fora do bundle principal
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { ArrowLeft, RefreshCw, Download, Trash2, AlertCircle, Info, Zap, AlertTriangle, Skull, ChevronDown, ChevronRight, ClipboardCopy } from 'lucide-react'
@@ -95,6 +95,7 @@ export default function Logs() {
       setLoadingServer(true)
       showGlobalLoading()
       try {
+        const { apiLogsList } = await import('../services/apiService')
         const serverEntries = await apiLogsList(filterDays)
         setEntries(Array.isArray(serverEntries) ? serverEntries : [])
         const s = Array.isArray(serverEntries) ? serverEntries : []

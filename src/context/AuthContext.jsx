@@ -6,13 +6,19 @@
  * A sessão é restaurada a partir do payload JWT sem chamada de rede.
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { apiLogin, clearToken, decodeTokenPayload, isTokenValid } from '../services/apiService'
 import { logger, flushLogsToServer } from '../utils/logger'
 import { ROLES } from '../config/users'
 
 const AuthContext = createContext(null)
 
-function sessionFromToken() {
+// Import dinâmico isolado — evita incluir apiService.js no bundle principal
+// (AuthContext é sempre carregado; import dinâmico permite ao Vite criar chunk separado)
+async function getApi() {
+  return import('../services/apiService')
+}
+
+async function sessionFromToken() {
+  const { isTokenValid, decodeTokenPayload } = await getApi()
   if (!isTokenValid()) return null
   const p = decodeTokenPayload()
   if (!p) return null
@@ -33,17 +39,19 @@ export function AuthProvider({ children }) {
 
   // Restaurar sessão a partir do JWT existente (sem chamada de rede)
   useEffect(() => {
-    const sess = sessionFromToken()
-    setSession(sess)
-    setHydrated(true)
-    if (sess?.user) {
-      logger.info('AuthContext', 'sessionRestore', `Sessão restaurada: ${sess.user.username} (${sess.user.role})`)
-    }
+    sessionFromToken().then(sess => {
+      setSession(sess)
+      setHydrated(true)
+      if (sess?.user) {
+        logger.info('AuthContext', 'sessionRestore', `Sessão restaurada: ${sess.user.username} (${sess.user.role})`)
+      }
+    })
   }, [])
 
   const login = useCallback(async (username, password) => {
     setLoginError(null)
     try {
+      const { apiLogin } = await getApi()
       const result = await apiLogin(username, password)
       // apiLogin já guardou o token via setToken()
       const sess = {
@@ -73,6 +81,7 @@ export function AuthProvider({ children }) {
     const username = session?.user?.username ?? 'desconhecido'
     logger.action('AuthContext', 'logout', `Utilizador "${username}" terminou sessão`)
     await flushLogsToServer()
+    const { clearToken } = await getApi()
     clearToken()
     try { localStorage.setItem('atm_after_logout', '1') } catch { /* */ }
     setSession(null)

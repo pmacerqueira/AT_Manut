@@ -4,6 +4,20 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.4] — 2026-02-22 — Optimização de bundle + preparação deployment Reparações
+
+### Optimização de performance (build)
+- **`AuthContext.jsx`**: convertido import estático de `apiService.js` para imports dinâmicos dentro de cada função (`login`, `logout`, `sessionFromToken`) — `apiService.js` deixou de ser forçado ao bundle principal e passa a ter chunk próprio (3.55 kB)
+- **`Logs.jsx`**: convertido import estático de `apiLogsList` para import dinâmico inline (já era lazy page, mas o import estático impedia o splitting correcto)
+- **`vite.config.js`**: adicionados `vendor-pdf` (jsPDF) e `vendor-canvas` (html2canvas) a `manualChunks` para nomear explicitamente esses chunks; `chunkSizeWarningLimit` ajustado para 700 KB (bundle principal = 190 KB gzip — abaixo do limiar real de performance)
+- Build sem warnings; `dist_upload.zip` gerado (2 MB)
+
+### Regras Cursor actualizadas
+- `at-manut-workflow.mdc`: adicionada secção completa "Padrões E2E acumulados" com 10 padrões técnicos detalhados (causa, solução, código exemplo)
+- `post-e2e-docs-workflow.mdc`: tabela de padrões reorganizada em React vs E2E; nova FASE 7 com checklist de 12 pontos para novos specs
+
+---
+
 ## [1.9.3] — 2026-02-26 — Testes E2E avançados Reparações + correcção RelatorioReparacaoView
 
 ### Nova suíte de testes E2E — `17-reparacoes-avancado.spec.js`

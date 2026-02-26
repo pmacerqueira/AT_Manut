@@ -9,19 +9,23 @@ export default defineConfig({
   base: process.env.VITE_BASE_URL || '/manut/',
   build: {
     target: 'es2020',
-    // Alertar quando chunk > 600KB (após splitting, nenhum deve exceder)
-    chunkSizeWarningLimit: 600,
+    // Limiar para o bundle principal (DataContext é grande por design — gzip real: ~190KB)
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
         manualChunks: {
           // Core React — sempre carregado
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          // Gráficos KPIs — apenas em /metricas (lazy), ~300KB separados do bundle principal
+          // Gráficos KPIs — apenas em /metricas (lazy)
           'vendor-charts': ['recharts'],
           // QR Code — geração de etiquetas
           'vendor-qr': ['qrcode'],
           // Sanitização HTML
           'vendor-purify': ['dompurify'],
+          // Geração de PDF — apenas quando solicitado
+          'vendor-pdf': ['jspdf'],
+          // Captura de ecrã para PDF
+          'vendor-canvas': ['html2canvas'],
         },
       },
     },

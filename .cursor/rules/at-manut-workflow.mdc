@@ -162,7 +162,7 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A suite tem **270 testes** (12 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
+A suite tem **441 testes** (17 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
 
 ```powershell
 # Pré-requisito: servidor de desenvolvimento a correr
@@ -171,14 +171,15 @@ npm run dev   # http://localhost:5173
 # Suite completa
 npx playwright test tests/e2e/
 
-# Spec específico
-npx playwright test tests/e2e/12-v170-features.spec.js
+# Specs por módulo
+npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avancado.spec.js --reporter=list
+npx playwright test --grep "RA-8|RA-9" --reporter=list   # filtrar por grupo
 ```
 
-**Regras:**
+**Regras gerais:**
 - Correr a suite antes de qualquer build importante
 - Os testes usam mock de API (`setupApiMock`) — não precisam de servidor real
-- Ao alterar seletores CSS usados nos testes, actualizar `tests/e2e/helpers.js` e os specs afectados
+- Ao alterar seletores CSS usados nos testes, actualizar `helpers.js` e os specs afectados
 - Não usar `button[title*="QR"]` (ambíguo) — usar selector exacto `button[title="Gerar etiqueta QR"]`
 - Isolamento de sessão: `await page.evaluate(() => sessionStorage.clear())` antes de `doLoginTecnico()` quando o `beforeEach` faz login como Admin
 - Nunca usar `navigate()` directamente no corpo de um componente React — sempre dentro de `useEffect`
@@ -194,6 +195,133 @@ npx playwright test tests/e2e/12-v170-features.spec.js
 5. `git add -A` + commit + push
 
 > Ver regra global `post-e2e-docs-workflow.mdc` para o workflow completo: pré-desenvolvimento, guarda de regressões, padrões React, performance, análise de logs e documentação pós-E2E.
+
+## Padrões E2E acumulados — AT_Manut (biblioteca de falhas recorrentes)
+
+> Cada padrão foi descoberto por falha real num ciclo de testes. Aplicar proactivamente ao escrever novos specs.
+
+### 1. `route.fallback()` em vez de `route.continue()` para handlers em cadeia
+**Quando:** Simular offline parcial (leituras funcionam, escritas falham) com dois handlers registados.
+**Problema:** `route.continue()` envia o pedido para a REDE REAL, ignorando o `setupApiMock` registado antes. Os dados mock não chegam → select vazio → validação falha → modal não fecha.
+**Solução:**
+```js
+// ERRADO — continua para a rede, ignora setupApiMock
+await route.continue()
+
+// CORRECTO — passa ao handler anterior na pilha (setupApiMock)
+await route.fallback()
+```
+**Padrão completo para offline parcial:**
+```js
+await setupApiMock(page, { failFetch: false })  // registar primeiro
+await doLoginAdmin(page)
+// Depois adicionar handler de escrita — usa fallback() para leituras
+await page.route('**/api/data.php', async (route) => {
+  const body = route.request().postDataJSON()
+  if (['create', 'update', 'delete'].includes(body?.action)) {
+    await route.abort('failed')
+  } else {
+    await route.fallback()  // ← fallback, não continue
+  }
+})
+```
+
+### 2. `.first()` obrigatório quando o empty-state duplica botões
+**Quando:** Página com empty-state que repete um botão de acção que já existe no cabeçalho (ex.: "Nova Reparação" em header + empty-state).
+**Problema:** `page.locator('button').filter({ hasText: 'Nova X' }).click()` falha com strict mode se existirem ≥2 elementos.
+**Solução:** Usar sempre `.first().click()` quando existe risco de duplicação de texto:
+```js
+// Seguro — funciona mesmo com 1 ou 2 botões
+await page.locator('button').filter({ hasText: 'Nova Reparação' }).first().click()
+```
+
+### 3. `tbody .badge` para evitar apanhar badges de cabeçalho/filtros
+**Quando:** Verificar badges de estado em linhas de tabela.
+**Problema:** `.badge` apanha também badges nos botões de filtro ("Pendentes 2", "Concluídas 3") do cabeçalho.
+**Solução:** `tbody .badge` ou `.badge[class*="pendente"]` para limitar ao corpo da tabela.
+
+### 4. Botões de ícone precisam de `aria-label` para serem testáveis
+**Quando:** Botões de navegação (anterior/seguinte), botões de fechar, botões de acção sem texto.
+**Problema:** `button:has-text('>')` ou `:has-text('←')` falha — o conteúdo é um SVG/ícone, não texto.
+**Solução:** Adicionar `aria-label` no componente React e usar-lo no teste:
+```jsx
+// No componente
+<button aria-label="Mês anterior" onClick={mesAnterior}>...</button>
+```
+```js
+// No teste
+await page.locator('button[aria-label="Mês anterior"]').click()
+```
+
+### 5. `isVisible()` não aguarda — usar `toBeVisible()` para assertions
+**Problema:** `locator.isVisible()` resolve imediatamente com o estado actual. Se o elemento ainda não renderizou, retorna `false` mesmo que apareça em 100ms.
+**Solução:** Para assertions, usar `expect(locator).toBeVisible()` (com timeout). Para verificação sem espera, usar `isVisible().catch(() => false)`.
+```js
+// ERRADO para assertions (não aguarda)
+const visivel = await page.locator('.modal').isVisible()
+expect(visivel).toBe(true)
+
+// CORRECTO (aguarda até timeout)
+await expect(page.locator('.modal')).toBeVisible()
+
+// OK para verificação condicional rápida
+const jaExiste = await page.locator('.modal').isVisible().catch(() => false)
+```
+
+### 6. Sort order do mock data afecta qual linha é a primeira
+**Quando:** Testar "abrir primeira reparação em progresso" ou "ver primeiro relatório concluído".
+**Problema:** A lista é ordenada por data desc — a reparação mais recente aparece primeiro, não a mais antiga. Ao adicionar novos registos ao mock (ex.: `rr-rep05` com data mais recente que `rr-rep02`), o primeiro item da lista muda.
+**Solução:** Ao escrever testes que clicam em `.first()`, verificar sempre qual o item com data mais recente no mock e adaptar as assertions a esse item.
+
+### 7. `APP_FOOTER_TEXT` esquecido em novos componentes de relatório
+**Problema recorrente:** Ao criar `RelatorioXxxView`, o rodapé Navel é omitido ou os dados de máquina/cliente não são passados/renderizados.
+**Checklist obrigatória para qualquer novo relatório:**
+```jsx
+import { APP_FOOTER_TEXT } from '../config/version'
+
+function RelatorioXxxView({ relatorio, maquina, cliente }) {
+  return (
+    <div className="relatorio-xxx">
+      {/* Secção obrigatória: dados do equipamento */}
+      <div className="rel-section-equipamento">
+        <p>{maquina?.marca} {maquina?.modelo} — S/N: {maquina?.numeroSerie}</p>
+        <p>{cliente?.nome} · NIF {cliente?.nif}</p>
+      </div>
+      {/* ... conteúdo ... */}
+      {/* Rodapé obrigatório */}
+      <div className="rel-footer"><span>{APP_FOOTER_TEXT}</span></div>
+    </div>
+  )
+}
+```
+
+### 8. Selector `.mensal-titulo` + `aria-label` para navegação de meses
+**Específico do modal ISTOBAL:** O título do mês activo está em `.mensal-titulo` (não `.mensal-nav-titulo`). Os botões de navegação são ícones — usar `aria-label`.
+```js
+// Título do mês activo
+await expect(page.locator('.mensal-titulo')).toContainText('Fevereiro 2026')
+// Navegação
+await page.locator('button[aria-label="Mês anterior"]').click()
+await page.locator('button[aria-label="Mês seguinte"]').click()
+```
+
+### 9. `toPass` para assertions com dados carregados assincronamente
+**Quando:** Verificar conteúdo que depende de um `useEffect` completar (ex.: pré-carregamento de rascunho em modal de reparação).
+```js
+// Mais robusto que waitForTimeout fixo
+await expect(async () => {
+  const valor = await page.locator('textarea').inputValue()
+  expect(valor).toMatch(/Sensor|Inspecção|trabalho/i)
+}).toPass({ timeout: 8000, intervals: [500, 1000, 1000] })
+```
+
+### 10. `setupApiMock` com `customData` — verificar que data carregou antes de abrir modal
+**Quando:** `loginAdminSemAlertas(page, { customData: { maquinas: [] } })` — garantir que os dados vazios chegaram ao React antes de abrir modais.
+**Solução:** Após `loginAdminSemAlertas`, adicionar:
+```js
+await page.waitForLoadState('networkidle')
+await page.waitForTimeout(500)
+```
 
 ## Performance — pontos críticos do AT_Manut
 
