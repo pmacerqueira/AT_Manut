@@ -68,9 +68,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
   // Emails fixos para envio após conclusão de cada reparação
   const EMAIL_ADMIN   = 'comercial@navel.pt'
-  // isat@istobal.com = contacto operacional ISTOBAL (de onde chegam os avisos ES-...)
-  // O resumo mensal de faturação vai para a ISTOBAL Portugal (ver cliente cli-istobal na app)
-  const EMAIL_ISTOBAL = 'isat@istobal.com'
+  // lmonteiro.pt@istobal.com = Sra. Luísa Monteiro (ISTOBAL Portugal) — destinatária dos relatórios concluídos
+  // Nota: isat@istobal.com é o remetente dos avisos ES-... (usado no parse-istobal-email.php); não é o mesmo endereço
+  const EMAIL_ISTOBAL = 'lmonteiro.pt@istobal.com'
   const { showToast }                           = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
 
@@ -286,9 +286,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   // ── Envio automático ao concluir ──────────────────────────────────────────
   //
   // Destinatários:
-  //   1. Sempre:             comercial@navel.pt  (Admin)
-  //   2. Se ISTOBAL:         isat@istobal.com    (pedido de assistência original)
-  //   3. Se cliente tem email: email do cliente   (confirmação ao cliente)
+  //   1. Sempre:               comercial@navel.pt         (Admin Navel)
+  //   2. Se ISTOBAL:           lmonteiro.pt@istobal.com   (Sra. Luísa Monteiro, ISTOBAL Portugal)
+  //   3. Se cliente tem email: email do cliente            (confirmação ao cliente final)
 
   const enviarEmailsAutomaticos = async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')

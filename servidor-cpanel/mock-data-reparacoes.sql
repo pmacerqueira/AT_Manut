@@ -52,14 +52,14 @@ VALUES
 -- Fluxo dos avisos:
 --   1. ISTOBAL envia email (isat@istobal.com) com aviso "ES-..." → registo automático na app
 --   2. Navel executa a reparação → cliente final assina o relatório
---   3. Relatório enviado para: Admin (comercial@navel.pt) + ISTOBAL (isat@istobal.com) + cliente final
+--   3. Relatório enviado para: Admin (comercial@navel.pt) + Luísa Monteiro/ISTOBAL PT (lmonteiro.pt@istobal.com) + cliente final
 --   4. No final do mês, resumo mensal (horas M.O. + materiais) emitido e enviado à ISTOBAL Portugal
 --      para servir de base à fatura mensal
 
 INSERT IGNORE INTO `clientes` (`id`, `nif`, `nome`, `morada`, `codigo_postal`, `localidade`, `telefone`, `email`, `notas`)
 VALUES
   ('cli-istobal', '509876543', 'ISTOBAL Portugal, Lda.',
-   'Rua dos Inventores, Lote 12, Parque Tecnológico de Sintra-Cascais', '2710-089', 'Sintra', '+351 219 000 000', 'portugal@istobal.com',
+   'Rua dos Inventores, Lote 12, Parque Tecnológico de Sintra-Cascais', '2710-089', 'Sintra', '+351 219 000 000', 'lmonteiro.pt@istobal.com',
    'Subsidiária portuguesa do grupo ISTOBAL España. Responsável pela gestão dos contratos de assistência em Portugal. Cliente de faturação mensal: a Navel emite fatura mensal à ISTOBAL Portugal pelo total de horas M.O. e materiais das reparações dos avisos ES-... recebidos. NÃO confundir com ISTOBAL España (fabricante/fornecedor de máquinas).');
 
 -- Clientes finais com máquinas ISTOBAL instaladas (eles assinam o relatório de reparação)
