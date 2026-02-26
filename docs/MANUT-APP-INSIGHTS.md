@@ -1,13 +1,13 @@
 # AT_Manut — Insights de Desenvolvimento e Estado Técnico
 
 > Referência sobre decisões de arquitectura, estado actual e próximos passos técnicos.
-> Última revisão: 2026-02-23 — v1.6.2
+> Última revisão: 2026-02-26 — v1.9.3
 
 ---
 
 ## 1. Contexto e posicionamento
 
-O AT_Manut é uma aplicação web PWA de gestão de manutenção destinada às equipas da Navel-Açores, Lda. Os utilizadores actuam no terreno com equipamentos industriais, por vezes em condições adversas:
+O AT_Manut é uma aplicação web PWA de gestão de manutenção e reparações destinada às equipas da Navel-Açores, Lda. Os utilizadores actuam no terreno com equipamentos industriais, por vezes em condições adversas:
 
 - Conectividade instável ou inexistente
 - Mãos sujas ou com luvas
@@ -16,84 +16,76 @@ O AT_Manut é uma aplicação web PWA de gestão de manutenção destinada às e
 
 ---
 
-## 2. Arquitectura actual (v1.6.2)
+## 2. Arquitectura actual (v1.9.3)
 
 ```
 Fonte de verdade:  PHP + MySQL no cPanel
 Cache offline:     localStorage (atm_*) via localCache.js (TTL 30 dias)
 Autenticação:      JWT em sessionStorage (sessão por janela)
-Sync offline:      syncQueue.js → processado ao reconectar
+Sync offline:      syncQueue.js → processado ao reconectar (optimistic update)
 Alertas:           AlertaProactivoModal + atm_config_alertas + atm_alertas_dismiss
 PWA:               manifest.json + ícones optimizados (installable)
 ```
 
 ### O que funciona bem
 - **Multi-dispositivo:** qualquer dispositivo autenticado lê/escreve os mesmos dados MySQL
-- **Offline-first:** dados em cache, operações enfileiradas, banner de estado visual
+- **Offline-first:** dados em cache, operações enfileiradas (optimistic), banner de estado visual
 - **Conformidade:** alertas proactivos ao Admin, email automático ao cliente, badge de conformidade
-- **Automação:** reagendamento automático após cada execução (próximos 2 anos)
-- **QR Code:** etiqueta 90×50mm pronta a colar nas máquinas
+- **Automação:** reagendamento automático após cada execução periódica (próximos 2 anos)
+- **QR Code:** etiqueta 90×50mm pronta a colar + leitura via câmara
+- **Reparações:** fluxo multi-dia completo com fotos, peças, assinatura e relatório ISTOBAL
+- **Testes:** 441 testes E2E a 100% — offline, mobile, permissões, performance cobertas
 
 ### O que ainda não temos
 - **Actualizações em tempo real** — se Admin cria manutenção no computador, ATecnica só vê ao refrescar (não é problema prático para equipa pequena)
-- **Leitura de QR via câmara** — geração implementada, leitura não
-- **Notificações push** — Web Push API não implementada
-- **Service Worker** — app não funciona completamente offline na primeira visita (sem cache de assets)
+- **Notificações push** — Web Push API não implementada (cron diário de email existe como alternativa)
+- **Valores de custo/venda em reparações** — estrutura de peças existe; falta camada de preços para faturação interna
 
 ---
 
-## 3. O que as melhores apps CMMS fazem que ainda não fazemos
+## 3. Módulo Reparações — decisões de design
 
-### Simplicidade radical — 2-3 toques para qualquer tarefa
-**Estado actual:** 4+ toques para registar manutenção. **Oportunidade:** botão de acção rápida no Dashboard.
+### Fluxo multi-dia
+A distinção entre "Guardar progresso" (sem assinatura, `em_progresso`) e "Concluir" (com assinatura, `concluida`) permite que o técnico registe trabalho parcial ao longo de vários dias sem bloquear o relatório final.
 
-### Leitura QR via câmara
-**Estado actual:** só geração. **Próximo passo:** `BarcodeDetector` API (nativa Chrome Android) ou `@zxing/browser`.
+### ISTOBAL — fluxo de negócio
+- **ISTOBAL fábrica (Espanha):** fornecedor de máquinas, envia avisos por email `isat@istobal.com`
+- **ISTOBAL Portugal (Portugal):** subsidiária portuguesa, é quem fatura os serviços prestados
+- Avisos chegam no formato ES-XXXXXXXX-NNN → Navel executa → relatório individual → resumo mensal faturado à ISTOBAL Portugal, Lda.
+- O relatório mensal no botão "Mensal ISTOBAL" serve de base para a fatura mensal
 
-### Entrada por voz
-**Oportunidade:** `SpeechRecognition` API (nativa Chrome/Safari iOS 14.5+) nos campos de notas.
+### Peças usadas (sem preços)
+Por deliberação, os relatórios ao cliente nunca mostram preços de custo ou venda. As peças registadas (referência + descrição + quantidade) servem para controlo interno e para a fase de faturação, que ocorre externamente à aplicação.
 
-### Alto contraste para exterior
-**Oportunidade:** toggle "Modo campo" nas Definições — fundo branco, texto escuro.
+### Rodapé em relatórios
+Todos os relatórios de reparação incluem `APP_FOOTER_TEXT` (`Navel-Açores, Lda — Todos os direitos reservados · v{versão}`) implementado via `.rel-footer` em `Reparacoes.jsx`.
 
 ---
 
 ## 4. Backlog técnico por fase
 
-### Fase 2 — Imediata (0-3 meses)
+### Fase imediata (v2.x)
 
 | # | Funcionalidade | Impacto | Esforço |
 |---|---|---|---|
-| F2.1 | **Leitura QR via câmara** — `BarcodeDetector` ou `@zxing/browser` | Alto | Médio |
-| F2.2 | **Notificações push** — Web Push API, manutenções a vencer em 3 dias | Alto | Alto |
-| F2.3 | **Entrada por voz** — `SpeechRecognition` em campos de notas | Médio | Médio |
-| F2.4 | **Modo campo** — alto contraste, toggle nas Definições | Médio | Baixo |
-| F2.5 | **Service Worker** — cache de assets para app 100% offline | Médio | Médio |
+| P1 | **Notificações push** — Web Push API, manutenções a vencer em 3 dias | Alto | Alto |
+| P2 | **Entrada por voz** — `SpeechRecognition` em campos de notas | Médio | Médio |
+| P3 | **Relatório executivo PDF** — visão da frota para apresentar ao cliente | Médio | Médio |
+| P4 | **Valores de custo/venda em reparações** — camada interna de preços | Alto | Médio |
 
-```bash
-# Dependências para leitura QR
-npm install @zxing/browser --save
-# OU usar BarcodeDetector API nativa (sem instalação)
-
-# Para Service Worker
-npm install vite-plugin-pwa --save-dev
-```
-
-### Fase 3 — Médio prazo (3-12 meses)
+### Fase média (v3.x)
 
 | # | Funcionalidade | Impacto | Esforço |
 |---|---|---|---|
-| F3.1 | **Dashboard de métricas** — MTBF, taxa de cumprimento, recharts | Médio | Alto |
-| F3.2 | **Realtime multi-dispositivo** — Supabase Realtime (WebSockets) | Alto | Alto |
-| F3.3 | **App nativa** — Capacitor (iOS + Android) | Alto | Muito alto |
-
-> **Nota sobre Supabase:** Reavaliar quando houver múltiplas equipas em simultâneo ou quando o tamanho dos dados (fotos base64 no MySQL) começar a ser um problema.
+| M1 | **Realtime multi-dispositivo** — Supabase Realtime (WebSockets) | Alto | Alto |
+| M2 | **App nativa** — Capacitor (iOS + Android) | Alto | Muito alto |
+| M3 | **Actualização automática multi-tab** — BroadcastChannel API | Baixo | Baixo |
 
 ---
 
 ## 5. UX para utilizadores com pouco conhecimento digital
 
-### Já implementado (v1.6.2)
+### Já implementado (v1.9.3)
 - Layouts diferentes para mobile (cards) vs. desktop (tabela)
 - Botões com área de toque ≥ 44px (WCAG 2.5.5)
 - Confirmação antes de apagar
@@ -101,14 +93,13 @@ npm install vite-plugin-pwa --save-dev
 - Indicadores de estado por cores (verde/laranja/vermelho)
 - PWA instalável no ecrã inicial
 - Indicador offline/online com banner
-- Cache local + fila de sincronização
+- Cache local + fila de sincronização (optimistic update)
 - QR codes para identificação de máquinas no terreno
+- Leitor QR via câmara (abre ficha directamente)
 - Breadcrumbs de navegação
-
-### A implementar
-- Alto contraste para uso no exterior (F2.4)
-- Entrada por voz para evitar digitação (F2.3)
-- Leitura QR para eliminar busca manual (F2.1)
+- Alto contraste para uso no exterior (Modo campo)
+- Pesquisa global Ctrl+K
+- Assinatura digital no próprio dispositivo
 
 ---
 
@@ -117,6 +108,7 @@ npm install vite-plugin-pwa --save-dev
 | Métrica | Como medir | Objectivo |
 |---------|-----------|-----------|
 | Tempo para registar 1 manutenção | Cronometrar com técnico | < 60 segundos |
+| Tempo para criar + executar 1 reparação | Cronometrar com técnico | < 2 minutos |
 | Taxa de registos completos | Analisar dados no localStorage | > 90% completos |
 | Erros críticos/semana | `atm_log` filtrado por `fatal/error` | 0 erros críticos |
 | Uso mobile vs. desktop | Analisar user-agent (futuro) | > 60% mobile |

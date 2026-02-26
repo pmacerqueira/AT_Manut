@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-02-23 — v1.7.2
+> Última revisão: 2026-02-26 — v1.9.3
 
 ---
 
-## Estado actual (v1.7.2) — O que está implementado
+## Estado actual (v1.9.3) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -33,123 +33,104 @@
 | Autenticação JWT | Admin / ATecnica, sessão por janela, roles separados | v1.0 |
 | Offline-first | Cache localStorage, fila de sync, OfflineBanner | v1.3.0 |
 | PWA instalável | Ícone no ecrã inicial, manifest, ícones optimizados | v1.4.1 |
-| Suite de testes E2E | 270 testes Playwright (12 specs) | v1.7.2 |
 | Log de sistema | Acções, erros, eventos de autenticação | v1.0 |
 | Breadcrumbs | Navegação hierárquica contextual | v1.2.0 |
 | Responsividade | Mobile/tablet/landscape optimizado | v1.2.0 |
+| Importação Kaeser PDF | Leitura de relatórios de compressores Kaeser e importação de dados | v1.8.x |
+| **Módulo Reparações** | Registo, execução multi-dia, fotos (máx. 8), assinatura digital | **v1.9.x** |
+| **Reparações — peças usadas** | Registo de materiais e consumíveis por reparação (ref., descrição, qty.) | **v1.9.x** |
+| **Reparações — fluxo ISTOBAL** | Avisos ES-, relatório individual + resumo mensal faturável | **v1.9.x** |
+| **Reparações — relatório mensal** | Modal mensal ISTOBAL com horas M.O., materiais expansíveis, impressão | **v1.9.x** |
+| **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
+| **Suite de testes E2E** | 441 testes Playwright (17 specs) — 100% a passar | **v1.9.3** |
 
 ---
 
 ## Histórico de versões principais
 
-### v1.6.x — Blocos A+B+C (Conformidade e Alertas)
+### v1.9.x — Módulo Reparações
 **Implementado:** Fevereiro 2026
 
-**Bloco A — Email e configuração:**
-- Email do cliente obrigatório (validação JS, badge "Sem email" nos que faltam)
-- Remoção do atributo HTML `required` do campo email para permitir validação customizada
-- Secção "Alertas de conformidade" nas Definições (apenas Admin)
-- Configuração de "Dias de aviso" (1–60, default 7), persistida em `atm_config_alertas`
+**Funcionalidades:**
+- Página `Reparacoes.jsx` com lista, filtros (Todas/Pendentes/Em progresso/Concluídas), badges ISTOBAL
+- Criação de reparação: máquina, data, técnico, aviso ES- (ISTOBAL), descrição da avaria
+- Modal de execução `ExecutarReparacaoModal.jsx`: trabalho realizado, fotos (máx. 8), checklist corretivo, peças usadas, assinatura digital, data histórica (Admin)
+- Fluxo multi-dia: "Guardar progresso" (sem assinatura, grava rascunho), "Concluir" (com assinatura, gera relatório definitivo)
+- `RelatorioReparacaoView`: visualização do relatório concluído com dados da máquina/cliente, número sequencial `AAAA.RP.NNNNN`, assinante, materiais, rodapé Navel
+- Email automático pós-conclusão: Admin sempre, ISTOBAL se aviso ES-, cliente se tem email na ficha
+- **Relatório mensal ISTOBAL:** agrupa reparações concluídas do mês com aviso ES- → mostra horas M.O. e materiais → impressão com expansão automática
+- `RelatorioReparacaoView` inclui secção de equipamento (marca, modelo, nº série, localização, cliente)
 
-**Bloco B — Reagendamento automático:**
-- Após execução de manutenção periódica: `recalcularPeriodicasAposExecucao` recalcula todas as manutenções futuras da máquina (próximos 2 anos)
-- Cálculo a partir da data de conclusão do último relatório (montagem ou periódica)
-- Função em `DataContext.jsx`, chamada por `ExecutarManutencaoModal.jsx`
+**Contexto de negócio ISTOBAL:**
+- ISTOBAL Portugal é cliente de prestação de serviços (não a fábrica espanhola)
+- Avisos chegam por email (`isat@istobal.com`) → Navel executa → relatório individual → resumo mensal faturado à ISTOBAL Portugal, Lda.
+- Contacto de relatórios ISTOBAL: Sra. Luísa Monteiro (`lmonteiro.pt@istobal.com`)
 
-**Bloco C — Modal proactivo de alertas:**
-- `AlertaProactivoModal.jsx`: aparece ao Admin no Dashboard com manutenções próximas do prazo
-- Agrupado por cliente, com indicação de clientes sem email
-- "Fechar" — fecha sem marcar; "Dispensar hoje" — não volta a aparecer no próprio dia
-- Envio de lembrete por email directamente do modal
-- Persistência de dismiss: `atm_alertas_dismiss` em `localStorage`
-- Correcção de bug em `toggleExpand`: `!(prev[nif] ?? true)` para colapso correcto na primeira interacção
+**Testes E2E adicionados:**
+- `16-reparacoes.spec.js` (42 testes): R1→R10 — listagem, filtros, dashboard, criação, fluxo multi-dia, retoma, conclusão, relatório, mensal ISTOBAL, eliminar, badges ISTOBAL
+- `17-reparacoes-avancado.spec.js` (69 testes): RA-1→RA-15 — permissões, multi-dia, fotos, email, relatório, mobile, tablet, offline, estados vazios, data histórica, peças, checklist, ISTOBAL, volumoso, logging
 
-**Correcções v1.6.1/v1.6.2:**
-- `QrEtiquetaModal.jsx`: handler de Escape adicionado (UX fix + fix de 3 testes E2E)
-- `helpers.js` (testes): data `mt20` movida para isolamento correcto entre specs
-- `playwright.config.js`: `baseURL` corrigido para `http://localhost:5173`
-- E2E specs 01–11: 228 testes a passar
+**Bug corrigido:** `route.fallback()` (não `route.continue()`) necessário em Playwright para passar ao handler anterior (`setupApiMock`) nos testes offline.
 
 ---
 
-### v1.7.1/v1.7.2 — E2E: cobertura v1.7.0 + correcções de robustez
-**Implementado:** 2026-02-23
-
-- Criado `12-v170-features.spec.js` (42 testes) para cobertura completa dos 5 features do v1.7.0
-- **Bug `Metricas.jsx`:** redirect de ATecnica movido para `useEffect` (evitar `navigate()` durante render em React 19)
-- **Selector QR ambíguo:** substituição de `button[title*="QR"]` pelo selector exacto `button[title="Gerar etiqueta QR"]` — o botão sidebar adicionado em v1.7.0 tornava o selector ambíguo
-- **Sessão Auth isolada:** `sessionStorage.clear()` antes de `doLoginTecnico()` em testes que partilham `beforeEach` Admin
-- E2E total: **270 testes** (12 specs) — 100% a passar
-
----
-
-### v1.5.x — Etapas 1–4 do Roadmap
+### v1.8.x — Importação Kaeser PDF
 **Implementado:** Fevereiro 2026
 
-- **Etapa 1:** Vista "O meu dia" no Dashboard — lista filtrada por técnico + data
-- **Etapa 2:** Alertas de conformidade — card pulsante + sub-texto com dias de atraso
-- **Etapa 3:** QR Code por máquina — etiqueta 90×50mm, logo Navel, impressão
-- **Etapa 4:** Histórico completo em PDF por máquina — `gerarHtmlHistoricoMaquina.js`
+- Leitura de relatórios de manutenção de compressores Kaeser em formato PDF
+- Importação de dados para o sistema (manutenções, equipamentos)
+- Specs 14-15: 49 testes Playwright
 
 ---
 
-### v1.4.x — Testes E2E + PWA
-- Suite Playwright: 9 specs, 137 testes (specs 01–09)
-- Logotipo Navel na sidebar
-- Ícones PWA optimizados
-
----
-
-### v1.3.x — Offline-first
-- `localCache.js` — cache de dados do servidor (TTL 30 dias)
-- `syncQueue.js` — fila de operações offline
-- `OfflineBanner.jsx` — indicador visual de conectividade
-
----
-
-### v1.2.x — Responsividade
-- Auditoria e optimização mobile/tablet/landscape
-- Breadcrumbs de navegação
-
----
-
-### v1.0–v1.1 — Núcleo da aplicação
-- CRUD Clientes, Equipamentos, Manutenções, Categorias
-- Execução com checklist, assinatura digital, fotos
-- Relatório PDF + email
-- Calendário + Agendamento
-- Logs de sistema
-
----
-
-## Histórico v1.7.0 — Etapas 5-9 (Campo + Produtividade + KPIs)
+### v1.7.x — Campo + Produtividade + KPIs
 **Implementado:** Fevereiro 2026
 
-- **Etapa 5 — Leitor QR Code via câmara:** `QrReaderModal.jsx` com `@zxing/browser`; preferência câmara traseira mobile; navega directamente para ficha da máquina ao ler QR da app; `Equipamentos.jsx` recebe `?maquina=ID` para abrir automaticamente a subcategoria
-- **Etapa 6 — Dashboard KPIs:** `kpis.js` com funções de cálculo; `Metricas.jsx` com cards de resumo, taxa de cumprimento circular, gráfico de linha mensal, gráfico de barras 8 semanas, top clientes em atraso; `recharts` como biblioteca de gráficos
-- **Etapa 7 — Pesquisa global:** `PesquisaGlobal.jsx`; `Ctrl+K` global; pesquisa simultânea em clientes/equipamentos/manutenções; navegação por teclado (↑↓ Enter Esc); debounce 200ms
-- **Etapa 8 — Modo campo:** `.modo-campo` em `index.css`; toggle em Definições; persiste em `atm_modo_campo`; indicador "☀ MODO CAMPO" na sidebar
-- **Etapa 9 — Indicador de armazenamento:** barra de progresso de uso do localStorage em Definições; alerta automático acima de 70%
+- **Etapa 5:** Leitor QR Code via câmara (`QrReaderModal.jsx`, `@zxing/browser`)
+- **Etapa 6:** Dashboard KPIs (`Metricas.jsx`, `recharts`) — taxa de cumprimento, gráficos, top clientes
+- **Etapa 7:** Pesquisa global (`PesquisaGlobal.jsx`, `Ctrl+K`)
+- **Etapa 8:** Modo campo (alto contraste, toggle em Definições)
+- **Etapa 9:** Indicador de armazenamento (localStorage %)
+
+---
+
+### v1.6.x — Conformidade e Alertas (Blocos A+B+C)
+**Implementado:** Fevereiro 2026
+
+- **Bloco A:** Email obrigatório nos clientes, badge "Sem email", configuração de dias de aviso
+- **Bloco B:** Reagendamento automático após execução periódica (próximos 2 anos)
+- **Bloco C:** Modal proactivo de alertas ao Admin; "Dispensar hoje"; cron job de email diário
+
+---
+
+### v1.5.x — Etapas 1–4
+**Implementado:** Fevereiro 2026
+
+- Vista "O meu dia" no Dashboard, alertas badge, QR Code (etiqueta 90×50mm), Histórico PDF por máquina
+
+---
+
+### v1.4.x → v1.0 — Base
+- Suite Playwright: 9 specs, 137 testes → PWA → Offline-first → Responsividade → Núcleo CRUD
 
 ---
 
 ## O que ainda está por fazer (Backlog)
 
-### Próximo sprint (v1.8.x)
+### Próximo sprint (v2.x)
 
 | # | Funcionalidade | Impacto | Esforço | Notas |
 |---|---|---|---|---|
 | N1 | **Notificações push** (Web Push API) — manutenções a vencer em 3 dias | Alto | Alto | Service Worker necessário; independente do cron |
-| N2 | **Ordens de trabalho** — estado `Em progresso` com início/fim registado, tempo gasto | Alto | Médio | Melhora o MTTR, exigido por auditoria |
-| N3 | **Ficha de peças/consumíveis** — registo de peças usadas em cada manutenção | Alto | Médio | Permite análise de custos por máquina |
-| N4 | **Relatório executivo PDF** — visão da frota para apresentar ao cliente, baseado nos KPIs | Médio | Médio | Gerado a partir do `kpis.js` existente |
-| N5 | **Entrada por voz** nos campos de texto (SpeechRecognition API, `pt-PT`) | Médio | Médio | Muito útil em ambiente de campo com luvas |
+| N2 | **Entrada por voz** nos campos de texto (SpeechRecognition API, `pt-PT`) | Médio | Médio | Útil em ambiente de campo com luvas |
+| N3 | **Relatório executivo PDF** — visão da frota para apresentar ao cliente, baseado nos KPIs | Médio | Médio | Gerado a partir do `kpis.js` existente |
+| N4 | **Valores de custo/venda em reparações** — fase de faturação (invisível no relatório do cliente) | Alto | Médio | Já existe estrutura de peças usadas; falta a camada de preços |
 
 ### Fase 3 — Escalabilidade (horizonte 6-12 meses)
 
 | # | Funcionalidade | Impacto | Esforço | Notas |
 |---|---|---|---|---|
-| F3.1 | **Multi-técnico em manutenção** — registar 2+ técnicos numa execução | Médio | Médio | Adequado para equipas |
+| F3.1 | **Multi-técnico em manutenção** — registar 2+ técnicos numa execução | Médio | Médio | Adequado para equipas maiores |
 | F3.2 | **App nativa** — Capacitor (iOS + Android, notificações push nativas) | Alto | Muito alto | Reavaliar quando tiver >5 técnicos de campo |
 | F3.3 | **Actualização automática multi-tab** — BroadcastChannel API | Baixo | Baixo | Sincronização instantânea entre abas abertas |
 
@@ -168,22 +149,10 @@
 - **Pesquisa global Ctrl+K** — encontra qualquer entidade em milissegundos
 - **Dashboard KPIs executivo** — taxa de cumprimento, gráficos, top clientes em atraso
 - **Modo campo** — alto contraste para técnicos ao sol
-- **270 testes E2E** — cobertura total de fluxos e perfis de utilizador
+- **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
+- **441 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 
 ---
 
-## Referências de mercado
-
-| Produto | URL | Relevância |
-|---------|-----|------------|
-| TRACTIAN Mobile CMMS | tractian.com | QR code, fotos, mobile-first — redução 40% tempo campo |
-| DIMO Maint | dimomaint.com | "Sem formação necessária", vista pessoal, voz |
-| Fabriq Frontline | fabriq.tech | Operadores sem formação digital, 3 toques máximo |
-| UpKeep CMMS | upkeep.com | Alertas preventivos, histórico por activo, ordens de trabalho |
-| Limble CMMS | limblecmms.com | Conformidade, peças, relatórios de auditoria |
-| MaintainX | getmaintainx.com | Multi-utilizador real-time, ordens de trabalho, custo por activo |
-
----
-
-*Última actualização: 2026-02-23 — v1.7.2*
+*Última actualização: 2026-02-26 — v1.9.3*

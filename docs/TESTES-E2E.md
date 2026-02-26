@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 285 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
-> Última revisão: 2026-02-23 — v1.7.3
+> 441 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
+> Última revisão: 2026-02-26 — v1.9.3
 
 ---
 
@@ -9,25 +9,31 @@
 
 | Ficheiro | Testes | Cobertura |
 |----------|--------|-----------|
-| `01-auth.spec.js` | 8 | Login, logout, sessão, redirecionamentos |
-| `02-dashboard.spec.js` | 10 | Cards KPI, "O meu dia", alertas badge, navegação |
-| `03-clientes.spec.js` | 12 | CRUD clientes, pesquisa, validação de email |
-| `04-manutencoes.spec.js` | 27 | Listagem, filtros, execução, validações, permissões |
+| `01-auth.spec.js` | 7 | Login, logout, sessão, redirecionamentos |
+| `02-dashboard.spec.js` | 14 | Cards KPI, "O meu dia", alertas badge, navegação |
+| `03-clientes.spec.js` | 15 | CRUD clientes, pesquisa, validação de email |
+| `04-manutencoes.spec.js` | 23 | Listagem, filtros, execução, validações, permissões |
 | `05-montagem.spec.js` | 5 | Fluxo completo montagem, assinatura, periódicas |
 | `06-agendamento.spec.js` | 10 | Formulário, validações, fluxo completo |
-| `07-permissions.spec.js` | 20 | RBAC Admin vs ATecnica, rotas protegidas |
-| `08-equipamentos-categorias.spec.js` | 18 | Equipamentos, categorias CRUD inline, calendário |
-| `09-edge-cases.spec.js` | 27 | Fotos, assinatura, modais, mobile, estado vazio |
+| `07-permissions.spec.js` | 26 | RBAC Admin vs ATecnica, rotas protegidas |
+| `08-equipamentos-categorias.spec.js` | 17 | Equipamentos, categorias CRUD inline, calendário |
+| `09-edge-cases.spec.js` | 20 | Fotos, assinatura, modais, mobile, estado vazio |
 | `10-etapas-evolucao.spec.js` | 48 | Vista "O meu dia", alertas badge, QR Code etiqueta, Histórico PDF |
 | `11-blocos-abc.spec.js` | 40 | Email clientes, config alertas, reagendamento, modal proactivo |
 | `12-v170-features.spec.js` | 42 | Pesquisa global, Leitor QR, Modo campo, Métricas, localStorage |
-| `13-performance.spec.js` | 15 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
-| **Total** | **285** | **100% dos fluxos da aplicação + escalabilidade** |
+| `13-performance.spec.js` | 14 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
+| `14-kaeser-features.spec.js` | 31 | Funcionalidades Kaeser — importação e visualização |
+| `15-kaeser-pdf-import.spec.js` | 18 | Importação de PDF Kaeser — extracção e validação de dados |
+| `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
+| `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
+| **Total** | **441** | **100% dos fluxos da aplicação + escalabilidade** |
 
-> **Specs 01–09** (140 testes): cobertura base do núcleo da aplicação.
+> **Specs 01–09** (127 testes): cobertura base do núcleo da aplicação.
 > **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
 > **Spec 12** (42 testes): funcionalidades v1.7.0 (pesquisa, leitor QR, modo campo, métricas, localStorage).
-> **Spec 13** (15 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
+> **Spec 13** (14 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
+> **Specs 14–15** (49 testes): importação e funcionalidades Kaeser.
+> **Specs 16–17** (111 testes): módulo Reparações — base + avançado (permissões, responsividade, offline).
 
 ---
 
@@ -49,8 +55,8 @@ npx playwright install chromium
 # Suite completa
 npx playwright test tests/e2e/
 
-# Specs específicos (mais rápido para validar funcionalidades recentes)
-npx playwright test tests/e2e/10-etapas-evolucao.spec.js tests/e2e/11-blocos-abc.spec.js
+# Specs específicos
+npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avancado.spec.js --reporter=list
 
 # Com output detalhado
 npx playwright test tests/e2e/ --reporter=list
@@ -61,8 +67,8 @@ npx playwright test --ui
 # Ver relatório HTML após execução
 npx playwright show-report
 
-# Filtrar por nome de teste
-npx playwright test tests/e2e/ -g "QR Code"
+# Filtrar por grupo de testes
+npx playwright test --grep "RA-8|RA-9" --reporter=list
 ```
 
 ---
@@ -72,24 +78,33 @@ npx playwright test tests/e2e/ -g "QR Code"
 ### `helpers.js` — utilitários partilhados
 
 ```js
-import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, getInputByLabel, SELETOR_BOTAO_EDITAR, MC } from './helpers.js'
+import {
+  setupApiMock, doLoginAdmin, doLoginTecnico,
+  loginAdminSemAlertas, dismissAlertasModal,
+  getInputByLabel, SELETOR_BOTAO_EDITAR, MC
+} from './helpers.js'
 
 // Interceptar API com dados mock (isola testes do servidor real)
 await setupApiMock(page)
-await setupApiMock(page, { customData: MC_COM_ALERTA })  // dados customizados
+await setupApiMock(page, { customData: { maquinas: [] } })  // dados customizados
+await setupApiMock(page, { failFetch: true })                // simular offline
 
 // Login
 await doLoginAdmin(page)
 await doLoginTecnico(page)
 
-// Login Admin SEM modal de alertas (evita flakiness — preferir em specs gerais)
-await loginAdminSemAlertas(page, { path: '/' })           // → /manut/
-await loginAdminSemAlertas(page, { path: '/clientes' })    // → /manut/clientes
+// Login Admin SEM modal de alertas (preferir em specs gerais)
+await loginAdminSemAlertas(page, { path: '/' })
+await loginAdminSemAlertas(page, { path: '/reparacoes' })
+await loginAdminSemAlertas(page, { path: '/reparacoes', customData: { reparacoes: [] } })
 
-// Preencher modal de execução de manutenção
-await fillExecucaoModal(page)
+// Reparações — helpers específicos
+await irParaReparacoes(page)              // login + navegar para /reparacoes
+await abrirModalExecucaoPendente(page)    // clica "Executar" na 1ª reparação pendente
+await preencherTecnico(page)              // preenche campo técnico no modal de execução
+await signCanvas(page, canvasLocator)     // assina o canvas de assinatura
 
-// Assertar Toast (ephemeral — usar com cautela)
+// Assertar Toast
 await expectToast(page, /texto/, 5000)
 ```
 
@@ -100,190 +115,221 @@ await expectToast(page, /texto/, 5000)
 | Botão Editar | `.icon-btn.secondary` (pode apanhar Relatório frota) | `SELETOR_BOTAO_EDITAR` ou `button[title="Editar"]` |
 | Campo de formulário | `input.nth(1)` (ordem pode mudar) | `getInputByLabel(page, 'Nome do Cliente')` |
 | Modal de alertas | Deixar aparecer (bloqueia interacção) | `dismissAlertasModal(page)` ou `loginAdminSemAlertas()` |
+| Múltiplos botões iguais (empty-state) | `.filter({ hasText: '...' }).click()` | `.filter({ hasText: '...' }).first().click()` |
+| Route handler sequencial | `route.continue()` (vai para rede real) | `route.fallback()` (passa ao handler anterior) |
 
 ### Dados mock (`MC` — Mock Constants)
 
 ```js
 MC = {
-  clientes: [
-    { id: 'c01', nif: '501234567', nome: 'Mecânica Bettencourt', email: 'bet@bett.pt' },
-    { id: 'c02', nif: '502345678', nome: 'Frigorífico Açores', email: '' }  // sem email
+  clientes: [ /* 4 clientes: ISTOBAL Portugal, Mecânica Bettencourt, Frigorífico Açores, outro */ ],
+  maquinas: [ /* 7 máquinas */ ],
+  manutencoes: [ /* manutenções com mt20 em Abril para não activar alertas */ ],
+  relatorios: [ /* relatórios de manutenção */ ],
+  categorias: [...], subcategorias: [...], checklistItems: [...],
+  // Reparações
+  reparacoes: [
+    { id: 'rep01', status: 'pendente', origem: 'manual', ... },
+    { id: 'rep02', status: 'em_progresso', origem: 'manual', ... },
+    { id: 'rep03', status: 'concluida', origem: 'manual', ... },
+    { id: 'rep04', status: 'concluida', origem: 'istobal', numeroAviso: 'ES-20260201-004', ... },
+    { id: 'rep05', status: 'em_progresso', origem: 'istobal', numeroAviso: 'ES-20260218-005', ... },
   ],
-  maquinas: [
-    { id: 'm01', clienteId: 'c01', marca: 'Otis', modelo: 'GeN2', periodicidadeManut: 'anual' },
-    { id: 'm02', clienteId: 'c02', marca: 'Schindler', modelo: '3300' }
+  relatoriosReparacao: [
+    { id: 'rr-rep03', reparacaoId: 'rep03', numeroRelatorio: '2026.RP.00001', pecasUsadas: [{referencia: 'SENS-NTC-01', ...}], ... },
+    { id: 'rr-rep04', reparacaoId: 'rep04', numeroRelatorio: '2026.RP.00002', pecasUsadas: [{referencia: 'IST-PUMP-HP', ...}], ... },
+    { id: 'rr-rep05', reparacaoId: 'rep05', trabalhoRealizado: 'Sensor de posição diagnosticado...', ... }, // rascunho
   ],
-  manutencoes: [
-    { id: 'mt10', maquinaId: 'm01', tipo: 'periodica', status: 'pendente', data: '2026-02-15' },
-    { id: 'mt15', maquinaId: 'm01', tipo: 'periodica', status: 'pendente', data: '...' },
-    { id: 'mt20', maquinaId: 'm02', tipo: 'montagem',  status: 'pendente', data: '2026-04-01' }
-    // mt20 afastado para não activar modal de alertas nos testes do spec 10
-  ],
-  // + categorias, subcategorias, checklist, relatorios
 }
-```
-
-### `MC_COM_ALERTA` — dados para testes de alertas (spec 11)
-
-Estende `MC` com:
-- `c02` sem email → testa badge "Sem email"
-- `mt_prox1`, `mt_prox2` com datas a 3-4 dias → activam o modal proactivo
-- `mt20` em Abril → não activa alertas, mantém isolamento
-
-### Helpers de autenticação para alertas (spec 11)
-
-```js
-// Login como Admin COM modal de alertas visível
-async function loginAdminComAlertas(page, customData = MC_COM_ALERTA) {
-  await setupApiMock(page, { customData })
-  await doLoginAdmin(page)
-  await page.evaluate(() => {
-    localStorage.removeItem('atm_alertas_dismiss')
-    localStorage.setItem('atm_config_alertas', JSON.stringify({ diasAviso: 7 }))
-  })
-  await page.goto('/manut/')  // re-navegar para useEffect disparar
-  await page.waitForTimeout(1500)
-}
-
-// Login como Admin SEM modal de alertas — helper exportado em helpers.js
-await loginAdminSemAlertas(page, { path: '/clientes' })  // path = rota após /manut
 ```
 
 ---
 
-## Cobertura por funcionalidade (specs 10 e 11)
+## Cobertura — Módulo Reparações (specs 16 e 17)
 
-### Spec 10 — Etapas 1–4 (48 testes)
+### Spec 16 — Reparações Base (42 testes)
 
-**Etapa 1 — Vista "O meu dia":**
-- Secção "O meu dia" visível no Dashboard
-- Lista manutenções do técnico autenticado
-- Botão "Executar" navega para Manutenções
-- ATecnica vê a sua vista; Admin vê global
+**R1 — Listagem e filtros:**
+- Mostra todas as reparações (mock data) por defeito
+- Filtros Pendentes, Em progresso, Concluídas funcionam correctamente
+- Badges de estado correctos em `tbody` (não confundir com badges de cabeçalho)
+- Contador de filtro mostra número correcto
 
-**Etapa 2 — Alertas de conformidade badge:**
-- Card "Em atraso" tem classe `stat-card-pulse` quando >7 dias
-- Sub-texto "Há X dias!" exibido
-- Número de dias coerente
-- Sem atraso → sem pulse
-- Atraso de apenas 3 dias → sem badge (< threshold)
-- ATecnica também vê o alerta
+**R2 — Dashboard:**
+- Card de reparações visível com ligação para a página
 
-**Etapa 3 — QR Code:**
-- Botão QR visível em vista hierárquica e em máquinas em atraso
-- Modal `.qr-modal` abre ao clicar
-- Modal mostra cabeçalho NAVEL e info da máquina (marca/modelo/série)
-- QR code gerado (img aparece)
-- Botão "Imprimir etiqueta" activo após gerar QR
-- Fechar via botão, via overlay, via **Escape** ← corrigido em v1.6.2
-- ATecnica também tem acesso ao QR
-- Etiqueta tem rodapé com versão Navel
-- QR em vista hierárquica funciona (com Escape)
+**R3 — Criar nova reparação:**
+- Botão "Nova Reparação" abre modal
+- Validação de campos obrigatórios
+- Criar reparação válida fecha modal + toast de sucesso
+- ATecnica também pode criar
 
-**Etapa 4 — Histórico PDF:**
-- Botão "Histórico PDF" visível em ambas as vistas
-- Clique abre modal de histórico
-- Modal mostra título e lista de relatórios
-- Download/impressão funciona
+**R4 — Guardar progresso (fluxo multi-dia):**
+- Reparação pendente tem botão "Executar"
+- Modal de execução abre
+- "Guardar progresso" sem assinatura fecha modal + toast
+- Reparação em progresso não tem botão "Ver relatório"
 
-**Integração:**
-- Dashboard mostra alerta E lista "meu dia" em simultâneo
-- QR e Histórico coexistem na mesma linha de máquina
-- Fluxo: abrir QR, fechar, abrir Histórico na mesma sessão
-- ATecnica: tem "O meu dia" + alertas + QR + Histórico (sem botões Admin)
+**R5 — Retoma de reparação em progresso:**
+- Abrir reparação em progresso pré-preenche dados guardados (trabalho realizado parcial)
+- Relatório parcial existente carregado correctamente
+
+**R6 — Concluir com assinatura:**
+- Sem assinatura: botão "Concluir" mostra erro
+- Fluxo completo: preencher + assinar + concluir gera relatório
+
+**R7 — Ver relatório concluído:**
+- Reparações concluídas têm botão "Ver relatório"
+- Modal mostra número de relatório, horas M.O., materiais usados, botão "Enviar email"
+
+**R8 — Relatório mensal ISTOBAL:**
+- Botão "Mensal ISTOBAL" visível no cabeçalho
+- Modal abre com título ISTOBAL
+- Mostra avisos ES- do mês corrente
+- Coluna H. M.O.; card "Horas M.O. (faturar)"
+- Linha com materiais tem badge de contagem; expandir mostra sub-tabela sem preços
+- Navegação entre meses (via `aria-label` nos botões); título `.mensal-titulo` actualiza
+- Botão "Imprimir / Exportar" visível no footer
+
+**R9 — Eliminar reparação:**
+- Admin tem botão "Eliminar"; ATecnica não tem
+- Confirmar → remove da lista; Cancelar → mantém
+
+**R10 — Badges ISTOBAL:**
+- Badge `.rep-origem-istobal` visível nas reparações ISTOBAL
+- Coluna "Aviso" mostra número ES-
 
 ---
 
-### Spec 11 — Blocos A+B+C (40 testes)
+### Spec 17 — Reparações Avançado (69 testes)
 
-**Bloco A — Email e Definições:**
-- A1: Badge "Sem email" visível no cliente sem email
-- A2: Campo email obrigatório no formulário de novo cliente
-- A3: Erro inline ao tentar criar cliente sem email
-- A4: Badge desaparece após adicionar email
-- A5: Criar cliente com email — modal fecha, cliente aparece na tabela
-- A6: Limpar email em edição → erro inline
-- D1: Secção "Alertas de conformidade" visível nas Definições (Admin)
-- D2: Valor por defeito "7 dias" no campo
-- D3: Alterar para 14 dias → `localStorage.atm_config_alertas.diasAviso = 14`
-- D4: Valor persiste após navegação
-- D5: Valor 0 → erro de validação
-- D6: Valor 61 → erro de validação
-- D7: ATecnica não vê a secção de alertas nas Definições
+**RA-1 — Permissões Admin vs ATecnica (12 testes):**
+- Admin: botões Eliminar, "Nova Reparação", "Mensal ISTOBAL", campo data histórica
+- ATecnica: SEM Eliminar, COM "Nova Reparação", COM "Mensal ISTOBAL" (leitura), SEM data histórica
+- ATecnica: PODE criar, executar, guardar progresso
+- Reparações visíveis na sidebar para ATecnica
 
-**Bloco B — Reagendamento:**
-- B1: Executar manutenção periódica → log contém `reagendarPeriodicas` ou `concluirManutencao`
-- B2: Botão "Executar manutenção" visível em pendentes (desktop, `.btn-executar-manut`)
-- B3: Execução de montagem NÃO mostra toast de reagendamento periódico
-- B4: Máquina m01 tem `periodicidadeManut: 'anual'` (pré-condição do Bloco B)
+**RA-2 — Fluxo multi-dia realista (4 testes):**
+- Dia 1: criar reparação e guardar progresso parcial
+- Dia 2: retomar reparação em_progresso, adicionar materiais e concluir
+- Reparação concluída aparece no filtro "Concluídas"
 
-**Bloco C — Modal proactivo:**
-- C1: Modal aparece ao Admin com manutenções próximas
-- C2: Modal mostra título "Alertas de conformidade"
-- C3: Subtítulo com número de manutenções
-- C4: Grupo do cliente com email (Bettencourt)
-- C5: Grupo do cliente sem email com aviso
-- C6: Itens mostram data e badge de urgência
-- C7: Botão X fecha o modal
-- C8: Botão "Fechar" fecha sem dispensar (reaparece ao voltar ao Dashboard)
-- C9: "Dispensar hoje" guarda dismiss em `localStorage`
-- C10: Após dispensar, modal não reaparece ao voltar ao Dashboard
-- C11: Modal NÃO aparece para ATecnica
-- C12: Modal NÃO aparece se já dispensado hoje
-- C13: Modal NÃO aparece se manutenções estão fora do prazo de aviso
-- C14: Email mock → botão "Enviar lembrete" funciona
-- C15: Feedback de erro se email falhar (mock de falha)
-- C16: Grupo de cliente é expansível/colapsável
-- C17: Badge de contagem correcto por cliente
-- I1–I4: Testes de integração combinados
+**RA-3 — Fotos no modal de execução (7 testes):**
+- Secção de fotos presente (botão `.foto-add`)
+- Upload PNG: foto aparece na grid
+- Botão remover: foto eliminada da grid
+- Contador 0/8 inicialmente
+- Múltiplas fotos adicionadas sequencialmente
+- Limite de 8 fotos respeitado — toast de aviso ao exceder
+- Fotos guardadas no progresso recarregadas ao retomar
+
+**RA-4 — Envio de email após conclusão (5 testes):**
+- Admin: ecrã de conclusão mostra email Admin automático
+- Reparação ISTOBAL: tag ISTOBAL no ecrã de conclusão
+- Cliente com email na ficha: tag Cliente no ecrã de conclusão
+- Campo de email manual não aparece se cliente tem email
+- Botão "Enviar email" abre modal com campo de destinatário
+
+**RA-5 — Relatório concluído: conteúdo e estrutura (6 testes):**
+- Relatório mostra dados da máquina (marca, modelo, nº série, localização)
+- Relatório mostra dados do cliente (nome, NIF)
+- Nº sequencial no formato `AAAA.RP.NNNNN`
+- Assinante e data de assinatura presentes
+- Materiais usados com código e quantidade
+- Rodapé Navel com versão da app
+
+**RA-6 — Responsividade mobile 375×812 (7 testes):**
+- Página carrega sem overflow horizontal
+- Filtros visíveis e clicáveis em mobile
+- Tabela com scroll horizontal sem quebrar layout
+- Modal "Nova Reparação" abre e é usável
+- Modal de execução é scrollável
+- Sidebar: menu Reparações acessível em mobile
+
+**RA-7 — Responsividade tablet 768×1024 (3 testes):**
+- Tabela sem overflow
+- Modal mensal ISTOBAL legível
+- Canvas de assinatura funciona em tablet
+
+**RA-8 — Offline: graceful degradation (3 testes):**
+- Criar reparação offline: app continua com dados locais (optimistic update)
+- Guardar progresso offline: modal fecha (estado guardado localmente)
+- App mantém dados ao recarregar (localStorage cache)
+
+**RA-9 — Estados vazios (4 testes):**
+- Sem reparações: empty-state com botão "Nova Reparação"
+- Filtro "Pendentes" vazio: empty-state
+- Modal "Nova Reparação" sem máquinas: select com só placeholder
+- Relatório mensal ISTOBAL sem avisos: mensagem "Nenhum aviso"
+
+**RA-10 — Admin: data histórica (3 testes):**
+- Admin pode definir data histórica no modal de execução
+- Relatório com data histórica mostra a data correcta
+- ATecnica NÃO tem campo de data histórica
+
+**RA-11 — Peças e consumíveis (5 testes):**
+- Secção de peças presente no modal
+- Botão "+" adiciona nova linha
+- Botão de remover elimina a linha
+- Peças com código aparecem no relatório
+- Linhas vazias não aparecem no relatório
+
+**RA-12 — Checklist corretivo (2 testes):**
+- Modal mostra secção de checklist quando existem itens
+- Sem itens: não bloqueia a conclusão
+
+**RA-13 — Fluxo completo ISTOBAL (5 testes):**
+- Badge ISTOBAL na lista
+- Aviso ES- na coluna "Aviso"
+- Executar: nº aviso ES- pré-preenchido
+- Relatório mensal mostra aviso ES-
+- Linhas concluídas têm horas M.O. na tabela mensal
+
+**RA-14 — Relatório mensal com dados volumosos (2 testes):**
+- Modal renderiza com 20 avisos ISTOBAL sem travar (< 3s)
+- Total de horas M.O. correcto com dataset volumoso
+
+**RA-15 — Logging de acções (4 testes):**
+- Criar reparação gera entrada no log
+- Eliminar reparação gera entrada no log
+- Página de Logs acessível ao Admin
+- ATecnica não acede à página de Logs (redirecionado)
 
 ---
 
 ## Problemas técnicos documentados e resoluções
 
-### Modal de alertas proactivos interfere com testes do spec 10
-**Problema:** A data de `mt20` em `helpers.js` estava a 2026-03-01 — exactamente no limite de 7 dias a partir de 2026-02-22. O modal de alertas activava nos testes do spec 10 que não o esperavam, bloqueando UI (botão "Executar", tecla Escape).
-**Solução:** Data de `mt20` movida para 2026-04-01 nos dados mock base de `helpers.js`.
+### `route.continue()` vs `route.fallback()` em testes offline (Playwright 1.58)
+**Problema:** Nos testes RA-8, ao adicionar um segundo handler de route para simular escritas offline, usar `route.continue()` para as leituras envia o pedido para a rede real (não para o handler `setupApiMock` registado anteriormente). Isso impede o carregamento de dados mock, e os testes falham porque o select de máquinas fica vazio.
+**Solução:** Usar `route.fallback()` para passar ao handler anterior na pilha de routes. `continue()` vai para a rede; `fallback()` vai para o próximo handler registado.
 
-### Tecla Escape não fechava modal QR
-**Problema:** `QrEtiquetaModal.jsx` não tinha handler de teclado — 3 testes do spec 10 falhavam ao pressionar Escape.
-**Solução:** Adicionado `useEffect` com `document.addEventListener('keydown', ...)` que chama `onClose()` quando `e.key === 'Escape'`.
+### Dois botões "Nova Reparação" quando lista vazia (strict mode)
+**Problema:** Com `reparacoes: []`, a página mostra dois botões com texto "Nova Reparação" (header + empty-state). Chamar `.click()` sem `.first()` pode violar o strict mode do Playwright.
+**Solução:** Usar `.filter({ hasText: '...' }).first().click()` sempre que possa existir mais do que um elemento com o mesmo texto.
 
-### HTML5 `required` vs. validação React em formulário de cliente
-**Problema:** O atributo `required` no campo email de `Clientes.jsx` bloqueava o `handleSubmit` do React antes de este poder mostrar a mensagem de erro customizada. O browser mostrava o seu próprio popover de validação.
-**Solução:** Remoção do atributo `required` do input email — a validação JS em `handleSubmit` faz a verificação e exibe `.form-erro`.
+### Selector de badge: `tbody .badge` vs `.badge`
+**Problema:** Badges de cabeçalho (ex.: contador "5" no filtro) e badges de estado nas linhas da tabela têm a mesma classe. O selector `.badge` apanha ambos.
+**Solução:** Usar `tbody .badge` para limitar a linhas de dados.
 
-### Atributo `toggleExpand` no modal de alertas
-**Problema:** `!prev[nif]` quando `prev[nif]` é `undefined` (estado inicial) avalia para `true` — o primeiro clique expandia em vez de colapsar.
-**Solução:** `!(prev[nif] ?? true)` — assume que o estado inicial é "expandido", e o primeiro clique colapsa correctamente.
+### Selector de título do mensal: `.mensal-titulo` + `aria-label` nos botões
+**Problema:** O selector `.mensal-nav-titulo` não existe; os botões de navegação não têm texto visível (são ícones) — usar `.textContent('>')` falha.
+**Solução:** Título em `.mensal-titulo`; botões com `button[aria-label="Mês anterior"]` / `button[aria-label="Mês seguinte"]`.
+
+### Relatório de reparação sem dados de máquina/cliente (bug de feature)
+**Problema:** `RelatorioReparacaoView` não mostrava dados da máquina nem do cliente; não tinha rodapé Navel.
+**Solução:** Adicionada secção `.rel-section-equipamento` com dados da máquina e cliente, e `.rel-footer` com `APP_FOOTER_TEXT`.
 
 ### Canvas de assinatura em testes E2E
-**Problema:** O canvas de assinatura é sensível a timing e ao estado `assinaturaFeita`. O `page.mouse` do Playwright é pouco fiável em canvas.
-**Solução:** Usar `page.evaluate()` para desenhar directamente no contexto 2D e disparar `MouseEvent` via `dispatchEvent`, garantindo que o estado de assinatura é activado.
+**Problema:** `page.mouse` é pouco fiável em canvas; o estado `assinaturaFeita` pode não ser activado.
+**Solução:** Usar `page.evaluate()` para desenhar directamente no contexto 2D e disparar `MouseEvent` via `dispatchEvent`.
 
-### Chamadas reais ao servidor bloqueiam testes
-**Problema:** Alguns modais (ex: `ExecutarManutencaoModal`) fazem chamadas reais a `send-email.php` quando há email do cliente. Em Playwright headless, estas chamadas pendentes bloqueiam a execução.
-**Solução:** `page.route('**send-email.php**', route => route.fulfill({ status: 200, body: ... }))` no início de cada teste que execute manutenções com email.
-
-### Sessão persistente entre testes de perfis diferentes
-**Problema:** `beforeEach` com Admin pode deixar JWT no `sessionStorage`, bloqueando login como ATecnica.
+### Sessão Admin persistente em testes ATecnica
+**Problema:** `beforeEach` com Admin guarda JWT no `sessionStorage`; `doLoginTecnico()` pode não processar novo login.
 **Solução:** `await page.evaluate(() => sessionStorage.clear())` antes de cada login alternativo.
 
-### Seletores desktop vs. mobile
-**Problema:** A lista de manutenções tem dois layouts no DOM (tabela desktop, cards mobile). Playwright pode resolver para o elemento escondido.
-**Solução:** Usar seletores de classe específica (`.manutencoes-table tbody tr`, `.btn-executar-manut`).
-
-### Selector QR ambíguo após v1.7.0 (corrigido em v1.7.2)
-**Problema:** O v1.7.0 adicionou o botão "Ler QR Code de equipamento" na sidebar. O selector original `button[title*="QR"], button[title*="etiqueta"]` tornava-se ambíguo — `.first()` apanhava o botão da sidebar em vez do botão de etiqueta da máquina, abrindo `QrReaderModal` em vez de `QrEtiquetaModal`. Todos os testes QR do spec 10 falhavam.
-**Solução:** Selector exacto `button[title="Gerar etiqueta QR"]` em todos os locais do spec 10.
-
-### Sessão Admin persistente em testes ATecnica (corrigido em v1.7.2)
-**Problema:** `beforeEach` fazia login como Admin e guardava JWT no `sessionStorage`. Quando um teste chamava `doLoginTecnico()`, o `Login.jsx` detectava sessão activa e redirecionava sem processar o novo login — o utilizador ficava como Admin.
-**Solução:** `await page.evaluate(() => sessionStorage.clear())` antes de cada `doLoginTecnico()` em testes que partilham `beforeEach` de Admin (spec 12, testes Q7, M9, M10).
-
-### `navigate()` durante render em `Metricas.jsx` (corrigido em v1.7.2)
-**Problema:** O redirect de ATecnica era feito directamente no corpo da função (`if (!isAdmin) { navigate('/') }`), o que é um anti-pattern em React 19 — pode não ser executado de forma consistente, e M9 falhava ao verificar que o URL não continha `/metricas`.
-**Solução:** Redirect movido para `useEffect(() => { if (!isAdmin) navigate('/') }, [isAdmin, navigate])`, alinhado com o padrão de `Logs.jsx`.
+### Modal de alertas interfere com outros testes
+**Problema:** Datas próximas no mock activam o modal proactivo, bloqueando interacção noutros specs.
+**Solução:** `mt20` e manutenções base a > 60 dias; alertas de teste só em `MC_COM_ALERTA` (spec 11). Usar `dismissAlertasModal(page)` ou `loginAdminSemAlertas()`.
 
 ---
 
@@ -292,7 +338,7 @@ await loginAdminSemAlertas(page, { path: '/clientes' })  // path = rota após /m
 ```js
 {
   testDir: './tests',
-  timeout: 45000,            // 45 s por teste (permite testes lentos de QR e PDF)
+  timeout: 45000,            // 45 s por teste
   retries: 1,                // 1 retry por teste falhado
   use: {
     baseURL: 'http://localhost:5173',
@@ -306,34 +352,37 @@ await loginAdminSemAlertas(page, { path: '/clientes' })  // path = rota após /m
 }
 ```
 
-> **Workers:** Por omissão usa 2 workers em paralelo. Para debugging usar `--workers=1`.  
-> **Servidor de desenvolvimento:** Deve estar a correr em `http://localhost:5173` antes de executar os testes.
+> **Workers:** Por omissão usa 2 workers em paralelo. Para debugging: `--workers=1`.
 
 ---
 
 ## Manutenção dos testes
 
 ### Ao adicionar uma nova funcionalidade
-1. Identificar o painel e as acções que cobre
-2. Adicionar testes ao spec correspondente (ou criar novo numerado)
-3. Atualizar `MC` em `helpers.js` se precisar de novos dados mock
+1. Identificar o módulo e as acções que cobre
+2. Adicionar testes ao spec correspondente ou criar novo spec numerado (ex.: `18-xxx.spec.js`)
+3. Atualizar `MC` em `helpers.js` com novos dados mock se necessário
 4. Correr `npx playwright test tests/e2e/` para confirmar que nada quebrou
 
 ### Ao alterar seletores CSS
 Os testes dependem de classes CSS. Se alterar uma classe, verificar:
-- `helpers.js` — `fillExecucaoModal`, `expectToast`
+- `helpers.js` — `fillExecucaoModal`, `signCanvas`, `expectToast`
 - `04-manutencoes.spec.js` — `.manutencoes-table`, `.btn-executar-manut`
 - `11-blocos-abc.spec.js` — `.def-alerta-row`, `.form-erro`, `.badge-sem-email`
+- `16-reparacoes.spec.js` — `.modal-exec-rep`, `.modal-nova-rep`, `.modal-relatorio-rep`, `.mensal-titulo`
+- `17-reparacoes-avancado.spec.js` — `.foto-add`, `.fotos-grid`, `.rep-origem-istobal`
 
 ### Ao alterar dados mock (datas)
-As datas dos dados mock em `helpers.js` têm impacto no modal de alertas. Regra:
-- `mt20` e outras manutenções base devem estar a **mais de 60 dias** da data actual
-- Manutenções de teste de alertas devem estar em `MC_COM_ALERTA` (spec 11)
+- `mt20` e manutenções base: a **> 60 dias** da data actual
+- Manutenções de teste de alertas: em `MC_COM_ALERTA` (spec 11)
+- Reparações: `rep04` e `rep05` devem continuar ISTOBAL com avisos ES- para os testes R8/RA-13
 
-### Ao alterar lógica de validação de formulários
-Verificar se campos com `required` HTML interferem com validação React.
-Regra: **não usar `required` em campos com validação customizada JS** — remover o atributo e deixar o `handleSubmit` controlar.
+### Ao adicionar novo módulo de testes offline
+- Usar `setupApiMock(page, { failFetch: false })` para o carregamento inicial
+- Adicionar segundo route handler com `route.fallback()` (não `continue()`) para leituras
+- `route.abort('failed')` para escritas
+- Verificar se há múltiplos botões com o mesmo texto e usar `.first()` se necessário
 
 ---
 
-*Última actualização: 2026-02-23 — v1.7.3*
+*Última actualização: 2026-02-26 — v1.9.3*

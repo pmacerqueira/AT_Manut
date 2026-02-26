@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.7.2 · **Última actualização:** 2026-02-23
+**Versão:** 1.9.3 · **Última actualização:** 2026-02-26
 **Localização:** `c:\AT_Manut\`
 
 ---
@@ -26,7 +26,7 @@ Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCU
 | Ficheiro | Responsabilidade |
 |----------|-----------------|
 | `src/App.jsx` | Rotas, Layout, ProtectedRoute |
-| `src/context/DataContext.jsx` | Estado global: clientes, máquinas, manutenções, relatórios; CRUD; `recalcularPeriodicasAposExecucao` |
+| `src/context/DataContext.jsx` | Estado global: todas as entidades; CRUD; `recalcularPeriodicasAposExecucao` |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
 | `src/hooks/usePermissions.js` | `canDelete`, `canEditManutencao`, `isAdmin` |
 | `src/config/alertasConfig.js` | `getDiasAviso()`, `getManutencoesPendentesAlertas()` |
@@ -61,6 +61,10 @@ Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCU
 | Categorias (Admin) | `Categorias.jsx` |
 | Definições / Backup | `Definicoes.jsx` |
 | Permissões | `usePermissions.js`, `ProtectedRoute.jsx` |
+| **Reparações — página principal** | `Reparacoes.jsx`, `Reparacoes.css` |
+| **Reparações — execução** | `ExecutarReparacaoModal.jsx` (fotos, peças, assinatura, email) |
+| **Reparações — API** | `DataContext.jsx` → `addReparacao`, `updateReparacao`, `removeReparacao` |
+| **Reparações — relatório mensal ISTOBAL** | `Reparacoes.jsx` → `RelatorioMensalISTOBAL`, `RelatorioReparacaoView` |
 
 ---
 
@@ -86,11 +90,29 @@ Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCU
 // status: 'pendente' | 'agendada' | 'concluida'
 ```
 
-### Relatórios
+### Relatórios de manutenção
 ```js
 { id, manutencaoId, dataCriacao, nomeAssinante, assinaturaDigital,
   assinadoPeloCliente, dataAssinatura, checklistItems, fotos,
   horasServico, tecnicoNome }
+```
+
+### Reparações
+```js
+{ id, maquinaId, data, tecnico, status, numeroAviso, descricaoAvaria, origem }
+// status: 'pendente' | 'em_progresso' | 'concluida'
+// origem: 'manual' | 'istobal'
+// numeroAviso: referência ISTOBAL, ex.: 'ES-20260226-001' (apenas reparações ISTOBAL)
+```
+
+### Relatórios de reparação
+```js
+{ id, reparacaoId, dataConclucao, tecnico, trabalhoRealizado, horasMaoObra,
+  pecasUsadas, fotos, assinaturaDigital, nomeAssinante,
+  checklistRespostas, numeroRelatorio }
+// pecasUsadas: [{ referencia, descricao, quantidade }]
+// fotos: máx. 8 (base64 JPEG/PNG)
+// numeroRelatorio: formato 'AAAA.RP.NNNNN' (sequencial por ano)
 ```
 
 ---
@@ -135,8 +157,9 @@ git push origin v{versão}
 3. **Adicionar** a rota em `App.jsx` com o `ProtectedRoute` adequado
 4. **Ligar** ao menu em `Layout.jsx` se for uma nova página
 5. **Persistir** novos campos no `DataContext.jsx`:
-   - Lazy initializer com `useState(() => JSON.parse(localStorage.getItem('atm_X') ?? '[]'))`
-   - `useEffect` de sincronização: `localStorage.setItem('atm_X', JSON.stringify(estado))`
+   - Novo estado: `useState([])`
+   - CRUD via `addXxx`, `updateXxx`, `removeXxx` com `persist()` (optimistic + API)
+   - API no `fetchTodosOsDados` em `apiService.js`
 6. **Usar** `showGlobalLoading/hideGlobalLoading` para operações assíncronas
 7. **Usar** `showToast` para feedback (nunca `alert()`)
 8. **Usar** `logger.action/error` para registo de acções importantes
@@ -147,35 +170,37 @@ git push origin v{versão}
 
 ---
 
-## 7. Adicionar persistência de dados no DataContext
+## 7. Persistência e CRUD no DataContext
 
-```jsx
-// 1. Estado com lazy initializer
-const [novaEntidade, setNovaEntidade] = useState(
-  () => JSON.parse(localStorage.getItem('atm_nova_entidade') ?? '[]')
-)
+O padrão actual usa **optimistic updates** + fire-and-forget para a API:
 
-// 2. Sincronização automática
-useEffect(() => {
-  localStorage.setItem('atm_nova_entidade', JSON.stringify(novaEntidade))
-}, [novaEntidade])
+```js
+// DataContext.jsx — padrão para CRUD
+const addXxx = useCallback((data) => {
+  const id = 'xxx' + Date.now()
+  setXxx(prev => [...prev, { ...data, id }])  // optimistic update imediato
+  logger.action('DataContext', 'addXxx', '...', { id })
+  import('../services/apiService').then(({ apiXxx }) =>
+    persist(() => apiXxx.create({ ...data, id }),
+            { resource: 'xxx', action: 'create', data: { ...data, id } })
+  )
+  return id
+}, [persist])
 
-// 3. Expor no value do contexto
-const value = useMemo(() => ({
-  // ... existentes
-  novaEntidade,
-  setNovaEntidade,
-}), [/* deps */])
+// persist() — trata offline automaticamente:
+// - Se navigator.onLine === false → enfileira na syncQueue
+// - Se API falha por rede → enfileira e marca isOnline=false
+// - Sem toast de erro — o optimistic update continua visível
 ```
 
 ---
 
 ## 8. Permissões por role
 
-| Role | Clientes | Categorias | Eliminar | Editar manut. assinada | Definições | Alertas proactivos |
-|------|----------|------------|----------|------------------------|------------|--------------------|
-| `admin` | CRUD | CRUD | ✅ | ✅ | ✅ | ✅ |
-| `tecnico` | Ver | Não acede | ❌ | ❌ | ❌ | ❌ |
+| Role | Clientes | Categorias | Eliminar | Editar manut. assinada | Definições | Alertas proactivos | Reparações eliminar | Data histórica reparação |
+|------|----------|------------|----------|------------------------|------------|--------------------|---------------------|--------------------------|
+| `admin` | CRUD | CRUD | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `tecnico` | Ver | Não acede | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ---
 
@@ -192,6 +217,11 @@ const value = useMemo(() => ({
 .btn-executar-manut { color: #39ff14 }  /* verde fluorescente — botão Executar */
 .badge-sem-email { ... }                /* badge laranja clientes sem email */
 .stat-card-pulse { animation: pulse }  /* card pulsante no Dashboard */
+
+/* Reparações */
+.rep-origem-istobal { ... }       /* badge ISTOBAL nas linhas de reparação */
+.rel-section-equipamento { ... }  /* secção máquina/cliente no relatório */
+.rel-footer { ... }               /* rodapé Navel no relatório de reparação */
 ```
 
 ---
@@ -202,9 +232,15 @@ const value = useMemo(() => ({
 # Desenvolvimento
 npm run dev                 # http://localhost:5173
 
-# Testes
-npx playwright test tests/e2e/10-etapas-evolucao.spec.js tests/e2e/11-blocos-abc.spec.js --reporter=list
-npx playwright test tests/e2e/  # suite completa
+# Testes — suite completa
+npx playwright test tests/e2e/
+
+# Testes — specs específicos
+npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avancado.spec.js --reporter=list
+npx playwright test tests/e2e/14-kaeser-features.spec.js tests/e2e/15-kaeser-pdf-import.spec.js --reporter=list
+
+# Testes — filtrar por grupo
+npx playwright test --grep "RA-8|RA-9" --reporter=list
 
 # Build
 npm run build               # inclui optimize-images (prebuild)
