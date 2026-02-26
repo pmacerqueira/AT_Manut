@@ -330,11 +330,16 @@ switch ($action) {
         if ($resource === 'maquinas') $data = preprocess_maquina($data);
 
         // Geração de número de relatório de reparação (RP)
+        // Usa MAX em vez de COUNT para ser resiliente a apagamentos;
+        // o UNIQUE KEY na BD previne colisões em race conditions raras.
         if ($resource === 'relatoriosReparacao' && empty($data['numeroRelatorio'])) {
             $ano = date('Y');
-            $sc  = $pdo->prepare("SELECT COUNT(*) FROM relatorios_reparacao WHERE numero_relatorio LIKE ?");
+            $sc  = $pdo->prepare(
+                "SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(numero_relatorio, '.', -1) AS UNSIGNED)), 0) + 1
+                 FROM relatorios_reparacao WHERE numero_relatorio LIKE ?"
+            );
             $sc->execute(["$ano.RP.%"]);
-            $cnt = (int)$sc->fetchColumn() + 1;
+            $cnt = (int)$sc->fetchColumn();
             $data['numeroRelatorio'] = sprintf('%s.RP.%05d', $ano, $cnt);
         }
 

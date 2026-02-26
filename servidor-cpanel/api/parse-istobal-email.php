@@ -216,14 +216,26 @@ $instalacao      = findField($parsed, ['instalación', 'instalacion', 'cliente',
 $dataAviso       = findField($parsed, ['fecha', 'data', 'date', 'dt.']);
 $tipoAvaria      = findField($parsed, ['tipo', 'type', 'classe', 'categoria']);
 
-// Limpar e normalizar a data (formato DD/MM/YYYY ou YYYY-MM-DD)
+// Normalizar data — suporta DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, D/M/YYYY
 $dataFormatada = date('Y-m-d'); // default: hoje
 if ($dataAviso) {
-    // Tentar DD/MM/YYYY
-    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $dataAviso, $dm)) {
-        $dataFormatada = $dm[3] . '-' . $dm[2] . '-' . $dm[1];
-    } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $dataAviso, $dm)) {
-        $dataFormatada = $dm[0];
+    $dataAviso = trim($dataAviso);
+    $formats = ['d/m/Y', 'Y-m-d', 'd-m-Y', 'Y/m/d', 'd/m/y', 'j/n/Y'];
+    $parsed_dt = false;
+    foreach ($formats as $fmt) {
+        $dt = DateTime::createFromFormat($fmt, $dataAviso);
+        if ($dt && $dt->format($fmt) === $dataAviso || $dt) {
+            // Verificar que a data é plausível (entre 2020 e 2100)
+            $yr = (int)$dt->format('Y');
+            if ($yr >= 2020 && $yr <= 2100) {
+                $dataFormatada = $dt->format('Y-m-d');
+                $parsed_dt = true;
+                break;
+            }
+        }
+    }
+    if (!$parsed_dt) {
+        ilog("AVISO: Formato de data não reconhecido: '$dataAviso' — usando data de hoje.");
     }
 }
 

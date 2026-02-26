@@ -16,7 +16,7 @@ const EMPRESA = {
   web:              'www.navel.pt',
 }
 
-export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, options = {}) {
+export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
   const { subcategoriaNome, logoUrl } = options
   const logoSrc = logoUrl ?? '/manut/logo.png'
@@ -39,25 +39,42 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
 
   // ── Peças ──
   let pecas = []
-  try { pecas = JSON.parse(relatorio.pecasUsadas || '[]') } catch { /* empty */ }
+  try {
+    const p = typeof relatorio.pecasUsadas === 'string'
+      ? JSON.parse(relatorio.pecasUsadas || '[]') : (relatorio.pecasUsadas ?? [])
+    pecas = Array.isArray(p) ? p : []
+  } catch { /* empty */ }
   const temPecas = pecas.length > 0 && pecas.some(p => p.descricao?.trim())
 
   // ── Checklist ──
   let checklistRespostas = {}
-  try { checklistRespostas = JSON.parse(relatorio.checklistRespostas || '{}') } catch { /* empty */ }
+  try {
+    const cr = typeof relatorio.checklistRespostas === 'string'
+      ? JSON.parse(relatorio.checklistRespostas || '{}') : (relatorio.checklistRespostas ?? {})
+    checklistRespostas = (cr && typeof cr === 'object' && !Array.isArray(cr)) ? cr : {}
+  } catch { /* empty */ }
   const checklistEntries = Object.entries(checklistRespostas)
   const temChecklist = checklistEntries.length > 0
 
   // ── Fotos ──
   let fotos = []
-  try { fotos = JSON.parse(relatorio.fotos || '[]') } catch { /* empty */ }
+  try {
+    const f = typeof relatorio.fotos === 'string'
+      ? JSON.parse(relatorio.fotos || '[]') : (relatorio.fotos ?? [])
+    fotos = Array.isArray(f) ? f : []
+  } catch { /* empty */ }
   const fotosSafe = fotos.map(f => safeDataImageUrl(f)).filter(Boolean)
 
+  // Mapa id → texto legível para lookup rápido
+  const checklistMap = {}
+  checklistItems.forEach(it => { checklistMap[it.id] = it.texto ?? it.descricao ?? it.nome ?? it.id })
+
   const buildCheckRow = ([id, resp], i) => {
+    const texto = checklistMap[id] ?? id   // fallback ao ID se não encontrar
     const badge = resp === 'OK'
       ? '<span class="badge-sim">OK</span>'
       : resp === 'NOK' ? '<span class="badge-nao">NOK</span>' : '<span class="badge-nd">N/A</span>'
-    return `<tr><td class="cl-num">${i + 1}.</td><td class="cl-texto">${esc(id)}</td><td class="cl-badge">${badge}</td></tr>`
+    return `<tr><td class="cl-num">${i + 1}.</td><td class="cl-texto">${esc(texto)}</td><td class="cl-badge">${badge}</td></tr>`
   }
 
   const html = `<!DOCTYPE html>

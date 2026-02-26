@@ -13,7 +13,7 @@ import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
-import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, Pencil } from 'lucide-react'
+import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle } from 'lucide-react'
 import './ExecutarReparacaoModal.css'
 
 const MAX_FOTOS    = 8
@@ -128,13 +128,26 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       trabalhoRealizado: existente.trabalhoRealizado  ?? '',
       horasMaoObra:      existente.horasMaoObra       ?? '',
       notas:             existente.notas              ?? '',
-      checklistRespostas: existente.checklistRespostas ?? p.checklistRespostas,
+      checklistRespostas: (() => {
+        const cr = existente.checklistRespostas
+        if (!cr) return p.checklistRespostas
+        if (typeof cr === 'string') { try { return JSON.parse(cr) } catch { return p.checklistRespostas } }
+        return cr
+      })(),
     }))
     if (existente.pecasUsadas) {
-      try { setPecas(JSON.parse(existente.pecasUsadas)) } catch { /* manter padrão */ }
+      try {
+        const p = typeof existente.pecasUsadas === 'string'
+          ? JSON.parse(existente.pecasUsadas) : existente.pecasUsadas
+        if (Array.isArray(p) && p.length > 0) setPecas(p)
+      } catch { /* manter padrão */ }
     }
     if (existente.fotos) {
-      try { setFotos(JSON.parse(existente.fotos)) } catch { /* manter padrão */ }
+      try {
+        const f = typeof existente.fotos === 'string'
+          ? JSON.parse(existente.fotos) : existente.fotos
+        if (Array.isArray(f)) setFotos(f)
+      } catch { /* manter padrão */ }
     }
   }, [reparacao.id, getRelatorioByReparacao])
 
@@ -278,7 +291,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const enviarEmailsAutomaticos = async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
     const { enviarRelatorioEmail }       = await import('../services/emailService')
-    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli)
+    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems)
     const assunto = `Relatório de Reparação ${relGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
 
     // Construir lista de destinatários únicos e válidos
@@ -361,12 +374,15 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       // Se já existe rascunho em progresso, actualiza; caso contrário cria
       const existente = getRelatorioByReparacao(reparacao.id)
       let numeroRelatorio
+      let relId
       if (existente) {
         updateRelatorioReparacao(existente.id, payload)
         numeroRelatorio = existente.numeroRelatorio
+        relId           = existente.id
       } else {
         const resultado = addRelatorioReparacao(payload)
         numeroRelatorio = resultado.numeroRelatorio
+        relId           = resultado.id
       }
 
       updateReparacao(reparacao.id, {
@@ -376,7 +392,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         descricaoAvaria: form.descricaoAvaria.trim(),
       })
 
-      const relFinal = { ...payload, numeroRelatorio, id: existente?.id }
+      const relFinal = { ...payload, numeroRelatorio, id: relId }
 
       logger.action('ExecutarReparacaoModal', 'concluirReparacao',
         `Reparação ${reparacao.id} concluída — relatório ${numeroRelatorio}`,
@@ -408,7 +424,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     try {
       const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
       const { enviarRelatorioEmail }       = await import('../services/emailService')
-      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli)
+      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems)
       await enviarRelatorioEmail({
         destinatario: emailDestinatario.trim(),
         assunto:      `Relatório de Reparação ${relatorioGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,

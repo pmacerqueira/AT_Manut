@@ -9,8 +9,8 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, CheckCircle, Clock, AlertCircle, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getHojeAzores, formatDataAzores, formatDataHoraCurtaAzores } from '../utils/datasAzores'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import './Reparacoes.css'
 
@@ -39,6 +39,7 @@ export default function Reparacoes() {
     removeReparacao,
     getRelatorioByReparacao,
     getSubcategoria,
+    getChecklistBySubcategoria,
   } = useData()
   const { canDelete } = usePermissions()
   const { showToast } = useToast()
@@ -180,7 +181,8 @@ export default function Reparacoes() {
     try {
       const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
       const { enviarRelatorioEmail }       = await import('../services/emailService')
-      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli)
+      const itensChecklist = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
+      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist)
       await enviarRelatorioEmail({
         destinatario: emailDestino.trim(),
         assunto:      `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
