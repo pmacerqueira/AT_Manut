@@ -24,7 +24,7 @@ export default function Categorias() {
     removeSubcategoria,
   } = useData()
 
-  const [expandedCat, setExpandedCat] = useState(new Set(categorias.map(c => c.id)))
+  const [expandedCat, setExpandedCat] = useState(new Set())
   const [expandedSub, setExpandedSub] = useState(new Set())
   const [addingCategoria, setAddingCategoria] = useState(false)
   const [addingSubcategoria, setAddingSubcategoria] = useState(null)

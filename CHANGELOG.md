@@ -4,7 +4,10 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
-## [1.9.5] — 2026-02-22 — Correcção formulário de máquinas (reset + Kaeser)
+## [1.9.5] — 2026-02-22 — Correcção formulário de máquinas (reset + Kaeser) + categorias colapsadas
+
+### Correcções de bugs
+- **`Categorias.jsx` — lista de categorias arrancava toda expandida:** `expandedCat` inicializado com todos os IDs. Corrigido para `new Set()` vazio — todas as categorias arrancam colapsadas; o utilizador expande clicando no chevron
 
 ### Correcções de bugs
 - **`MaquinaFormModal.jsx` — formulário apagava dados ao sair da janela:** O `useEffect` de inicialização re-disparava quando o DataContext fazia refresh silencioso em background (ao refocar a janela). Corrigido com `wasOpenRef` para só inicializar na transição fechado→aberto, nunca em re-renders subsequentes
