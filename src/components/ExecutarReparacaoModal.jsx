@@ -269,6 +269,11 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   }
 
   // ── Envio automático ao concluir ──────────────────────────────────────────
+  //
+  // Destinatários:
+  //   1. Sempre:             comercial@navel.pt  (Admin)
+  //   2. Se ISTOBAL:         isat@istobal.com    (pedido de assistência original)
+  //   3. Se cliente tem email: email do cliente   (confirmação ao cliente)
 
   const enviarEmailsAutomaticos = async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
@@ -276,20 +281,30 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli)
     const assunto = `Relatório de Reparação ${relGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
 
-    const destinatarios = [EMAIL_ADMIN]
-    if (reparacao.origem === 'istobal_email') destinatarios.push(EMAIL_ISTOBAL)
+    // Construir lista de destinatários únicos e válidos
+    const destsSet = new Set()
+    destsSet.add(EMAIL_ADMIN)
+    if (reparacao.origem === 'istobal_email') destsSet.add(EMAIL_ISTOBAL)
+    if (cli?.email?.trim()) destsSet.add(cli.email.trim().toLowerCase())
 
-    const enviados = []
-    for (const dest of destinatarios) {
+    const enviados  = []
+    const falhados  = []
+    for (const dest of destsSet) {
       try {
         await enviarRelatorioEmail({ destinatario: dest, assunto, html, nomeCliente: cli?.nome ?? '' })
         enviados.push(dest)
+        logger.action('ExecutarReparacaoModal', 'envioAuto', `Email enviado para ${dest}`, { relId: relGerado.id })
       } catch (err) {
+        falhados.push(dest)
         logger.error('ExecutarReparacaoModal', 'envioAuto', `Falha ao enviar para ${dest}: ${err.message}`)
       }
     }
+
     setEmailsAutoEnviados(enviados)
-    return enviados
+    // Se o cliente não tem email na ficha, deixar o campo manual preenchido em branco
+    // para o técnico poder inserir o endereço manualmente se necessário
+    if (!cli?.email?.trim()) setEmailDestinatario('')
+    return { enviados, falhados }
   }
 
   // ── Submissão final (com assinatura) ────────────────────────────────────
@@ -444,16 +459,25 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
               <div className="concluido-auto-email card">
                 <h4><Mail size={15} /> Relatório enviado automaticamente para:</h4>
                 <ul className="emails-auto-lista">
-                  {emailsAutoEnviados.map(e => <li key={e}>{e}</li>)}
+                  {emailsAutoEnviados.map(e => (
+                    <li key={e}>
+                      {e}
+                      {e === EMAIL_ADMIN   && <span className="email-tag">Admin</span>}
+                      {e === EMAIL_ISTOBAL && <span className="email-tag email-tag-istobal">ISTOBAL</span>}
+                      {e !== EMAIL_ADMIN && e !== EMAIL_ISTOBAL && <span className="email-tag email-tag-cliente">Cliente</span>}
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
 
-            {isEmailConfigured() && (
+            {/* Envio manual — só mostrar se o cliente não tem email na ficha */}
+            {isEmailConfigured() && !cli?.email?.trim() && (
               <div className="concluido-email card">
-                <h4><Mail size={16} /> Enviar também para o cliente</h4>
+                <h4><Mail size={16} /> Enviar relatório ao cliente</h4>
+                <p className="concluido-email-aviso">O cliente não tem email registado na ficha. Pode enviar manualmente:</p>
                 <div className="form-group">
-                  <label>Email de destino</label>
+                  <label>Email do cliente</label>
                   <input
                     type="email"
                     value={emailDestinatario}
@@ -462,7 +486,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                   />
                 </div>
                 <button type="button" className="btn primary" onClick={handleEnviarEmail} disabled={emailEnviando}>
-                  {emailEnviando ? 'A enviar...' : <><Mail size={14} /> Enviar para cliente</>}
+                  {emailEnviando ? 'A enviar...' : <><Mail size={14} /> Enviar ao cliente</>}
                 </button>
               </div>
             )}

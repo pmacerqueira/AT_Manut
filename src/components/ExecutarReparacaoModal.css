@@ -282,6 +282,14 @@
   font-weight: 700;
   margin: 0;
 }
+.concluido-email-aviso {
+  font-size: 0.8rem;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  margin: 0;
+}
 .btn-fechar-concluido {
   margin-top: 0.5rem;
 }
@@ -320,6 +328,9 @@
   color: #166534;
   padding-left: 1rem;
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .emails-auto-lista li::before {
   content: '✓';
@@ -327,6 +338,24 @@
   left: 0;
   color: #16a34a;
   font-weight: 700;
+}
+.email-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+  border-radius: 0.75rem;
+  padding: 0.05rem 0.4rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.email-tag-istobal {
+  background: #fff7ed;
+  color: #c2410c;
+}
+.email-tag-cliente {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 /* Botão guardar progresso */
