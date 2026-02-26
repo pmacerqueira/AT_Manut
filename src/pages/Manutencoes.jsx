@@ -691,7 +691,8 @@ export default function Manutencoes() {
                 <textarea
                   value={form.observacoes}
                   onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
-                  rows={3}
+                  rows={4}
+                  className="textarea-full"
                   placeholder="Notas da manutenção..."
                 />
               </label>
@@ -775,7 +776,8 @@ export default function Manutencoes() {
                   <textarea
                     value={formAssinatura.notas}
                     onChange={e => setFormAssinatura(f => ({ ...f, notas: e.target.value.slice(0, 300) }))}
-                    rows={3}
+                    rows={4}
+                    className="textarea-full"
                     maxLength={300}
                     placeholder="Escreva aqui notas relevantes da manutenção..."
                   />

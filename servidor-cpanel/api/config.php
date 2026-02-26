@@ -24,6 +24,11 @@ define('JWT_SECRET', getenv('ATM_JWT_SECRET') ?: 'xK9mP2vL5nQ8wR3tY6uI0oA7sD4fG1
 // Duração do token em segundos (28800 = 8 horas)
 define('JWT_TTL', 28800);
 
+// ── Token secreto para webhook ISTOBAL (Power Automate) ──────────────────────
+// Gera um token forte em: https://www.uuidgenerator.net/ ou similar
+// Deve ser igual ao valor configurado no HTTP Header do Power Automate
+define('ATM_WEBHOOK_TOKEN', getenv('ATM_WEBHOOK_TOKEN') ?: '35338ce1-8050-4770-aa2f-8d8fb9912215');
+
 // ── Origens CORS permitidas ───────────────────────────────────────────────────
 define('CORS_ORIGINS', [
     'https://www.navel.pt',

@@ -24,6 +24,18 @@ alwaysApply: true
 - Ao adicionar novas imagens PNG que precisem de redimensionamento, configurar em `scripts/optimize-images.js` (DIMENSIONS)
 - Documentação completa: `docs/IMAGENS-E-ICONES.md`
 
+## Quando fazer build e zip — regra de ouro
+
+**Nunca fazer `npm run build` nem gerar `dist_upload.zip` automaticamente após correcções.**
+
+Só fazer build quando:
+1. O utilizador pedir **explicitamente** ("faz build", "prepara zip", "optimiza e prepara build")
+2. For absolutamente necessário para validar uma correcção que não pode ser verificada de outra forma (nesse caso, avisar antes de o fazer)
+
+Para correcções normais: editar o ficheiro, confirmar com `ReadLints`, e aguardar instrução do utilizador para build.
+
+---
+
 ## Fluxo obrigatório: "optimizar e preparar build"
 
 Quando o utilizador pedir para **optimizar, corrigir ou preparar um novo build**, seguir sempre esta sequência:

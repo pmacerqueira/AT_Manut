@@ -31,7 +31,7 @@ error_reporting(E_ALL & ~E_NOTICE);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
-$LOG_FILE = __DIR__ . '/../../logs/istobal-email.log';
+$LOG_FILE = __DIR__ . '/logs/istobal-email.log';
 
 function ilog($msg) {
     global $LOG_FILE;
@@ -90,6 +90,14 @@ if (function_exists('iconv_mime_decode')) {
     $subjectLine = iconv_mime_decode($subjectLine, 0, 'UTF-8');
 }
 ilog('Assunto: ' . $subjectLine);
+
+// Extrair número de aviso ES\d+ directamente do assunto (fonte mais fiável —
+// está na barra vermelha do email mas pode não estar numa célula <td> do HTML)
+$numeroAvisoSubject = '';
+if (preg_match('/\b(ES\d+)\b/', $subjectLine, $esm)) {
+    $numeroAvisoSubject = $esm[1];
+    ilog('Nº aviso extraído do assunto: ' . $numeroAvisoSubject);
+}
 
 // ── 4. Extrair corpo HTML ─────────────────────────────────────────────────────
 /**
@@ -212,14 +220,21 @@ $numeroAviso     = findField($parsed, ['aviso', 'número', 'numero', 'n.º', 'n�
 $descricaoAvaria = findField($parsed, ['descripción', 'descripcion', 'avería', 'averia', 'fallo', 'problema']);
 $numeroSerie     = findField($parsed, ['serie', 'serial', 'n.s.', 's/n', 's / n']);
 $modeloMaquina   = findField($parsed, ['modelo', 'model']);
-$instalacao      = findField($parsed, ['instalación', 'instalacion', 'cliente', 'site', 'ubicación']);
+$instalacao      = findField($parsed, ['emplazamiento', 'instalación', 'instalacion', 'cliente', 'site', 'ubicación']);
 $dataAviso       = findField($parsed, ['fecha', 'data', 'date', 'dt.']);
 $tipoAvaria      = findField($parsed, ['tipo', 'type', 'classe', 'categoria']);
+
+// Usar nº aviso do assunto se a tabela HTML não tiver o campo (barra vermelha não é <td>)
+if (!$numeroAviso && $numeroAvisoSubject) {
+    $numeroAviso = $numeroAvisoSubject;
+    ilog('Nº aviso usado do assunto (fallback): ' . $numeroAviso);
+}
 
 // Normalizar data — suporta DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, D/M/YYYY
 $dataFormatada = date('Y-m-d'); // default: hoje
 if ($dataAviso) {
-    $dataAviso = trim($dataAviso);
+    // Cortar a parte da hora se existir (ex: "24/02/2026 18:56:33" → "24/02/2026")
+    $dataAviso = trim(preg_replace('/\s+\d{2}:\d{2}(:\d{2})?$/', '', trim($dataAviso)));
     $formats = ['d/m/Y', 'Y-m-d', 'd-m-Y', 'Y/m/d', 'd/m/y', 'j/n/Y'];
     $parsed_dt = false;
     foreach ($formats as $fmt) {

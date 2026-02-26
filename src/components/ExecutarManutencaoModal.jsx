@@ -812,7 +812,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             <textarea
               value={form.notas}
               onChange={e => setForm(f => ({ ...f, notas: e.target.value.slice(0, 300) }))}
-              rows={2}
+              rows={4}
+              className="textarea-full"
               maxLength={300}
               placeholder="Notas relevantes da manutenção..."
             />

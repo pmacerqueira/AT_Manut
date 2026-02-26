@@ -13,7 +13,8 @@ import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
-import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle } from 'lucide-react'
+import { Hammer, X, Camera, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
+import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import './ExecutarReparacaoModal.css'
 
 const MAX_FOTOS    = 8
@@ -417,6 +418,34 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     }
   }
 
+  // ── Pré-visualizar / PDF ──────────────────────────────────────────────────
+
+  const handlePrevisualizar = useCallback(async () => {
+    const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
+    const tempRel = {
+      tecnico:            form.tecnico,
+      numeroAviso:        form.numeroAviso,
+      descricaoAvaria:    form.descricaoAvaria,
+      trabalhoRealizado:  form.trabalhoRealizado,
+      horasMaoObra:       form.horasMaoObra,
+      notas:              form.notas,
+      checklistRespostas: form.checklistRespostas,
+      pecasUsadas:        pecas.filter(p => p.descricao?.trim() || p.codigo?.trim()),
+      fotos,
+      assinaturaDigital:  assinaturaFeita ? canvasRef.current?.toDataURL('image/png') : null,
+      nomeAssinante:      form.nomeAssinante,
+      numeroRelatorio:    '(pré-visualização)',
+    }
+    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems)
+    if (html) imprimirOuGuardarPdf(html)
+  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems])
+
+  const handleVerPdf = useCallback(async (relGerado) => {
+    const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
+    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems)
+    if (html) imprimirOuGuardarPdf(html)
+  }, [reparacao, maq, cli, checklistItems])
+
   // ── Envio de email ────────────────────────────────────────────────────────
 
   const handleEnviarEmail = async () => {
@@ -472,6 +501,13 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
             <div className="concluido-icon"><CheckCircle2 size={48} /></div>
             <h3>Reparação concluída!</h3>
             <p>Relatório <strong>{relatorioGerado?.numeroRelatorio}</strong> gerado com sucesso.</p>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => handleVerPdf(relatorioGerado)}
+            >
+              <FileText size={15} /> Ver / Guardar PDF
+            </button>
 
             {emailsAutoEnviados.length > 0 && (
               <div className="concluido-auto-email card">
@@ -524,16 +560,13 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Técnico <span className="required">*</span></label>
-                    <input
-                      type="text"
-                      list="tecnicos-list"
+                    <select
                       value={form.tecnico}
                       onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))}
-                      placeholder="Nome do técnico"
-                    />
-                    <datalist id="tecnicos-list">
-                      {TECNICOS.map(t => <option key={t} value={t} />)}
-                    </datalist>
+                    >
+                      <option value="">— Seleccionar técnico —</option>
+                      {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label>Nº Aviso / Pedido</label>
@@ -567,7 +600,8 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 <h3 className="exec-section-title">Avaria / Problema reportado</h3>
                 <div className="form-group">
                   <textarea
-                    rows={3}
+                    rows={5}
+                    className="textarea-full"
                     value={form.descricaoAvaria}
                     onChange={e => setForm(p => ({ ...p, descricaoAvaria: e.target.value }))}
                     placeholder="Descreva a avaria ou problema reportado pelo cliente..."
@@ -578,26 +612,25 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
               {/* Secção: Trabalho realizado */}
               <div className="exec-section">
                 <h3 className="exec-section-title">Trabalho realizado</h3>
-                <div className="form-row">
-                  <div className="form-group" style={{ flex: 3 }}>
-                    <textarea
-                      rows={3}
-                      value={form.trabalhoRealizado}
-                      onChange={e => setForm(p => ({ ...p, trabalhoRealizado: e.target.value }))}
-                      placeholder="Descreva o trabalho efectuado, substituições feitas, ajustes realizados..."
-                    />
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <label>Horas M.O.</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={form.horasMaoObra}
-                      onChange={e => setForm(p => ({ ...p, horasMaoObra: e.target.value }))}
-                      placeholder="Ex: 2.5"
-                    />
-                  </div>
+                <div className="form-group">
+                  <textarea
+                    rows={6}
+                    className="textarea-full"
+                    value={form.trabalhoRealizado}
+                    onChange={e => setForm(p => ({ ...p, trabalhoRealizado: e.target.value }))}
+                    placeholder="Descreva o trabalho efectuado, substituições feitas, ajustes realizados..."
+                  />
+                </div>
+                <div className="form-group form-group-horas">
+                  <label>Horas M.O.</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={form.horasMaoObra}
+                    onChange={e => setForm(p => ({ ...p, horasMaoObra: e.target.value }))}
+                    placeholder="Ex: 2.5"
+                  />
                 </div>
               </div>
 
@@ -699,7 +732,8 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
               <div className="exec-section">
                 <h3 className="exec-section-title">Notas adicionais</h3>
                 <textarea
-                  rows={2}
+                  rows={4}
+                  className="textarea-full"
                   value={form.notas}
                   onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}
                   placeholder="Observações, recomendações ao cliente..."
@@ -749,6 +783,14 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
             <div className="modal-footer">
               <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handlePrevisualizar}
+                title="Pré-visualizar relatório (PDF/impressão)"
+              >
+                <Eye size={14} /> Pré-visualizar
+              </button>
               <button
                 type="button"
                 className="btn secondary btn-guardar-progresso"

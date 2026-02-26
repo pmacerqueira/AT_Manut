@@ -13,6 +13,7 @@ import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarCha
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
+import { TECNICOS } from '../config/users'
 import './Reparacoes.css'
 
 const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -360,92 +361,111 @@ export default function Reparacoes() {
       )}
 
       {/* ── Modal: Nova Reparação ─────────────────────────────────────────── */}
-      {modalNova && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Nova Reparação">
-          <div className="modal modal-nova-rep">
-            <div className="modal-header">
-              <h2><Hammer size={18} /> Nova Reparação</h2>
-              <button type="button" className="icon-btn" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Máquina <span className="required">*</span></label>
-                <select
-                  className={errorsNova.maquinaId ? 'input-error' : ''}
-                  value={formNova.maquinaId}
-                  onChange={e => setFormNova(p => ({ ...p, maquinaId: e.target.value }))}
-                >
-                  <option value="">— Seleccione —</option>
-                  {maquinasOrdenadas.map(m => {
-                    const c = getCliente(m.clienteNif)
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {m.marca} {m.modelo}{c ? ` — ${c.nome}` : ''}
-                      </option>
-                    )
-                  })}
-                </select>
-                {errorsNova.maquinaId && <span className="field-error">{errorsNova.maquinaId}</span>}
+      {modalNova && (() => {
+        const maqSel = maquinas.find(m => m.id === formNova.maquinaId)
+        const isIstobal = maqSel?.marca?.toUpperCase().includes('ISTOBAL')
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Nova Reparação">
+            <div className="modal modal-nova-rep">
+              <div className="modal-header">
+                <h2><Hammer size={18} /> Nova Reparação</h2>
+                <button type="button" className="icon-btn" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
+                  <X size={20} />
+                </button>
               </div>
+              <div className="modal-body">
 
-              <div className="form-row">
+                {/* Máquina — linha completa */}
                 <div className="form-group">
-                  <label>Técnico <span className="required">*</span></label>
+                  <label>Máquina <span className="required">*</span></label>
+                  <select
+                    className={errorsNova.maquinaId ? 'input-error' : ''}
+                    value={formNova.maquinaId}
+                    onChange={e => setFormNova(p => ({ ...p, maquinaId: e.target.value }))}
+                  >
+                    <option value="">— Seleccione —</option>
+                    {maquinasOrdenadas.map(m => {
+                      const c = getCliente(m.clienteNif)
+                      return (
+                        <option key={m.id} value={m.id}>
+                          {m.marca} {m.modelo}{c ? ` — ${c.nome}` : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  {errorsNova.maquinaId && <span className="field-error">{errorsNova.maquinaId}</span>}
+                </div>
+
+                {/* Técnico + Data — linha dupla */}
+                <div className="form-row-nova">
+                  <div className="form-group">
+                    <label>Técnico <span className="required">*</span></label>
+                    <select
+                      className={errorsNova.tecnico ? 'input-error' : ''}
+                      value={formNova.tecnico}
+                      onChange={e => setFormNova(p => ({ ...p, tecnico: e.target.value }))}
+                    >
+                      <option value="">— Seleccione —</option>
+                      {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {errorsNova.tecnico && <span className="field-error">{errorsNova.tecnico}</span>}
+                  </div>
+                  <div className="form-group">
+                    <label>Data <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      className={errorsNova.data ? 'input-error' : ''}
+                      value={formNova.data}
+                      max={getHojeAzores()}
+                      onChange={e => setFormNova(p => ({ ...p, data: e.target.value }))}
+                    />
+                    {errorsNova.data && <span className="field-error">{errorsNova.data}</span>}
+                  </div>
+                </div>
+
+                {/* Nº Aviso — hint contextual para ISTOBAL */}
+                <div className="form-group">
+                  <label>
+                    Nº de Aviso / Pedido de Assistência
+                    {isIstobal && (
+                      <span className="field-hint-istobal">
+                        <Zap size={11} /> ISTOBAL — usar o nº do aviso recebido de isat@istobal.com
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="text"
-                    className={errorsNova.tecnico ? 'input-error' : ''}
-                    value={formNova.tecnico}
-                    onChange={e => setFormNova(p => ({ ...p, tecnico: e.target.value }))}
-                    placeholder="Nome do técnico"
+                    value={formNova.numeroAviso}
+                    onChange={e => setFormNova(p => ({ ...p, numeroAviso: e.target.value }))}
+                    placeholder={isIstobal ? 'Ex: ES00549609 (aviso ISTOBAL)' : 'Ex: 2026-RP-001'}
                   />
-                  {errorsNova.tecnico && <span className="field-error">{errorsNova.tecnico}</span>}
                 </div>
-                <div className="form-group">
-                  <label>Data <span className="required">*</span></label>
-                  <input
-                    type="date"
-                    className={errorsNova.data ? 'input-error' : ''}
-                    value={formNova.data}
-                    max={getHojeAzores()}
-                    onChange={e => setFormNova(p => ({ ...p, data: e.target.value }))}
+
+                {/* Descrição — largura total, textarea generoso para mobile */}
+                <div className="form-group form-group-full">
+                  <label>Descrição da avaria / problema</label>
+                  <textarea
+                    rows={5}
+                    className="textarea-descricao"
+                    value={formNova.descricaoAvaria}
+                    onChange={e => setFormNova(p => ({ ...p, descricaoAvaria: e.target.value }))}
+                    placeholder="Descreva brevemente o problema reportado pelo cliente..."
                   />
-                  {errorsNova.data && <span className="field-error">{errorsNova.data}</span>}
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label>Nº de Aviso / Pedido de Assistência</label>
-                <input
-                  type="text"
-                  value={formNova.numeroAviso}
-                  onChange={e => setFormNova(p => ({ ...p, numeroAviso: e.target.value }))}
-                  placeholder="Ex: 2026-RP-001 ou referência ISTOBAL"
-                />
               </div>
-
-              <div className="form-group">
-                <label>Descrição da avaria / problema</label>
-                <textarea
-                  rows={3}
-                  value={formNova.descricaoAvaria}
-                  onChange={e => setFormNova(p => ({ ...p, descricaoAvaria: e.target.value }))}
-                  placeholder="Descreva brevemente o problema reportado pelo cliente..."
-                />
+              <div className="modal-footer">
+                <button type="button" className="btn secondary" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn primary" onClick={handleCriarReparacao}>
+                  <Plus size={15} /> Criar Reparação
+                </button>
               </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn secondary" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
-                Cancelar
-              </button>
-              <button type="button" className="btn primary" onClick={handleCriarReparacao}>
-                <Plus size={15} /> Criar Reparação
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Modal: Executar Reparação ─────────────────────────────────────── */}
       {modalExecucao && (

@@ -258,6 +258,43 @@
 .form-row .form-group {
   flex: 1;
 }
+
+/* Linha Técnico + Data no modal Nova Reparação */
+.form-row-nova {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Textarea de descrição — largura total, confortável em mobile */
+.form-group-full {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.textarea-descricao {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* Hint contextual ISTOBAL no label do Nº Aviso */
+.field-hint-istobal {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--istobal-accent, #f59e0b);
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
 .required {
   color: #ef4444;
 }
@@ -513,6 +550,19 @@
   .form-row {
     flex-direction: column;
     gap: 0;
+  }
+  /* Nova Reparação — colapsar para coluna única em mobile */
+  .form-row-nova {
+    grid-template-columns: 1fr;
+  }
+  .form-group-full {
+    grid-column: 1;
+  }
+  /* Hint ISTOBAL — ocupar linha própria em mobile */
+  .field-hint-istobal {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.25rem;
   }
   .reparacoes-table .data-table td:nth-child(4),
   .reparacoes-table .data-table th:nth-child(4) {

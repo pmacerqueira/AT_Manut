@@ -117,6 +117,8 @@ form input, form select, form textarea { width: 100%; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
 .form-erro { color: var(--color-danger); font-size: 0.9em; margin: -0.5rem 0 1rem; }
+/* Textarea utilitária — largura total, redimensionável verticalmente */
+.textarea-full { width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px; display: block; }
 form input.readonly { background: var(--color-bg-elevated); color: var(--color-text-muted); cursor: not-allowed; }
 
 /* Loading state para lazy routes */
