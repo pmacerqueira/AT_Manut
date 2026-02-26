@@ -4,6 +4,20 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.1] — 2026-02-22 — Relatório mensal ISTOBAL melhorado + ISTOBAL como cliente
+
+### Melhorias Reparações / ISTOBAL
+- **Relatório mensal ISTOBAL**: nova coluna "H. M.O." por aviso (base da faturação à ISTOBAL)
+- **Total de horas** no rodapé da tabela de avisos ("Total horas a faturar à ISTOBAL: X.X h")
+- **Cartão de resumo** "Horas M.O. (faturar)" com destaque visual azul nos stats do modal mensal
+- **Linhas em curso** com estilo diferenciado (itálico/opacidade) para distinção visual dos avisos pendentes
+- **Botão "Imprimir / Exportar"** no modal mensal para gerar versão impressa do resumo a enviar à ISTOBAL
+- **CSS de impressão** (`@media print`): ao imprimir, oculta o resto da página e mostra apenas o conteúdo do relatório mensal
+- **ISTOBAL registado como cliente** no mock data (`cli-istobal`, NIF `ES-B46200226`) com notas a clarificar o papel de fornecedor/cliente de faturação
+- Clarificada distinção no mock data: clientes finais (ex. Lavagem Express) são quem tem as máquinas instaladas e assina o relatório; ISTOBAL é a entidade de faturação mensal
+
+---
+
 ## [1.9.0] — 2026-02-22 — Módulo Reparações + Integração ISTOBAL
 
 ### Novo módulo: Reparações (`/reparacoes`)

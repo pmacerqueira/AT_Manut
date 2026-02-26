@@ -42,13 +42,22 @@ VALUES
    'Zona Industrial do Relvão, Lote 7', '9700-789', 'Angra do Heroísmo', '295 555 666', 'admin@tfaria.pt',
    'Gerador de emergência principal — manutenção semestral');
 
--- ── 3. Cliente com máquinas ISTOBAL ──────────────────────────────────────────
+-- ── 3. ISTOBAL como fornecedor/cliente de faturação + cliente local ──────────
+-- ISTOBAL España, S.A. — envia avisos ES-..., paga à Navel pelas reparações (fatura mensal)
+
+INSERT IGNORE INTO `clientes` (`id`, `nif`, `nome`, `morada`, `codigo_postal`, `localidade`, `telefone`, `email`, `notas`)
+VALUES
+  ('cli-istobal', 'ES-B46200226', 'ISTOBAL España, S.A.',
+   'Calle de Huelva, 35 — Polígono Industrial El Oliveral', '46394', 'Ribarroja del Turia (Valencia)', '+34 961 978 000', 'isat@istobal.com',
+   'Fornecedor de máquinas de lavagem automática. Cliente de faturação para reparações solicitadas via aviso ES-... Resumo mensal enviado no final de cada mês.');
+
+-- Clientes finais com máquinas ISTOBAL instaladas (eles assinam o relatório de reparação)
 
 INSERT IGNORE INTO `clientes` (`id`, `nif`, `nome`, `morada`, `codigo_postal`, `localidade`, `telefone`, `email`, `notas`)
 VALUES
   ('cli-mock-004', '508777888', 'Lavagem Express Açores, Lda.',
    'Av. Infante Dom Henrique, 200', '9500-321', 'Ponta Delgada', '296 777 888', 'geral@lavemexpress.pt',
-   'Duas máquinas de lavagem automática ISTOBAL. Contrato de assistência com Navel.');
+   'Duas máquinas de lavagem automática ISTOBAL. Contrato de assistência gerido pela ISTOBAL — avisos ES-....');
 
 -- ── 4. Máquinas ───────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import './Reparacoes.css'
@@ -75,6 +75,14 @@ export default function Reparacoes() {
   const reparacoesIstobaMensais = useMemo(() =>
     reparacoesMensais.filter(r => r.origem === 'istobal_email'),
   [reparacoesMensais])
+
+  // Total de horas M.O. dos avisos ISTOBAL concluídos no mês (base de faturação)
+  const totalHorasIstobalMes = useMemo(() =>
+    reparacoesIstobaMensais.reduce((acc, r) => {
+      const rel = getRelatorioByReparacao(r.id)
+      return acc + (rel?.horasMaoObra ? parseFloat(rel.horasMaoObra) : 0)
+    }, 0),
+  [reparacoesIstobaMensais, getRelatorioByReparacao])
 
   const navMes = (delta) => setMesMensal(({ ano, mes }) => {
     let nm = mes + delta
@@ -527,6 +535,10 @@ export default function Reparacoes() {
                   <span className="mensal-stat-val text-warning">{reparacoesIstobaMensais.filter(r => r.status !== 'concluida').length}</span>
                   <span className="mensal-stat-lbl">Em curso</span>
                 </div>
+                <div className="mensal-stat mensal-stat-destaque">
+                  <span className="mensal-stat-val">{totalHorasIstobalMes.toFixed(1)} h</span>
+                  <span className="mensal-stat-lbl">Horas M.O. (faturar)</span>
+                </div>
                 <div className="mensal-stat mensal-stat-total">
                   <span className="mensal-stat-val">{reparacoesMensais.length}</span>
                   <span className="mensal-stat-lbl">Total Reparações</span>
@@ -541,11 +553,12 @@ export default function Reparacoes() {
                     <thead>
                       <tr>
                         <th>Data</th>
-                        <th>Aviso</th>
+                        <th>Aviso ES</th>
                         <th>Máquina</th>
-                        <th>Cliente</th>
+                        <th>Local / Cliente</th>
                         <th>Estado</th>
                         <th>Relatório</th>
+                        <th className="th-horas">H. M.O.</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -554,18 +567,28 @@ export default function Reparacoes() {
                         const cli = maq ? getCliente(maq.clienteNif) : null
                         const rel = getRelatorioByReparacao(r.id)
                         const st  = STATUS_LABELS[r.status] ?? { label: r.status, cls: 'badge-secondary' }
+                        const horas = rel?.horasMaoObra ? parseFloat(rel.horasMaoObra) : null
                         return (
-                          <tr key={r.id}>
+                          <tr key={r.id} className={r.status === 'concluida' ? '' : 'row-em-curso'}>
                             <td>{formatDataAzores(r.data)}</td>
                             <td className="td-aviso-bold">{r.numeroAviso ?? '—'}</td>
                             <td>{maq ? `${maq.marca} ${maq.modelo}` : '—'}</td>
                             <td>{cli?.nome ?? '—'}</td>
                             <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
                             <td>{rel?.numeroRelatorio ?? <em className="text-muted">—</em>}</td>
+                            <td className="td-horas">{horas != null ? `${horas.toFixed(1)} h` : <em className="text-muted">—</em>}</td>
                           </tr>
                         )
                       })}
                     </tbody>
+                    {reparacoesIstobaMensais.some(r => getRelatorioByReparacao(r.id)?.horasMaoObra) && (
+                      <tfoot>
+                        <tr className="mensal-total-row">
+                          <td colSpan={6} className="mensal-total-lbl">Total horas a faturar à ISTOBAL:</td>
+                          <td className="td-horas mensal-total-val">{totalHorasIstobalMes.toFixed(1)} h</td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               ) : (
@@ -604,6 +627,14 @@ export default function Reparacoes() {
             </div>
             <div className="modal-footer">
               <button type="button" className="btn secondary" onClick={() => setModalMensal(false)}>Fechar</button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => window.print()}
+                title="Imprimir relatório mensal para enviar à ISTOBAL"
+              >
+                <Printer size={15} /> Imprimir / Exportar
+              </button>
             </div>
           </div>
         </div>
