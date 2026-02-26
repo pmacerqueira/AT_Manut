@@ -4,6 +4,45 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.7] — 2026-02-26 — Importação de clientes via SAF-T (Gestor.32)
+
+### Novidade
+- **`Clientes.jsx` — botão "Importar SAF-T" (só Admin):** abre modal que aceita ficheiro `clientes-navel-2026.json` gerado pelo script `extract-clientes-saft-2026.js`
+- **Modal de importação com preview:** mostra contagem de novos clientes, existentes e total antes de confirmar
+- **Dois modos de importação:** "Ignorar existentes" (recomendado — só adiciona novos) e "Actualizar existentes" (substitui morada/contactos com dados do SAF-T)
+- **`DataContext.jsx` — `importClientes(lista, modo)`:** função de importação em massa com log de auditoria
+- **Scripts de extracção SAF-T 2026:** `extract-clientes-saft-2026.js` (em `C:\Cursor_Dados_Gestor\scripts\`) — extrai 626 clientes do SAF-T Jan/2026 e enriquece com emails do FTTERCEI (210 clientes com email)
+- **Workflow recomendado:** gerar SAF-T no Gestor.32 → correr script → importar JSON na app
+
+### Dados exportados
+- `C:\Cursor_Dados_Gestor\dados-exportados\clientes-navel-2026.json` — 626 clientes, 210 com email
+- `C:\Cursor_Dados_Gestor\dados-exportados\clientes-navel-2026.csv` — formato CSV com BOM UTF-8
+
+---
+
+## [1.9.6] — 2026-02-26 — Integração ISTOBAL email (Make.com webhook) + UX reparações
+
+### Novidade
+- **Integração ISTOBAL automática via Make.com:** quando chega email de `isat@istobal.com` na pasta `ISTOBAL` do Outlook, o Make.com envia os dados via HTTP POST para `istobal-webhook.php` que cria automaticamente uma reparação com `origem = istobal_email`
+- **`servidor-cpanel/api/istobal-webhook.php`:** endpoint seguro (token `X-ATM-Token`) que parseia HTML do email ISTOBAL, extrai aviso ES, nº de série, data, descrição, instalação e faz match com a máquina pela BD
+- **`config.php` — `ATM_WEBHOOK_TOKEN`:** token secreto configurável para autenticar o webhook
+- **Make.com (gratuito):** cenário `ISTOBAL - Importar Aviso` activo, monitorizando a cada 15 min
+
+### Melhorias UX — Modal Executar Reparação
+- **Técnico:** campo de texto substituído por `<select>` combobox com lista de técnicos
+- **Textareas largura total:** Avaria (5 linhas), Trabalho realizado (6 linhas), Notas (4 linhas) ocupam a largura total do painel
+- **Horas M.O.:** movido para linha separada abaixo do textarea de trabalho
+- **PDF / Pré-visualização:** botão "Pré-visualizar" no footer e "Ver / Guardar PDF" no ecrã de conclusão (igual às manutenções)
+- **Modal sem transparência:** fundo sólido, scroll interno correcto, `border-radius` e `box-shadow`
+- **Responsivo mobile:** footer com 4 botões em grid 2×2, "Concluir" ocupa linha completa, canvas assinatura adaptado
+
+### Melhorias globais
+- **`index.css` — `.textarea-full`:** classe global para textareas full-width e redimensionáveis
+- **`ExecutarManutencaoModal` + `Manutencoes`:** textareas de notas actualizadas com `.textarea-full`
+- **`Reparacoes.css`:** `.form-row-nova` colapsa para coluna única em mobile
+
+---
+
 ## [1.9.5] — 2026-02-22 — Correcção formulário de máquinas (reset + Kaeser) + categorias colapsadas
 
 ### Correcções de bugs

@@ -163,6 +163,88 @@
   margin-bottom: 0.75rem;
 }
 
+/* ── Modal de importação SAF-T ──────────────────────────────────────────── */
+.modal-import {
+  max-width: 520px;
+}
+
+.import-file-label {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.import-preview {
+  margin-top: 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--bg-alt, #f9fafb);
+}
+
+.import-preview-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.import-stat {
+  flex: 1;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 0.65rem 0.5rem;
+}
+
+.import-stat-new  { border-color: #6ee7b7; background: #f0fdf4; }
+.import-stat-exist { border-color: #fcd34d; background: #fffbeb; }
+
+.import-stat-num {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-primary, #2563eb);
+}
+
+.import-stat-new  .import-stat-num  { color: #059669; }
+.import-stat-exist .import-stat-num { color: #d97706; }
+
+.import-stat-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 0.2rem;
+}
+
+.import-modo-fieldset {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.import-modo-fieldset legend {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  padding: 0 0.35rem;
+}
+
+.import-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.import-radio input[type="radio"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Badge de aviso para clientes sem email */
 .sem-email-aviso {
   display: inline-flex;

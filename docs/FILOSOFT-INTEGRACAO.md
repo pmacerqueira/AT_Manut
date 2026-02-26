@@ -77,9 +77,58 @@ node scripts/extract-artigos-armazem.js 001 "C:\Filosoft.32\empnav\Ano2026\FTART
 
 **Output:** `artigos-armazem-002.csv` e `artigos-armazem-002.json` (código, descrição, quantidade, família, unidade)
 
-## Importação no AT_Manut
+## Importação no AT_Manut — Workflow completo
 
-Os JSON gerados (`clientes-filosoft.json`, `clientes-fttercei.json`) têm formato compatível com AT_Manut. Uma importação em massa pode ser implementada na página Clientes (Admin) — carregar ficheiro JSON e fazer `bulkRestore` via API.
+### Script principal (Jan/2026 em diante)
+
+```
+C:\Cursor_Dados_Gestor\scripts\extract-clientes-saft-2026.js
+```
+
+Este script combina dois passos num só:
+1. **Extrai** clientes do SAF-T XML (NIF, Nome, Morada, Localidade, CodigoPostal)
+2. **Enriquece** com email e telefone do `clientes-fttercei.json` (cruzamento por NIF)
+
+**Resultado Jan/2026:** 626 clientes, 210 com email, 0 com telefone (não exportado pelo SAF-T nem pelo FTTERCEI).
+
+### Passo a passo para actualizações periódicas
+
+```
+1. Gestor.32 → Faturação → Exportar SAF-T PT
+   → Guardar em C:\Cursor_Dados_Gestor\SAFT512012962-e-fatura-*.xml
+
+2. node "C:\Cursor_Dados_Gestor\scripts\extract-clientes-saft-2026.js"
+   → Gera C:\Cursor_Dados_Gestor\dados-exportados\clientes-navel-2026.json
+
+3. Dashboard AT_Manut → Clientes (Admin) → botão "Importar SAF-T"
+   → Escolher clientes-navel-2026.json
+   → Preview mostra: X novos | Y existentes | total
+   → Modo "Ignorar existentes" (recomendado) ou "Actualizar existentes"
+   → Confirmar → toast com resultado
+```
+
+### Função no DataContext
+
+```js
+importClientes(lista, modo)
+// lista  → array de { nif, nome, morada, localidade, codigoPostal, telefone, email }
+// modo   → 'novos' (só adiciona novos) | 'atualizar' (novos + actualiza existentes)
+// return → { adicionados, atualizados, ignorados }
+```
+
+### Campos disponíveis por fonte
+
+| Campo        | SAF-T | FTTERCEI | Notas |
+|--------------|-------|----------|-------|
+| NIF          | ✅    | ✅       | chave de cruzamento |
+| Nome         | ✅    | ✅       | SAF-T tem razão social fiscal |
+| Morada       | ✅    | ✅       | SAF-T usa BillingAddress |
+| Localidade   | ✅    | ✅       | tag `<City>` no SAF-T |
+| Código Postal| ✅    | ✅       | tag `<PostalCode>` |
+| Telefone     | ❌    | ⚠️       | FTTERCEI não conseguiu extrair este campo |
+| Email        | ❌    | ✅       | 210 de 626 clientes têm email |
+
+> **Nota sobre telefone:** O SAF-T PT não inclui telefone dos clientes (só da empresa emissora). O FTTERCEI binário tem o campo mas o extractor heurístico não o isolou com fiabilidade. Se for preciso, o telefone pode ser inserido manualmente na ficha do cliente no AT_Manut.
 
 ## Arquitectura interna dos ficheiros
 

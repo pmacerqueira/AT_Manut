@@ -895,6 +895,69 @@ export function DataProvider({ children }) {
     }
   }, [clientes, maquinas, manutencoes, persist])
 
+  /**
+   * Importação em massa de clientes a partir de uma lista JSON (formato AT_Manut).
+   * @param {Array}  lista  Array de { nif, nome, morada, localidade, codigoPostal, telefone, email }
+   * @param {'novos'|'atualizar'} modo  'novos' → só adiciona novos; 'atualizar' → também actualiza existentes
+   * @returns {{ adicionados: number, atualizados: number, ignorados: number }}
+   */
+  const importClientes = useCallback((lista, modo = 'novos') => {
+    let adicionados = 0, atualizados = 0, ignorados = 0
+    const agora = Date.now()
+
+    setClientes(prev => {
+      const mapaExistentes = new Map(prev.map(c => [c.nif, c]))
+      const resultado = [...prev]
+
+      lista.forEach((raw, i) => {
+        const nif = String(raw.nif || '').trim()
+        if (!nif || !raw.nome) { ignorados++; return }
+
+        if (mapaExistentes.has(nif)) {
+          if (modo === 'atualizar') {
+            const idx = resultado.findIndex(c => c.nif === nif)
+            if (idx !== -1) {
+              resultado[idx] = {
+                ...resultado[idx],
+                nome:         raw.nome         || resultado[idx].nome,
+                morada:       raw.morada        || resultado[idx].morada,
+                localidade:   raw.localidade    || resultado[idx].localidade,
+                codigoPostal: raw.codigoPostal  || resultado[idx].codigoPostal,
+                telefone:     raw.telefone      || resultado[idx].telefone,
+                email:        raw.email         || resultado[idx].email,
+              }
+              atualizados++
+            }
+          } else {
+            ignorados++
+          }
+        } else {
+          const novo = {
+            id: 'cli' + (agora + i),
+            nif,
+            nome:         String(raw.nome         || '').trim(),
+            morada:       String(raw.morada        || '').trim(),
+            localidade:   String(raw.localidade    || '').trim(),
+            codigoPostal: String(raw.codigoPostal  || '').trim(),
+            telefone:     String(raw.telefone      || '').trim(),
+            email:        String(raw.email         || '').trim(),
+          }
+          resultado.push(novo)
+          mapaExistentes.set(nif, novo)
+          adicionados++
+        }
+      })
+
+      return resultado
+    })
+
+    logger.action('DataContext', 'importClientes',
+      `Importação: +${adicionados} novos, ~${atualizados} actualizados, ${ignorados} ignorados`,
+      { modo, total: lista.length })
+
+    return { adicionados, atualizados, ignorados }
+  }, [])
+
   // ── Categorias ────────────────────────────────────────────────────────────
   const addCategoria = useCallback((c) => {
     const id = 'cat' + Date.now()
@@ -1493,7 +1556,7 @@ export function DataProvider({ children }) {
     addSubcategoria, updateSubcategoria, removeSubcategoria,
     addChecklistItem, updateChecklistItem, removeChecklistItem,
     addCategoria, updateCategoria, removeCategoria,
-    addCliente, updateCliente, removeCliente,
+    addCliente, updateCliente, removeCliente, importClientes,
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
     addManutencao, updateManutencao, removeManutencao, iniciarManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,

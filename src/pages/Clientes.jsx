@@ -8,7 +8,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle, FileBarChart } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle, FileBarChart, Upload } from 'lucide-react'
 import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -31,6 +31,7 @@ export default function Clientes() {
     addCliente,
     updateCliente,
     removeCliente,
+    importClientes,
     getSubcategoria,
     getCategoria,
     getChecklistBySubcategoria,
@@ -56,6 +57,54 @@ export default function Clientes() {
   const [erro, setErro] = useState('')
   const [searchCliente, setSearchCliente] = useState('')
   const searchClienteDebounced = useDebounce(searchCliente, 250)
+
+  // ── Modal de importação SAF-T ─────────────────────────────────────────────
+  const [modalImport, setModalImport] = useState(false)
+  const [importPreview, setImportPreview] = useState(null) // { lista, novos, existentes }
+  const [importModo, setImportModo] = useState('novos')    // 'novos' | 'atualizar'
+  const [importErro, setImportErro] = useState('')
+
+  const handleImportFile = (e) => {
+    setImportErro('')
+    setImportPreview(null)
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.name.endsWith('.json')) {
+      setImportErro('Selecione um ficheiro .json exportado pelo script extract-clientes-saft-2026.js')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const lista = JSON.parse(ev.target.result)
+        if (!Array.isArray(lista) || !lista[0]?.nif) {
+          setImportErro('Ficheiro inválido — deve ser um array de clientes com campo "nif".')
+          return
+        }
+        const nifSet = new Set(clientes.map(c => c.nif))
+        const novos     = lista.filter(c => !nifSet.has(String(c.nif)))
+        const existentes = lista.filter(c =>  nifSet.has(String(c.nif)))
+        setImportPreview({ lista, novos: novos.length, existentes: existentes.length })
+      } catch {
+        setImportErro('Erro ao ler o ficheiro JSON — verifique se está correctamente formatado.')
+      }
+    }
+    reader.readAsText(file, 'utf-8')
+    // limpar input para permitir re-seleccionar o mesmo ficheiro
+    e.target.value = ''
+  }
+
+  const handleImportConfirm = () => {
+    if (!importPreview) return
+    const resultado = importClientes(importPreview.lista, importModo)
+    setModalImport(false)
+    setImportPreview(null)
+    const partes = []
+    if (resultado.adicionados)  partes.push(`${resultado.adicionados} novos`)
+    if (resultado.atualizados)  partes.push(`${resultado.atualizados} actualizados`)
+    if (resultado.ignorados)    partes.push(`${resultado.ignorados} ignorados`)
+    showToast(`Importação concluída: ${partes.join(', ')}.`, 'success', 5000)
+  }
 
   const openAdd = () => {
     setForm({ nif: '', nome: '', morada: '', codigoPostal: '', localidade: '', telefone: '', email: '' })
@@ -191,9 +240,16 @@ export default function Clientes() {
           <h1>Clientes</h1>
           <p className="page-sub">Empresas e proprietários de equipamentos Navel</p>
         </div>
-        {canAddCliente && (
-          <button type="button" onClick={openAdd}><Plus size={18} /> Novo cliente</button>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {isAdmin && (
+            <button type="button" className="secondary" onClick={() => { setModalImport(true); setImportPreview(null); setImportErro('') }}>
+              <Upload size={18} /> Importar SAF-T
+            </button>
+          )}
+          {canAddCliente && (
+            <button type="button" onClick={openAdd}><Plus size={18} /> Novo cliente</button>
+          )}
+        </div>
       </div>
       <div className="search-bar">
         <Search size={18} className="search-icon" />
@@ -569,6 +625,88 @@ export default function Clientes() {
           documento={modalDocumentoEmail.documento}
           maquina={modalDocumentoEmail.maquina}
         />
+      )}
+
+      {/* ── Modal de importação SAF-T ─────────────────────────────────── */}
+      {modalImport && (
+        <div className="modal-overlay" onClick={() => setModalImport(false)}>
+          <div className="modal modal-import" onClick={e => e.stopPropagation()}>
+            <h2><Upload size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Importar clientes — SAF-T</h2>
+            <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+              Selecione o ficheiro <strong>clientes-navel-2026.json</strong> gerado pelo script de extracção SAF-T.
+              O ficheiro deve estar em <code>C:\Cursor_Dados_Gestor\dados-exportados\</code>.
+            </p>
+
+            <label className="import-file-label">
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportFile}
+                style={{ display: 'none' }}
+                id="import-json-input"
+              />
+              <span className="btn secondary" style={{ cursor: 'pointer' }} onClick={() => document.getElementById('import-json-input').click()}>
+                <Upload size={16} /> Escolher ficheiro JSON…
+              </span>
+            </label>
+
+            {importErro && <p className="form-erro" style={{ marginTop: '0.75rem' }}>{importErro}</p>}
+
+            {importPreview && (
+              <div className="import-preview">
+                <div className="import-preview-stats">
+                  <div className="import-stat import-stat-new">
+                    <span className="import-stat-num">{importPreview.novos}</span>
+                    <span className="import-stat-label">novos clientes</span>
+                  </div>
+                  <div className="import-stat import-stat-exist">
+                    <span className="import-stat-num">{importPreview.existentes}</span>
+                    <span className="import-stat-label">já existem</span>
+                  </div>
+                  <div className="import-stat">
+                    <span className="import-stat-num">{importPreview.lista.length}</span>
+                    <span className="import-stat-label">total no ficheiro</span>
+                  </div>
+                </div>
+
+                <fieldset className="import-modo-fieldset">
+                  <legend>O que fazer com os clientes já existentes?</legend>
+                  <label className="import-radio">
+                    <input
+                      type="radio"
+                      name="importModo"
+                      value="novos"
+                      checked={importModo === 'novos'}
+                      onChange={() => setImportModo('novos')}
+                    />
+                    <strong>Ignorar</strong> — só adiciona os {importPreview.novos} novos (recomendado)
+                  </label>
+                  <label className="import-radio">
+                    <input
+                      type="radio"
+                      name="importModo"
+                      value="atualizar"
+                      checked={importModo === 'atualizar'}
+                      onChange={() => setImportModo('atualizar')}
+                    />
+                    <strong>Actualizar</strong> — substitui morada/contactos dos {importPreview.existentes} existentes com dados do SAF-T
+                  </label>
+                </fieldset>
+              </div>
+            )}
+
+            <div className="form-actions" style={{ marginTop: '1.25rem' }}>
+              <button type="button" className="secondary" onClick={() => setModalImport(false)}>Cancelar</button>
+              <button
+                type="button"
+                onClick={handleImportConfirm}
+                disabled={!importPreview}
+              >
+                <Upload size={16} /> Importar {importPreview ? importPreview.lista.length : ''} clientes
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modal && modal !== 'ficha' && (
