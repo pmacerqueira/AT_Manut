@@ -376,6 +376,102 @@
   color: #1d4ed8;
 }
 
+/* Linha expansível (clicável para ver materiais) */
+.row-expansivel {
+  cursor: pointer;
+}
+.row-expansivel:hover td {
+  background: #f0f9ff !important;
+}
+.td-horas-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+.chevron-expand {
+  color: var(--text-secondary, #94a3b8);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.chevron-expand.rotated {
+  transform: rotate(180deg);
+}
+.td-rel-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.badge-materiais {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  white-space: nowrap;
+}
+
+/* Sub-linha com materiais expandidos */
+.row-materiais-detail td {
+  background: #f8fafc !important;
+  padding: 0 !important;
+  border-top: none !important;
+}
+.materiais-detail-inner {
+  padding: 0.6rem 1rem 0.8rem 2.5rem;
+  border-left: 3px solid #3b82f6;
+  margin: 0 0.5rem 0.3rem 0.5rem;
+  border-radius: 0 0.25rem 0.25rem 0;
+}
+.materiais-detail-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0369a1;
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.materiais-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.materiais-mini-table thead th {
+  background: #e0f2fe;
+  color: #075985;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #bae6fd;
+}
+.materiais-mini-table tbody td {
+  padding: 0.2rem 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent !important;
+}
+.materiais-mini-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.td-codigo {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #475569;
+  white-space: nowrap;
+}
+.th-qtd, .td-qtd {
+  text-align: right;
+  white-space: nowrap;
+  width: 4rem;
+}
+
 /* Print: mostrar apenas o conteúdo do modal mensal */
 @media print {
   body > * { display: none !important; }
@@ -383,6 +479,10 @@
   .modal-mensal-istobal { box-shadow: none !important; max-width: 100% !important; width: 100% !important; }
   .modal-header button, .modal-footer { display: none !important; }
   .mensal-nav button { display: none !important; }
+  .row-expansivel { cursor: default; }
+  .chevron-expand { display: none; }
+  /* Na impressão, expandir todos os materiais automaticamente */
+  .row-materiais-detail { display: table-row !important; }
 }
 .mensal-vazio {
   text-align: center;

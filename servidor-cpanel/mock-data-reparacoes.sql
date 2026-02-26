@@ -42,14 +42,25 @@ VALUES
    'Zona Industrial do Relvão, Lote 7', '9700-789', 'Angra do Heroísmo', '295 555 666', 'admin@tfaria.pt',
    'Gerador de emergência principal — manutenção semestral');
 
--- ── 3. ISTOBAL como fornecedor/cliente de faturação + cliente local ──────────
--- ISTOBAL España, S.A. — envia avisos ES-..., paga à Navel pelas reparações (fatura mensal)
+-- ── 3. ISTOBAL Portugal como cliente de faturação ────────────────────────────
+--
+-- Estrutura do grupo ISTOBAL relevante para a Navel:
+--   • ISTOBAL España (fabricante) — fornecedor de máquinas; a Navel compra-lhes equipamentos
+--   • ISTOBAL Portugal (subsidiária) — gere os contratos de assistência em Portugal;
+--     é a entidade a quem a Navel fatura os serviços de reparação mensalmente
+--
+-- Fluxo dos avisos:
+--   1. ISTOBAL envia email (isat@istobal.com) com aviso "ES-..." → registo automático na app
+--   2. Navel executa a reparação → cliente final assina o relatório
+--   3. Relatório enviado para: Admin (comercial@navel.pt) + ISTOBAL (isat@istobal.com) + cliente final
+--   4. No final do mês, resumo mensal (horas M.O. + materiais) emitido e enviado à ISTOBAL Portugal
+--      para servir de base à fatura mensal
 
 INSERT IGNORE INTO `clientes` (`id`, `nif`, `nome`, `morada`, `codigo_postal`, `localidade`, `telefone`, `email`, `notas`)
 VALUES
-  ('cli-istobal', 'ES-B46200226', 'ISTOBAL España, S.A.',
-   'Calle de Huelva, 35 — Polígono Industrial El Oliveral', '46394', 'Ribarroja del Turia (Valencia)', '+34 961 978 000', 'isat@istobal.com',
-   'Fornecedor de máquinas de lavagem automática. Cliente de faturação para reparações solicitadas via aviso ES-... Resumo mensal enviado no final de cada mês.');
+  ('cli-istobal', '509876543', 'ISTOBAL Portugal, Lda.',
+   'Rua dos Inventores, Lote 12, Parque Tecnológico de Sintra-Cascais', '2710-089', 'Sintra', '+351 219 000 000', 'portugal@istobal.com',
+   'Subsidiária portuguesa do grupo ISTOBAL España. Responsável pela gestão dos contratos de assistência em Portugal. Cliente de faturação mensal: a Navel emite fatura mensal à ISTOBAL Portugal pelo total de horas M.O. e materiais das reparações dos avisos ES-... recebidos. NÃO confundir com ISTOBAL España (fabricante/fornecedor de máquinas).');
 
 -- Clientes finais com máquinas ISTOBAL instaladas (eles assinam o relatório de reparação)
 

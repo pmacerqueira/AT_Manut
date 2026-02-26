@@ -4,6 +4,21 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.2] — 2026-02-22 — Materiais por aviso no relatório mensal ISTOBAL + correcção cliente ISTOBAL
+
+### Melhorias Reparações / ISTOBAL
+- **Linhas expansíveis** na tabela de avisos do relatório mensal: clicar numa linha com materiais registados expande uma sub-linha com a lista de materiais/consumíveis (referência, descrição, quantidade) — sem valores monetários
+- **Badge "nº ref."** no número de relatório indica visualmente que existem materiais registados nesse aviso
+- **Impressão inteligente**: ao clicar "Imprimir / Exportar", todos os avisos com materiais ficam automaticamente expandidos antes de o diálogo de impressão abrir; após fechar, o estado regressa ao normal
+- Sem qualquer valor de custo ou venda — apenas referências, descrições e quantidades
+
+### Correcção: estrutura de clientes ISTOBAL
+- Corrigida identificação do cliente ISTOBAL no mock data: o cliente de faturação é **ISTOBAL Portugal, Lda.** (subsidiária portuguesa, NIF PT, email `portugal@istobal.com`), não a fábrica espanhola
+- Acrescentado comentário no mock data a explicar o fluxo completo: avisos chegam via `isat@istobal.com` → Navel executa → relatório individual para `isat@istobal.com` + cliente final → resumo mensal faturado à ISTOBAL Portugal
+- Adicionado comentário em `ExecutarReparacaoModal.jsx` a distinguir o email operacional ISTOBAL (`isat@istobal.com`) do contacto de faturação mensal (ISTOBAL Portugal)
+
+---
+
 ## [1.9.1] — 2026-02-22 — Relatório mensal ISTOBAL melhorado + ISTOBAL como cliente
 
 ### Melhorias Reparações / ISTOBAL

@@ -9,7 +9,7 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import './Reparacoes.css'
@@ -56,6 +56,8 @@ export default function Reparacoes() {
   const [emailEnviando, setEmailEnviando] = useState(false)
   const [modalEliminar, setModalEliminar] = useState(null)
   const [modalMensal, setModalMensal] = useState(false)
+  const [avisoExpandido, setAvisoExpandido] = useState(null) // id da reparação com detalhe expandido
+  const [modoPrint, setModoPrint] = useState(false)
   const [mesMensal, setMesMensal] = useState(() => {
     const d = new Date()
     return { ano: d.getFullYear(), mes: d.getMonth() } // mes 0-11
@@ -568,16 +570,71 @@ export default function Reparacoes() {
                         const rel = getRelatorioByReparacao(r.id)
                         const st  = STATUS_LABELS[r.status] ?? { label: r.status, cls: 'badge-secondary' }
                         const horas = rel?.horasMaoObra ? parseFloat(rel.horasMaoObra) : null
+                        const pecas = rel?.pecasUsadas
+                          ? (typeof rel.pecasUsadas === 'string' ? JSON.parse(rel.pecasUsadas) : rel.pecasUsadas)
+                          : []
+                        const expandido = modoPrint || avisoExpandido === r.id
                         return (
-                          <tr key={r.id} className={r.status === 'concluida' ? '' : 'row-em-curso'}>
-                            <td>{formatDataAzores(r.data)}</td>
-                            <td className="td-aviso-bold">{r.numeroAviso ?? '—'}</td>
-                            <td>{maq ? `${maq.marca} ${maq.modelo}` : '—'}</td>
-                            <td>{cli?.nome ?? '—'}</td>
-                            <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
-                            <td>{rel?.numeroRelatorio ?? <em className="text-muted">—</em>}</td>
-                            <td className="td-horas">{horas != null ? `${horas.toFixed(1)} h` : <em className="text-muted">—</em>}</td>
-                          </tr>
+                          <>
+                            <tr
+                              key={r.id}
+                              className={[
+                                r.status === 'concluida' ? '' : 'row-em-curso',
+                                pecas.length > 0 ? 'row-expansivel' : ''
+                              ].join(' ')}
+                              onClick={() => pecas.length > 0 && setAvisoExpandido(avisoExpandido === r.id ? null : r.id)}
+                              title={pecas.length > 0 ? 'Clique para ver materiais' : undefined}
+                            >
+                              <td>{formatDataAzores(r.data)}</td>
+                              <td className="td-aviso-bold">{r.numeroAviso ?? '—'}</td>
+                              <td>{maq ? `${maq.marca} ${maq.modelo}` : '—'}</td>
+                              <td>{cli?.nome ?? '—'}</td>
+                              <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
+                              <td>
+                                <span className="td-rel-wrapper">
+                                  {rel?.numeroRelatorio ?? <em className="text-muted">—</em>}
+                                  {pecas.length > 0 && (
+                                    <span className="badge-materiais" title={`${pecas.length} referência(s)`}>
+                                      <Package size={11} /> {pecas.length}
+                                    </span>
+                                  )}
+                                </span>
+                              </td>
+                              <td className="td-horas td-horas-toggle">
+                                {horas != null ? `${horas.toFixed(1)} h` : <em className="text-muted">—</em>}
+                                {pecas.length > 0 && (
+                                  <ChevronDown size={13} className={`chevron-expand ${expandido ? 'rotated' : ''}`} />
+                                )}
+                              </td>
+                            </tr>
+                            {expandido && pecas.length > 0 && (
+                              <tr key={`${r.id}-pecas`} className="row-materiais-detail">
+                                <td colSpan={7}>
+                                  <div className="materiais-detail-inner">
+                                    <span className="materiais-detail-titulo"><Package size={13} /> Materiais / Consumíveis utilizados</span>
+                                    <table className="materiais-mini-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Referência</th>
+                                          <th>Descrição</th>
+                                          <th className="th-qtd">Qtd.</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {pecas.map((p, i) => (
+                                          <tr key={i}>
+                                            <td className="td-codigo">{p.codigo || '—'}</td>
+                                            <td>{p.descricao || '—'}</td>
+                                            <td className="td-qtd">{p.quantidade ?? '—'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         )
                       })}
                     </tbody>
@@ -630,7 +687,10 @@ export default function Reparacoes() {
               <button
                 type="button"
                 className="btn primary"
-                onClick={() => window.print()}
+                onClick={() => {
+                  setModoPrint(true)
+                  setTimeout(() => { window.print(); setModoPrint(false) }, 150)
+                }}
                 title="Imprimir relatório mensal para enviar à ISTOBAL"
               >
                 <Printer size={15} /> Imprimir / Exportar

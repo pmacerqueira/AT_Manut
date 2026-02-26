@@ -66,8 +66,10 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     getSubcategoria,
   } = useData()
 
-  // Emails fixos para envio após conclusão
+  // Emails fixos para envio após conclusão de cada reparação
   const EMAIL_ADMIN   = 'comercial@navel.pt'
+  // isat@istobal.com = contacto operacional ISTOBAL (de onde chegam os avisos ES-...)
+  // O resumo mensal de faturação vai para a ISTOBAL Portugal (ver cliente cli-istobal na app)
   const EMAIL_ISTOBAL = 'isat@istobal.com'
   const { showToast }                           = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
