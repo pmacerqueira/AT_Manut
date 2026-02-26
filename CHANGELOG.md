@@ -4,6 +4,17 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.9.5] — 2026-02-22 — Correcção formulário de máquinas (reset + Kaeser)
+
+### Correcções de bugs
+- **`MaquinaFormModal.jsx` — formulário apagava dados ao sair da janela:** O `useEffect` de inicialização re-disparava quando o DataContext fazia refresh silencioso em background (ao refocar a janela). Corrigido com `wasOpenRef` para só inicializar na transição fechado→aberto, nunca em re-renders subsequentes
+- **`MaquinaFormModal.jsx` — secção Kaeser A/B/C/D aparecia em todos os compressores:** A condição usava `isCompressor()` (todos os compressores) em vez de `isCompressorParafuso()` (apenas `sub5`/`sub14`). Corrigido em 3 locais: display da secção, inicialização de `posicaoKaeser` no modo add e no modo edit
+
+### Qualidade
+- Build v1.9.5 limpo, sem warnings
+
+---
+
 ## [1.9.4] — 2026-02-22 — Optimização de bundle + preparação deployment Reparações
 
 ### Optimização de performance (build)

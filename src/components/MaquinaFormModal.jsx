@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useData } from '../context/DataContext'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser, MARCAS_COMPRESSOR, MARCAS_ELEVADOR } from '../context/DataContext'
 import { format } from 'date-fns'
@@ -27,6 +27,9 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     updateMaquina,
   } = useData()
   const { showToast } = useToast()
+  // Ref para detectar apenas a transição fechado→aberto e não re-inicializar
+  // o formulário quando dependências do DataContext mudam em background (refresh silencioso)
+  const wasOpenRef = useRef(false)
   const [form, setForm] = useState({
     clienteNif: '',
     categoriaId: '',
@@ -49,7 +52,11 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
   const subcategoriasFiltradas = form.categoriaId ? getSubcategoriasByCategoria(form.categoriaId) : []
 
   useEffect(() => {
-    if (!isOpen) return
+    const justOpened = isOpen && !wasOpenRef.current
+    wasOpenRef.current = isOpen
+    // Só inicializar o formulário quando o modal passa de fechado → aberto.
+    // Evita reset quando o DataContext faz refresh silencioso em background.
+    if (!justOpened) return
     if (mode === 'add') {
       const firstCat = categorias[0]
       const catId = firstCat?.id || ''
@@ -76,7 +83,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: '',
         refFiltroSeparador: '',
         refFiltroAr: '',
-        posicaoKaeser: isCompressor(subId) ? 0 : null,
+        posicaoKaeser: isCompressorParafuso(subId) ? 0 : null,
       })
     } else if (maquina) {
       const sub = getSubcategoria(maquina.subcategoriaId)
@@ -100,7 +107,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: maquina.refFiltroOleo || '',
         refFiltroSeparador: maquina.refFiltroSeparador || '',
         refFiltroAr: maquina.refFiltroAr || '',
-        posicaoKaeser: maquina.posicaoKaeser ?? (isCompressor(maquina.subcategoriaId) ? 0 : null),
+        posicaoKaeser: maquina.posicaoKaeser ?? (isCompressorParafuso(maquina.subcategoriaId) ? 0 : null),
       })
     }
   }, [isOpen, mode, clienteNifLocked, maquina, categorias, clientes, getSubcategoriasByCategoria, getSubcategoria, getCategoria, INTERVALOS])
@@ -238,7 +245,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
               </div>
             )
           })()}
-          {isCompressor(form.subcategoriaId) && (
+          {isCompressorParafuso(form.subcategoriaId) && (
             <div className="form-section">
               <h3>Ciclo de manutenção KAESER (A/B/C/D)</h3>
               <p className="horas-info">
