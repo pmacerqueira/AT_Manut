@@ -777,13 +777,14 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await doLoginAdmin(page)
     await dismissAlertasModal(page)
 
-    // Tornar operações de escrita offline após o carregamento inicial
+    // Tornar operações de escrita offline APÓS o carregamento inicial
+    // Nota: route.fallback() (não continue()) passa ao handler anterior (setupApiMock)
     await page.route('**/api/data.php', async (route) => {
       const body = route.request().postDataJSON()
       if (['create', 'update', 'delete'].includes(body?.action)) {
         await route.abort('failed')
       } else {
-        await route.continue()
+        await route.fallback()
       }
     })
 
@@ -792,8 +793,10 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await page.waitForTimeout(800)
 
     const countAntes = await page.locator('tbody tr').count()
+    // Deve ter 5 reparações mock carregadas
+    expect(countAntes).toBeGreaterThan(0)
 
-    // Criar reparação com rede offline
+    // Criar reparação com rede offline para escrita (mas leitura ainda funciona)
     await page.locator('button').filter({ hasText: 'Nova Reparação' }).click()
     const modal = page.locator('.modal-nova-rep')
     await modal.locator('select').first().selectOption({ index: 1 })
@@ -803,13 +806,10 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await modal.locator('button').filter({ hasText: 'Criar Reparação' }).click()
     await page.waitForTimeout(1500)
 
-    // Graceful degradation: a reparação deve ter sido adicionada localmente
-    // (optimistic update) OU aparece algum toast (erro ou sucesso)
-    const modalFechado = !(await page.locator('.modal-nova-rep').isVisible({ timeout: 1000 }).catch(() => false))
+    // A reparação fica no estado local (optimistic update): modal fecha + toast sucesso
+    const modalFechado = !(await page.locator('.modal-nova-rep').isVisible().catch(() => true))
     const countDepois = await page.locator('tbody tr').count()
-    const anyToast = await page.locator('.toast, [role="alert"]').isVisible({ timeout: 3000 }).catch(() => false)
-    // A condição de sucesso: modal fechou (criação aceite localmente) OU apareceu toast
-    expect(modalFechado || anyToast || countDepois > countAntes).toBe(true)
+    expect(modalFechado || countDepois > countAntes).toBe(true)
   })
 
   test('Guardar progresso offline — modal fecha ou mostra toast', async ({ page }) => {
@@ -817,12 +817,13 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await doLoginAdmin(page)
     await dismissAlertasModal(page)
 
+    // route.fallback() passa ao handler setupApiMock para list/get
     await page.route('**/api/data.php', async (route) => {
       const body = route.request().postDataJSON()
       if (['create', 'update'].includes(body?.action)) {
         await route.abort('failed')
       } else {
-        await route.continue()
+        await route.fallback()
       }
     })
 
@@ -836,10 +837,11 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await page.locator('.modal-exec-rep button').filter({ hasText: /Guardar progresso/i }).click()
     await page.waitForTimeout(1500)
 
-    // Graceful degradation: modal fechou OU apareceu algum toast (sucesso ou erro)
-    const modalFechado = !(await page.locator('.modal-exec-rep').isVisible({ timeout: 1000 }).catch(() => false))
-    const anyToast = await page.locator('.toast, [role="alert"]').isVisible({ timeout: 3000 }).catch(() => false)
-    expect(modalFechado || anyToast).toBe(true)
+    // Graceful degradation: modal fechou (estado guardado localmente — optimistic)
+    const modalFechado = !(await page.locator('.modal-exec-rep').isVisible().catch(() => true))
+    const badges = page.locator('tbody .badge').filter({ hasText: /Em progresso/i })
+    const countBadges = await badges.count()
+    expect(modalFechado || countBadges >= 2).toBe(true)
   })
 
   test('App mantém dados de reparações ao recarregar a página (localStorage)', async ({ page }) => {
@@ -897,11 +899,12 @@ test.describe('RA-9 — Estados vazios', () => {
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(800)
 
-    await page.locator('button').filter({ hasText: 'Nova Reparação' }).click()
+    // Com reparacoes:[] há 2 botões "Nova Reparação" (header + empty-state) — usar .first()
+    await page.locator('button').filter({ hasText: 'Nova Reparação' }).first().click()
     await page.waitForTimeout(600)
     const select = page.locator('.modal-nova-rep select').first()
     await expect(select).toBeVisible()
-    // Aguardar que o select seja actualizado (state React pode demorar 1 render)
+    // Com maquinas:[], o select deve ter apenas o placeholder (≤ 2 options)
     await expect(async () => {
       const options = await select.locator('option').count()
       expect(options).toBeLessThanOrEqual(2)
