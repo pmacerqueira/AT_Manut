@@ -34,6 +34,17 @@ Só fazer build quando:
 
 Para correcções normais: editar o ficheiro, confirmar com `ReadLints`, e aguardar instrução do utilizador para build.
 
+### Como executar build e zip (qualquer agente)
+
+**Sempre executar no terminal do Windows** — evita crash do Cursor. Qualquer agente deve usar:
+
+```powershell
+cd c:\AT_Manut
+npm run build:zip
+```
+
+Ou comandos separados: `npm run build` seguido de `npm run zip`. Ver `docs/BUILD-E-ZIP.md`.
+
 ---
 
 ## Fluxo obrigatório: "optimizar e preparar build"
@@ -42,11 +53,10 @@ Quando o utilizador pedir para **optimizar, corrigir ou preparar um novo build**
 
 1. **Verificar logs do sistema** (se o utilizador colou um relatório de suporte no chat, analisar primeiro)
 2. **Correr `ReadLints`** nos ficheiros recentemente editados
-3. **Correr `npm run build`** e verificar todos os warnings e erros (o prebuild executa optimize-images automaticamente)
+3. **Correr `npm run build:zip`** no terminal (evita crash). Verificar warnings e erros.
 4. **Corrigir** todos os problemas encontrados
 5. **Actualizar `APP_VERSION`** em `src/config/version.js` (incrementar patch: ex. `1.3.0` → `1.4.0`)
-6. **Novo build limpo** após correcções
-7. **Gerar zip**: `Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force`
+6. **Novo build limpo** após correcções: `npm run build:zip`
 8. **Actualizar `CHANGELOG.md`** com resumo das alterações
 9. **Push para GitHub** (backup e histórico de versões):
    ```powershell

@@ -89,12 +89,23 @@ Se a BD foi criada antes das migrações mais recentes:
 | Build React (`dist/`) | `public_html/manut/` | `npm run build` |
 
 ### Build da aplicação React
+
+**Recomendado:** Executar no terminal Windows (fora do Cursor) para evitar crash do editor.
+
 ```powershell
 cd c:\AT_Manut
-npm run build
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+npm run build:zip
 ```
+
+Ou comandos separados:
+```powershell
+npm run build
+npm run zip
+```
+
 Enviar `dist_upload.zip` para o cPanel (File Manager → Upload → Extract em `public_html/manut/`).
+
+Ver [`docs/BUILD-E-ZIP.md`](./BUILD-E-ZIP.md) para instruções completas.
 
 ### Variáveis de ambiente
 - Garantir que `VITE_API_BASE_URL` aponta para a API no cPanel (ex.: `https://navel.pt/api`)
@@ -106,19 +117,17 @@ Enviar `dist_upload.zip` para o cPanel (File Manager → Upload → Extract em `
 ```powershell
 # 1. Verificar lints nos ficheiros editados
 # 2. Incrementar APP_VERSION em src/config/version.js
-# 3. Build
-npm run build   # prebuild corre optimize-images automaticamente
-# 4. Gerar zip
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
-# 5. Actualizar CHANGELOG.md
-# 6. Commit + tag + push
+# 3. Build e zip (no terminal Windows)
+npm run build:zip   # ou: npm run build && npm run zip
+# 4. Actualizar CHANGELOG.md
+# 5. Commit + tag + push
 git add -A
 git commit -m "v{versão} - resumo"
 git tag -a v{versão} -m "Release v{versão}"
 git push origin master
 git push origin v{versão}
-# 7. Upload dist_upload.zip → cPanel → public_html/manut/ (extrair)
-# 8. Upload servidor-cpanel/send-email.php → cPanel → public_html/api/
+# 6. Upload dist_upload.zip → cPanel → public_html/manut/ (extrair)
+# 7. Upload servidor-cpanel/send-email.php → cPanel → public_html/api/
 ```
 
 ---

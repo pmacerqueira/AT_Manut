@@ -260,6 +260,8 @@ export const MC = {
  */
 export async function setupApiMock(page, { failFetch = false, customData = {} } = {}) {
   const data = { ...MC, ...customData }
+  // Estado mutável para clientes (create/update) — permite testes de importação SAF-T
+  const clientesMutable = [...(data.clientes ?? [])]
 
   await page.route('**/api/data.php', async (route) => {
     const body = route.request().postDataJSON()
@@ -300,7 +302,7 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
 
     // ── list ──
     if (action === 'list') {
-      const rows = data[resource] ?? []
+      const rows = resource === 'clientes' ? clientesMutable : (data[resource] ?? [])
       await route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({ ok: true, data: rows }),
@@ -308,7 +310,32 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
       return
     }
 
-    // ── create / update / delete / bulk_create / bulk_restore ──
+    // ── create (clientes) — acumular para list ──
+    if (resource === 'clientes' && action === 'create') {
+      const novo = body?.data
+      if (novo && !clientesMutable.some(c => String(c.nif) === String(novo.nif))) {
+        clientesMutable.push(novo)
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: novo ?? {} }),
+      })
+      return
+    }
+
+    // ── update (clientes) ──
+    if (resource === 'clientes' && action === 'update') {
+      const merged = body?.data
+      const idx = clientesMutable.findIndex(c => String(c.id) === String(body?.id) || String(c.nif) === String(merged?.nif))
+      if (idx !== -1 && merged) clientesMutable[idx] = { ...clientesMutable[idx], ...merged }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+
+    // ── create / update / delete / bulk_create / bulk_restore (outros) ──
     await route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ ok: true, data: body?.data ?? {} }),
@@ -318,7 +345,8 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
 
 // ── Login via UI ──────────────────────────────────────────────────────────────
 
-export async function doLogin(page, { username = 'Admin', password = 'admin123' } = {}) {
+// Credenciais Admin: password pode ser sobrescrita via env ATM_ADMIN_PASSWORD (ex: admin123%)
+export async function doLogin(page, { username = 'Admin', password = process.env.ATM_ADMIN_PASSWORD || 'admin123' } = {}) {
   await page.goto('/manut/login')
   await page.waitForLoadState('domcontentloaded')
   await page.locator('input').first().fill(username)

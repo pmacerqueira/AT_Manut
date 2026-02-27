@@ -1,0 +1,4 @@
+[
+  {"nif":"999888777","nome":"Cliente E2E Import Test Lda","morada":"Rua do Teste E2E, 42","localidade":"Ponta Delgada","codigoPostal":"9500-123","telefone":"296123456","email":"e2e@teste-import.pt"},
+  {"nif":"999888778","nome":"Segundo Cliente E2E Import","morada":"Avenida dos Testes","localidade":"Ribeira Grande","codigoPostal":"9600-000","telefone":"296654321","email":"segundo@teste-import.pt"}
+]

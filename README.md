@@ -98,24 +98,27 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 ## Deployment
 
 ```powershell
-# 1. Build
-npm run build
+# 1. Build e zip (executar no terminal Windows — evita crash do Cursor)
+cd c:\AT_Manut
+npm run build:zip
 
-# 2. Zip para upload cPanel (public_html/manut/)
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+# Ou comandos separados:
+# npm run build
+# npm run zip
 
-# 3. Push para GitHub
+# 2. Push para GitHub
 git add -A
 git commit -m "v{versão} - resumo"
 git tag -a v{versão} -m "Release v{versão}"
 git push origin master
 git push origin v{versão}
 
-# 4. Upload manual dist_upload.zip para cPanel → public_html/manut/
-# 5. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
+# 3. Upload manual dist_upload.zip para cPanel → public_html/manut/
+# 4. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
 ```
 
-Ver `docs/DEPLOY_CHECKLIST.md` para lista completa de verificação.
+Ver [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md) para instruções detalhadas de build e zip.  
+Ver [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) para lista completa de verificação.
 
 ---
 
@@ -130,6 +133,7 @@ Ver `docs/DEPLOY_CHECKLIST.md` para lista completa de verificação.
 | [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md) | Suite de testes Playwright (441 testes, 17 specs) |
 | [`docs/MANUAL-UX-UI.md`](./docs/MANUAL-UX-UI.md) | Directrizes de UX/UI obrigatórias |
 | [`docs/IMAGENS-E-ICONES.md`](./docs/IMAGENS-E-ICONES.md) | Gestão de imagens e ícones |
+| [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md) | Build e zip para deploy (evitar crash Cursor) |
 | [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) | Checklist de deployment |
 | [`docs/GIT-SETUP.md`](./docs/GIT-SETUP.md) | Configuração Git/GitHub |
 | [`servidor-cpanel/INSTRUCOES_CPANEL.md`](./servidor-cpanel/INSTRUCOES_CPANEL.md) | Configuração do backend PHP |

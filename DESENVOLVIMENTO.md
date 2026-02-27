@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.9.3 · **Última actualização:** 2026-02-26
+**Versão:** 1.10.0 · **Última actualização:** 2026-02-22
 **Localização:** `c:\AT_Manut\`
 
 ---
@@ -119,33 +119,29 @@ Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCU
 
 ## 5. Fluxo de build e deployment
 
+> **Importante:** Executar build e zip no **terminal Windows** (fora do Cursor) para evitar crash do editor. Ver [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md).
+
 ```powershell
 # 1. Verificar lints nos ficheiros editados (ReadLints)
-# 2. Build (prebuild corre optimize-images automaticamente)
-npm run build
-
-# 3. Verificar warnings/erros no output
-
-# 4. Incrementar versão em src/config/version.js
+# 2. Incrementar versão em src/config/version.js
 #    MAJOR.MINOR.PATCH → patches para correcções, minor para novas funcionalidades
 
-# 5. Novo build limpo após correcções
-npm run build
+# 3. Build e zip (no terminal: cd c:\AT_Manut)
+npm run build:zip   # ou: npm run build && npm run zip
 
-# 6. Gerar zip
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+# 4. Verificar warnings/erros no output; corrigir e repetir se necessário
 
-# 7. Actualizar CHANGELOG.md
+# 5. Actualizar CHANGELOG.md
 
-# 8. Commit + tag + push
+# 6. Commit + tag + push
 git add -A
 git commit -m "v{versão} - resumo"
 git tag -a v{versão} -m "Release v{versão}"
 git push origin master
 git push origin v{versão}
 
-# 9. Upload dist_upload.zip para cPanel → public_html/manut/
-# 10. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
+# 7. Upload dist_upload.zip para cPanel → public_html/manut/
+# 8. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
 ```
 
 ---

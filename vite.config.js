@@ -11,6 +11,8 @@ export default defineConfig({
     target: 'es2020',
     // Limiar para o bundle principal (DataContext é grande por design — gzip real: ~190KB)
     chunkSizeWarningLimit: 700,
+    // Não calcular tamanho gzip no output — poupa 6-8s por build
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
         manualChunks: {

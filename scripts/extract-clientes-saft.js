@@ -106,7 +106,20 @@ function main() {
   const csvPath = join(outDir, 'clientes-filosoft.csv')
   const jsonPath = join(outDir, 'clientes-filosoft.json')
 
-  // CSV (separador ; para Excel PT)
+  // Filtrar: só registos que cumprem requisitos de importação AT_Manut
+  // (NIF, Nome, Morada, Telefone ou telemóvel, Email — todos preenchidos)
+  const cumpreImport = (c) =>
+    (c.nif || '').trim() &&
+    (c.nome || '').trim() &&
+    (c.morada || '').trim() &&
+    ((c.telefone || '').trim() || (c.telemovel || '').trim()) &&
+    (c.email || '').trim()
+  const clientesImportaveis = clientes.filter(cumpreImport)
+  if (clientesImportaveis.length < clientes.length) {
+    console.log(`[INFO] ${clientes.length - clientesImportaveis.length} registos sem NIF/Nome/Morada/Telefone/Email — excluídos do JSON`)
+  }
+
+  // CSV (separador ; para Excel PT) — todos para análise
   const header = 'NIF;Nome;Morada;Localidade;Código Postal;Telefone;Email'
   const csvRows = [
     header,
@@ -125,8 +138,8 @@ function main() {
   writeFileSync(csvPath, '\uFEFF' + csvRows.join('\r\n'), 'utf8') // BOM para Excel
   console.log(`[OK] CSV: ${csvPath} (${clientes.length} clientes)`)
 
-  // JSON (formato AT_Manut: id = nif)
-  const jsonClientes = clientes.map((c) => ({
+  // JSON (formato AT_Manut) — só os que cumprem requisitos de importação
+  const jsonClientes = clientesImportaveis.map((c) => ({
     id: c.nif,
     nif: c.nif,
     nome: c.nome,
@@ -137,7 +150,7 @@ function main() {
     email: c.email,
   }))
   writeFileSync(jsonPath, JSON.stringify(jsonClientes, null, 2), 'utf8')
-  console.log(`[OK] JSON: ${jsonPath} (${clientes.length} clientes)`)
+  console.log(`[OK] JSON: ${jsonPath} (${jsonClientes.length} clientes importáveis)`)
 
   console.log(`\nTotal: ${clientes.length} clientes extraídos do SAF-T.`)
 }

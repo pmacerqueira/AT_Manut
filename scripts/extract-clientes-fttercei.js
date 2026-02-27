@@ -163,6 +163,18 @@ function main() {
   const csvPath = join(outDir, 'clientes-fttercei.csv')
   const jsonPath = join(outDir, 'clientes-fttercei.json')
 
+  // Filtrar: só registos que cumprem requisitos de importação AT_Manut
+  const cumpreImport = (c) =>
+    (c.nif || '').trim() &&
+    (c.nome || '').trim() &&
+    (c.morada || '').trim() &&
+    ((c.telefone || '').trim() || (c.telemovel || '').trim()) &&
+    (c.email || '').trim()
+  const clientesImportaveis = clientes.filter(cumpreImport)
+  if (clientesImportaveis.length < clientes.length) {
+    console.log(`[INFO] ${clientes.length - clientesImportaveis.length} registos incompletos — excluídos do JSON`)
+  }
+
   const header = 'NIF;Nome;Morada;Localidade;Código Postal;Telefone;Email'
   const csvRows = [
     header,
@@ -181,7 +193,7 @@ function main() {
   writeFileSync(csvPath, '\uFEFF' + csvRows.join('\r\n'), 'utf8')
   console.log(`[OK] CSV: ${csvPath} (${clientes.length} clientes)`)
 
-  const jsonClientes = clientes.map((c) => ({
+  const jsonClientes = clientesImportaveis.map((c) => ({
     id: c.nif,
     nif: c.nif,
     nome: c.nome,
@@ -192,7 +204,7 @@ function main() {
     email: c.email,
   }))
   writeFileSync(jsonPath, JSON.stringify(jsonClientes, null, 2), 'utf8')
-  console.log(`[OK] JSON: ${jsonPath} (${clientes.length} clientes)`)
+  console.log(`[OK] JSON: ${jsonPath} (${jsonClientes.length} clientes importáveis)`)
 
   console.log(`\nTotal: ${clientes.length} clientes extraídos do FTTERCEI.`)
 }

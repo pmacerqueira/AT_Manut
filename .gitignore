@@ -44,3 +44,12 @@ clientes-fttercei.csv
 clientes-fttercei.json
 artigos-armazem-*.csv
 artigos-armazem-*.json
+
+# Ficheiros obsoletos (não commitar)
+teste-import.json
+RELATORIO-TESTE-IMPORTACAO.md
+PHP*.phpinfo*.pdf
+
+# Artefactos servidor (backups, testes)
+servidor-cpanel/api/api.zip
+servidor-cpanel/teste-email-istobal.txt

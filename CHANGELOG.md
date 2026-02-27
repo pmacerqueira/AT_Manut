@@ -4,7 +4,90 @@ Registo das alterações implementadas por sessão de desenvolvimento.
 
 ---
 
+## [1.10.3] — 2026-02-27 — Optimização do processo de build e zip
+
+### Build
+- `reportCompressedSize: false` em `vite.config.js` — elimina o cálculo gzip no output, poupa ~6-8 s por build
+- Novo script `build:fast` — corre `vite build` directamente (salta `optimize-images` quando as imagens não mudaram) + zip em sequência
+- Script `zip` migrado de `Compress-Archive` para `tar` nativo do Windows 10+ — 4× mais rápido (2.5 s vs 11 s)
+- **Resultado prático:** ciclo build+zip de ~55 s passa para ~35 s (~35% mais rápido)
+
+---
+
+## [1.10.2] — 2026-02-27 — Correcção definitiva da tabela de clientes
+
+### Clientes — tabela desktop
+- Removida a coluna **Morada** da listagem geral (visível apenas na ficha individual); Morada era a principal causa do overflow horizontal
+- Tabela agora com 6 colunas: NIF, Nome, Localidade, Telefone, Máq., Acções
+- Adoptado `table-layout: fixed` com larguras explícitas por coluna — garante que os botões de acção nunca ficam cortados
+- Coluna Nome trunca com `text-overflow: ellipsis` em vez de quebrar para nova linha
+- Removido `position: sticky` da coluna de acções (não funciona dentro de `overflow-x: auto`)
+- Eliminado wrapper `overflow-x: auto` — a tabela cabe dentro do ecrã sem scroll horizontal
+
+---
+
+## [1.10.1] — 2026-02-22 — Limpeza e optimização do projecto
+
+### Ficheiros removidos (obsoletos)
+- `teste-import.json` — substituído por `tests/fixtures/clientes-import-test.json`
+- `RELATORIO-TESTE-IMPORTACAO.md` — relatório temporário
+- `tests/test-import-manual.spec.js` — substituído por `tests/e2e/18-import-saft-clientes.spec.js`
+- `PHP 8.1.32 - phpinfo().pdf` — referência técnica temporária
+
+### .gitignore
+- Adicionadas entradas para evitar commit de ficheiros obsoletos se forem recriados
+
+---
+
+## [1.10.0] — 2026-02-22 — Importação clientes: scripts, modal e validação
+
+### Scripts de extracção
+- **extract-clientes-saft.js / extract-clientes-fttercei.js:** JSON só inclui registos que cumprem requisitos (NIF, Nome, Morada, Telefone, Email)
+- CSV mantém todos os registos para análise
+
+### Modal Importar SAF-T
+- Instruções actualizadas: `clientes-filosoft.json` ou `clientes-fttercei.json`, gerados na pasta do projecto
+- Validação mais flexível: aceita array, objecto com chave clientes/data/dados, e busca recursiva
+- Aceita NIF em `nif`, `NIF`, `CustomerTaxID`, `TaxID`
+
+### Fixture E2E
+- `clientes-import-test.json`: segundo registo com telefone e email preenchidos
+
+---
+
+## [1.9.9] — 2026-02-22 — Importação SAF-T: validação mais flexível
+
+### Correção
+- **Modal Importar SAF-T:** aceita ficheiro como array directo ou objecto com chave `clientes`/`data`/`dados`
+- **Campo NIF:** aceita `nif`, `Nif` ou `NIF` (maiúsculas/minúsculas)
+- Mensagens de erro mais claras para diagnóstico
+
+---
+
+## [1.9.8] — 2026-02-22 — Clientes: paginação, eliminar todos, importação refinada
+
+### Novidade
+- **Botão "Eliminar todos"** (só Admin, quando há clientes): modal de confirmação que apaga todos os clientes, máquinas, manutenções e relatórios — permite limpar lista importada e importar nova
+- **Paginação na lista de clientes:** 25 por página, controlos anterior/seguinte, indicador "X–Y de Z"
+- **Ordenação alfabética** por nome (já existia)
+- **Coluna Nome:** alinhamento à esquerda para melhor legibilidade
+
+### Importação SAF-T — critérios ajustados
+- **Obrigatórios:** NIF, Nome, Morada, Telefone ou telemovel (o que existir), Email
+- **Código postal** deixou de ser obrigatório (continua a ser guardado se existir)
+- Clientes sem estes campos são ignorados (contagem em "ignorados")
+
+### Correção
+- **Paginação ao apagar:** quando se elimina clientes e a página actual fica vazia, volta automaticamente à página 1
+
+---
+
 ## [1.9.7] — 2026-02-26 — Importação de clientes via SAF-T (Gestor.32)
+
+### Correção crítica (E2E)
+- **`DataContext.jsx` — `importClientes` não exportado no contexto:** a função estava definida e nas dependências do `useMemo` mas **faltava no objeto `value`** passado ao `DataContext.Provider`. Corrigido: `importClientes` incluído no value → importação passa a funcionar.
+- **`importClientes` — persistência na API:** a função actualizava só o estado local sem chamar `apiClientes.create`/`update`. Corrigido: cada cliente novo/actualizado é persistido via `persist()` em background.
+- **Mock E2E — clientes acumulados:** `setupApiMock` em `helpers.js` passa a manter estado mutável para `clientes` (create/update) para os testes de importação SAF-T funcionarem com dados persistidos.
 
 ### Novidade
 - **`Clientes.jsx` — botão "Importar SAF-T" (só Admin):** abre modal que aceita ficheiro `clientes-navel-2026.json` gerado pelo script `extract-clientes-saft-2026.js`

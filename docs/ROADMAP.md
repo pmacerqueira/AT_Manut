@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-02-26 — v1.9.3
+> Última revisão: 2026-02-26 — v1.9.7
 
 ---
 
-## Estado actual (v1.9.3) — O que está implementado
+## Estado actual (v1.9.7) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -42,7 +42,8 @@
 | **Reparações — fluxo ISTOBAL** | Avisos ES-, relatório individual + resumo mensal faturável | **v1.9.x** |
 | **Reparações — relatório mensal** | Modal mensal ISTOBAL com horas M.O., materiais expansíveis, impressão | **v1.9.x** |
 | **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
-| **Suite de testes E2E** | 441 testes Playwright (17 specs) — 100% a passar | **v1.9.3** |
+| **Importação SAF-T clientes** | Modal Admin, preview, modos Ignorar/Actualizar, persistência API | **v1.9.7** |
+| **Suite de testes E2E** | 447 testes Playwright (18 specs) — importação SAF-T incluída | **v1.9.7** |
 
 ---
 
@@ -71,6 +72,23 @@
 - `17-reparacoes-avancado.spec.js` (69 testes): RA-1→RA-15 — permissões, multi-dia, fotos, email, relatório, mobile, tablet, offline, estados vazios, data histórica, peças, checklist, ISTOBAL, volumoso, logging
 
 **Bug corrigido:** `route.fallback()` (não `route.continue()`) necessário em Playwright para passar ao handler anterior (`setupApiMock`) nos testes offline.
+
+---
+
+### v1.9.7 — Importação SAF-T de clientes + correcções E2E
+**Implementado:** Fevereiro 2026
+
+**Funcionalidades:**
+- Importação em massa de clientes a partir de ficheiro JSON (formato SAF-T/Gestor.32)
+- Modal com preview (novos vs existentes), modos "Ignorar" e "Actualizar"
+- Persistência na API para cada cliente criado/actualizado
+
+**Correcções críticas (descobertas via E2E):**
+- `importClientes` faltava no objeto `value` do DataContext → importação falhava com "is not a function"
+- `importClientes` não chamava `apiClientes.create`/`update` → clientes só em memória, perdidos ao recarregar
+- Mock E2E: `clientesMutable` para acumular clientes criados e retornar em `list`
+
+**Spec 18:** 6 testes E2E para o fluxo completo de importação SAF-T.
 
 ---
 
@@ -155,4 +173,6 @@
 
 ---
 
-*Última actualização: 2026-02-26 — v1.9.3*
+*Última actualização: 2026-02-26 — v1.9.7*
+
+> **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
@@ -8,7 +8,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ArrowLeft, ExternalLink, Mail, Search, AlertTriangle, FileBarChart, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload } from 'lucide-react'
 import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -17,10 +17,12 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
+import { logger } from '../utils/logger'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada' }
+const PAGE_SIZE = 25
 
 export default function Clientes() {
   const {
@@ -32,6 +34,7 @@ export default function Clientes() {
     updateCliente,
     removeCliente,
     importClientes,
+    clearAllClientesAndRelated,
     getSubcategoria,
     getCategoria,
     getChecklistBySubcategoria,
@@ -57,6 +60,12 @@ export default function Clientes() {
   const [erro, setErro] = useState('')
   const [searchCliente, setSearchCliente] = useState('')
   const searchClienteDebounced = useDebounce(searchCliente, 250)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => { setPage(1) }, [searchClienteDebounced])
+
+  // ── Modal eliminar todos ────────────────────────────────────────────────────
+  const [modalEliminarTodos, setModalEliminarTodos] = useState(false)
 
   // ── Modal de importação SAF-T ─────────────────────────────────────────────
   const [modalImport, setModalImport] = useState(false)
@@ -64,29 +73,83 @@ export default function Clientes() {
   const [importModo, setImportModo] = useState('novos')    // 'novos' | 'atualizar'
   const [importErro, setImportErro] = useState('')
 
+  const handleEliminarTodosConfirm = async () => {
+    setModalEliminarTodos(false)
+    showGlobalLoading()
+    try {
+      await clearAllClientesAndRelated()
+      showToast('Todos os clientes e dados relacionados foram eliminados.', 'success')
+    } catch (err) {
+      logger.error('Clientes', 'handleEliminarTodosConfirm', err?.message || 'Erro ao eliminar', { stack: err?.stack?.slice(0, 400) })
+      showToast('Erro ao eliminar. Verifique a ligação e tente novamente.', 'error', 4000)
+    } finally {
+      hideGlobalLoading()
+    }
+  }
+
   const handleImportFile = (e) => {
     setImportErro('')
     setImportPreview(null)
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.name.endsWith('.json')) {
-      setImportErro('Selecione um ficheiro .json exportado pelo script extract-clientes-saft-2026.js')
+      setImportErro('Selecione um ficheiro .json (clientes-filosoft.json ou clientes-fttercei.json)')
       return
     }
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const lista = JSON.parse(ev.target.result)
-        if (!Array.isArray(lista) || !lista[0]?.nif) {
-          setImportErro('Ficheiro inválido — deve ser um array de clientes com campo "nif".')
+        let raw = ev.target.result
+        if (typeof raw === 'string' && raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1)
+        const parsed = JSON.parse(raw)
+        const temNif = (c) => {
+          if (!c || typeof c !== 'object') return false
+          const v = c.nif ?? c.Nif ?? c.NIF ?? c.CustomerTaxID ?? c.TaxID
+          return v != null && String(v).trim() !== ''
+        }
+        const encontrarLista = (obj, profundidade = 0) => {
+          if (profundidade > 5) return null
+          if (Array.isArray(obj) && obj.length > 0 && obj.some(temNif)) return obj
+          if (obj && typeof obj === 'object') {
+            for (const k of ['clientes', 'data', 'dados', 'customers', 'lista', 'records', 'items']) {
+              const v = obj[k]
+              if (Array.isArray(v) && v.length > 0 && v.some(temNif)) return v
+            }
+            for (const v of Object.values(obj)) {
+              const r = encontrarLista(v, profundidade + 1)
+              if (r) return r
+            }
+          }
+          return null
+        }
+        const lista = Array.isArray(parsed) && parsed.some(temNif) ? parsed
+          : parsed?.clientes ?? parsed?.data ?? parsed?.dados ?? parsed?.customers ?? encontrarLista(parsed)
+        if (!Array.isArray(lista) || lista.length === 0) {
+          setImportErro('Ficheiro inválido — não foi encontrado um array de clientes. Verifique a estrutura do JSON.')
           return
         }
-        const nifSet = new Set(clientes.map(c => c.nif))
-        const novos     = lista.filter(c => !nifSet.has(String(c.nif)))
-        const existentes = lista.filter(c =>  nifSet.has(String(c.nif)))
-        setImportPreview({ lista, novos: novos.length, existentes: existentes.length })
-      } catch {
-        setImportErro('Erro ao ler o ficheiro JSON — verifique se está correctamente formatado.')
+        if (!lista.some(temNif)) {
+          setImportErro('Ficheiro inválido — nenhum registo tem NIF (nif, NIF ou CustomerTaxID).')
+          return
+        }
+        const get = (obj, ...keys) => {
+          const k = keys.find(key => obj[key] != null && String(obj[key]).trim() !== '')
+          return k != null ? String(obj[k]).trim() : ''
+        }
+        const nifSet = new Set(clientes.map(c => String(c.nif)))
+        const passam = lista.filter(c => {
+          const nif = get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID')
+          const nome = get(c, 'nome', 'Nome', 'CompanyName')
+          const morada = get(c, 'morada', 'Morada')
+          const telefone = get(c, 'telefone', 'telemovel', 'Telefone', 'Telemovel')
+          const email = get(c, 'email', 'Email')
+          return nif && nome && morada && telefone && email
+        })
+        const novos = passam.filter(c => !nifSet.has(String(get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID'))))
+        const existentes = passam.filter(c => nifSet.has(String(get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID'))))
+        setImportPreview({ lista, novos: novos.length, existentes: existentes.length, totalFicheiro: lista.length, ignorados: lista.length - passam.length })
+      } catch (err) {
+        setImportErro(err?.message || 'Erro ao ler o ficheiro JSON — verifique se está correctamente formatado.')
       }
     }
     reader.readAsText(file, 'utf-8')
@@ -94,16 +157,26 @@ export default function Clientes() {
     e.target.value = ''
   }
 
-  const handleImportConfirm = () => {
+  const handleImportConfirm = async () => {
     if (!importPreview) return
-    const resultado = importClientes(importPreview.lista, importModo)
+    const listaParaImportar = importPreview.lista
+    const modoImport = importModo
     setModalImport(false)
     setImportPreview(null)
-    const partes = []
-    if (resultado.adicionados)  partes.push(`${resultado.adicionados} novos`)
-    if (resultado.atualizados)  partes.push(`${resultado.atualizados} actualizados`)
-    if (resultado.ignorados)    partes.push(`${resultado.ignorados} ignorados`)
-    showToast(`Importação concluída: ${partes.join(', ')}.`, 'success', 5000)
+    showGlobalLoading()
+    try {
+      const resultado = await importClientes(listaParaImportar, modoImport)
+      const partes = []
+      if (resultado.adicionados)  partes.push(`${resultado.adicionados} novos`)
+      if (resultado.atualizados)  partes.push(`${resultado.atualizados} actualizados`)
+      if (resultado.ignorados)    partes.push(`${resultado.ignorados} ignorados`)
+      showToast(`Importação concluída: ${partes.join(', ')}.`, 'success', 5000)
+    } catch (err) {
+      logger.error('Clientes', 'handleImportConfirm', err?.message || 'Importação falhou', { stack: err?.stack?.slice(0, 400) })
+      showToast('Erro na importação. Tente novamente.', 'error')
+    } finally {
+      hideGlobalLoading()
+    }
   }
 
   const openAdd = () => {
@@ -229,6 +302,16 @@ export default function Clientes() {
     return [...lista].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'))
   }, [searchClienteDebounced, clientes])
 
+  // Ao apagar clientes, voltar à página 1 se a página actual ficar vazia
+  useEffect(() => {
+    const total = Math.max(1, Math.ceil(clientesFiltrados.length / PAGE_SIZE))
+    setPage(p => (p > total ? 1 : p))
+  }, [clientesFiltrados.length])
+
+  const totalPages = Math.max(1, Math.ceil(clientesFiltrados.length / PAGE_SIZE))
+  const startIdx = (page - 1) * PAGE_SIZE
+  const clientesPaginated = clientesFiltrados.slice(startIdx, startIdx + PAGE_SIZE)
+
   return (
     <div className="page">
       <div className="page-header">
@@ -242,9 +325,16 @@ export default function Clientes() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {isAdmin && (
-            <button type="button" className="secondary" onClick={() => { setModalImport(true); setImportPreview(null); setImportErro('') }}>
-              <Upload size={18} /> Importar SAF-T
-            </button>
+            <>
+              <button type="button" className="secondary" onClick={() => { setModalImport(true); setImportPreview(null); setImportErro('') }}>
+                <Upload size={18} /> Importar SAF-T
+              </button>
+              {clientes.length > 0 && (
+                <button type="button" className="danger" onClick={() => setModalEliminarTodos(true)} title="Eliminar todos os clientes e dados relacionados">
+                  <Trash2 size={18} /> Eliminar todos
+                </button>
+              )}
+            </>
           )}
           {canAddCliente && (
             <button type="button" onClick={openAdd}><Plus size={18} /> Novo cliente</button>
@@ -268,7 +358,7 @@ export default function Clientes() {
       </div>
       {/* Lista compacta — mobile */}
       <div className="clientes-mobile-lista">
-        {clientesFiltrados.map(c => {
+        {clientesPaginated.map(c => {
           const nMaq = getMaquinasCount(c.nif)
           return (
             <button
@@ -282,12 +372,12 @@ export default function Clientes() {
                 <div className="cliente-mobile-meta">
                   <code className="cliente-mobile-nif">{c.nif}</code>
                   {c.localidade && <span className="cliente-mobile-loc">{c.localidade}</span>}
-                  <span className="cliente-mobile-maq">{nMaq} máq.</span>
-                  {!c.email && (
-                    <span className="sem-email-aviso" title="Sem email registado">
-                      <AlertTriangle size={11} /> Sem email
-                    </span>
+                  {c.telefone && (
+                    <a href={`tel:${c.telefone.replace(/\s/g, '')}`} className="cliente-mobile-tel" onClick={e => e.stopPropagation()}>
+                      {c.telefone}
+                    </a>
                   )}
+                  <span className="cliente-mobile-maq">{nMaq} máq.</span>
                 </div>
               </div>
               <ChevronRight size={16} className="cliente-mobile-chevron" />
@@ -296,6 +386,22 @@ export default function Clientes() {
         })}
         {clientesFiltrados.length === 0 && (
           <p className="text-muted" style={{ padding: '1rem 0', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
+        )}
+        {clientesFiltrados.length > PAGE_SIZE && (
+          <div className="clientes-pagination clientes-pagination-mobile">
+            <span className="pagination-info">
+              {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, clientesFiltrados.length)} de {clientesFiltrados.length}
+            </span>
+            <div className="pagination-btns">
+              <button type="button" className="icon-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Página anterior">
+                <ChevronLeft size={18} />
+              </button>
+              <span className="pagination-page">{page} / {totalPages}</span>
+              <button type="button" className="icon-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} aria-label="Página seguinte">
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -306,16 +412,14 @@ export default function Clientes() {
             <tr>
               <th>NIF</th>
               <th>Nome do Cliente</th>
-              <th>Morada</th>
               <th>Localidade</th>
               <th>Telefone</th>
-              <th>Email</th>
-              <th>Máquinas</th>
+              <th>Máq.</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {clientesFiltrados.map(c => (
+            {clientesPaginated.map(c => (
               <tr key={c.nif}>
                 <td data-label="NIF"><code>{c.nif}</code></td>
                 <td data-label="Nome">
@@ -323,18 +427,9 @@ export default function Clientes() {
                     <strong>{c.nome}</strong>
                   </button>
                 </td>
-                <td data-label="Morada">{c.morada || '—'}</td>
                 <td data-label="Localidade">{c.localidade || '—'}</td>
                 <td data-label="Telefone">{c.telefone || '—'}</td>
-                <td data-label="Email">
-                  {c.email
-                    ? c.email
-                    : <span className="sem-email-aviso" title="Email em falta — edite o cliente para corrigir">
-                        <AlertTriangle size={13} /> Sem email
-                      </span>
-                  }
-                </td>
-                <td data-label="Máquinas">{getMaquinasCount(c.nif)}</td>
+                <td data-label="Máq.">{getMaquinasCount(c.nif)}</td>
                 <td className="actions" data-label="">
                   {getMaquinasCount(c.nif) > 0 && (
                     <button className="icon-btn secondary" onClick={() => handleRelatorioFrota(c)} title="Relatório executivo de frota (PDF)"><FileBarChart size={16} /></button>
@@ -350,6 +445,22 @@ export default function Clientes() {
             ))}
           </tbody>
         </table>
+        {clientesFiltrados.length > PAGE_SIZE && (
+          <div className="clientes-pagination">
+            <span className="pagination-info">
+              {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, clientesFiltrados.length)} de {clientesFiltrados.length}
+            </span>
+            <div className="pagination-btns">
+              <button type="button" className="icon-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Página anterior">
+                <ChevronLeft size={18} />
+              </button>
+              <span className="pagination-page">{page} / {totalPages}</span>
+              <button type="button" className="icon-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} aria-label="Página seguinte">
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {modal === 'ficha' && fichaCliente && (
@@ -627,14 +738,32 @@ export default function Clientes() {
         />
       )}
 
+      {/* ── Modal confirmar eliminar todos ───────────────────────────────────── */}
+      {modalEliminarTodos && (
+        <div className="modal-overlay" onClick={() => setModalEliminarTodos(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <h2><Trash2 size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Eliminar todos os clientes</h2>
+            <p style={{ margin: '1rem 0', lineHeight: 1.5 }}>
+              Esta acção elimina <strong>todos os clientes</strong>, máquinas, manutenções e relatórios. Não é possível desfazer.
+            </p>
+            <p className="text-muted" style={{ fontSize: '0.88rem' }}>
+              Use esta opção para limpar uma lista importada e importar uma nova.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+              <button type="button" className="secondary" onClick={() => setModalEliminarTodos(false)}>Cancelar</button>
+              <button type="button" className="danger" onClick={handleEliminarTodosConfirm}>Eliminar todos</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal de importação SAF-T ─────────────────────────────────── */}
       {modalImport && (
         <div className="modal-overlay" onClick={() => setModalImport(false)}>
           <div className="modal modal-import" onClick={e => e.stopPropagation()}>
             <h2><Upload size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Importar clientes — SAF-T</h2>
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Selecione o ficheiro <strong>clientes-navel-2026.json</strong> gerado pelo script de extracção SAF-T.
-              O ficheiro deve estar em <code>C:\Cursor_Dados_Gestor\dados-exportados\</code>.
+              Selecione o ficheiro <strong>clientes-filosoft.json</strong> ou <strong>clientes-fttercei.json</strong> gerado pelos scripts de extracção (<code>npm run extract-clientes-saft</code> ou <code>extract-clientes-fttercei</code>). Os ficheiros são criados na pasta do projecto.
             </p>
 
             <label className="import-file-label">
@@ -657,12 +786,18 @@ export default function Clientes() {
                 <div className="import-preview-stats">
                   <div className="import-stat import-stat-new">
                     <span className="import-stat-num">{importPreview.novos}</span>
-                    <span className="import-stat-label">novos clientes</span>
+                    <span className="import-stat-label">novos a importar</span>
                   </div>
                   <div className="import-stat import-stat-exist">
                     <span className="import-stat-num">{importPreview.existentes}</span>
                     <span className="import-stat-label">já existem</span>
                   </div>
+                  {importPreview.ignorados > 0 && (
+                    <div className="import-stat">
+                      <span className="import-stat-num">{importPreview.ignorados}</span>
+                      <span className="import-stat-label">sem critérios</span>
+                    </div>
+                  )}
                   <div className="import-stat">
                     <span className="import-stat-num">{importPreview.lista.length}</span>
                     <span className="import-stat-label">total no ficheiro</span>

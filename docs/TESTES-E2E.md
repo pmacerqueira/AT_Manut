@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 441 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
-> Última revisão: 2026-02-26 — v1.9.3
+> 447 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
+> Última revisão: 2026-02-26 — v1.9.7
 
 ---
 
@@ -26,7 +26,8 @@
 | `15-kaeser-pdf-import.spec.js` | 18 | Importação de PDF Kaeser — extracção e validação de dados |
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
-| **Total** | **441** | **100% dos fluxos da aplicação + escalabilidade** |
+| `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T: modal, validação ficheiro, preview, importação completa, 2ª importação (ignorar) |
+| **Total** | **447** | **100% dos fluxos da aplicação + escalabilidade** |
 
 > **Specs 01–09** (127 testes): cobertura base do núcleo da aplicação.
 > **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
@@ -34,6 +35,7 @@
 > **Spec 13** (14 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
 > **Specs 14–15** (49 testes): importação e funcionalidades Kaeser.
 > **Specs 16–17** (111 testes): módulo Reparações — base + avançado (permissões, responsividade, offline).
+> **Spec 18** (6 testes): importação SAF-T de clientes — modal, validação, preview, importação completa, modo ignorar.
 
 ---
 
@@ -297,6 +299,22 @@ MC = {
 
 ---
 
+### Spec 18 — Importação SAF-T de clientes (6 testes)
+
+**Cobertura:**
+- Admin vê botão "Importar SAF-T"
+- Abrir modal de importação e ver instruções (ficheiro JSON, input file)
+- Ficheiro com estrutura inválida (object em vez de array) exibe erro `.form-erro`
+- Ficheiro JSON válido mostra pré-visualização (novos, existentes, total)
+- Importação completa: clientes aparecem na lista + toast de sucesso
+- 2ª importação do mesmo ficheiro (modo Ignorar): toast "ignorados"
+
+**Fixtures:** `tests/fixtures/clientes-import-test.json` (2 clientes), `invalid-import.json` (object inválido).
+
+**Mock:** `setupApiMock` acumula clientes criados em `clientesMutable` para `list` retornar dados actualizados.
+
+---
+
 ## Problemas técnicos documentados e resoluções
 
 ### `route.continue()` vs `route.fallback()` em testes offline (Playwright 1.58)
@@ -385,4 +403,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-02-26 — v1.9.3*
+*Última actualização: 2026-02-26 — v1.9.7*
