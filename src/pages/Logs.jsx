@@ -352,6 +352,11 @@ export default function Logs() {
 
                 {/* Mensagem */}
                 <span className="log-message">{e.message}</span>
+                {e.details?.failureMode && (
+                  <span className="log-version" title="Modo de falha identificado automaticamente">
+                    {e.details.failureMode}
+                  </span>
+                )}
 
                 {/* Versão (pequena, à direita) */}
                 {e.version && e.version !== '?' && (

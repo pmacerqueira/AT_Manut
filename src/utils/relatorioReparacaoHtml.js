@@ -16,18 +16,50 @@ const EMPRESA = {
   web:              'www.navel.pt',
 }
 
+function normalizeHexColor(value, fallback) {
+  const raw = String(value ?? '').trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase()
+  if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase()
+  }
+  return fallback
+}
+
+function hexToRgba(hex, alpha) {
+  const h = normalizeHexColor(hex, '#000000')
+  const r = Number.parseInt(h.slice(1, 3), 16)
+  const g = Number.parseInt(h.slice(3, 5), 16)
+  const b = Number.parseInt(h.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
-  const { subcategoriaNome, logoUrl } = options
-  const logoSrc = logoUrl ?? '/manut/logo.png'
+  const { subcategoriaNome, logoUrl, istobalLogoUrl } = options
+  const logoSrc = logoUrl ?? '/manut/logo-navel.png'
+  const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
+  const isIstobalReport = (
+    reparacao?.origem === 'istobal_email' ||
+    /istobal/i.test(String(maquina?.marca ?? '')) ||
+    /istobal/i.test(String(subcategoriaNome ?? ''))
+  )
+  const logoMarcaSrc = maquina?.marcaLogoUrl || (isIstobalReport ? logoIstobalSrc : '')
+  const logoMarcaAlt = maquina?.marca ? `Logotipo ${maquina.marca}` : 'Logotipo da marca'
+  const brandPrimary = normalizeHexColor(maquina?.marcaCorHex, isIstobalReport ? '#c8102e' : '#b45309')
+  const brandSoft = hexToRgba(brandPrimary, 0.09)
+  const brandBorder = hexToRgba(brandPrimary, 0.28)
 
   // ── Datas ──
+  const dataEmissao = relatorio.dataCriacao
+    ? formatDataAzores(relatorio.dataCriacao, true) : '—'
   const dataAssinatura = relatorio.dataAssinatura
-    ? formatDataHoraAzores(relatorio.dataAssinatura) : '—'
-  const dataRealizacao = relatorio.dataAssinatura
-    ? formatDataAzores(relatorio.dataAssinatura, true)
-    : (relatorio.dataCriacao ? formatDataAzores(relatorio.dataCriacao, true) : '—')
+    ? formatDataHoraAzores(relatorio.dataAssinatura)
+    : 'Pendente de assinatura'
+  const dataRealizacaoBruta = relatorio.dataRealizacao || reparacao?.data || relatorio.dataAssinatura || relatorio.dataCriacao
+  const dataRealizacao = dataRealizacaoBruta
+    ? formatDataAzores(dataRealizacaoBruta, true)
+    : 'Pendente de preenchimento'
 
   // ── Equipamento ──
   const equipCompleto = maquina && subcategoriaNome
@@ -91,7 +123,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:10.5px;line-height:1.42;c
   --azul:#1a4880;--azul-med:#2d6eb5;--azul-claro:#e8f2fa;
   --cinza:#f4f6f8;--borda:#c6d8ec;--texto:#1a1a2e;--muted:#5a6a7e;
   --verde:#16a34a;--vermelho:#dc2626;--acento:#f0a500;
-  --rep:#b45309;--rep-bg:#fff7ed;--rep-borda:#fed7aa;
+  --rep:${brandPrimary};--rep-bg:${brandSoft};--rep-borda:${brandBorder};--acento:${brandPrimary};
 }
 
 section{margin-bottom:10px;page-break-inside:avoid}
@@ -101,7 +133,9 @@ section{margin-bottom:10px;page-break-inside:avoid}
 
 /* Cabeçalho */
 .rpt-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:2.5px solid var(--azul)}
-.rpt-logo img{max-height:42px;max-width:150px;object-fit:contain;display:block}
+.rpt-logos{display:flex;align-items:center;gap:10px}
+.rpt-logo img{max-height:42px;max-width:170px;object-fit:contain;display:block}
+.rpt-logo-istobal img{max-height:42px;max-width:170px;object-fit:contain;display:block}
 .rpt-logo-fallback{font-size:1.2em;font-weight:700;color:var(--azul)}
 .rpt-empresa{text-align:right;font-size:9px;line-height:1.5;color:var(--muted)}
 .rpt-empresa strong{display:block;font-size:10px;color:var(--azul);margin-bottom:1px}
@@ -158,6 +192,7 @@ section{margin-bottom:10px;page-break-inside:avoid}
 .rpt-assinatura-canvas{display:block;max-width:200px;max-height:70px;object-fit:contain;margin:0 auto 2px}
 .rpt-assinatura-label{font-size:7.5px;color:var(--muted);text-align:center;margin-top:2px;padding-top:3px;border-top:1px solid var(--borda)}
 .rpt-assinatura-nome{font-size:9px;font-weight:700;color:var(--texto);text-align:center;margin-bottom:1px}
+.rpt-assinatura-legenda{margin-top:4px;font-size:8px;color:var(--muted);text-align:center;line-height:1.35}
 
 /* Aviso ISTOBAL */
 .rpt-istobal-badge{display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:var(--rep);border:1px solid var(--rep-borda);border-radius:3px;padding:1px 6px;font-size:8px;font-weight:700;margin-left:6px}
@@ -171,8 +206,14 @@ section{margin-bottom:10px;page-break-inside:avoid}
 <!-- Cabeçalho -->
 <section>
   <div class="rpt-header">
-    <div class="rpt-logo">
-      <img src="${logoSrc}" alt="Navel" onerror="this.parentNode.innerHTML='<span class=\\'rpt-logo-fallback\\'>NAVEL</span>'" />
+    <div class="rpt-logos">
+      <div class="rpt-logo">
+        <img src="${logoSrc}" alt="Navel" onerror="this.parentNode.innerHTML='<span class=\\'rpt-logo-fallback\\'>NAVEL</span>'" />
+      </div>
+      ${logoMarcaSrc ? `
+      <div class="rpt-logo-istobal">
+        <img src="${logoMarcaSrc}" alt="${esc(logoMarcaAlt)}" onerror="this.parentNode.style.display='none'" />
+      </div>` : ''}
     </div>
     <div class="rpt-empresa">
       <strong>${esc(EMPRESA.nome)}</strong>
@@ -196,6 +237,7 @@ section{margin-bottom:10px;page-break-inside:avoid}
   <div class="rpt-section-title">Dados da Intervenção</div>
   <div class="rpt-grid">
     <div class="rpt-field"><span class="rpt-label">Data de realização</span><span class="rpt-value">${esc(dataRealizacao)}</span></div>
+    <div class="rpt-field"><span class="rpt-label">Data de emissão do relatório</span><span class="rpt-value">${esc(dataEmissao)}</span></div>
     <div class="rpt-field"><span class="rpt-label">Técnico</span><span class="rpt-value">${esc(relatorio.tecnico ?? '—')}</span></div>
     <div class="rpt-field"><span class="rpt-label">Equipamento</span><span class="rpt-value">${equipCompleto}</span></div>
     <div class="rpt-field"><span class="rpt-label">Cliente</span><span class="rpt-value">${esc(cliente?.nome ?? '—')}</span></div>
@@ -288,6 +330,7 @@ ${fotosSafe.length > 0 ? `
       }
       <div class="rpt-assinatura-nome">${esc(relatorio.nomeAssinante ?? '—')}</div>
       <div class="rpt-assinatura-label">Assinatura do Cliente</div>
+      <div class="rpt-assinatura-legenda">Relatório assinado pelo cliente / responsável no local: <strong>${esc(relatorio.nomeAssinante ?? '—')}</strong></div>
     </div>
   </div>
 </section>

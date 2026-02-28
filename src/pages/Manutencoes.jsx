@@ -285,7 +285,7 @@ export default function Manutencoes() {
         cliente,
         checklistItems,
         subcategoriaNome: sub?.nome || '',
-        logoUrl: `${import.meta.env.BASE_URL}logo.png`,
+        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
       })
       if (resultado?.ok) {
         showToast(`Email enviado para ${emailDestino}.`, 'success')
@@ -309,7 +309,7 @@ export default function Manutencoes() {
       const html = relatorioParaHtml(rel, m, maq, cliente, checklistItems, {
         subcategoriaNome: sub?.nome,
         ultimoEnvio: rel.ultimoEnvio,
-        logoUrl: `${import.meta.env.BASE_URL}logo.png`,
+        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
       })
       await abrirPdfRelatorio({
         relatorio: rel,

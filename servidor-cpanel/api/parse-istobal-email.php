@@ -32,12 +32,35 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
 $LOG_FILE = __DIR__ . '/logs/istobal-email.log';
+$ALERT_EMAIL = 'pmcerqueira@navel.pt';
 
 function ilog($msg) {
     global $LOG_FILE;
     $dir = dirname($LOG_FILE);
     if (!is_dir($dir)) @mkdir($dir, 0755, true);
     @file_put_contents($LOG_FILE, '[' . date('Y-m-d H:i:s T') . '] ' . $msg . PHP_EOL, FILE_APPEND);
+}
+
+function norm_text($s) {
+    $s = strtoupper(trim((string)$s));
+    return preg_replace('/\s+/', ' ', $s);
+}
+
+function norm_alnum($s) {
+    $s = strtoupper(trim((string)$s));
+    return preg_replace('/[^A-Z0-9]/', '', $s);
+}
+
+function notify_ops($subject, $body) {
+    global $ALERT_EMAIL;
+    if (!$ALERT_EMAIL || !filter_var($ALERT_EMAIL, FILTER_VALIDATE_EMAIL)) return;
+    $headers = [
+        'MIME-Version: 1.0',
+        'Content-type: text/plain; charset=UTF-8',
+        'From: AT_Manut Bot <noreply@navel.pt>',
+        'Reply-To: comercial@navel.pt',
+    ];
+    @mail($ALERT_EMAIL, $subject, $body, implode("\r\n", $headers));
 }
 
 function gen_id() {
@@ -54,6 +77,10 @@ fclose($stdin);
 
 if (empty(trim($rawEmail))) {
     ilog('ERROR: Email vazio ou STDIN vazio.');
+    notify_ops(
+        'AT_Manut: Falha ao abrir reparação ISTOBAL',
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: email vazio no piping.\nData: " . date('Y-m-d H:i:s')
+    );
     exit(1);
 }
 
@@ -147,6 +174,10 @@ ilog('HTML body extraído: ' . strlen($htmlBody) . ' bytes');
 
 if (empty(trim($htmlBody))) {
     ilog('ERROR: Não foi possível extrair corpo HTML.');
+    notify_ops(
+        'AT_Manut: Falha ao abrir reparação ISTOBAL',
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: corpo HTML inválido/indisponível.\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+    );
     exit(1);
 }
 
@@ -216,7 +247,18 @@ function findField(array $data, array $keywords) {
     return '';
 }
 
-$numeroAviso     = findField($parsed, ['aviso', 'número', 'numero', 'n.º', 'nº']);
+function findAvisoField(array $data) {
+    foreach ($data as $key => $value) {
+        $keyLower = mb_strtolower((string)$key);
+        // Evitar confundir "Número de Serie" com nº de aviso.
+        if (mb_strpos($keyLower, 'serie') !== false || mb_strpos($keyLower, 'serial') !== false) continue;
+        if (mb_strpos($keyLower, 'aviso') !== false) return trim((string)$value);
+        if (preg_match('/\bes\d{4,}\b/i', (string)$value)) return trim((string)$value);
+    }
+    return '';
+}
+
+$numeroAviso     = findAvisoField($parsed);
 $descricaoAvaria = findField($parsed, ['descripción', 'descripcion', 'avería', 'averia', 'fallo', 'problema']);
 $numeroSerie     = findField($parsed, ['serie', 'serial', 'n.s.', 's/n', 's / n']);
 $modeloMaquina   = findField($parsed, ['modelo', 'model']);
@@ -262,33 +304,45 @@ try {
     $pdo = get_pdo();
 } catch (PDOException $e) {
     ilog('ERROR DB: ' . $e->getMessage());
+    notify_ops(
+        'AT_Manut: Falha ao abrir reparação ISTOBAL',
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo DB: {$e->getMessage()}\nAssunto: $subjectLine\nAviso: $numeroAviso\nData: " . date('Y-m-d H:i:s')
+    );
     exit(1);
 }
 
 $maquinaId = null;
-if ($numeroSerie) {
-    $stmt = $pdo->prepare('SELECT id FROM maquinas WHERE numero_serie = ? LIMIT 1');
-    $stmt->execute([$numeroSerie]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) {
-        $maquinaId = $row['id'];
-        ilog("Máquina encontrada: id=$maquinaId (serie=$numeroSerie)");
-    } else {
-        ilog("AVISO: Máquina com serie=$numeroSerie não encontrada na BD.");
+$modeloBd = '';
+$serieBd = '';
+$normSerieEmail = norm_alnum($numeroSerie);
+$normModeloEmail = norm_text($modeloMaquina);
+if ($normSerieEmail !== '') {
+    $stmt = $pdo->query('SELECT id, modelo, numero_serie FROM maquinas WHERE numero_serie IS NOT NULL');
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+        if (norm_alnum($m['numero_serie'] ?? '') === $normSerieEmail) {
+            $maquinaId = $m['id'];
+            $modeloBd = (string)($m['modelo'] ?? '');
+            $serieBd = (string)($m['numero_serie'] ?? '');
+            break;
+        }
     }
 }
 
-// ── 8. Verificar duplicado (mesmo aviso já registado) ─────────────────────────
-if ($numeroAviso) {
-    $dup = $pdo->prepare('SELECT id FROM reparacoes WHERE numero_aviso = ? LIMIT 1');
-    $dup->execute([$numeroAviso]);
-    if ($dup->fetch()) {
-        ilog("IGNORADO: Reparação com aviso=$numeroAviso já existe.");
-        exit(0);
-    }
+if (!$maquinaId) {
+    ilog("ERROR: Máquina não encontrada (serie='$numeroSerie', modelo='$modeloMaquina').");
+    notify_ops(
+        "AT_Manut: Não foi possível abrir reparação ISTOBAL ($numeroAviso)",
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: máquina não encontrada por Nº de série/modelo.\nAviso: $numeroAviso\nSérie no email: $numeroSerie\nModelo no email: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+    );
+    exit(1);
 }
 
-// ── 9. Construir descrição completa da avaria ─────────────────────────────────
+if ($normModeloEmail !== '' && norm_text($modeloBd) !== $normModeloEmail) {
+    ilog("AVISO: divergência de modelo para maquinaId=$maquinaId (email='$modeloMaquina' vs BD='$modeloBd').");
+}
+ilog("Máquina encontrada: id=$maquinaId (serieEmail='$numeroSerie' | serieBD='$serieBd')");
+
+// ── 8. Construir descrição completa da avaria ──────────────────────────────────
 $descFull = $descricaoAvaria;
 if ($tipoAvaria && stripos($descFull, $tipoAvaria) === false) {
     $descFull = "[{$tipoAvaria}] " . $descFull;
@@ -296,10 +350,42 @@ if ($tipoAvaria && stripos($descFull, $tipoAvaria) === false) {
 if ($instalacao) {
     $descFull .= "\n\nInstalação: $instalacao";
 }
-// Incluir todos os campos do email para referência
 $descFull .= "\n\n--- Dados originais do email ISTOBAL ---\n";
 foreach ($parsed as $k => $v) {
     $descFull .= "$k: $v\n";
+}
+
+// ── 9. Verificar duplicado (mesmo aviso já registado) ─────────────────────────
+if ($numeroAviso) {
+    $dup = $pdo->prepare('SELECT id, status FROM reparacoes WHERE numero_aviso = ? ORDER BY criado_em DESC LIMIT 1');
+    $dup->execute([$numeroAviso]);
+    $exist = $dup->fetch(PDO::FETCH_ASSOC);
+    if ($exist) {
+        if (($exist['status'] ?? '') === 'concluida') {
+            ilog("IGNORADO: aviso=$numeroAviso já concluído (id={$exist['id']}).");
+            notify_ops(
+                "AT_Manut: Aviso ISTOBAL repetido após fecho ($numeroAviso)",
+                "Recebido novo email para aviso já concluído.\nNenhuma alteração aplicada.\n\nAviso: $numeroAviso\nReparação: {$exist['id']}\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+            );
+            exit(0);
+        }
+
+        // Último email vence para avisos ainda em aberto (pendente/em_progresso).
+        $upd = $pdo->prepare('UPDATE reparacoes
+            SET maquina_id = ?, data = ?, numero_aviso = ?, descricao_avaria = ?, observacoes = ?, origem = ?
+            WHERE id = ?');
+        $upd->execute([
+            $maquinaId,
+            $dataFormatada,
+            $numeroAviso ?: null,
+            $descFull,
+            "Atualizado pelo último email ISTOBAL. Assunto: $subjectLine",
+            'istobal_email',
+            $exist['id'],
+        ]);
+        ilog("ATUALIZADO: aviso=$numeroAviso (id={$exist['id']}) com dados mais recentes.");
+        exit(0);
+    }
 }
 
 // ── 10. Inserir reparação ─────────────────────────────────────────────────────
@@ -313,7 +399,7 @@ try {
     );
     $ins->execute([
         $id,
-        $maquinaId,           // pode ser NULL se máquina não encontrada
+        $maquinaId,
         $dataFormatada,
         '',                   // técnico a designar
         'pendente',
@@ -325,6 +411,10 @@ try {
     ilog("Reparação criada com sucesso: id=$id (maquinaId=" . ($maquinaId ?? 'NULL') . ")");
 } catch (PDOException $e) {
     ilog('ERROR INSERT: ' . $e->getMessage());
+    notify_ops(
+        "AT_Manut: Falha ao abrir reparação ISTOBAL ($numeroAviso)",
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo INSERT: {$e->getMessage()}\nAviso: $numeroAviso\nSérie: $numeroSerie\nModelo: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+    );
     exit(1);
 }
 

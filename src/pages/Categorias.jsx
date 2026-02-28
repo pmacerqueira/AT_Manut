@@ -220,15 +220,54 @@ export default function Categorias() {
                   {subs.map(sub => {
                     const items = getChecklistBySubcategoria(sub.id)
                     const subExpanded = expandedSub.has(sub.id)
+                    const isEditingSub = editingSubcategoria === sub.id
                     return (
                       <div key={sub.id} className="subcategoria-block">
-                        <div className="subcategoria-row">
-                          <button type="button" className="expand-btn sub" onClick={() => toggleSub(sub.id)}>
-                            {subExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          </button>
-                          <span className="subcategoria-nome">{sub.nome}</span>
-                          <span className="badge badge-count"><ListChecks size={12} /> {items.length} itens</span>
-                        </div>
+                        {isEditingSub ? (
+                          <div className="edit-form-inline card">
+                            <form onSubmit={handleEditSubcategoria}>
+                              <div className="form-field">
+                                <label>Nome da subcategoria</label>
+                                <input
+                                  required
+                                  value={formSub.nome}
+                                  onChange={e => setFormSub({ nome: e.target.value })}
+                                  placeholder="Ex: Gerador diesel"
+                                />
+                              </div>
+                              <div className="form-actions">
+                                <button type="submit">Guardar</button>
+                                <button type="button" className="secondary" onClick={() => setEditingSubcategoria(null)}>Cancelar</button>
+                              </div>
+                            </form>
+                          </div>
+                        ) : (
+                          <div className="subcategoria-row">
+                            <button type="button" className="expand-btn sub" onClick={() => toggleSub(sub.id)}>
+                              {subExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            <span className="subcategoria-nome">{sub.nome}</span>
+                            <span className="badge badge-count"><ListChecks size={12} /> {items.length} itens</span>
+                            <div className="subcategoria-actions">
+                              <button
+                                type="button"
+                                className="icon-btn secondary"
+                                onClick={() => openEditSubcategoria(sub)}
+                                title="Editar subcategoria"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn danger"
+                                onClick={() => handleRemoveSubcategoria(sub)}
+                                title={canRemoveSubcategoria(sub.id) ? 'Eliminar subcategoria' : 'Existem equipamentos associados'}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         {subExpanded && (
                           <div className="checklist-list">
                             <strong>Checklist</strong>

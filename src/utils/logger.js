@@ -41,7 +41,7 @@ const MAX_DAYS          = 60
 const MAX_BYTES         = 2_000_000   // 2 MB — localStorage tem ~5-10 MB por origem
 const DEDUP_MS          = 5_000       // não repete a mesma mensagem em 5 segundos
 const FLUSH_BATCH_SIZE  = 20          // envia para o servidor após N entradas acumuladas
-const LOG_ENDPOINT      = 'https://www.navel.pt/api/log-receiver.php'
+const LOG_ENDPOINT      = '/api/log-receiver.php'
 const LOG_AUTH_TOKEN    = 'Navel2026$Api!Key#xZ99'  // mesmo token da API de email
 const FLUSH_PENDING_KEY = 'atm_log_pending_flush'   // entradas ainda não enviadas ao servidor
 const APP_VERSION  = (() => {
@@ -125,6 +125,69 @@ function isDuplicate(level, component, action, message) {
   return false
 }
 
+function hashString(input = '') {
+  let h = 0
+  for (let i = 0; i < input.length; i++) {
+    h = ((h << 5) - h) + input.charCodeAt(i)
+    h |= 0
+  }
+  return Math.abs(h).toString(36)
+}
+
+function pickStack(details) {
+  if (!details || typeof details !== 'object') return ''
+  const stack = details.stack || details.errorStack || details.errStack
+  return typeof stack === 'string' ? stack : ''
+}
+
+function parseFailureLocation(stackText) {
+  if (!stackText) return ''
+  const lines = stackText.split('\n').map(s => s.trim()).filter(Boolean)
+  const candidate = lines.find(line => line.includes('http') || line.includes('.js:') || line.includes('.jsx:') || line.includes('.ts:'))
+  if (!candidate) return ''
+  const cleaned = candidate.replace(/^at\s+/, '')
+  return cleaned.slice(0, 220)
+}
+
+function inferFailureMode(level, action, message, details) {
+  const msg = String(message || '').toLowerCase()
+  const status = Number(details?.status || 0)
+  if (status === 0) return 'network'
+  if (status === 401) return 'auth_expired'
+  if (status === 403) return 'forbidden'
+  if (status === 404) return msg.includes('recurso desconhecido') ? 'api_unknown_resource' : 'not_found'
+  if (status === 408) return 'timeout'
+  if (status === 409) return 'conflict'
+  if (status === 422) return 'validation'
+  if (status >= 500) return 'server_error'
+  if (msg.includes('failed to fetch') || msg.includes('falha de rede') || msg.includes('networkerror')) return 'network'
+  if (msg.includes('recurso desconhecido')) return 'api_unknown_resource'
+  if (String(action || '').toLowerCase().includes('login')) return 'auth'
+  return level === 'warn' ? 'warning' : 'unknown'
+}
+
+function enrichDetails(level, component, action, message, details) {
+  if (!details || typeof details !== 'object') return details
+  const stackText = pickStack(details)
+  const failureLocation = parseFailureLocation(stackText)
+  const failureMode = inferFailureMode(level, action, message, details)
+  const fingerprintBase = [
+    level,
+    component,
+    action,
+    failureMode,
+    details?.resource || '',
+    details?.status || '',
+    String(message || '').slice(0, 120),
+  ].join('|')
+  return {
+    ...details,
+    failureMode,
+    ...(failureLocation ? { failureLocation } : {}),
+    failureFingerprint: hashString(fingerprintBase),
+  }
+}
+
 // ── API pública ───────────────────────────────────────────────────────────────
 
 /**
@@ -154,6 +217,8 @@ export function logEntry(level, component, action, message, details = null) {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
   const isMobile = /mobile|android|iphone|ipad|webos|blackberry|iemobile/i.test(ua)
 
+  const enriched = enrichDetails(level, component, action, message, details)
+
   const entry = {
     ts:        Date.now(),
     sessionId: getSessionId(),
@@ -165,7 +230,7 @@ export function logEntry(level, component, action, message, details = null) {
     component,
     action,
     message,
-    ...(details ? { details } : {}),
+    ...(enriched ? { details: enriched } : {}),
   }
 
   const current = prune(readLog())

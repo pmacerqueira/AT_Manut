@@ -56,6 +56,7 @@ const Logs         = lazy(() => import('./pages/Logs'))
 const Definicoes   = lazy(() => import('./pages/Definicoes'))
 const Metricas     = lazy(() => import('./pages/Metricas'))
 const Reparacoes   = lazy(() => import('./pages/Reparacoes'))
+const Marcas       = lazy(() => import('./pages/Marcas'))
 
 function PageLoader() {
   return (
@@ -101,6 +102,7 @@ function App() {
                       <Route path="/agendamento" element={<Agendamento />} />
                       <Route path="/logs" element={<Logs />} />
                       <Route path="/definicoes" element={<Definicoes />} />
+                      <Route path="/marcas" element={<Marcas />} />
                       <Route path="/metricas" element={<Metricas />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

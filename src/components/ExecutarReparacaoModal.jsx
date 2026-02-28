@@ -91,7 +91,8 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const [form, setForm] = useState({
     tecnico:           reparacao.tecnico ?? '',
     nomeAssinante:     '',
-    dataRealizacao:    '',            // Admin: data histórica
+    dataRealizacao:    reparacao.data ?? '', // Admin: data histórica (execução real)
+    dataEmissao:       '',            // Admin: data de emissão do relatório
     numeroAviso:       reparacao.numeroAviso ?? '',
     descricaoAvaria:   reparacao.descricaoAvaria ?? '',
     trabalhoRealizado: '',
@@ -126,6 +127,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       ...p,
       tecnico:           existente.tecnico           ?? p.tecnico,
       nomeAssinante:     existente.nomeAssinante      ?? '',
+      dataEmissao:       existente.dataCriacao        ? String(existente.dataCriacao).slice(0, 10) : p.dataEmissao,
       numeroAviso:       existente.numeroAviso        ?? p.numeroAviso,
       descricaoAvaria:   existente.descricaoAvaria    ?? p.descricaoAvaria,
       trabalhoRealizado: existente.trabalhoRealizado  ?? '',
@@ -351,8 +353,14 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
     showGlobalLoading()
     try {
-      const hoje = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : getHojeAzores()
-      const now  = (isAdmin && form.dataRealizacao) ? `${form.dataRealizacao}T12:00:00.000Z` : nowISO()
+      // Separação explícita de datas:
+      // - dataRealizacao: quando o trabalho foi efetivamente executado
+      // - dataEmissao: data do relatório (manual ou sistema)
+      // - dataAssinatura: sempre relógio atual do sistema/dispositivo
+      const dataRealizacao = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : getHojeAzores()
+      const dataEmissao = (isAdmin && form.dataEmissao) ? form.dataEmissao : getHojeAzores()
+      const dataAssinaturaSistema = nowISO()
+      const dataEmissaoIso = `${dataEmissao}T12:00:00.000Z`
 
       const pecasFiltradas = pecas.filter(p => p.descricao?.trim() || p.codigo?.trim())
 
@@ -360,9 +368,10 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         reparacaoId:         reparacao.id,
         tecnico:             form.tecnico.trim(),
         nomeAssinante:       form.nomeAssinante.trim(),
-        dataAssinatura:      now,
+        dataAssinatura:      dataAssinaturaSistema,
         assinadoPeloCliente: true,
         assinaturaDigital:   canvasRef.current?.toDataURL('image/png') ?? null,
+        dataRealizacao,
         numeroAviso:         form.numeroAviso.trim(),
         descricaoAvaria:     form.descricaoAvaria.trim(),
         trabalhoRealizado:   form.trabalhoRealizado.trim(),
@@ -371,7 +380,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         pecasUsadas:         JSON.stringify(pecasFiltradas),
         fotos:               JSON.stringify(fotos),
         notas:               form.notas.trim(),
-        dataCriacao:         now,
+        dataCriacao:         dataEmissaoIso,
       }
 
       // Se já existe rascunho em progresso, actualiza; caso contrário cria
@@ -390,6 +399,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
       updateReparacao(reparacao.id, {
         status:          'concluida',
+        data:            dataRealizacao,
         tecnico:         form.tecnico.trim(),
         numeroAviso:     form.numeroAviso.trim(),
         descricaoAvaria: form.descricaoAvaria.trim(),
@@ -422,8 +432,13 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
   const handlePrevisualizar = useCallback(async () => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
+    const dataRealizacao = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : (reparacao?.data ?? getHojeAzores())
+    const dataEmissao = (isAdmin && form.dataEmissao) ? form.dataEmissao : getHojeAzores()
     const tempRel = {
       tecnico:            form.tecnico,
+      dataRealizacao,
+      dataCriacao:        `${dataEmissao}T12:00:00.000Z`,
+      dataAssinatura:     assinaturaFeita ? nowISO() : null,
       numeroAviso:        form.numeroAviso,
       descricaoAvaria:    form.descricaoAvaria,
       trabalhoRealizado:  form.trabalhoRealizado,
@@ -438,7 +453,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     }
     const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems)
     if (html) imprimirOuGuardarPdf(html)
-  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems])
+  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin])
 
   const handleVerPdf = useCallback(async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
@@ -580,18 +595,29 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 </div>
 
                 {isAdmin && (
-                  <div className="form-group admin-date-field">
-                    <label><AlertTriangle size={14} className="text-warning" /> Data de realização (Admin — data histórica)</label>
-                    <input
-                      type="date"
-                      value={form.dataRealizacao}
-                      max={getHojeAzores()}
-                      onChange={e => setForm(p => ({ ...p, dataRealizacao: e.target.value }))}
-                    />
-                    {form.dataRealizacao && (
-                      <span className="admin-date-aviso">⚠ Relatório datado de {formatDataAzores(form.dataRealizacao)}</span>
-                    )}
-                  </div>
+                  <>
+                    <div className="form-group admin-date-field">
+                      <label><AlertTriangle size={14} className="text-warning" /> Data de realização (Admin — data histórica)</label>
+                      <input
+                        type="date"
+                        value={form.dataRealizacao}
+                        max={getHojeAzores()}
+                        onChange={e => setForm(p => ({ ...p, dataRealizacao: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group admin-date-field">
+                      <label><FileText size={14} className="text-warning" /> Data de emissão do relatório (Admin)</label>
+                      <input
+                        type="date"
+                        value={form.dataEmissao}
+                        max={getHojeAzores()}
+                        onChange={e => setForm(p => ({ ...p, dataEmissao: e.target.value }))}
+                      />
+                      <span className="admin-date-aviso">
+                        ⚠ Emissão do relatório: {formatDataAzores(form.dataEmissao || getHojeAzores())} · Assinatura digital: data/hora do sistema
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
 

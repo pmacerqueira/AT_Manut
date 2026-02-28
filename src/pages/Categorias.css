@@ -52,6 +52,13 @@
   margin-left: 0.5rem;
 }
 
+.subcategoria-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.5rem;
+}
+
 .edit-form-inline {
   margin: 0.5rem 0;
   padding: 1rem;

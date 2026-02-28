@@ -19,6 +19,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
 $LOG_FILE = __DIR__ . '/logs/istobal-email.log';
+$ALERT_EMAIL = 'pmcerqueira@navel.pt';
 
 function ilog($msg) {
     global $LOG_FILE;
@@ -41,6 +42,28 @@ function wh_err($code, $msg) {
 
 function gen_id() {
     return bin2hex(random_bytes(16));
+}
+
+function norm_text($s) {
+    $s = strtoupper(trim((string)$s));
+    return preg_replace('/\s+/', ' ', $s);
+}
+
+function norm_alnum($s) {
+    $s = strtoupper(trim((string)$s));
+    return preg_replace('/[^A-Z0-9]/', '', $s);
+}
+
+function notify_ops($subject, $body) {
+    global $ALERT_EMAIL;
+    if (!$ALERT_EMAIL || !filter_var($ALERT_EMAIL, FILTER_VALIDATE_EMAIL)) return;
+    $headers = [
+        'MIME-Version: 1.0',
+        'Content-type: text/plain; charset=UTF-8',
+        'From: AT_Manut Bot <noreply@navel.pt>',
+        'Reply-To: comercial@navel.pt',
+    ];
+    @mail($ALERT_EMAIL, $subject, $body, implode("\r\n", $headers));
 }
 
 // ── 1. Apenas POST ────────────────────────────────────────────────────────────
@@ -76,6 +99,16 @@ ilog("Webhook recebido — from=$fromField | assunto=$subjectLine");
 if (stripos($fromField, 'isat@istobal.com') === false) {
     ilog('IGNORADO: Remetente não é isat@istobal.com: ' . $fromField);
     wh_ok('Ignorado: remetente não autorizado');
+}
+
+// ── 4b. Ignorar emails de fecho técnico/serviço ───────────────────────────────
+$subjectNorm = mb_strtolower((string)$subjectLine, 'UTF-8');
+$closureKeywords = ['cierre', 'cerrado', 'finalizado', 'finalizacion', 'finalización', 'resuelto', 'resolvido', 'fecho', 'fechado'];
+foreach ($closureKeywords as $kw) {
+    if (mb_strpos($subjectNorm, $kw) !== false) {
+        ilog("IGNORADO: email de fecho detectado no assunto (keyword='$kw').");
+        wh_ok('Ignorado: email de fecho técnico');
+    }
 }
 
 // ── 5. Extrair nº aviso do assunto (fallback) ─────────────────────────────────
@@ -120,10 +153,37 @@ function findField(array $data, array $keywords) {
     return '';
 }
 
+function findAvisoField(array $data) {
+    foreach ($data as $key => $value) {
+        $kl = mb_strtolower((string)$key);
+        $keyStr = (string)$key;
+        $valStr = trim((string)$value);
+
+        // Prioridade 1: ES... no próprio rótulo da linha.
+        if (preg_match('/\b(ES\d{4,})\b/i', $keyStr, $mKey)) {
+            return strtoupper($mKey[1]);
+        }
+
+        // Evitar falsos positivos tipo "Número de Serie".
+        if (mb_strpos($kl, 'serie') !== false || mb_strpos($kl, 'serial') !== false) continue;
+
+        // Prioridade 2: rótulo de aviso com valor ES...
+        if (mb_strpos($kl, 'aviso') !== false && preg_match('/\b(ES\d{4,})\b/i', $valStr, $mAviso)) {
+            return strtoupper($mAviso[1]);
+        }
+
+        // Prioridade 3: qualquer valor contendo ES...
+        if (preg_match('/\b(ES\d{4,})\b/i', $valStr, $mVal)) {
+            return strtoupper($mVal[1]);
+        }
+    }
+    return '';
+}
+
 $parsed = parseIstobalTable($htmlBody);
 ilog('Campos extraídos: ' . json_encode($parsed, JSON_UNESCAPED_UNICODE));
 
-$numeroAviso     = findField($parsed, ['aviso', 'número', 'numero', 'n.º', 'nº']);
+$numeroAviso     = findAvisoField($parsed);
 $descricaoAvaria = findField($parsed, ['descripción', 'descripcion', 'avería', 'averia', 'fallo', 'problema']);
 $numeroSerie     = findField($parsed, ['serie', 'serial', 'n.s.', 's/n', 's / n']);
 $modeloMaquina   = findField($parsed, ['modelo', 'model']);
@@ -131,10 +191,13 @@ $instalacao      = findField($parsed, ['emplazamiento', 'instalación', 'instala
 $dataAviso       = findField($parsed, ['fecha', 'data', 'date', 'dt.']);
 $tipoAvaria      = findField($parsed, ['tipo', 'type', 'classe', 'categoria']);
 
-// Fallback: nº aviso do assunto
-if (!$numeroAviso && $numeroAvisoSubject) {
+// Número de aviso: assunto tem prioridade, depois tabela HTML.
+if ($numeroAvisoSubject) {
+    if ($numeroAviso && $numeroAviso !== $numeroAvisoSubject) {
+        ilog("AVISO: divergência no nº aviso (assunto='$numeroAvisoSubject' vs html='$numeroAviso'). Mantido assunto.");
+    }
     $numeroAviso = $numeroAvisoSubject;
-    ilog('Nº aviso usado do assunto (fallback): ' . $numeroAviso);
+    ilog('Nº aviso usado do assunto (prioridade): ' . $numeroAviso);
 }
 
 // ── 7. Normalizar data ────────────────────────────────────────────────────────
@@ -161,34 +224,46 @@ ilog("Mapeado → numeroAviso=$numeroAviso | serie=$numeroSerie | modelo=$modelo
 try {
     $pdo = get_pdo();
 } catch (PDOException $e) {
+    notify_ops(
+        'AT_Manut: Falha ao abrir reparação ISTOBAL',
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo DB: {$e->getMessage()}\nAssunto: $subjectLine\nAviso: $numeroAviso\nData: " . date('Y-m-d H:i:s')
+    );
     wh_err(500, 'Erro DB: ' . $e->getMessage());
 }
 
-// ── 9. Encontrar máquina pelo nº de série ────────────────────────────────────
+// ── 9. Encontrar máquina pelo nº de série/modelo (normalizado) ───────────────
 $maquinaId = null;
-if ($numeroSerie) {
-    $stmt = $pdo->prepare('SELECT id FROM maquinas WHERE numero_serie = ? LIMIT 1');
-    $stmt->execute([$numeroSerie]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($row) {
-        $maquinaId = $row['id'];
-        ilog("Máquina encontrada: id=$maquinaId (serie=$numeroSerie)");
-    } else {
-        ilog("AVISO: Máquina com serie=$numeroSerie não encontrada na BD.");
+$modeloBd = '';
+$serieBd = '';
+$normSerieEmail = norm_alnum($numeroSerie);
+$normModeloEmail = norm_text($modeloMaquina);
+if ($normSerieEmail !== '') {
+    $stmt = $pdo->query('SELECT id, modelo, numero_serie FROM maquinas WHERE numero_serie IS NOT NULL');
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $m) {
+        if (norm_alnum($m['numero_serie'] ?? '') === $normSerieEmail) {
+            $maquinaId = $m['id'];
+            $modeloBd = (string)($m['modelo'] ?? '');
+            $serieBd = (string)($m['numero_serie'] ?? '');
+            break;
+        }
     }
 }
 
-// ── 10. Verificar duplicado ───────────────────────────────────────────────────
-if ($numeroAviso) {
-    $dup = $pdo->prepare('SELECT id FROM reparacoes WHERE numero_aviso = ? LIMIT 1');
-    $dup->execute([$numeroAviso]);
-    if ($dup->fetch()) {
-        ilog("IGNORADO: Reparação com aviso=$numeroAviso já existe.");
-        wh_ok('Duplicado ignorado', ['aviso' => $numeroAviso]);
-    }
+if (!$maquinaId) {
+    $msg = "Máquina não encontrada (serie='$numeroSerie', modelo='$modeloMaquina'). Será criada/atualizada reparação sem máquina associada.";
+    ilog("WARN: $msg");
+    notify_ops(
+        "AT_Manut: Aviso ISTOBAL sem máquina associada ($numeroAviso)",
+        "Aviso ISTOBAL recebido sem correspondência de máquina. A reparação será criada/atualizada como pendente sem máquina.\n\nAviso: $numeroAviso\nSérie no email: $numeroSerie\nModelo no email: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+    );
 }
 
-// ── 11. Construir descrição completa ──────────────────────────────────────────
+if ($normModeloEmail !== '' && norm_text($modeloBd) !== $normModeloEmail) {
+    ilog("AVISO: divergência de modelo para maquinaId=$maquinaId (email='$modeloMaquina' vs BD='$modeloBd').");
+}
+ilog("Máquina encontrada: id=$maquinaId (serieEmail='$numeroSerie' | serieBD='$serieBd')");
+
+// ── 10. Construir descrição completa ──────────────────────────────────────────
 $descFull = $descricaoAvaria;
 if ($tipoAvaria && stripos($descFull, $tipoAvaria) === false) {
     $descFull = "[{$tipoAvaria}] " . $descFull;
@@ -199,6 +274,46 @@ if ($instalacao) {
 $descFull .= "\n\n--- Dados originais do email ISTOBAL ---\n";
 foreach ($parsed as $k => $v) {
     $descFull .= "$k: $v\n";
+}
+
+// ── 11. Verificar duplicado ───────────────────────────────────────────────────
+if ($numeroAviso) {
+    $dup = $pdo->prepare('SELECT id, status, maquina_id FROM reparacoes WHERE numero_aviso = ? ORDER BY criado_em DESC LIMIT 1');
+    $dup->execute([$numeroAviso]);
+    $exist = $dup->fetch(PDO::FETCH_ASSOC);
+    if ($exist) {
+        if (($exist['status'] ?? '') === 'concluida') {
+            ilog("IGNORADO: aviso=$numeroAviso já concluído (id={$exist['id']}).");
+            notify_ops(
+                "AT_Manut: Aviso ISTOBAL repetido após fecho ($numeroAviso)",
+                "Recebido novo email para aviso já concluído.\nNenhuma alteração aplicada.\n\nAviso: $numeroAviso\nReparação: {$exist['id']}\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+            );
+            wh_ok('Duplicado ignorado (já concluído)', ['aviso' => $numeroAviso, 'id' => $exist['id']]);
+        }
+
+        // Último email vence para avisos ainda em aberto (pendente/em_progresso).
+        // Se não houver máquina extraída neste email, manter a máquina já existente.
+        $resolvedMaquinaId = $maquinaId ?: ($exist['maquina_id'] ?? null);
+        $upd = $pdo->prepare('UPDATE reparacoes
+            SET maquina_id = ?, data = ?, numero_aviso = ?, descricao_avaria = ?, observacoes = ?, origem = ?
+            WHERE id = ?');
+        $upd->execute([
+            $resolvedMaquinaId,
+            $dataFormatada,
+            $numeroAviso ?: null,
+            $descFull,
+            "Atualizado pelo último email ISTOBAL. Assunto: $subjectLine",
+            'istobal_email',
+            $exist['id'],
+        ]);
+        ilog("ATUALIZADO: aviso=$numeroAviso (id={$exist['id']}) com dados mais recentes. maquinaId=" . ($resolvedMaquinaId ?: 'NULL'));
+        wh_ok('Reparação atualizada com dados mais recentes', [
+            'aviso' => $numeroAviso,
+            'id' => $exist['id'],
+            'maquinaId' => $resolvedMaquinaId,
+            'machineLinked' => !empty($resolvedMaquinaId),
+        ]);
+    }
 }
 
 // ── 12. Inserir reparação ─────────────────────────────────────────────────────
@@ -222,6 +337,10 @@ try {
     ]);
     ilog("Reparação criada: id=$id (maquinaId=" . ($maquinaId ?? 'NULL') . ", aviso=$numeroAviso)");
 } catch (PDOException $e) {
+    notify_ops(
+        "AT_Manut: Falha ao abrir reparação ISTOBAL ($numeroAviso)",
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo INSERT: {$e->getMessage()}\nAviso: $numeroAviso\nSérie: $numeroSerie\nModelo: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+    );
     wh_err(500, 'Erro INSERT: ' . $e->getMessage());
 }
 
@@ -230,4 +349,5 @@ wh_ok('Reparação criada com sucesso', [
     'numeroAviso' => $numeroAviso,
     'maquinaId'   => $maquinaId,
     'data'        => $dataFormatada,
+    'machineLinked' => !empty($maquinaId),
 ]);

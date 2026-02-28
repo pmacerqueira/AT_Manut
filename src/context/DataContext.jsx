@@ -392,6 +392,44 @@ export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub1
 // Marcas habituais por tipo de equipamento (para sugestão no formulário de máquina)
 export const MARCAS_COMPRESSOR = ['KAESER', 'Fini', 'ECF', 'IES', 'LaPadana']
 export const MARCAS_ELEVADOR   = ['Cascos', 'Ravaglioli', 'Space', 'Kroftools', 'TwinBusch', 'Sunshine', 'Werther', 'Velyen']
+const INITIAL_MARCAS = [...new Set([...MARCAS_COMPRESSOR, ...MARCAS_ELEVADOR])]
+  .sort((a, b) => a.localeCompare(b, 'pt'))
+  .map((nome, idx) => ({ id: `mk${idx + 1}`, nome, logoUrl: '', corHex: nome.toLowerCase() === 'istobal' ? '#c8102e' : '', ativo: true }))
+
+function normalizeMarca(m) {
+  return {
+    ...m,
+    nome: (m?.nome ?? '').trim(),
+    logoUrl: m?.logoUrl ?? m?.logo_url ?? '',
+    corHex: m?.corHex ?? m?.cor_hex ?? '',
+  }
+}
+
+function mergeMarcasPreferIncoming(incoming = [], current = []) {
+  const map = new Map()
+  for (const base of INITIAL_MARCAS) {
+    const n = normalizeMarca(base)
+    map.set((n.nome || '').toLowerCase(), n)
+  }
+  for (const prev of current) {
+    const n = normalizeMarca(prev)
+    if (!n.nome) continue
+    map.set(n.nome.toLowerCase(), n)
+  }
+  for (const row of incoming) {
+    const n = normalizeMarca(row)
+    if (!n.nome) continue
+    map.set(n.nome.toLowerCase(), n)
+  }
+  return [...map.values()].sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt'))
+}
+
+function shouldRetryMarcaCreateWithId(err) {
+  const msg = String(err?.message || '').toLowerCase()
+  return msg.includes("duplicate entry '' for key 'primary'")
+    || msg.includes("field 'id' doesn't have a default value")
+    || msg.includes('null value in column')
+}
 
 /** Indica se uma máquina é da marca KAESER (relatório e template de consumíveis específicos). */
 export const isKaeserMarca = (marca) => (marca ?? '').toLowerCase() === 'kaeser'
@@ -594,6 +632,7 @@ export function DataProvider({ children }) {
   const [categorias,    setCategorias]    = useState([])
   const [subcategorias, setSubcategorias] = useState([])
   const [checklistItems,setChecklistItems]= useState([])
+  const [marcas,        setMarcas]        = useState(INITIAL_MARCAS)
   const [maquinas,      setMaquinas]      = useState([])
   const [manutencoes,   setManutencoes]   = useState([])
   const [relatorios,          setRelatorios]          = useState([])
@@ -619,6 +658,7 @@ export function DataProvider({ children }) {
       setCategorias(d.categorias       ?? [])
       setSubcategorias(d.subcategorias ?? [])
       setChecklistItems(d.checklistItems ?? [])
+      setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
       setMaquinas(d.maquinas           ?? [])
       setManutencoes(d.manutencoes             ?? [])
       setRelatorios(d.relatorios               ?? [])
@@ -642,6 +682,7 @@ export function DataProvider({ children }) {
           setCategorias(d.categorias       ?? [])
           setSubcategorias(d.subcategorias ?? [])
           setChecklistItems(d.checklistItems ?? [])
+          setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
           setMaquinas(d.maquinas           ?? [])
           setManutencoes(d.manutencoes             ?? [])
           setRelatorios(d.relatorios               ?? [])
@@ -1064,19 +1105,129 @@ export function DataProvider({ children }) {
     return true
   }, [subcategorias, persist])
 
+  // ── Marcas ───────────────────────────────────────────────────────────────
+  const addMarca = useCallback(async (m) => {
+    const nome = (m?.nome ?? '').trim()
+    if (!nome) return null
+
+    const existing = marcas.find(x => (x.nome ?? '').trim().toLowerCase() === nome.toLowerCase())
+    if (existing?.id != null) return existing.id
+
+    const tempId = `tmp_mk_${Date.now()}`
+    const novo = {
+      id: tempId,
+      nome,
+      logoUrl: (m?.logoUrl ?? '').trim(),
+      corHex: (m?.corHex ?? '').trim(),
+      ativo: m?.ativo ?? true,
+    }
+
+    setMarcas(prev => [...prev, novo].sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
+
+    try {
+      const { apiMarcas } = await import('../services/apiService')
+      // Não enviar "id" no create: em MySQL é tipicamente AUTO_INCREMENT.
+      const payload = { nome: novo.nome, logoUrl: novo.logoUrl, corHex: novo.corHex, ativo: novo.ativo }
+      let created
+      try {
+        created = await apiMarcas.create(payload)
+      } catch (err) {
+        if (!shouldRetryMarcaCreateWithId(err)) throw err
+        // Compatibilidade com esquemas legacy em que "marcas.id" é PK string sem default.
+        const retryId = `mk${Date.now()}`
+        created = await apiMarcas.create({ ...payload, id: retryId })
+      }
+
+      const persisted = normalizeMarca({
+        ...novo,
+        ...(created || {}),
+        id: created?.id ?? created?.ID ?? tempId,
+      })
+
+      setMarcas(prev => prev
+        .map(x => String(x.id) === String(tempId) ? persisted : x)
+        .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
+
+      return persisted.id
+    } catch (err) {
+      setMarcas(prev => prev.filter(x => String(x.id) !== String(tempId)))
+      logger.error('DataContext', 'addMarca', err?.message || 'Falha ao criar marca', { stack: err?.stack?.slice(0, 300) })
+      throw err
+    }
+  }, [marcas])
+
+  const updateMarca = useCallback(async (id, data) => {
+    const before = marcas
+    const atual = before.find(m => String(m.id) === String(id))
+    const merged = normalizeMarca({ ...(atual || {}), ...(data || {}) })
+    setMarcas(prev => prev
+      .map(m => String(m.id) === String(id) ? { ...m, ...merged } : m)
+      .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
+    try {
+      const { apiMarcas } = await import('../services/apiService')
+      let targetId = id
+      const idStr = String(id ?? '')
+      const isLegacyLocalId = !idStr || /^mk\d+$/i.test(idStr) || idStr.startsWith('tmp_mk_')
+
+      if (isLegacyLocalId) {
+        const remote = await apiMarcas.list().catch(() => [])
+        const remoteByName = (remote || []).find(x =>
+          String(x?.nome || '').trim().toLowerCase() === String(merged?.nome || '').trim().toLowerCase(),
+        )
+
+        if (remoteByName?.id != null) {
+          targetId = remoteByName.id
+          await apiMarcas.update(targetId, data)
+        } else {
+          const payloadCreate = {
+            nome: merged.nome || '',
+            logoUrl: merged.logoUrl || '',
+            corHex: merged.corHex || '',
+            ativo: merged.ativo ?? true,
+          }
+          let created
+          try {
+            created = await apiMarcas.create(payloadCreate)
+          } catch (err) {
+            if (!shouldRetryMarcaCreateWithId(err)) throw err
+            const retryId = `mk${Date.now()}`
+            created = await apiMarcas.create({ ...payloadCreate, id: retryId })
+          }
+          targetId = created?.id ?? created?.ID ?? id
+        }
+      } else {
+        await apiMarcas.update(id, data)
+      }
+
+      if (String(targetId) !== String(id)) {
+        setMarcas(prev => prev
+          .map(m => String(m.id) === String(id) ? { ...m, id: targetId } : m)
+          .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
+      }
+    } catch (err) {
+      setMarcas(before)
+      logger.error('DataContext', 'updateMarca', err?.message || 'Falha ao atualizar marca', { stack: err?.stack?.slice(0, 300) })
+      throw err
+    }
+  }, [marcas])
+
   // ── Máquinas ──────────────────────────────────────────────────────────────
-  const addMaquina = useCallback((m) => {
+  const addMaquina = useCallback(async (m) => {
     const id = String(Date.now())
     const { clienteId, ...rest } = m
     const novo = { ...rest, id, clienteId: m.clienteId ?? m.clienteNif, clienteNif: m.clienteNif ?? clienteId, documentos: m.documentos ?? [] }
     setMaquinas(prev => [...prev, novo])
     logger.action('DataContext', 'addMaquina', `Equipamento "${m.marca} ${m.modelo || ''}" adicionado`, { id, clienteNif: novo.clienteNif })
-    import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.create(novo),
-              { resource: 'maquinas', action: 'create', data: novo })
-    )
+    try {
+      const { apiMaquinas } = await import('../services/apiService')
+      await apiMaquinas.create(novo)
+    } catch (err) {
+      setMaquinas(prev => prev.filter(x => String(x.id) !== String(id)))
+      logger.error('DataContext', 'addMaquina', err?.message || 'Falha ao criar equipamento', { stack: err?.stack?.slice(0, 300) })
+      throw err
+    }
     return id
-  }, [persist])
+  }, [])
 
   const addDocumentoMaquina = useCallback((maquinaId, doc) => {
     const id = 'doc' + Date.now()
@@ -1110,13 +1261,18 @@ export function DataProvider({ children }) {
     }
   }, [persist])
 
-  const updateMaquina = useCallback((id, data) => {
-    setMaquinas(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
-    import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.update(id, data),
-              { resource: 'maquinas', action: 'update', id, data })
-    )
-  }, [persist])
+  const updateMaquina = useCallback(async (id, data) => {
+    const before = maquinas
+    setMaquinas(prev => prev.map(m => String(m.id) === String(id) ? { ...m, ...data } : m))
+    try {
+      const { apiMaquinas } = await import('../services/apiService')
+      await apiMaquinas.update(id, data)
+    } catch (err) {
+      setMaquinas(before)
+      logger.error('DataContext', 'updateMaquina', err?.message || 'Falha ao atualizar equipamento', { stack: err?.stack?.slice(0, 300) })
+      throw err
+    }
+  }, [maquinas])
 
   const removeMaquina = useCallback((id) => {
     const maqManutIds = manutencoes.filter(m => m.maquinaId === id).map(m => m.id)
@@ -1501,6 +1657,7 @@ export function DataProvider({ children }) {
         categorias,
         subcategorias,
         checklistItems,
+        marcas,
         maquinas,
         manutencoes,
         relatorios,
@@ -1515,7 +1672,7 @@ export function DataProvider({ children }) {
     a.download = `atmanut_backup_${ts}.json`
     a.click()
     URL.revokeObjectURL(url)
-  }, [clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios])
+  }, [clientes, categorias, subcategorias, checklistItems, marcas, maquinas, manutencoes, relatorios])
 
   /**
    * Restaura dados a partir de um objecto de backup.
@@ -1531,13 +1688,14 @@ export function DataProvider({ children }) {
       if (Array.isArray(d.categorias))     setCategorias(d.categorias)
       if (Array.isArray(d.subcategorias))  setSubcategorias(d.subcategorias)
       if (Array.isArray(d.checklistItems)) setChecklistItems(d.checklistItems)
+      if (Array.isArray(d.marcas))         setMarcas(d.marcas)
       if (Array.isArray(d.maquinas))       setMaquinas(d.maquinas)
       if (Array.isArray(d.manutencoes))    setManutencoes(d.manutencoes)
       if (Array.isArray(d.relatorios))     setRelatorios(d.relatorios)
 
       // Persiste no servidor (substitui todos os dados)
       const {
-        apiClientes, apiCategorias, apiSubcategorias, apiChecklistItems,
+        apiClientes, apiCategorias, apiSubcategorias, apiChecklistItems, apiMarcas,
         apiMaquinas, apiManutencoes, apiRelatorios,
       } = await import('../services/apiService')
 
@@ -1546,6 +1704,7 @@ export function DataProvider({ children }) {
         d.categorias     ? apiCategorias.bulkRestore(d.categorias)        : Promise.resolve(),
         d.subcategorias  ? apiSubcategorias.bulkRestore(d.subcategorias)  : Promise.resolve(),
         d.checklistItems ? apiChecklistItems.bulkRestore(d.checklistItems): Promise.resolve(),
+        d.marcas ? apiMarcas.bulkRestore(d.marcas).catch(() => null)      : Promise.resolve(),
         d.maquinas       ? apiMaquinas.bulkRestore(d.maquinas)            : Promise.resolve(),
         d.manutencoes    ? apiManutencoes.bulkRestore(d.manutencoes)      : Promise.resolve(),
         d.relatorios     ? apiRelatorios.bulkRestore(d.relatorios)        : Promise.resolve(),
@@ -1570,6 +1729,7 @@ export function DataProvider({ children }) {
     categorias,
     subcategorias,
     checklistItems,
+    marcas,
     clientes,
     maquinas,
     manutencoes,
@@ -1591,6 +1751,8 @@ export function DataProvider({ children }) {
     addCategoria,
     updateCategoria,
     removeCategoria,
+    addMarca,
+    updateMarca,
     addCliente,
     updateCliente,
     removeCliente,
@@ -1628,12 +1790,12 @@ export function DataProvider({ children }) {
     exportarDados,
     restaurarDados,
   }), [
-    INTERVALOS, categorias, subcategorias, checklistItems, clientes, maquinas, manutencoes, relatorios, reparacoes, relatoriosReparacao, pecasPlano,
+    INTERVALOS, categorias, subcategorias, checklistItems, marcas, clientes, maquinas, manutencoes, relatorios, reparacoes, relatoriosReparacao, pecasPlano,
     getIntervaloDias, getIntervaloDiasBySubcategoria, getIntervaloDiasByMaquina,
     getSubcategoria, getCategoria, getSubcategoriasByCategoria, getChecklistBySubcategoria,
     addSubcategoria, updateSubcategoria, removeSubcategoria,
     addChecklistItem, updateChecklistItem, removeChecklistItem,
-    addCategoria, updateCategoria, removeCategoria,
+    addCategoria, updateCategoria, removeCategoria, addMarca, updateMarca,
     addCliente, updateCliente, removeCliente, importClientes, clearAllClientesAndRelated,
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
     addManutencao, updateManutencao, removeManutencao, iniciarManutencao,

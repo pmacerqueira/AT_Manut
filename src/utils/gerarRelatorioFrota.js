@@ -26,7 +26,7 @@ const EMPRESA = {
  */
 export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatorios, getSubcategoria, options = {}) {
   const esc = escapeHtml
-  const logoSrc = options.logoUrl ?? '/manut/logo.png'
+  const logoSrc = options.logoUrl ?? '/manut/logo-navel.png'
   const hoje = new Date().toISOString().slice(0, 10)
   const hojeFormatado = formatDataAzores(hoje, true)
   const ano = new Date().getFullYear()

@@ -44,7 +44,7 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
       const htmlBody = relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItems, {
         subcategoriaNome: sub?.nome,
         ultimoEnvio: relatorio.ultimoEnvio,
-        logoUrl: `${import.meta.env.BASE_URL}logo.png`,
+        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
       })
       // URL absoluta em produção (https://www.navel.pt) ou relativa em dev
       const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')

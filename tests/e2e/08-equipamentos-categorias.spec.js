@@ -79,6 +79,88 @@ test.describe('Equipamentos — Admin', () => {
     }
   })
 
+  test('Guardar marca ISTOBAL na ficha envia update com marca correta', async ({ page }) => {
+    await page.goto('/manut')
+    await page.evaluate(() => { sessionStorage.clear(); localStorage.clear() })
+    await page.unroute('**/api/data.php').catch(() => {})
+    await setupApiMock(page, {
+      customData: {
+        marcas: [
+          { id: '', nome: 'ISTOBAL', logoUrl: 'https://istobal.com/logo.png', corHex: '#c8102e', ativo: true },
+        ],
+      },
+    })
+    await doLoginAdmin(page)
+    await page.goto('/manut/equipamentos')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+
+    let ultimaAtualizacaoMaquina = null
+    page.on('request', req => {
+      if (!req.url().includes('/api/data.php')) return
+      const payload = req.postDataJSON?.()
+      if (payload?.r === 'maquinas' && payload?.action === 'update') {
+        ultimaAtualizacaoMaquina = payload
+      }
+    })
+
+    await page.locator('.categoria-card').filter({ hasText: /elevadores/i }).first().click()
+    await page.locator('.categoria-card').first().click()
+    await page.locator('button[title="Editar"]').first().click()
+    await expect(page.locator('.modal h2').filter({ hasText: /editar máquina/i })).toBeVisible()
+
+    await page.locator('.modal label:has-text("Marca") select').first().selectOption({ label: 'ISTOBAL' })
+    const dataInput1 = page.locator('.modal input[type="date"]').first()
+    if ((await dataInput1.inputValue()).trim() === '') {
+      await dataInput1.fill('2026-12-31')
+    }
+    await page.locator('.modal button[type="submit"]').filter({ hasText: /guardar/i }).click()
+
+    await expect.poll(() => ultimaAtualizacaoMaquina?.data?.marca ?? '').toBe('ISTOBAL')
+  })
+
+  test('Criar nova marca no modal e guardar ficha envia create+update', async ({ page }) => {
+    await page.goto('/manut')
+    await page.evaluate(() => { sessionStorage.clear(); localStorage.clear() })
+    await page.unroute('**/api/data.php').catch(() => {})
+    await setupApiMock(page)
+    await doLoginAdmin(page)
+    await page.goto('/manut/equipamentos')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+
+    const chamadas = []
+    page.on('request', req => {
+      if (!req.url().includes('/api/data.php')) return
+      const payload = req.postDataJSON?.()
+      if (payload?.r && payload?.action) chamadas.push(payload)
+    })
+
+    const nomeNovaMarca = `ISTOBAL-E2E-${Date.now()}`
+    await page.locator('.categoria-card').filter({ hasText: /elevadores/i }).first().click()
+    await page.locator('.categoria-card').first().click()
+    await page.locator('button[title="Editar"]').first().click()
+    await expect(page.locator('.modal h2').filter({ hasText: /editar máquina/i })).toBeVisible()
+
+    await page.locator('.modal label:has-text("Marca") select').first().selectOption('__new__')
+    await page.locator('.modal label').filter({ hasText: /nova marca/i }).locator('input').fill(nomeNovaMarca)
+    const dataInput2 = page.locator('.modal input[type="date"]').first()
+    if ((await dataInput2.inputValue()).trim() === '') {
+      await dataInput2.fill('2026-12-31')
+    }
+    await page.locator('.modal button[type="submit"]').filter({ hasText: /guardar/i }).click()
+
+    await expect.poll(() => {
+      const c = chamadas.find(x => x.r === 'marcas' && x.action === 'create')
+      return c?.data?.nome ?? ''
+    }).toBe(nomeNovaMarca)
+
+    await expect.poll(() => {
+      const c = [...chamadas].reverse().find(x => x.r === 'maquinas' && x.action === 'update')
+      return c?.data?.marca ?? ''
+    }).toBe(nomeNovaMarca)
+  })
+
 })
 
 test.describe('Equipamentos — ATecnica', () => {

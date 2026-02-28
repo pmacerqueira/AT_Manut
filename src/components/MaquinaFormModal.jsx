@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useData } from '../context/DataContext'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser, MARCAS_COMPRESSOR, MARCAS_ELEVADOR } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from './Toast'
@@ -14,15 +14,64 @@ const isCompressorParafuso = (subcategoriaId) => ['sub5', 'sub14'].includes(subc
 const isCompressor = (subcategoriaId) => SUBCATEGORIAS_COMPRESSOR.includes(subcategoriaId)
 const temContadorHoras = (subcategoriaId) => SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(subcategoriaId)
 
+function sortMarcasAZ(items = []) {
+  return [...items].sort((a, b) => {
+    const na = (a?.nome ?? '').trim()
+    const nb = (b?.nome ?? '').trim()
+    return na.localeCompare(nb, 'pt', { sensitivity: 'base' })
+  })
+}
+
+function marcaOptionValue(m) {
+  const id = String(m?.id ?? '').trim()
+  if (id) return `id:${id}`
+  const nome = (m?.nome ?? '').trim().toLowerCase()
+  if (nome) return `name:${nome}`
+  return ''
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = reject
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.readAsDataURL(file)
+  })
+}
+
+function optimizeLogoDataUrl(rawDataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onerror = reject
+    img.onload = () => {
+      const maxW = 1200
+      const maxH = 360
+      const ratio = Math.min(maxW / img.width, maxH / img.height, 1)
+      const w = Math.max(1, Math.round(img.width * ratio))
+      const h = Math.max(1, Math.round(img.height * ratio))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/png', 0.92))
+    }
+    img.src = rawDataUrl
+  })
+}
+
 export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLocked, maquina, onSave }) {
   const {
     clientes,
     categorias,
+    marcas,
     maquinas,
     INTERVALOS,
     getSubcategoriasByCategoria,
     getSubcategoria,
     getCategoria,
+    addMarca,
     addMaquina,
     updateMaquina,
   } = useData()
@@ -35,7 +84,9 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     categoriaId: '',
     subcategoriaId: '',
     periodicidadeManut: '',
+    marcaId: '',
     marca: '',
+    marcaLogoUrl: '',
     modelo: '',
     numeroSerie: '',
     anoFabrico: '',
@@ -50,6 +101,27 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     posicaoKaeser: null,
   })
   const subcategoriasFiltradas = form.categoriaId ? getSubcategoriasByCategoria(form.categoriaId) : []
+  const [showNovaMarca, setShowNovaMarca] = useState(false)
+  const [novaMarca, setNovaMarca] = useState({ nome: '', logoUrl: '', corHex: '#1a4880' })
+  const [logoUploading, setLogoUploading] = useState(false)
+
+  const marcasOrdenadas = sortMarcasAZ(marcas)
+  const findMarcaById = (id) => marcasOrdenadas.find(m => String(m?.id) === String(id))
+  const findMarcaByNome = (nome) => marcasOrdenadas.find(m => (m?.nome ?? '').trim().toLowerCase() === String(nome ?? '').trim().toLowerCase())
+  const findMarcaByOptionValue = (val) => marcasOrdenadas.find(m => marcaOptionValue(m) === val)
+
+  const selectedMarcaOption = (() => {
+    if (showNovaMarca) return '__new__'
+    if (form.marcaId) {
+      const byId = findMarcaById(form.marcaId)
+      if (byId) return marcaOptionValue(byId)
+    }
+    if (form.marca) {
+      const byNome = findMarcaByNome(form.marca)
+      if (byNome) return marcaOptionValue(byNome)
+    }
+    return ''
+  })()
 
   useEffect(() => {
     const justOpened = isOpen && !wasOpenRef.current
@@ -71,7 +143,10 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         categoriaId: catId,
         subcategoriaId: subId,
         periodicidadeManut: periodicidade,
+        marcaId: '',
         marca: '',
+        marcaLogoUrl: '',
+    marcaCorHex: '',
         modelo: '',
         numeroSerie: '',
         anoFabrico: new Date().getFullYear(),
@@ -85,17 +160,23 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroAr: '',
         posicaoKaeser: isCompressorParafuso(subId) ? 0 : null,
       })
+      setShowNovaMarca(false)
+      setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
     } else if (maquina) {
       const sub = getSubcategoria(maquina.subcategoriaId)
       getCategoria(sub?.categoriaId)
       const periodicidade = maquina.periodicidadeManut ?? (isElevadores(getCategoria, sub?.categoriaId) ? 'anual' : '')
+      const matchedMarca = marcas.find(m => (m.nome ?? '').toLowerCase() === (maquina.marca ?? '').toLowerCase())
       setForm({
         id: maquina.id,
         clienteNif: maquina.clienteNif,
         categoriaId: sub?.categoriaId || '',
         subcategoriaId: maquina.subcategoriaId,
         periodicidadeManut: periodicidade,
+        marcaId: maquina.marcaId != null ? String(maquina.marcaId) : (matchedMarca?.id != null ? String(matchedMarca.id) : ''),
         marca: maquina.marca,
+        marcaLogoUrl: maquina.marcaLogoUrl || '',
+        marcaCorHex: maquina.marcaCorHex || matchedMarca?.corHex || '',
         modelo: maquina.modelo,
         numeroSerie: maquina.numeroSerie,
         anoFabrico: maquina.anoFabrico || '',
@@ -109,25 +190,81 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroAr: maquina.refFiltroAr || '',
         posicaoKaeser: maquina.posicaoKaeser ?? (isCompressorParafuso(maquina.subcategoriaId) ? 0 : null),
       })
+      setShowNovaMarca(false)
+      setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
     }
-  }, [isOpen, mode, clienteNifLocked, maquina, categorias, clientes, getSubcategoriasByCategoria, getSubcategoria, getCategoria, INTERVALOS])
+  }, [isOpen, mode, clienteNifLocked, maquina, categorias, clientes, marcas, getSubcategoriasByCategoria, getSubcategoria, getCategoria, INTERVALOS])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const { categoriaId: _cid, id, ...payload } = form
-    if (mode === 'add') {
-      const novoId = addMaquina(payload)
-      showToast('Equipamento adicionado com sucesso.', 'success')
-      onSave?.({ id: novoId, ...payload }, 'add')
-    } else {
-      updateMaquina(id, payload)
-      showToast('Equipamento actualizado com sucesso.', 'success')
-      onSave?.({ id, ...payload }, 'edit')
+    const { categoriaId: _cid, id, ...payloadBase } = form
+    let payload = { ...payloadBase }
+
+    try {
+      if (showNovaMarca) {
+        const nome = novaMarca.nome.trim()
+        if (!nome) {
+          showToast('Indique o nome da nova marca.', 'warning')
+          return
+        }
+        const logoUrl = novaMarca.logoUrl.trim()
+        const corHex = (novaMarca.corHex || '').trim()
+        const marcaIdRaw = await addMarca({ nome, logoUrl, corHex })
+        const marcaId = marcaIdRaw != null ? String(marcaIdRaw) : ''
+        payload = { ...payload, marcaId, marca: nome, marcaLogoUrl: logoUrl, marcaCorHex: corHex }
+      } else if (payload.marcaId || payload.marca) {
+        const selected = payload.marcaId
+          ? marcas.find(m => String(m.id) === String(payload.marcaId))
+          : marcas.find(m => (m?.nome ?? '').trim().toLowerCase() === String(payload.marca ?? '').trim().toLowerCase())
+        if (selected) {
+          payload = {
+            ...payload,
+            marcaId: selected.id != null && String(selected.id).trim() !== '' ? String(selected.id) : '',
+            marca: selected.nome || payload.marca || '',
+            marcaLogoUrl: selected.logoUrl || payload.marcaLogoUrl || '',
+            marcaCorHex: selected.corHex || payload.marcaCorHex || '',
+          }
+        }
+      }
+
+      if (mode === 'add') {
+        const novoId = await addMaquina(payload)
+        showToast('Equipamento adicionado com sucesso.', 'success')
+        onSave?.({ id: novoId, ...payload }, 'add')
+      } else {
+        await updateMaquina(id, payload)
+        showToast('Equipamento actualizado com sucesso.', 'success')
+        onSave?.({ id, ...payload }, 'edit')
+      }
+      onClose()
+    } catch (err) {
+      showToast(err?.message || 'Falha ao guardar equipamento/marca.', 'error', 4000)
     }
-    onClose()
   }
 
   if (!isOpen) return null
+
+  const handleUploadLogoMarca = async (file) => {
+    if (!file) return
+    if (!file.type?.startsWith('image/')) {
+      showToast('Selecione um ficheiro de imagem válido.', 'warning')
+      return
+    }
+    setLogoUploading(true)
+    try {
+      const raw = await fileToDataUrl(file)
+      const optimized = await optimizeLogoDataUrl(raw)
+      const { apiUploadMarcaLogo } = await import('../services/apiService')
+      const nomeMarca = novaMarca.nome.trim() || 'marca'
+      const res = await apiUploadMarcaLogo({ dataUrl: optimized, brandName: nomeMarca })
+      setNovaMarca(prev => ({ ...prev, logoUrl: res?.url || '' }))
+      showToast('Logotipo carregado e otimizado com sucesso.', 'success')
+    } catch (err) {
+      showToast(`Falha no upload do logotipo: ${err?.message || 'erro desconhecido'}`, 'error', 4000)
+    } finally {
+      setLogoUploading(false)
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -193,18 +330,105 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           <div className="form-row">
             <label>
               Marca
-              <input
-                value={form.marca}
-                onChange={e => setForm(f => ({ ...f, marca: e.target.value }))}
-                placeholder={isCompressor(form.subcategoriaId) ? 'Ex: KAESER, Fini, ECF…' : 'Ex: Cascos, Ravaglioli…'}
-                list="marcas-sugestoes"
-              />
-              <datalist id="marcas-sugestoes">
-                {(isCompressor(form.subcategoriaId) ? MARCAS_COMPRESSOR : MARCAS_ELEVADOR).map(m => (
-                  <option key={m} value={m} />
+              <select
+                value={selectedMarcaOption}
+                onChange={e => {
+                  const val = e.target.value
+                  if (val === '__new__') {
+                    setShowNovaMarca(true)
+                    setForm(f => ({ ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }))
+                    return
+                  }
+                  if (!val) {
+                    setShowNovaMarca(false)
+                    setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
+                    setForm(f => ({ ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }))
+                    return
+                  }
+                  const selected = findMarcaByOptionValue(val)
+                  setShowNovaMarca(false)
+                  setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
+                  setForm(f => ({
+                    ...f,
+                    marcaId: selected?.id != null && String(selected.id).trim() !== '' ? String(selected.id) : '',
+                    marca: selected?.nome || '',
+                    marcaLogoUrl: selected?.logoUrl || '',
+                    marcaCorHex: selected?.corHex || '',
+                  }))
+                }}
+              >
+                <option value="">— Selecionar marca —</option>
+                {marcasOrdenadas.map(m => (
+                  <option key={marcaOptionValue(m) || `marca-${(m?.nome ?? '').toLowerCase()}`} value={marcaOptionValue(m)}>{m.nome}</option>
                 ))}
-              </datalist>
+                <option value="__new__">+ Nova Marca…</option>
+              </select>
+              {!showNovaMarca && !form.marcaId && (
+                <small className="text-muted">Selecione uma marca ou crie uma nova.</small>
+              )}
             </label>
+            {showNovaMarca && (
+              <>
+                <label>
+                  Nova marca
+                  <input
+                    value={novaMarca.nome}
+                    onChange={e => setNovaMarca(prev => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Ex: ISTOBAL"
+                  />
+                </label>
+                <label>
+                  URL do logotipo da marca
+                  <input
+                    type="url"
+                    value={novaMarca.logoUrl}
+                    onChange={e => setNovaMarca(prev => ({ ...prev, logoUrl: e.target.value }))}
+                    placeholder="https://.../logo-marca.png"
+                  />
+                </label>
+                <label>
+                  Cor institucional da marca
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={novaMarca.corHex || '#1a4880'}
+                      onChange={e => setNovaMarca(prev => ({ ...prev, corHex: e.target.value }))}
+                      style={{ width: '48px', height: '34px', padding: 0 }}
+                    />
+                    <input
+                      type="text"
+                      value={novaMarca.corHex}
+                      onChange={e => setNovaMarca(prev => ({ ...prev, corHex: e.target.value }))}
+                      placeholder="#c8102e"
+                    />
+                  </div>
+                </label>
+                <label>
+                  Upload do logotipo (recomendado)
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0]
+                      await handleUploadLogoMarca(f)
+                      e.target.value = ''
+                    }}
+                    disabled={logoUploading}
+                  />
+                  <small className="text-muted">
+                    {logoUploading ? 'A otimizar e enviar logotipo...' : 'A imagem é otimizada automaticamente para documentos.'}
+                  </small>
+                </label>
+                {novaMarca.logoUrl && (
+                  <div className="form-group">
+                    <small className="text-muted">Pré-visualização do logotipo:</small>
+                    <div style={{ marginTop: '0.35rem', padding: '0.45rem', border: '1px solid #e2e8f0', borderRadius: '6px', background: '#fff' }}>
+                      <img src={novaMarca.logoUrl} alt="Preview logotipo da marca" style={{ maxHeight: '42px', maxWidth: '170px', objectFit: 'contain' }} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             <label>
               Modelo
               <input value={form.modelo} onChange={e => setForm(f => ({ ...f, modelo: e.target.value }))} placeholder="Ex: EV-4P" />

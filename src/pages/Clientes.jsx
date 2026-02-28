@@ -247,7 +247,7 @@ export default function Clientes() {
         manutencoes,
         relatorios ?? [],
         getSubcategoria,
-        { logoUrl: `${import.meta.env.BASE_URL}logo.png` }
+        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png` }
       )
       const nomeArquivo = `frota_${cliente.nif}_${new Date().toISOString().slice(0, 10)}.pdf`
       await imprimirOuGuardarPdf(html, nomeArquivo)
@@ -347,7 +347,7 @@ export default function Clientes() {
           type="search"
           value={searchCliente}
           onChange={e => setSearchCliente(e.target.value)}
-          placeholder="Pesquisar por NIF ou palavra do nome..."
+          placeholder="Pesquisar por NIF ou nome..."
           aria-label="Pesquisar clientes"
         />
         {searchCliente && (
@@ -378,6 +378,7 @@ export default function Clientes() {
                     </a>
                   )}
                   <span className="cliente-mobile-maq">{nMaq} máq.</span>
+                  {!c.email && <span className="badge badge-warning" title="Cliente sem email registado">⚠ sem email</span>}
                 </div>
               </div>
               <ChevronRight size={16} className="cliente-mobile-chevron" />
@@ -428,7 +429,10 @@ export default function Clientes() {
                   </button>
                 </td>
                 <td data-label="Localidade">{c.localidade || '—'}</td>
-                <td data-label="Telefone">{c.telefone || '—'}</td>
+                <td data-label="Telefone">
+                  {c.telefone || '—'}
+                  {!c.email && <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }} title="Cliente sem email registado">⚠ sem email</span>}
+                </td>
                 <td data-label="Máq.">{getMaquinasCount(c.nif)}</td>
                 <td className="actions" data-label="">
                   {getMaquinasCount(c.nif) > 0 && (

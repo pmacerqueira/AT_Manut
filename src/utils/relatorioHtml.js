@@ -26,11 +26,37 @@ const EMPRESA = {
   web:         'www.navel.pt',
 }
 
+function normalizeHexColor(value, fallback) {
+  const raw = String(value ?? '').trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase()
+  if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`.toLowerCase()
+  }
+  return fallback
+}
+
+function hexToRgba(hex, alpha) {
+  const h = normalizeHexColor(hex, '#000000')
+  const r = Number.parseInt(h.slice(1, 3), 16)
+  const g = Number.parseInt(h.slice(3, 5), 16)
+  const b = Number.parseInt(h.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
-  const { subcategoriaNome, ultimoEnvio, logoUrl } = options
-  const logoSrc = logoUrl ?? '/manut/logo.png'
+  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl } = options
+  const logoSrc = logoUrl ?? '/manut/logo-navel.png'
+  const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
+  const isIstobalReport = (
+    /istobal/i.test(String(maquina?.marca ?? '')) ||
+    /istobal/i.test(String(subcategoriaNome ?? ''))
+  )
+  const logoMarcaSrc = maquina?.marcaLogoUrl || (isIstobalReport ? logoIstobalSrc : '')
+  const logoMarcaAlt = maquina?.marca ? `Logotipo ${maquina.marca}` : 'Logotipo da marca'
+  const brandPrimary = normalizeHexColor(maquina?.marcaCorHex, isIstobalReport ? '#c8102e' : '#1a4880')
+  const brandSoft = hexToRgba(brandPrimary, 0.12)
 
   // ── Detecção KAESER — baseada na marca da máquina (não na subcategoria)
   // KAESER é exclusivo da categoria Compressores; outras marcas (Fini, ECF, IES, LaPadana)
@@ -48,11 +74,13 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
 
   // ── Datas ──
   const dataCriacao    = relatorio.dataCriacao    ? formatDataHoraAzores(relatorio.dataCriacao)    : '—'
-  const dataAssinatura = relatorio.dataAssinatura ? formatDataHoraAzores(relatorio.dataAssinatura) : '—'
+  const dataAssinatura = relatorio.dataAssinatura
+    ? formatDataHoraAzores(relatorio.dataAssinatura)
+    : 'Pendente de assinatura'
   const dataAgendada   = manutencao?.data ? formatDataAzores(manutencao.data, true) : '—'
   const dataRealizacao = relatorio.dataAssinatura
     ? formatDataAzores(relatorio.dataAssinatura, true)
-    : (relatorio.dataCriacao ? formatDataAzores(relatorio.dataCriacao, true) : '—')
+    : (relatorio.dataCriacao ? formatDataAzores(relatorio.dataCriacao, true) : 'Pendente de preenchimento')
 
   // ── Texto do equipamento ──
   const equipCompleto = maquina && subcategoriaNome
@@ -91,9 +119,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:10.5px;line-height:1.42;c
 
 /* ── Paleta ── */
 :root{
-  --azul:#1a4880;--azul-med:#2d6eb5;--azul-claro:#e8f2fa;
+  --azul:${brandPrimary};--azul-med:${brandPrimary};--azul-claro:${brandSoft};
   --cinza:#f4f6f8;--borda:#c6d8ec;--texto:#1a1a2e;--muted:#5a6a7e;
-  --verde:#16a34a;--vermelho:#dc2626;--acento:#f0a500;
+  --verde:#16a34a;--vermelho:#dc2626;--acento:${brandPrimary};
   --kaeser:#b45309;--kaeser-bg:#fffbeb;--kaeser-borda:#fde68a;
 }
 
@@ -105,7 +133,9 @@ section{margin-bottom:10px;page-break-inside:avoid}
 
 /* ── Cabeçalho ── */
 .rpt-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:2.5px solid var(--azul)}
-.rpt-logo img{max-height:42px;max-width:150px;object-fit:contain;display:block}
+.rpt-logos{display:flex;align-items:center;gap:10px}
+.rpt-logo img{max-height:42px;max-width:170px;object-fit:contain;display:block}
+.rpt-logo-istobal img{max-height:42px;max-width:170px;object-fit:contain;display:block}
 .rpt-logo-fallback{font-size:1.2em;font-weight:700;color:var(--azul)}
 .rpt-empresa{text-align:right;font-size:9px;line-height:1.5;color:var(--muted)}
 .rpt-empresa strong{display:block;font-size:10px;color:var(--azul);margin-bottom:1px}
@@ -197,6 +227,7 @@ section{margin-bottom:10px;page-break-inside:avoid}
 .rpt-bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
 .rpt-assinatura-box{background:var(--cinza);border:1px solid var(--borda);border-radius:4px;padding:7px 10px}
 .rpt-assinatura-img img{max-width:180px;max-height:70px;border:1px solid var(--borda);border-radius:3px;margin-top:4px;background:#fff;display:block}
+.rpt-assinatura-legenda{margin-top:5px;font-size:8px;color:var(--muted);line-height:1.35}
 .rpt-declaracao{background:var(--cinza);border:1px solid var(--borda);border-radius:4px;padding:7px 10px;font-size:8.5px;color:var(--muted);line-height:1.55}
 
 /* ── Rodapé ── */
@@ -206,9 +237,15 @@ section{margin-bottom:10px;page-break-inside:avoid}
 <body>
 
 <header class="rpt-header">
-  <div class="rpt-logo">
-    <img src="${logoSrc}" alt="Navel"
-      onerror="this.parentNode.innerHTML='<span class=rpt-logo-fallback>Navel</span>'">
+  <div class="rpt-logos">
+    <div class="rpt-logo">
+      <img src="${logoSrc}" alt="Navel"
+        onerror="this.parentNode.innerHTML='<span class=rpt-logo-fallback>Navel</span>'">
+    </div>
+    ${logoMarcaSrc ? `
+    <div class="rpt-logo-istobal">
+      <img src="${logoMarcaSrc}" alt="${esc(logoMarcaAlt)}" onerror="this.parentNode.style.display='none'">
+    </div>` : ''}
   </div>
   <div class="rpt-empresa">
     <strong>${esc(EMPRESA.nome)}</strong>
@@ -458,6 +495,7 @@ section{margin-bottom:10px;page-break-inside:avoid}
         <span class="rpt-label" style="margin-top:5px;display:block">Assinatura manuscrita</span>
         <img src="${safeAssinatura}" alt="Assinatura do cliente">
       </div>` : ''}
+      <div class="rpt-assinatura-legenda">Relatório assinado pelo cliente / responsável no local: <strong>${esc(relatorio.nomeAssinante ?? '—')}</strong></div>
     </div>
     <div class="rpt-declaracao">${esc(DECLARACAO_CLIENTE)}</div>
   </div>

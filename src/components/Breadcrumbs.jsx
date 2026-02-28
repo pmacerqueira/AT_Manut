@@ -15,6 +15,7 @@ const ROUTE_LABELS = {
   '/calendario': 'Calendário',
   '/agendamento': 'Agendar',
   '/logs': 'Logs',
+  '/marcas': 'Marcas',
   '/definicoes': 'Definições',
 }
 

@@ -293,7 +293,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
     const html = relatorioParaHtml(tempRel, manutencaoAtual, maq, cliente, items, {
       subcategoriaNome: sub?.nome ?? '',
-      logoUrl: `${import.meta.env.BASE_URL}logo.png`,
+      logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
     })
     if (html) imprimirOuGuardarPdf(html)
   }, [maq, maquina, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, canvasRef])
@@ -439,7 +439,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           cliente,
           checklistItems:   items,
           subcategoriaNome: sub?.nome ?? '',
-          logoUrl:          `${import.meta.env.BASE_URL}logo.png`,
+          logoUrl:          `${import.meta.env.BASE_URL}logo-navel.png`,
         })
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
