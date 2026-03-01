@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.9.3` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.10.3` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 
@@ -124,16 +124,25 @@ Ver [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) para lista completa
 
 ## Documentação
 
-| Documento | Conteúdo |
-|-----------|----------|
-| [`CHANGELOG.md`](./CHANGELOG.md) | Histórico de versões e alterações |
-| [`DOCUMENTACAO.md`](./DOCUMENTACAO.md) | Modelo de dados, rotas, fluxos detalhados |
-| [`DESENVOLVIMENTO.md`](./DESENVOLVIMENTO.md) | Guia para desenvolvimento futuro |
-| [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Estado actual e próximas funcionalidades |
-| [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md) | Suite de testes Playwright (441 testes, 17 specs) |
-| [`docs/MANUAL-UX-UI.md`](./docs/MANUAL-UX-UI.md) | Directrizes de UX/UI obrigatórias |
-| [`docs/IMAGENS-E-ICONES.md`](./docs/IMAGENS-E-ICONES.md) | Gestão de imagens e ícones |
-| [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md) | Build e zip para deploy (evitar crash Cursor) |
-| [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) | Checklist de deployment |
-| [`docs/GIT-SETUP.md`](./docs/GIT-SETUP.md) | Configuração Git/GitHub |
-| [`servidor-cpanel/INSTRUCOES_CPANEL.md`](./servidor-cpanel/INSTRUCOES_CPANEL.md) | Configuração do backend PHP |
+### Fonte canónica (ordem de prioridade)
+1. `DOCUMENTACAO.md`
+2. `DESENVOLVIMENTO.md`
+3. `CHANGELOG.md`
+4. `docs/MANUT-APP-INSIGHTS.md`
+
+### Núcleo canónico
+- [`DOCUMENTACAO.md`](./DOCUMENTACAO.md) — arquitetura, modelo de dados e fluxos técnicos.
+- [`DESENVOLVIMENTO.md`](./DESENVOLVIMENTO.md) — práticas de implementação e entrega.
+- [`CHANGELOG.md`](./CHANGELOG.md) — histórico de versões.
+- [`docs/MANUT-APP-INSIGHTS.md`](./docs/MANUT-APP-INSIGHTS.md) — continuidade entre agentes/modelos, decisões e handoff.
+
+### Operação, qualidade e deploy
+- [`docs/TESTES-E2E.md`](./docs/TESTES-E2E.md)
+- [`docs/MANUAL-UX-UI.md`](./docs/MANUAL-UX-UI.md)
+- [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md)
+- [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md)
+- [`servidor-cpanel/INSTRUCOES_CPANEL.md`](./servidor-cpanel/INSTRUCOES_CPANEL.md)
+
+> Regra de manutenção: evitar duplicar conteúdo em múltiplos ficheiros. Atualizar a fonte canónica e referenciar nos restantes documentos.
+>
+> Nota: `docs/ROADMAP-EVOLUCAO-2026.md` e `docs/SESSAO-FILOSOFT-2026-02-22.md` são registos históricos (não canónicos para estado atual).

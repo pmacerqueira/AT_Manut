@@ -2,6 +2,11 @@
 
 Registo das alterações implementadas por sessão de desenvolvimento.
 
+Política de continuidade:
+- cada entrada deve registar contexto, decisão e impacto;
+- no fim de cada sessão crítica, acrescentar nota de handoff (próximo passo claro);
+- o changelog é fonte de verdade para continuidade entre agentes/modelos.
+
 ---
 
 ## [1.10.3] — 2026-02-27 — Optimização do processo de build e zip

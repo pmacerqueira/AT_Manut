@@ -1,6 +1,11 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.9.3 · **Última actualização:** 2026-02-26
+**Versão:** 1.10.3 · **Última actualização:** 2026-03-01
+
+> Nota de continuidade entre agentes/modelos:
+> - não existe memória global automática entre chats;
+> - não existe aprendizagem permanente automática de um modelo para outro;
+> - a continuidade é garantida via código, regras em `.cursor/rules`, `CHANGELOG.md` e documentação canónica.
 
 ---
 

@@ -17,6 +17,13 @@ alwaysApply: true
 - Email e PDF gerados pelo servidor cPanel via `servidor-cpanel/send-email.php`
 - Relação com **navel-site** (`c:\navel-site\`): projectos separados; Supabase existe no navel-site mas **não** é usado no AT_Manut — não misturar decisões de arquitectura entre os dois
 
+## Continuidade entre agentes/modelos
+
+- Não assumir memória global automática entre chats/sessões.
+- Não assumir aprendizagem permanente automática de um modelo para outro.
+- Em cada início de conversa, escrever resumo curto com: objetivo, estado atual, risco principal, ficheiros canónicos e próxima ação.
+- A memória operacional persistente deste projeto é: código + `.cursor/rules` + `CHANGELOG.md` + documentação canónica.
+
 ## Imagens e ícones
 
 **Regra obrigatória:** Todas as imagens em `public/` e `src/assets/` devem ser otimizadas. O script `npm run optimize-images` é executado automaticamente antes do build (`prebuild`).

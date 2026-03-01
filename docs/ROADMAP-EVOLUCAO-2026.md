@@ -2,6 +2,7 @@
 
 > Documento estratégico para decisão das próximas etapas de desenvolvimento.
 > Baseado no estado actual v1.9.7 (Fevereiro 2026).
+> Classificação: **histórico de planeamento**. Para prioridades atuais, consultar `docs/ROADMAP.md` e `CHANGELOG.md`.
 
 ---
 

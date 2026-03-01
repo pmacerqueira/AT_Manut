@@ -2,8 +2,36 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.10.0 · **Última actualização:** 2026-02-22
+**Versão:** 1.10.3 · **Última actualização:** 2026-03-01
 **Localização:** `c:\AT_Manut\`
+
+---
+
+## 0. Continuidade entre agentes (obrigatório)
+
+### Resumo inicial de conversa
+No início de cada sessão/chat, escrever sempre um resumo curto com:
+1. objetivo do trabalho;
+2. estado atual confirmado (build/testes/deploy);
+3. risco principal;
+4. ficheiros canónicos a consultar;
+5. próxima ação imediata.
+
+### Memória entre modelos
+- Não assumir memória global automática entre chats.
+- Não assumir aprendizagem permanente automática entre modelos.
+- A continuidade real vem de: `.cursor/rules`, `CHANGELOG.md`, documentação canónica e notas de sessão.
+
+### Formato mínimo de nota de sessão
+```text
+Data:
+Contexto:
+Problema:
+Causa raiz:
+Ficheiros alterados:
+Validação (lints/testes/build):
+Próximo passo:
+```
 
 ---
 

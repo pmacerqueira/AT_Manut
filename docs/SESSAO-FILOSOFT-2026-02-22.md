@@ -1,6 +1,7 @@
 # Sessão — Integração Filosoft / Lista de Clientes NAVEL
 
 **Data:** 22 de fevereiro de 2026
+**Estado:** Histórico de sessão (não canónico para regras atuais)
 
 ## Objetivo
 
