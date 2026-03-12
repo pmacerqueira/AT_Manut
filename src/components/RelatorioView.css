@@ -61,7 +61,7 @@
   border: 1px dashed var(--color-border);
   border-radius: var(--radius);
   min-height: 100px;
-  background: #fff;
+  background: var(--color-white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,8 +85,6 @@
 .checklist-num { color: var(--color-text-muted); width: 2rem; }
 .checklist-texto { }
 .checklist-resp { width: 4rem; text-align: center; }
-.badge-sim { background: rgba(34, 197, 94, 0.2); color: var(--color-success); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; }
-.badge-nao { background: rgba(239, 68, 68, 0.2); color: var(--color-danger); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; }
 
 .notas-section { }
 .notas-texto { margin: 0; padding: 0.75rem; background: var(--color-bg-elevated); border-radius: var(--radius); font-size: 0.9em; line-height: 1.5; white-space: pre-wrap; }
@@ -94,7 +92,7 @@
 .doc-links-relatorio { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .doc-links-relatorio .doc-link { display: inline-flex; align-items: center; gap: 0.2rem; }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .relatorio-view { max-width: 100%; }
   .assinatura-placeholder { font-size: 0.9em; }
 }

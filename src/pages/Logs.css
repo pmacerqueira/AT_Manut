@@ -224,7 +224,7 @@
 }
 
 /* ── Responsivo ─────────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .log-toolbar  { flex-direction: column; align-items: stretch; }
   .log-filters  { flex-direction: column; }
   .log-select   { max-width: 100%; }

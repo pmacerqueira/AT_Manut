@@ -15,6 +15,7 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { logger } from '../utils/logger'
 import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
 import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive } from 'lucide-react'
+import { STORAGE } from '../config/storageKeys'
 import './Definicoes.css'
 
 export default function Definicoes() {
@@ -26,14 +27,14 @@ export default function Definicoes() {
 
   const fileInputRef = useRef(null)
   const [importing,    setImporting]   = useState(false)
-  const [lastExport,   setLastExport]  = useState(() => localStorage.getItem('atm_last_export') ?? null)
+  const [lastExport,   setLastExport]  = useState(() => localStorage.getItem(STORAGE.LAST_EXPORT) ?? null)
   const [diasAviso,     setDiasAvisoUI]  = useState(() => getDiasAviso())
   const [diasAvisoErro, setDiasAvisoErro] = useState('')
-  const [modoCampo,     setModoCampoUI]  = useState(() => localStorage.getItem('atm_modo_campo') === 'true')
+  const [modoCampo,     setModoCampoUI]  = useState(() => localStorage.getItem(STORAGE.MODO_CAMPO) === 'true')
 
   const handleToggleModoCampo = (activo) => {
     setModoCampoUI(activo)
-    localStorage.setItem('atm_modo_campo', String(activo))
+    localStorage.setItem(STORAGE.MODO_CAMPO, String(activo))
     document.body.classList.toggle('modo-campo', activo)
     logger.action('Definicoes', 'modoCampo', activo ? 'Modo campo activado' : 'Modo campo desactivado')
     showToast(activo ? 'Modo campo activado.' : 'Modo campo desactivado.', 'success')
@@ -92,7 +93,7 @@ export default function Definicoes() {
   const handleExportar = () => {
     exportarDados()
     const now = new Date().toISOString()
-    localStorage.setItem('atm_last_export', now)
+    localStorage.setItem(STORAGE.LAST_EXPORT, now)
     setLastExport(now)
     logger.action('Definicoes', 'exportarDados', 'Backup de dados exportado')
     showToast('Backup exportado com sucesso.', 'success')

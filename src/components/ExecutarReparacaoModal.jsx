@@ -15,9 +15,9 @@ import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
 import { Hammer, X, Camera, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { MAX_FOTOS } from '../config/limits'
 import './ExecutarReparacaoModal.css'
 
-const MAX_FOTOS    = 8
 const FOTO_MAX_W   = 1200
 const FOTO_MAX_H   = 1200
 const FOTO_QUALITY = 0.75

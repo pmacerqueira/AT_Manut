@@ -19,7 +19,7 @@ O build do Vite (3800+ módulos) consome bastante memória. Executar no **termin
 ## Opção 1: Um único comando (recomendado)
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build:zip
 ```
 
@@ -30,7 +30,7 @@ Executa `npm run build` (inclui optimize-images) e depois cria `dist_upload.zip`
 ## Opção 2: Script PowerShell
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 .\scripts\build-and-zip.ps1
 ```
 
@@ -41,7 +41,7 @@ O script mostra mensagens de progresso e confirma quando o zip está pronto.
 ## Opção 3: Comandos separados
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build
 npm run zip
 ```
@@ -53,7 +53,7 @@ npm run zip
 ## Comandos PowerShell directos
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build
 Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
 ```

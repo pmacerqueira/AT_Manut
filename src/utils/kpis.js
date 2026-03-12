@@ -5,7 +5,7 @@
  * Os resultados devem ser memorizados (useMemo) para evitar recálculos desnecessários.
  */
 
-import { subMonths, isAfter, isBefore, parseISO, differenceInDays, format, startOfWeek, endOfWeek, addWeeks } from 'date-fns'
+import { subMonths, isAfter, isBefore, parseISO, format, startOfWeek, endOfWeek, addWeeks } from 'date-fns'
 import { pt } from 'date-fns/locale'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,21 +123,6 @@ export function calcTopClientesAtraso({ clientes, maquinas }) {
 }
 
 /**
- * Distribuição do status das manutenções pendentes/agendadas actuais.
- */
-export function calcDistribuicaoStatus({ manutencoes }) {
-  const activas = manutencoes.filter(m =>
-    m.status === 'pendente' || m.status === 'agendada' || m.status === 'concluida' || m.status === 'concluído'
-  )
-  const grupos = {}
-  for (const m of activas) {
-    const s = m.status ?? 'desconhecido'
-    grupos[s] = (grupos[s] ?? 0) + 1
-  }
-  return Object.entries(grupos).map(([status, count]) => ({ status, count }))
-}
-
-/**
  * Evolução mensal de manutenções concluídas (últimos N meses).
  * Para gráfico de linha ou barra histórico.
  */
@@ -167,29 +152,3 @@ export function calcEvolucaoMensal({ manutencoes, meses = 6 }) {
   return resultado
 }
 
-/**
- * Calcula o MTBF médio da frota (Mean Time Between Failures / periodicidade real).
- * Baseado no intervalo médio entre relatórios de cada máquina.
- */
-export function calcMtbfMedio({ maquinas, relatorios }) {
-  const intervalos = []
-
-  for (const maq of maquinas) {
-    const rels = relatorios
-      .filter(r => {
-        // relatorios podem ter manutencao_id, não maquina_id directamente
-        return r.maquinaId === maq.id || r.maquina_id === maq.id
-      })
-      .map(r => parseData(r.data_criacao ?? r.dataCriacao))
-      .filter(Boolean)
-      .sort((a, b) => a - b)
-
-    for (let i = 1; i < rels.length; i++) {
-      const diff = differenceInDays(rels[i], rels[i - 1])
-      if (diff > 0 && diff < 730) intervalos.push(diff)
-    }
-  }
-
-  if (intervalos.length === 0) return null
-  return Math.round(intervalos.reduce((a, b) => a + b, 0) / intervalos.length)
-}

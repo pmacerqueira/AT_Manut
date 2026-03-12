@@ -13,12 +13,13 @@
  */
 
 import { logger } from '../utils/logger'
+import { SESSION } from '../config/storageKeys'
+import { API_TIMEOUT_MS } from '../config/limits'
 
 const ENV_API_URL  = (import.meta.env.VITE_API_URL || '').trim()
 const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim()
 const API_URL = ENV_API_URL || `${(ENV_API_BASE || 'https://www.navel.pt').replace(/\/+$/, '')}/api/data.php`
-const TOKEN_KEY = 'atm_api_token'
-const TIMEOUT_MS = 15000  // 15s — protege contra rede lenta no cPanel
+const TOKEN_KEY = SESSION.API_TOKEN
 
 function apiFailureMode(status, msg = '') {
   const text = String(msg || '').toLowerCase()
@@ -64,7 +65,7 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
   if (data) body.data = data
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
   let resp
   try {
@@ -76,7 +77,7 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
     })
   } catch (err) {
     if (err.name === 'AbortError') {
-      const timeoutErr = new Error(`Timeout: API não respondeu em ${TIMEOUT_MS / 1000}s (${resource}/${action})`)
+      const timeoutErr = new Error(`Timeout: API não respondeu em ${API_TIMEOUT_MS / 1000}s (${resource}/${action})`)
       timeoutErr.status = 408
       logger.error('apiService', 'call', timeoutErr.message, {
         resource, action, status: 408, failureMode: 'timeout', endpoint: API_URL, method: 'POST', stack: timeoutErr.stack,
@@ -123,7 +124,7 @@ export async function apiLogin(username, password) {
   form.set('password', password)
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
 
   let resp
   try {
@@ -135,7 +136,7 @@ export async function apiLogin(username, password) {
     })
   } catch (err) {
     if (err.name === 'AbortError') {
-      const timeoutErr = new Error(`Timeout: servidor não respondeu ao login em ${TIMEOUT_MS / 1000}s`)
+      const timeoutErr = new Error(`Timeout: servidor não respondeu ao login em ${API_TIMEOUT_MS / 1000}s`)
       timeoutErr.status = 408
       logger.error('apiService', 'login', timeoutErr.message, {
         status: 408, failureMode: 'timeout', endpoint: API_URL, method: 'POST', stack: timeoutErr.stack,

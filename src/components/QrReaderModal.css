@@ -3,7 +3,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(4px);
-  z-index: 600;
+  z-index: var(--z-qr-reader);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,7 +181,7 @@
   font-family: monospace;
   background: var(--color-bg-card);
   padding: 0.4rem 0.6rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   max-height: 80px;
   overflow-y: auto;
   scrollbar-width: thin;

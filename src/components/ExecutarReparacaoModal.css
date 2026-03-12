@@ -9,7 +9,7 @@
   background: var(--color-bg-card, #1a2332);
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
   margin: auto;
 }
 
@@ -105,9 +105,9 @@
   flex: 1;
   min-width: 140px;
 }
-.required { color: #ef4444; }
+.required { color: var(--color-danger); }
 .field-error {
-  color: #ef4444;
+  color: var(--color-danger);
   font-size: 0.75rem;
   margin: 0.2rem 0 0;
   display: block;
@@ -193,13 +193,13 @@
   cursor: pointer;
   user-select: none;
   transition: all 0.12s;
-  background: #fff;
+  background: var(--color-white);
 }
 .checklist-opt input { display: none; }
 .checklist-opt.active {
   background: var(--primary, #3b82f6);
   border-color: var(--primary, #3b82f6);
-  color: #fff;
+  color: var(--color-white);
 }
 
 /* ── Fotos ────────────────────────────────────────────────────────────────── */
@@ -228,7 +228,7 @@
   top: 2px;
   right: 2px;
   background: rgba(0,0,0,0.55);
-  color: #fff;
+  color: var(--color-white);
   border: none;
   border-radius: 50%;
   width: 18px;
@@ -304,12 +304,12 @@
   padding: 2rem 1.5rem;
 }
 .concluido-icon {
-  color: #16a34a;
+  color: var(--color-success-dark);
 }
 .exec-rep-concluido h3 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #16a34a;
+  color: var(--color-success-dark);
   margin: 0;
 }
 .exec-rep-concluido p {
@@ -387,7 +387,7 @@
   content: '✓';
   position: absolute;
   left: 0;
-  color: #16a34a;
+  color: var(--color-success-dark);
   font-weight: 700;
 }
 .email-tag {
@@ -411,8 +411,8 @@
 
 /* Botão guardar progresso */
 .btn-guardar-progresso {
-  border-color: #f97316 !important;
-  color: #f97316 !important;
+  border-color: var(--color-warning) !important;
+  color: var(--color-warning) !important;
 }
 .btn-guardar-progresso:hover {
   background: #fff7ed !important;

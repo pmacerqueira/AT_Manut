@@ -9,13 +9,13 @@
    ```powershell
    npm run dev
    ```
-   Confirmar que está acessível em `http://localhost:5174/manut/` (ou porta indicada no terminal)
+   Confirmar que está acessível em `http://localhost:5173/manut/` (ou porta indicada no terminal)
 
 2. **Browser:** Chrome, Edge ou Firefox (com DevTools)
 
 3. **Credenciais:**
-   - Username: `admin` / Password: `admin123`
-   - OU Username: `tecnico` / Password: `tecnico123`
+   - Username: `Admin` / Password: `admin123%`
+   - OU Username: `ATecnica` / Password: `tecnica123%`
 
 ---
 
@@ -27,11 +27,11 @@ Verificar que o cache local é criado e populado quando a aplicação carrega on
 ### Passos
 
 1. **Navegar para login:**
-   - Abrir `http://localhost:5174/manut/login`
+   - Abrir `http://localhost:5173/manut/login`
 
 2. **Fazer login:**
-   - Username: `admin`
-   - Password: `admin123`
+   - Username: `Admin`
+   - Password: `admin123%`
    - Clicar em "Entrar"
 
 3. **Aguardar Dashboard carregar:**
@@ -40,7 +40,7 @@ Verificar que o cache local é criado e populado quando a aplicação carrega on
 4. **Abrir DevTools:**
    - Pressionar `F12` (ou `Ctrl+Shift+I` / `Cmd+Option+I`)
    - Ir à tab **Application** (Chrome/Edge) ou **Storage** (Firefox)
-   - No painel esquerdo: **Local Storage** → `http://localhost:5174`
+   - No painel esquerdo: **Local Storage** → `http://localhost:5173`
 
 5. **Procurar chave `atm_cache_v1`:**
    - Clicar na chave `atm_cache_v1`
@@ -286,9 +286,9 @@ Browser: _______________ (versão: ___)
 
 ### Chaves localStorage relevantes:
 
-- `atm_cache_v1` — Cache de todos os dados (clientes, máquinas, manutenções, etc.)
+- `atm_cache_v1` — Cache de todos os dados (clientes, máquinas, manutenções, etc.) — modelo actual
 - `atm_sync_queue` — Fila de operações pendentes de sincronização
-- `atm_clientes`, `atm_maquinas`, etc. — Dados persistidos (legacy, pode não existir)
+- `atm_clientes`, `atm_maquinas`, etc. — Dados persistidos (legacy; pode não existir; o modelo actual usa `atm_cache_v1`)
 
 ### Comportamento esperado do banner:
 

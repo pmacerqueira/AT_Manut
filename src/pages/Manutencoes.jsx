@@ -13,7 +13,8 @@ import { usePermissions } from '../hooks/usePermissions'
 import SignaturePad from '../components/SignaturePad'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, FolderOpen, Paperclip, X, CheckCircle, Wrench, Play, FileDown, ArrowLeft, Mail, Zap, Clock } from 'lucide-react'
+import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, FolderOpen, Paperclip, X, CheckCircle, Wrench, Play, FileDown, ArrowLeft, Mail, Zap, Clock, Archive } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores } from '../utils/datasAzores'
 import { safeHttpUrl } from '../utils/sanitize'
@@ -22,9 +23,12 @@ import { relatorioParaHtml } from '../utils/relatorioHtml'
 import { abrirPdfRelatorio, imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { logger } from '../utils/logger'
+import { STORAGE } from '../config/storageKeys'
 import './Manutencoes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', em_progresso: 'Em progresso', emAtraso: 'Em atraso', proxima: 'Próxima' }
+
+const SETE_DIAS_MS = 7 * 24 * 3600 * 1000
 
 const getDisplayStatus = (m) => {
   if (m.status === 'concluida')    return 'concluida'
@@ -62,13 +66,14 @@ export default function Manutencoes() {
   const [modalExecucao, setModalExecucao] = useState(null)
   const [modalFotos, setModalFotos] = useState(null) // { fotos: string[] }
   const [modalEmail, setModalEmail] = useState(null) // { manutencao, maquina, rel, sub, cliente }
+  const [modalRecolherAssinatura, setModalRecolherAssinatura] = useState(null) // { manutencao, maquina }
   const [emailDestino, setEmailDestino] = useState('')
   const [emailEnviando, setEmailEnviando] = useState(false)
   const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasTotais: '', horasServico: '' })
   const [formAssinatura, setFormAssinatura] = useState({ checklistRespostas: {}, notas: '', nomeAssinante: '', assinaturaDigital: null })
   const [erroChecklistAssinatura, setErroChecklistAssinatura] = useState('')
 
-  const STORAGE_KEY = 'atmanut_manutencoes_filter'
+  const STORAGE_KEY = STORAGE.MANUTENCOES_FILTER
 
   const [searchParams, setSearchParams] = useSearchParams()
   const filterRaw = searchParams.get('filter')
@@ -105,6 +110,19 @@ export default function Manutencoes() {
   }, [location.state?.openExecucaoId, manutencoes, maquinas, navigate, location.pathname, location.search])
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
+
+  const isHistorico = (m) => {
+    if (!m.criadoEm) return false
+    const dataManut = new Date(m.data).getTime()
+    const dataCriacao = new Date(m.criadoEm).getTime()
+    return dataManut < Date.now() && (dataCriacao - dataManut) > SETE_DIAS_MS
+  }
+
+  const isPendenteAssinatura = (m) => {
+    if (m.status !== 'concluida') return false
+    const rel = getRelatorioByManutencao(m.id)
+    return rel && !rel.assinadoPeloCliente
+  }
 
   const manutencoesPendentes = useMemo(() =>
     manutencoes.filter(m => m.status === 'pendente' || m.status === 'agendada'),
@@ -416,6 +434,8 @@ export default function Manutencoes() {
                     {/* Linha 1: tipo + badge + número + badge KAESER */}
                     <div className="mc-top">
                       <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
+                      {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
+                      {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
                       {maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId) && maq.posicaoKaeser != null && !isConcluida && (
                         <span
                           className={`badge kaeser-tipo-badge${maq.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
@@ -481,11 +501,15 @@ export default function Manutencoes() {
                             <button className="icon-btn secondary" onClick={() => abrirModalEmail(m)} title="Enviar email"><Mail size={15} /></button>
                           </>
                         )}
-                        {isConcluida && (rel?.assinadoPeloCliente ? (
+                        {isConcluida && rel?.assinadoPeloCliente && (
                           <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver manutenção"><FileText size={15} /></button>
-                        ) : (
-                          <button className="icon-btn secondary" onClick={() => openAssinatura(m)} title="Assinar"><FileSignature size={15} /></button>
-                        ))}
+                        )}
+                        {isConcluida && rel && !rel.assinadoPeloCliente && (
+                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Recolher assinatura do cliente"><FileSignature size={15} /></button>
+                        )}
+                        {isConcluida && !rel && (
+                          <button className="icon-btn secondary" onClick={() => openAssinatura(m)} title="Registar assinatura"><FileSignature size={15} /></button>
+                        )}
                         {canEditManutencao(m.id) ? (
                           <button className="icon-btn secondary" onClick={() => openEdit(m)} title="Editar"><Pencil size={15} /></button>
                         ) : (
@@ -557,6 +581,8 @@ export default function Manutencoes() {
                         <span className={`badge badge-${isConcluida ? 'concluida' : getDisplayStatus(m)}`}>
                           {statusLabel[isConcluida ? 'concluida' : getDisplayStatus(m)]}
                         </span>
+                        {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
+                        {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
                         {!canEditManutencao(m.id) && (
                           <span className="badge-assinado" title="Assinado pelo cliente"><Lock size={12} /> Assinado</span>
                         )}
@@ -582,11 +608,15 @@ export default function Manutencoes() {
                               <button className="icon-btn secondary" onClick={() => abrirModalEmail(m)} title="Enviar relatório por email"><Mail size={16} /></button>
                             </>
                           )}
-                          {isConcluida && (rel?.assinadoPeloCliente ? (
+                          {isConcluida && rel?.assinadoPeloCliente && (
                             <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver manutenção"><FileText size={16} /></button>
-                          ) : (
+                          )}
+                          {isConcluida && rel && !rel.assinadoPeloCliente && (
+                            <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Recolher assinatura do cliente"><FileSignature size={16} /></button>
+                          )}
+                          {isConcluida && !rel && (
                             <button className="icon-btn secondary" onClick={() => openAssinatura(m)} title="Registar assinatura"><FileSignature size={16} /></button>
-                          ))}
+                          )}
                           {canEditManutencao(m.id) ? (
                             <button className="icon-btn secondary" onClick={() => openEdit(m)} title="Editar"><Pencil size={16} /></button>
                           ) : (
@@ -871,6 +901,15 @@ export default function Manutencoes() {
           onClose={() => setModalExecucao(null)}
           manutencao={modalExecucao.manutencao}
           maquina={modalExecucao.maquina}
+        />
+      )}
+
+      {modalRecolherAssinatura && (
+        <RecolherAssinaturaModal
+          isOpen
+          onClose={() => setModalRecolherAssinatura(null)}
+          manutencao={modalRecolherAssinatura.manutencao}
+          maquina={modalRecolherAssinatura.maquina}
         />
       )}
 

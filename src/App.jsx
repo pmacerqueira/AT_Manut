@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import { logEntry } from './utils/logger'
+import { STORAGE } from './config/storageKeys'
 import './App.css'
 
 class ErrorBoundary extends Component {
@@ -24,19 +25,11 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap:'1rem', padding:'2rem', fontFamily:'sans-serif' }}>
-          <h2 style={{ color:'#dc2626' }}>Ocorreu um erro inesperado</h2>
-          <p style={{ color:'#555', maxWidth:'400px', textAlign:'center' }}>
-            Por favor recarregue a página. Se o problema persistir, contacte o suporte técnico.
-          </p>
-          <button onClick={() => window.location.reload()} style={{ padding:'0.6rem 1.4rem', background:'#1a4880', color:'#fff', border:'none', borderRadius:'6px', cursor:'pointer', fontSize:'1rem' }}>
-            Recarregar
-          </button>
-          {import.meta.env.DEV && (
-            <pre style={{ fontSize:'0.75rem', color:'#888', maxWidth:'600px', whiteSpace:'pre-wrap', marginTop:'1rem' }}>
-              {String(this.state.error)}
-            </pre>
-          )}
+        <div className="error-boundary">
+          <h2>Ocorreu um erro inesperado</h2>
+          <p>Por favor recarregue a página. Se o problema persistir, contacte o suporte técnico.</p>
+          <button onClick={() => window.location.reload()}>Recarregar</button>
+          {import.meta.env.DEV && <pre>{String(this.state.error)}</pre>}
         </div>
       )
     }
@@ -71,7 +64,7 @@ function App() {
   // Aplicar/remover classe de Modo Campo no <body> conforme persistência em localStorage
   useEffect(() => {
     const aplicar = () => {
-      const activo = localStorage.getItem('atm_modo_campo') === 'true'
+      const activo = localStorage.getItem(STORAGE.MODO_CAMPO) === 'true'
       document.body.classList.toggle('modo-campo', activo)
     }
     aplicar()

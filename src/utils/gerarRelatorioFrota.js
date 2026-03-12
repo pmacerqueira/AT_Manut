@@ -6,13 +6,7 @@
 import { escapeHtml } from './sanitize'
 import { formatDataAzores } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
-
-const EMPRESA = {
-  nome:      'JOSÉ GONÇALVES CERQUEIRA (NAVEL-AÇORES), Lda.',
-  sede:      'Rua Engº Abel Ferin Coutinho · Apt. 1481 · 9501-802 Ponta Delgada',
-  telefones: 'Tel: 296 205 290 / 296 630 120',
-  web:       'www.navel.pt',
-}
+import { EMPRESA } from '../constants/empresa'
 
 /**
  * Gera HTML do relatório executivo de frota para um cliente.

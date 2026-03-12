@@ -7,9 +7,11 @@
  *   atm_alertas_enviados → { [chave]: isoDateTime }
  */
 
-const CFG_KEY      = 'atm_config_alertas'
-const DISMISS_KEY  = 'atm_alertas_dismiss'
-const ENVIADOS_KEY = 'atm_alertas_enviados'
+import { STORAGE } from './storageKeys'
+
+const CFG_KEY      = STORAGE.CONFIG_ALERTAS
+const DISMISS_KEY  = STORAGE.ALERTAS_DISMISS
+const ENVIADOS_KEY = STORAGE.ALERTAS_ENVIADOS
 
 // ── Configuração ─────────────────────────────────────────────────────────────
 

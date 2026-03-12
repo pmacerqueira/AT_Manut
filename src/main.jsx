@@ -6,6 +6,7 @@ import { DataProvider } from './context/DataContext'
 import { GlobalLoadingProvider } from './context/GlobalLoadingContext'
 import { ToastProvider } from './components/Toast'
 import { logEntry } from './utils/logger'
+import { STORAGE } from './config/storageKeys'
 import './index.css'
 import App from './App.jsx'
 
@@ -36,7 +37,7 @@ import { APP_VERSION } from './config/version'
 //  • NÃO apaga dados do utilizador (clientes, manutenções, etc.)
 ;(async () => {
   try {
-    const storedVersion = localStorage.getItem('atm_app_version')
+    const storedVersion = localStorage.getItem(STORAGE.APP_VERSION)
     if (storedVersion !== APP_VERSION) {
       // Apaga todos os caches de Service Worker
       if ('caches' in window) {
@@ -46,7 +47,7 @@ import { APP_VERSION } from './config/version'
       // Limpa sessionStorage (dados de sessão temporários)
       sessionStorage.clear()
       // Regista nova versão
-      localStorage.setItem('atm_app_version', APP_VERSION)
+      localStorage.setItem(STORAGE.APP_VERSION, APP_VERSION)
       logEntry('info', 'App', 'versionUpdate', `Versão actualizada para ${APP_VERSION}. Caches limpos.`)
     } else {
       logEntry('info', 'App', 'startup', `App iniciada (v${APP_VERSION})`)

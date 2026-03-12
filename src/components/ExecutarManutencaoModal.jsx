@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER, SEQUENCIA_KAESER, tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../context/DataContext'
+import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER, tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../context/DataContext'
 import { TECNICOS } from '../config/users'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
@@ -22,8 +22,8 @@ import { relatorioParaHtml } from '../utils/relatorioHtml'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
+import { MAX_FOTOS } from '../config/limits'
 
-const MAX_FOTOS = 8
 const FOTO_MAX_W = 1200
 const FOTO_MAX_H = 1200
 const FOTO_QUALITY = 0.75
@@ -177,6 +177,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       nomeAssinante: existingRel?.nomeAssinante ?? '',
       tipoManutKaeser,
       pecasUsadas,
+      dataRealizacao: '',
     })
     setFotos(existingRel?.fotos ?? [])
     setErroChecklist('')
@@ -298,8 +299,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (html) imprimirOuGuardarPdf(html)
   }, [maq, maquina, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, canvasRef])
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const gravar = (semAssinatura = false) => {
     setErroChecklist('')
     setErroAssinatura('')
     if (!manutencaoAtual || !maq) return
@@ -315,21 +315,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setErroAssinatura('Selecione o técnico que realizou a manutenção.')
       return
     }
-    if (!form.nomeAssinante.trim()) {
-      setErroAssinatura('Indique o nome do cliente que assina o relatório.')
-      return
-    }
-    if (!assinaturaFeita) {
-      setErroAssinatura('A assinatura digital do cliente é obrigatória.')
-      return
+    if (!semAssinatura) {
+      if (!form.nomeAssinante.trim()) {
+        setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        return
+      }
+      if (!assinaturaFeita) {
+        setErroAssinatura('A assinatura digital do cliente é obrigatória.')
+        return
+      }
     }
 
     const canvas = canvasRef.current
-    const assinaturaDataUrl = canvas ? canvas.toDataURL('image/png') : ''
+    const assinaturaDataUrl = (!semAssinatura && canvas) ? canvas.toDataURL('image/png') : null
 
-    // Admin pode registar manutenções históricas com data retroativa.
-    // Se form.dataRealizacao estiver preenchido (só visível para Admin), usa essa data;
-    // caso contrário usa a data/hora actual — comportamento padrão.
     const hoje = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : getHojeAzores()
     const now  = (isAdmin && form.dataRealizacao)
       ? `${form.dataRealizacao}T12:00:00.000Z`
@@ -343,10 +342,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       notas: form.notas.slice(0, 300),
       fotos,
       tecnico: form.tecnico,
-      assinadoPeloCliente: true,
-      nomeAssinante: form.nomeAssinante.trim(),
+      assinadoPeloCliente: !semAssinatura,
+      nomeAssinante: semAssinatura ? '' : form.nomeAssinante.trim(),
       assinaturaDigital: assinaturaDataUrl,
-      dataAssinatura: now,
+      dataAssinatura: semAssinatura ? null : now,
       dataCriacao: rel?.dataCriacao ?? now,
       ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
       ...(form.pecasUsadas.length > 0 && { pecasUsadas: form.pecasUsadas }),
@@ -370,14 +369,27 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       tecnico: form.tecnico,
     })
 
-    logger.action('ExecutarManutencaoModal', 'concluirManutencao',
-      `Manutenção concluída — ${numeroRelatorioFinal} — assinada por "${form.nomeAssinante}" (técnico: ${form.tecnico})`,
-      { manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal, tecnico: form.tecnico }
+    const logMsg = semAssinatura
+      ? `Manutenção concluída SEM assinatura — ${numeroRelatorioFinal} (técnico: ${form.tecnico})`
+      : `Manutenção concluída — ${numeroRelatorioFinal} — assinada por "${form.nomeAssinante}" (técnico: ${form.tecnico})`
+    logger.action('ExecutarManutencaoModal', 'concluirManutencao', logMsg,
+      { manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal, tecnico: form.tecnico, semAssinatura }
     )
 
-    const updateMaqData = {
-      proximaManut: format(proxima, 'yyyy-MM-dd'),
-      ultimaManutencaoData: hoje,
+    const proximaFormatada = format(proxima, 'yyyy-MM-dd')
+    const isHistoricoPassado = isAdmin && form.dataRealizacao && form.dataRealizacao < getHojeAzores()
+
+    const updateMaqData = {}
+    if (isHistoricoPassado) {
+      if (!maq.ultimaManutencaoData || hoje > maq.ultimaManutencaoData) {
+        updateMaqData.ultimaManutencaoData = hoje
+      }
+      if (!maq.proximaManut || proximaFormatada > maq.proximaManut) {
+        updateMaqData.proximaManut = proximaFormatada
+      }
+    } else {
+      updateMaqData.proximaManut = proximaFormatada
+      updateMaqData.ultimaManutencaoData = hoje
     }
     if (temContadorHoras && (form.horasTotais !== '' || form.horasServico !== '')) {
       if (form.horasTotais !== '') updateMaqData.horasTotaisAcumuladas = Number(form.horasTotais)
@@ -410,20 +422,33 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
 
+    const periodicidadeRecalc = maq.periodicidadeManut || manutencaoAtual.periodicidade
+    if (!maq.periodicidadeManut && manutencaoAtual.periodicidade) {
+      updateMaqData.periodicidadeManut = manutencaoAtual.periodicidade
+    }
+
     updateMaquina(maq.id, updateMaqData)
 
-    // Bloco B: reagendar manutenções periódicas futuras a partir da data de execução real
-    if (manutencaoAtual.tipo === 'periodica' && maq.periodicidadeManut) {
-      const n = recalcularPeriodicasAposExecucao(maq.id, maq.periodicidadeManut, hoje, form.tecnico)
+    if (!isHistoricoPassado && manutencaoAtual.tipo === 'periodica' && periodicidadeRecalc) {
+      const n = recalcularPeriodicasAposExecucao(maq.id, periodicidadeRecalc, hoje, form.tecnico)
       if (n > 0) {
         logger.action('ExecutarManutencaoModal', 'reagendarPeriodicas',
           `${n} periódicas reagendadas para ${maq.marca ?? ''} ${maq.modelo ?? ''} a partir de ${hoje}`,
-          { maquinaId: maq.id, periodicidade: maq.periodicidadeManut, n })
+          { maquinaId: maq.id, periodicidade: periodicidadeRecalc, n })
         showToast(`${n} manutenções futuras reagendadas a partir de hoje.`, 'info', 2500)
       }
     }
 
-    // Enviar email se endereço preenchido, e depois navegar
+    if (semAssinatura) {
+      showToast('Relatório gravado sem assinatura. O cliente poderá assinar depois.', 'success')
+      setConcluido(true)
+      setTimeout(() => {
+        onClose()
+        navigate('/manutencoes?filter=executadas')
+      }, 2000)
+      return
+    }
+
     const enviarEmail = async (relFinal, manutFinal) => {
       if (!emailDestinatario.trim()) return
       setEmailEnviando(true)
@@ -453,8 +478,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
     }
 
-    // Mostra ecrã de confirmação breve e navega para a lista de concluídas.
-    // numeroRelatorioFinal é incluído para que o emailService use o número correcto.
     const relAtualizado = { ...relPayload, manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal }
     enviarEmail(relAtualizado, { ...manutencaoAtual, status: 'concluida', data: hoje, tecnico: form.tecnico })
       .finally(() => {
@@ -466,19 +489,31 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       })
   }
 
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    gravar(false)
+  }
+
+  const handleGravarSemAssinatura = () => {
+    gravar(true)
+  }
+
   if (!isOpen || !maq) return null
 
   const desc = `${maq.marca} ${maq.modelo} — Nº Série: ${maq.numeroSerie}`
 
-  // ── Ecrã de confirmação — manutenção periódica concluída ──────────────────
   if (concluido) {
+    const relFinal = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
+    const foiSemAssinatura = relFinal && !relFinal.assinadoPeloCliente
     return (
       <div className="modal-overlay">
         <div className="modal modal-assinatura" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', padding: '2rem' }}>
           <CheckCircle2 size={48} color="var(--color-success, #22c55e)" style={{ marginBottom: '0.75rem' }} />
           <h2 style={{ marginBottom: '0.5rem' }}>Manutenção executada!</h2>
           <p style={{ marginBottom: '0.5rem', color: 'var(--color-text-muted)' }}>
-            Relatório gerado e assinado com sucesso.
+            {foiSemAssinatura
+              ? 'Relatório gravado. Pendente de assinatura do cliente.'
+              : 'Relatório gerado e assinado com sucesso.'}
           </p>
           <p className="modal-hint">A abrir lista de manutenções executadas…</p>
         </div>
@@ -975,6 +1010,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
           <div className="form-actions">
             <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
+            {isAdmin && (
+              <button type="button" className="btn btn-outline-warning" onClick={handleGravarSemAssinatura} disabled={emailEnviando}>
+                <PenLine size={15} /> Guardar sem assinatura
+              </button>
+            )}
             <button type="submit" disabled={emailEnviando}>
               {emailEnviando
                 ? 'A enviar…'

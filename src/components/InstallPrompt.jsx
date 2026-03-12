@@ -5,10 +5,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, Smartphone, Monitor } from 'lucide-react'
 import { useToast } from './Toast'
+import { STORAGE } from '../config/storageKeys'
 import './InstallPrompt.css'
 
-const STORAGE_KEY_DISMISSED = 'atm_install_dismissed'
-const STORAGE_KEY_DONE = 'atm_install_done'
+const STORAGE_KEY_DISMISSED = STORAGE.INSTALL_DISMISSED
+const STORAGE_KEY_DONE = STORAGE.INSTALL_DONE
 
 function isStandalone() {
   if (typeof window === 'undefined') return true

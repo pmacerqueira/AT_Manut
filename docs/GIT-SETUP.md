@@ -43,7 +43,7 @@ git config --global user.email "pmcerqueira@navel.pt"
 Se a pasta `c:\AT_Manut` ainda não for um repositório Git:
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 git init
 ```
 
@@ -54,7 +54,7 @@ git init
 Depois de teres o Git a funcionar:
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 git add .
 git commit -m "v1.0.0 — Primeira versão estável"
 git tag -a v1.0.0 -m "Primeira versão estável"
@@ -69,7 +69,7 @@ O repositório está em **https://github.com/pmacerqueira/AT_Manut**.
 ### Push após cada build fechado
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 git add -A
 git commit -m "v{versão} - resumo breve"
 git tag -a v{versão} -m "Release v{versão}"

@@ -34,28 +34,30 @@
  *   logger.fatal ('App', 'crash', 'ErrorBoundary activado', { stack: '...' })
  */
 
+import { STORAGE, SESSION } from '../config/storageKeys'
+
 // ── Configuração ──────────────────────────────────────────────────────────────
 
-const STORAGE_KEY       = 'atm_log'
+const STORAGE_KEY       = STORAGE.LOG
 const MAX_DAYS          = 60
 const MAX_BYTES         = 2_000_000   // 2 MB — localStorage tem ~5-10 MB por origem
 const DEDUP_MS          = 5_000       // não repete a mesma mensagem em 5 segundos
 const FLUSH_BATCH_SIZE  = 20          // envia para o servidor após N entradas acumuladas
 const LOG_ENDPOINT      = '/api/log-receiver.php'
 const LOG_AUTH_TOKEN    = 'Navel2026$Api!Key#xZ99'  // mesmo token da API de email
-const FLUSH_PENDING_KEY = 'atm_log_pending_flush'   // entradas ainda não enviadas ao servidor
+const FLUSH_PENDING_KEY = STORAGE.LOG_PENDING_FLUSH
 const APP_VERSION  = (() => {
-  try { return localStorage.getItem('atm_app_version') || '?' } catch { return '?' }
+  try { return localStorage.getItem(STORAGE.APP_VERSION) || '?' } catch { return '?' }
 })()
 
 // ── Session ID (por sessão de browser; reset ao fechar o tab) ─────────────────
 
 function getSessionId() {
   try {
-    let id = sessionStorage.getItem('atm_session_id')
+    let id = sessionStorage.getItem(SESSION.SESSION_ID)
     if (!id) {
       id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-      sessionStorage.setItem('atm_session_id', id)
+      sessionStorage.setItem(SESSION.SESSION_ID, id)
     }
     return id
   } catch { return 'unknown' }
@@ -66,7 +68,7 @@ function getSessionId() {
 
 function getCurrentUser() {
   try {
-    const token = sessionStorage.getItem('atm_api_token')
+    const token = sessionStorage.getItem(SESSION.API_TOKEN)
     if (!token) return null
     const parts = token.split('.')
     if (parts.length !== 3) return null

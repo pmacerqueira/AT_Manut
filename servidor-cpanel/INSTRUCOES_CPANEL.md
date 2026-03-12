@@ -45,7 +45,7 @@ O token impede que terceiros utilizem o endpoint para enviar spam.
    - `send-email.php`, `send-report.php`, `log-receiver.php` — usam o mesmo token
    - Em alternativa: cPanel → Advanced → Environment Variables → adicionar `ATM_REPORT_AUTH_TOKEN`
 
-**b) Na app React** — editar `C:\AT_Manut\src\config\emailConfig.js`:
+**b) Na app React** — editar `c:\Cursor_Projetos\NAVEL\AT_Manut\src\config\emailConfig.js`:
    ```js
    AUTH_TOKEN: 'Navel2026$Api!Key#xZ99',   // ← mesmo token que no PHP
    ```
@@ -81,7 +81,7 @@ envios com estado detalhado e possíveis erros.
 ## Deployment da app AT_Manut (quando estiver pronto)
 
 Quando quiseres publicar a app:
-1. `cd C:\AT_Manut`
+1. `cd c:\Cursor_Projetos\NAVEL\AT_Manut`
 2. `npm run build`  → cria a pasta `dist/`
 3. Fazer upload do conteúdo de `dist/` para `public_html/manut/`
    (criar a pasta `manut/` primeiro)

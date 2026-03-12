@@ -9,10 +9,11 @@ import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
+import { STORAGE } from '../config/storageKeys'
 
 const DataContext = createContext(null)
 
-const INTERVALOS = {
+export const INTERVALOS = {
   trimestral: { dias: 90, label: 'Trimestral' },
   semestral: { dias: 180, label: 'Semestral' },
   anual: { dias: 365, label: 'Anual' },
@@ -468,48 +469,6 @@ export function descricaoCicloKaeser(posicao) {
   return `Tipo ${tipo} — Ano ${pos + 1} de 12`
 }
 
-// Plano de referência KAESER ASK 28T (extraído do manual)
-// Formato: { tipoManut, posicao, codigoArtigo, descricao, quantidade, unidade }
-export const KAESER_PLANO_ASK_28T = [
-  // Tipo A — 3.000h / 1 ano
-  { tipoManut: 'A', posicao: '0512', codigoArtigo: '490111.00030', descricao: 'SET filtro compressor sem FSÓ', quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',           quantidade: 3, unidade: 'PÇ' },
-  // Tipo B — 6.000h
-  { tipoManut: 'B', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',      quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'B', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',           quantidade: 3, unidade: 'PÇ' },
-  { tipoManut: 'B', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.', quantidade: 1, unidade: 'PÇ' },
-  // Tipo C — 12.000h
-  { tipoManut: 'C', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',         quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',              quantidade: 3, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '1801', codigoArtigo: '6.4832.0',     descricao: 'Correia de accionamento',          quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '2022', codigoArtigo: '401819.0',     descricao: 'Jogo manutenção válvula RPM',      quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '2042', codigoArtigo: '404249.0',     descricao: 'Jogo manutenção válv. entrada',    quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '2062', codigoArtigo: '400994.00020', descricao: 'Jogo manutenção/Válvula comb.',    quantidade: 1, unidade: 'TER' },
-  { tipoManut: 'C', posicao: '2102', codigoArtigo: '400706.00010', descricao: 'Jogo manutenção válvula CV',       quantidade: 1, unidade: 'TER' },
-  { tipoManut: 'C', posicao: '4451', codigoArtigo: '402533.0',     descricao: 'KIT manutenção rolamentos 6209',   quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '4701', codigoArtigo: '6.0034.00010', descricao: 'Rolamento rígido de esferas 60',   quantidade: 2, unidade: 'PÇ' },
-  { tipoManut: 'C', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.',   quantidade: 1, unidade: 'PÇ' },
-  // Tipo D — 36.000h
-  { tipoManut: 'D', posicao: '0510', codigoArtigo: '490111.00010', descricao: 'SET filtro compressor ASK',         quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l',              quantidade: 3, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '1801', codigoArtigo: '6.4832.0',     descricao: 'Correia de accionamento',          quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '2024', codigoArtigo: '401820.1',     descricao: 'Jogo revisão válvula RPM',         quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '2044', codigoArtigo: '404250.0',     descricao: 'Jogo revisão válvula entrada',     quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '2064', codigoArtigo: '403284.00010', descricao: 'Jogo revisão/Válvula comb.',       quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '2104', codigoArtigo: '400707.00010', descricao: 'Jogo revisão válvula CV',          quantidade: 1, unidade: 'TER' },
-  { tipoManut: 'D', posicao: '4451', codigoArtigo: '402533.0',     descricao: 'KIT manutenção rolamentos 6209',   quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '4701', codigoArtigo: '6.0034.00010', descricao: 'Rolamento rígido de esferas 60',   quantidade: 2, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '4920', codigoArtigo: '9.9351.0',     descricao: 'Unidade de ventilador axial Ø3',   quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '4930', codigoArtigo: '7.2751.00031', descricao: 'Ventilador do armário comando',    quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7140', codigoArtigo: '8.2772.0',     descricao: 'Tubo flexível (7140)',             quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7150', codigoArtigo: '8.2772.0',     descricao: 'Tubo flexível (7150)',             quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7190', codigoArtigo: '8.2333.10040', descricao: 'Tubo flexível (7190)',             quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7350', codigoArtigo: '403803.0',     descricao: 'Jogo conduto de comando',          quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7365', codigoArtigo: '212229.00070', descricao: 'Tubo de descarga condensação',     quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '7563', codigoArtigo: '8.1928.1',     descricao: 'Tubo flexível (7563)',             quantidade: 1, unidade: 'PÇ' },
-  { tipoManut: 'D', posicao: '9602', codigoArtigo: '8.2474.01550', descricao: 'Un. serv. cond. desc. condens.',   quantidade: 1, unidade: 'PÇ' },
-]
-
 // Tipos de documentação técnica por máquina (cumprimento legal obrigatório)
 export const TIPOS_DOCUMENTO = [
   { id: 'manual_utilizador', label: 'Manual do Utilizador' },
@@ -639,7 +598,7 @@ export function DataProvider({ children }) {
   const [reparacoes,          setReparacoes]          = useState([])
   const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
   const [pecasPlano,    setPecasPlano]    = useState(() => {
-    try { return JSON.parse(localStorage.getItem('atm_pecas_plano') ?? '[]') } catch { return [] }
+    try { return JSON.parse(localStorage.getItem(STORAGE.PECAS_PLANO) ?? '[]') } catch { return [] }
   })
   const [loading,       setLoading]       = useState(true)
 
@@ -1289,31 +1248,60 @@ export function DataProvider({ children }) {
   // ── Manutenções ───────────────────────────────────────────────────────────
   const addManutencao = useCallback((m) => {
     const id = 'm' + Date.now()
-    const novo = { ...m, id }
+    const novo = { ...m, id, criadoEm: m.criadoEm ?? new Date().toISOString() }
     setManutencoes(prev => [...prev, novo])
     logger.action('DataContext', 'addManutencao', `Manutenção agendada (maquinaId: ${m.maquinaId})`, { id, maquinaId: m.maquinaId, data: m.data })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.create(novo),
               { resource: 'manutencoes', action: 'create', data: novo })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'addManutencao', 'Falha ao persistir manutenção', { msg: err?.message, id })
+    })
     return id
+  }, [persist])
+
+  const addManutencoesBatch = useCallback((lista) => {
+    if (!lista || lista.length === 0) return 0
+    const base = Date.now()
+    const novas = lista.map((m, i) => ({
+      ...m,
+      id: m.id || `mb${base}_${i}`,
+      criadoEm: m.criadoEm ?? new Date().toISOString(),
+    }))
+    setManutencoes(prev => [...prev, ...novas])
+    logger.action('DataContext', 'addManutencoesBatch', `${novas.length} manutenções criadas em lote`, { count: novas.length })
+    import('../services/apiService').then(({ apiManutencoes }) =>
+      persist(() => apiManutencoes.bulkCreate(novas),
+              { resource: 'manutencoes', action: 'batch_create', data: novas })
+    ).catch(err => {
+      logger.error('DataContext', 'addManutencoesBatch', 'Falha ao persistir batch', { msg: err?.message, count: novas.length })
+    })
+    return novas.length
   }, [persist])
 
   const updateManutencao = useCallback((id, data) => {
     setManutencoes(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
+    logger.action('DataContext', 'updateManutencao',
+      `Manutenção ${id} actualizada (${data.status ?? 'sem status'})`,
+      { id, ...data })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.update(id, data),
               { resource: 'manutencoes', action: 'update', id, data })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'updateManutencao', 'Falha ao persistir actualização', { msg: err?.message, id })
+    })
   }, [persist])
 
   const removeManutencao = useCallback((id) => {
     setManutencoes(prev => prev.filter(m => m.id !== id))
     setRelatorios(prev => prev.filter(r => r.manutencaoId !== id))
+    logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.remove(id),
               { resource: 'manutencoes', action: 'delete', id })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'removeManutencao', 'Falha ao persistir eliminação', { msg: err?.message, id })
+    })
   }, [persist])
 
   // ── Relatórios ────────────────────────────────────────────────────────────
@@ -1325,7 +1313,7 @@ export function DataProvider({ children }) {
     // O servidor aceita o número proposto; a constraint UNIQUE protege contra colisões.
     let numeroRelatorio = r.numeroRelatorio
     if (!numeroRelatorio) {
-      const ano = new Date().getFullYear()
+      const ano = new Date(dataCriacao).getFullYear()
       const tipoManut = manutencoes.find(m => m.id === r.manutencaoId)?.tipo ?? 'periodica'
       const prefix = tipoManut === 'montagem' ? 'MT' : 'MP'
       const pattern = `${ano}.${prefix}.`
@@ -1340,19 +1328,30 @@ export function DataProvider({ children }) {
 
     const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
     setRelatorios(prev => [...prev, novo])
+    logger.action('DataContext', 'addRelatorio',
+      `Relatório criado: ${numeroRelatorio}`,
+      { id, manutencaoId: r.manutencaoId, assinado: novo.assinadoPeloCliente })
     import('../services/apiService').then(({ apiRelatorios }) =>
       persist(() => apiRelatorios.create(novo),
               { resource: 'relatorios', action: 'create', data: novo })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'addRelatorio', 'Falha ao persistir relatório', { msg: err?.message, id })
+    })
     return { id, numeroRelatorio }
   }, [manutencoes, relatorios, persist])
 
   const updateRelatorio = useCallback((id, data) => {
     setRelatorios(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
+    const tipo = data.assinadoPeloCliente ? 'assinatura recolhida' : 'dados actualizados'
+    logger.action('DataContext', 'updateRelatorio',
+      `Relatório ${id} actualizado (${tipo})`,
+      { id, assinado: data.assinadoPeloCliente ?? false })
     import('../services/apiService').then(({ apiRelatorios }) =>
       persist(() => apiRelatorios.update(id, data),
               { resource: 'relatorios', action: 'update', id, data })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'updateRelatorio', 'Falha ao persistir actualização', { msg: err?.message, id })
+    })
   }, [persist])
 
   /**
@@ -1432,10 +1431,15 @@ export function DataProvider({ children }) {
   const confirmarManutencoesPeriodicas = useCallback((novas) => {
     if (!novas?.length) return 0
     setManutencoes(prev => [...prev, ...novas])
+    logger.action('DataContext', 'confirmarManutencoesPeriodicas',
+      `${novas.length} manutenções periódicas confirmadas (pós-montagem)`,
+      { count: novas.length, maquinaId: novas[0]?.maquinaId })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.bulkCreate(novas),
               { resource: 'manutencoes', action: 'bulk_create', data: novas })
-    )
+    ).catch(err => {
+      logger.error('DataContext', 'confirmarManutencoesPeriodicas', 'Falha ao persistir periódicas', { msg: err?.message, count: novas.length })
+    })
     return novas.length
   }, [persist])
 
@@ -1586,10 +1590,15 @@ export function DataProvider({ children }) {
       novaCount = novas.length
 
       if (novas.length > 0) {
+        logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
+          `${novas.length} periódicas recalculadas para máquina ${maquinaId}`,
+          { maquinaId, periodicidade, dataExecucao, count: novas.length })
         import('../services/apiService').then(({ apiManutencoes }) =>
           persist(() => apiManutencoes.bulkCreate(novas),
                   { resource: 'manutencoes', action: 'recalc_periodicas', data: novas })
-        )
+        ).catch(err => {
+          logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
+        })
       }
 
       return [...semFuturas, ...novas]
@@ -1600,7 +1609,7 @@ export function DataProvider({ children }) {
 
   // ── Persistência local de pecasPlano ─────────────────────────────────────────
   useEffect(() => {
-    localStorage.setItem('atm_pecas_plano', JSON.stringify(pecasPlano))
+    localStorage.setItem(STORAGE.PECAS_PLANO, JSON.stringify(pecasPlano))
   }, [pecasPlano])
 
   // ── Peças e consumíveis — plano por máquina ───────────────────────────────────
@@ -1764,6 +1773,7 @@ export function DataProvider({ children }) {
     addDocumentoMaquina,
     removeDocumentoMaquina,
     addManutencao,
+    addManutencoesBatch,
     updateManutencao,
     removeManutencao,
     iniciarManutencao,
@@ -1798,7 +1808,7 @@ export function DataProvider({ children }) {
     addCategoria, updateCategoria, removeCategoria, addMarca, updateMarca,
     addCliente, updateCliente, removeCliente, importClientes, clearAllClientesAndRelated,
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
-    addManutencao, updateManutencao, removeManutencao, iniciarManutencao,
+    addManutencao, addManutencoesBatch, updateManutencao, removeManutencao, iniciarManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
     addReparacao, updateReparacao, removeReparacao,
     addRelatorioReparacao, updateRelatorioReparacao, getRelatorioByReparacao,

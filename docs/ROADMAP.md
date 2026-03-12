@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-02-26 — v1.9.7
+> Última revisão: 2026-03-12 — v1.10.3
 
 ---
 
-## Estado actual (v1.9.7) — O que está implementado
+## Estado actual (v1.10.3) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -42,8 +42,8 @@
 | **Reparações — fluxo ISTOBAL** | Avisos ES-, relatório individual + resumo mensal faturável | **v1.9.x** |
 | **Reparações — relatório mensal** | Modal mensal ISTOBAL com horas M.O., materiais expansíveis, impressão | **v1.9.x** |
 | **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
-| **Importação SAF-T clientes** | Modal Admin, preview, modos Ignorar/Actualizar, persistência API | **v1.9.7** |
-| **Suite de testes E2E** | 447 testes Playwright (18 specs) — importação SAF-T incluída | **v1.9.7** |
+| **Importação SAF-T clientes** | Modal Admin, preview, modos Ignorar/Actualizar, persistência API | **v1.10.3** |
+| **Suite de testes E2E** | ~450 testes Playwright (18 specs) — importação SAF-T incluída | **v1.10.3** |
 
 ---
 
@@ -168,11 +168,11 @@
 - **Dashboard KPIs executivo** — taxa de cumprimento, gráficos, top clientes em atraso
 - **Modo campo** — alto contraste para técnicos ao sol
 - **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
-- **441 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
+- **~450 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 
 ---
 
-*Última actualização: 2026-02-26 — v1.9.7*
+*Última actualização: 2026-03-12 — v1.10.3*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

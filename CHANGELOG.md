@@ -9,6 +9,53 @@ Política de continuidade:
 
 ---
 
+## [1.11.0] — 2026-03-12 — Históricos, assinatura em 2 passos, agendamento recorrente, purga dead code
+
+### Novas funcionalidades
+- **Manutenções históricas**: Admin pode inserir registos passados (ex.: papel do ano anterior) com datas retroactivas
+- **Assinatura em 2 passos**: Gravar manutenção sem assinatura → recolher assinatura depois (data bloqueada à data da manutenção)
+- **Agendamento recorrente automático**: Ao agendar periódica, opção de criar manutenções futuras (1–3 anos) conforme periodicidade do equipamento
+- **Inserção em lote**: Secção Admin para criar múltiplos registos históricos (equipamentos × datas) de uma só vez
+- **Badges visuais**: Indicadores "Histórico" e "Pendente assinatura" nas listas de manutenções
+- **RecolherAssinaturaModal**: Novo componente para recolha de assinatura digital pós-execução
+
+### Robustez e logging
+- Adicionado `logger.action` a 6 funções do DataContext que não tinham logging: `addRelatorio`, `updateRelatorio`, `updateManutencao`, `removeManutencao`, `confirmarManutencoesPeriodicas`, `recalcularPeriodicasAposExecucao`
+- Adicionado `.catch(logger.error)` a todas as cadeias `import→persist` do pipeline manutenções/relatórios
+- Adicionado logging completo a `Agendamento.jsx` (agendamento pontual, recorrente e lote histórico)
+- Adicionado `try/catch` + `logger.error` ao `RecolherAssinaturaModal.handleConfirmar`
+- Protecção contra regressão de datas em `updateMaquina` para registos históricos
+- Guard `!isHistoricoPassado` para evitar recálculo periódico ao executar registo histórico
+- Ano correcto no `numeroRelatorio` para relatórios históricos (`dataCriacao` em vez de `new Date()`)
+
+### Optimização mobile (tablet Samsung Galaxy Tab 10/11)
+- Breakpoints CSS consolidados: 768px → 1024px para tablets
+- Tokens CSS centralizados em `:root` (cores, tipografia, espaçamento, sombras, z-index)
+- Bottom navigation bar em substituição do FAB
+- Vista em cards para listas em tablet
+- Formulários com touch targets mínimos de 44px
+
+### Dead code purgado (JS)
+- Imports não usados: `Menu` (Layout), `SUBCATEGORIAS_COM_CONTADOR_HORAS` (Equipamentos), `SEQUENCIA_KAESER` (ExecutarManutencaoModal)
+- Exports mortos: `USERS` (users.js), `KAESER_PLANO_ASK_28T` (DataContext ~40 linhas), `formatISODateAzores`, `calcDistribuicaoStatus`, `calcMtbfMedio`, `getQueue`, `clearQueue`, `clearCache`
+- Constantes não importadas: `TOAST_DURATION`, `CACHE_TTL_DAYS`, `LOG_MAX_DAYS`, `MAX_NOTAS_LENGTH`, `STACK_TRUNCATE` (limits.js)
+- Ficheiro eliminado: `src/constants/status.js` (nunca importado)
+
+### Dead code purgado (CSS)
+- Selectores mortos: `.ficha-maquinas` (→renomeado para `.ficha-maquinas-view`), `.email-toast*`, `.sidebar-toggle`, `body.modo-campo` para classes inexistentes
+- Duplicados eliminados: `.btn-simnao` (Manutencoes.css), `.badge-sim`/`.badge-nao` (RelatorioView.css)
+- Variáveis CSS em falta adicionadas: `--color-primary-light`, `--color-bg-secondary`
+
+### Documentação actualizada (14 ficheiros)
+- Versão → 1.11.0 em todos os docs
+- Caminho workspace corrigido (`c:\Cursor_Projetos\NAVEL\AT_Manut`)
+- Contagem testes → ~450 (18 specs)
+- CHANGELOG: localStorage actualizado para modelo actual (MySQL + `atm_cache_v1`)
+- Supabase: clarificado como fora do âmbito do AT_Manut
+- TESTE-OFFLINE-MANUAL: porto corrigido (5173), credenciais corrigidas
+
+---
+
 ## [1.10.3] — 2026-02-27 — Optimização do processo de build e zip
 
 ### Build
@@ -708,7 +755,7 @@ Política de continuidade:
 
 ### Documentação
 - `docs/ROADMAP.md` — 5 etapas prioritárias refinadas com base em análise estratégica e casos de sucesso CMMS (TRACTIAN, DIMO Maint, UpKeep, Limble, MaintainX)
-- Etapa 5 corrigida: a sincronização multi-dispositivo **já está assegurada** pelo PHP + MySQL no cPanel — o `localStorage` é apenas cache offline; o Supabase reposicionado como *nice-to-have* para atualizações em tempo real
+- Etapa 5 corrigida: a sincronização multi-dispositivo **já está assegurada** pelo PHP + MySQL no cPanel — o `localStorage` é apenas cache offline (Supabase fora do âmbito do AT_Manut)
 - `.cursor/rules/at-manut-workflow.mdc` — arquitectura clarificada: MySQL/cPanel é fonte de verdade, `localStorage` é cache offline
 
 ---
@@ -934,22 +981,18 @@ npx playwright test --ui
 - `AUTH_TOKEN`: token de segurança partilhado entre frontend e PHP
 - Servidor de envio: `no-reply@navel.pt` via `mail()` do cPanel
 
-### Persistência de dados
+### Persistência de dados (modelo actual desde v1.4)
 
-| Chave localStorage | Conteúdo |
+**Fonte de verdade:** MySQL no cPanel (via `apiService.js` → `data.php`). O `localStorage` serve apenas como cache offline.
+
+| Chave | Conteúdo |
 |---|---|
-| `atm_clientes` | Array de clientes |
-| `atm_categorias` | Categorias de equipamento |
-| `atm_subcategorias` | Subcategorias |
-| `atm_checklist` | Itens de checklist |
-| `atm_maquinas` | Máquinas/equipamentos |
-| `atm_manutencoes` | Registos de manutenção |
-| `atm_relatorios` | Relatórios completos |
-| `atm_app_version` | Versão (cache busting) |
-| `atm_cache_v1` | Cache offline de dados do servidor (v1.3) |
-| `atm_sync_queue` | Fila de operações pendentes offline (v1.3) |
-| `atm_api_token` | JWT em `sessionStorage` (sessão termina ao fechar janela) |
+| `atm_cache_v1` | Snapshot completo dos dados do servidor (TTL 30 dias) |
+| `atm_sync_queue` | Fila de operações offline pendentes |
+| `atm_app_version` | Versão para cache busting |
+
+> As chaves individuais `atm_clientes`, `atm_maquinas`, etc. são legacy (pre-v1.4) e já não são usadas. Ver `src/config/storageKeys.js` para referência canónica.
 
 ---
 
-*Última actualização: 2026-02-23 — v1.4.0*
+*Última actualização: 2026-03-12 — v1.10.3*

@@ -6,15 +6,7 @@
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
-
-const EMPRESA = {
-  nome:             'JOSÉ GONÇALVES CERQUEIRA (NAVEL-AÇORES), Lda.',
-  divisaoComercial: "Div. Comercial: Pico d'Agua Park, Rua 5, n.º13-15 · 9600-049 Pico da Pedra",
-  sede:             'Sede / Divisão Oficinas: Rua Engº Abel Ferin Coutinho · Apt. 1481 · 9501-802 Ponta Delgada',
-  telefones:        'Tel: 296 205 290 / 296 630 120',
-  pais:             'Açores — Portugal',
-  web:              'www.navel.pt',
-}
+import { EMPRESA } from '../constants/empresa'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()

@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-02-26 — v1.9.3
+> Última revisão: 2026-03-12 — v1.10.3
 
 ## Resumo da verificação da base de dados
 
@@ -93,7 +93,7 @@ Se a BD foi criada antes das migrações mais recentes:
 **Recomendado:** Executar no terminal Windows (fora do Cursor) para evitar crash do editor.
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build:zip
 ```
 

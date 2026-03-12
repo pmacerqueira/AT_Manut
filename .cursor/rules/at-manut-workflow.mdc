@@ -15,7 +15,7 @@ alwaysApply: true
 - Notificações via `Toast.jsx` (`useToast` / `showToast`) — **nunca** usar `alert()` ou estados inline para feedback de operações
 - Log de sistema em `logger.js` (`logEntry`, `logger.*`) — registar erros, acções importantes e eventos de autenticação
 - Email e PDF gerados pelo servidor cPanel via `servidor-cpanel/send-email.php`
-- Relação com **navel-site** (`c:\navel-site\`): projectos separados; Supabase existe no navel-site mas **não** é usado no AT_Manut — não misturar decisões de arquitectura entre os dois
+- Relação com **navel-site** (`c:\Cursor_Projetos\NAVEL\navel-site\`): projectos separados; Supabase existe no navel-site mas **não** é usado no AT_Manut — não misturar decisões de arquitectura entre os dois
 
 ## Continuidade entre agentes/modelos
 
@@ -46,7 +46,7 @@ Para correcções normais: editar o ficheiro, confirmar com `ReadLints`, e aguar
 **Sempre executar no terminal do Windows** — evita crash do Cursor. Qualquer agente deve usar:
 
 ```powershell
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build:zip
 ```
 
@@ -149,10 +149,10 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ## Localizações no disco
 
-| Projeto      | Caminho        |
-|--------------|----------------|
-| AT_Manut     | `c:\AT_Manut\` |
-| Website Navel| `c:\navel-site\` |
+| Projeto      | Caminho (workspace NAVEL)        |
+|--------------|----------------------------------|
+| AT_Manut     | `c:\Cursor_Projetos\NAVEL\AT_Manut\` |
+| Website Navel| `c:\Cursor_Projetos\NAVEL\navel-site\` |
 
 ## Boas práticas Git
 

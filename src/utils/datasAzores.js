@@ -65,11 +65,3 @@ export function formatDataAzores(dateOrISO, long = false) {
     year: 'numeric',
   })
 }
-
-/**
- * Formata data no formato yyyy-MM-dd no fuso Açores.
- */
-export function formatISODateAzores(dateOrISO) {
-  const d = dateOrISO instanceof Date ? dateOrISO : new Date(dateOrISO)
-  return d.toLocaleDateString('en-CA', { ...optsBase, year: 'numeric', month: '2-digit', day: '2-digit' })
-}

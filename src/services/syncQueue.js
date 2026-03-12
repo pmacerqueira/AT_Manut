@@ -19,7 +19,9 @@
  *   }
  */
 
-const QUEUE_KEY      = 'atm_sync_queue'
+import { STORAGE } from '../config/storageKeys'
+
+const QUEUE_KEY      = STORAGE.SYNC_QUEUE
 const MAX_SIZE_BYTES = 4 * 1024 * 1024 // 4 MB
 
 function load() {
@@ -37,11 +39,6 @@ function save(q) {
   } catch {
     return false
   }
-}
-
-/** Devolve todos os itens da fila. */
-export function getQueue() {
-  return load()
 }
 
 /** Número de itens pendentes. */
@@ -76,11 +73,6 @@ export function enqueue({ resource, action, id = null, data = null }) {
 /** Remove um item da fila pelo seu queueId. */
 export function removeItem(queueId) {
   save(load().filter(i => i.queueId !== queueId))
-}
-
-/** Apaga toda a fila. */
-export function clearQueue() {
-  localStorage.removeItem(QUEUE_KEY)
 }
 
 /**

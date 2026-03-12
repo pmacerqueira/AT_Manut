@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { STORAGE } from '../config/storageKeys'
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, hydrated } = useAuth()
@@ -16,8 +17,8 @@ export default function ProtectedRoute({ children }) {
   if (!isAuthenticated) {
     let redirectState
     try {
-      if (localStorage.getItem('atm_after_logout')) {
-        localStorage.removeItem('atm_after_logout')
+      if (localStorage.getItem(STORAGE.AFTER_LOGOUT)) {
+        localStorage.removeItem(STORAGE.AFTER_LOGOUT)
         redirectState = { from: { pathname: '/' } }
       } else {
         redirectState = { from: location }

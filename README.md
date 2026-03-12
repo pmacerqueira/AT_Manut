@@ -80,7 +80,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
-| Testes | Playwright E2E — 441 testes (17 specs) |
+| Testes | Playwright E2E — ~450 testes (18 specs) |
 | Imagens | sharp (optimize-images via script prebuild) |
 
 ---
@@ -99,7 +99,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 
 ```powershell
 # 1. Build e zip (executar no terminal Windows — evita crash do Cursor)
-cd c:\AT_Manut
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build:zip
 
 # Ou comandos separados:

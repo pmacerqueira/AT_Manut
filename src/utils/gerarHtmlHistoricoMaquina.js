@@ -9,14 +9,7 @@
 import { formatDataAzores, formatDataHoraAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
-
-const EMPRESA = {
-  nome:    'JOSÉ GONÇALVES CERQUEIRA (NAVEL-AÇORES), Lda.',
-  divisao: "Div. Comercial: Pico d'Água Park, Rua 5, n.º13-15 · 9600-049 Pico da Pedra",
-  sede:    'Sede / Div. Oficinas: Rua Engº Abel Ferin Coutinho · Apt. 1481 · 9501-802 Ponta Delgada',
-  tel:     'Tel: 296 205 290 / 296 630 120',
-  web:     'www.navel.pt',
-}
+import { EMPRESA } from '../constants/empresa'
 
 /**
  * @param {object} params
@@ -191,9 +184,9 @@ body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; line-heigh
   </div>
   <div class="rpt-empresa">
     <strong>${esc(EMPRESA.nome)}</strong>
-    ${esc(EMPRESA.divisao)}<br>
+    ${esc(EMPRESA.divisaoComercial)}<br>
     ${esc(EMPRESA.sede)}<br>
-    ${esc(EMPRESA.tel)} &nbsp;|&nbsp; ${esc(EMPRESA.web)}
+    ${esc(EMPRESA.telefones)} &nbsp;|&nbsp; ${esc(EMPRESA.web)}
   </div>
 </header>
 

@@ -1,7 +1,7 @@
 # AT_Manut — Análise de Potencial e Roadmap de Evolução 2026
 
 > Documento estratégico para decisão das próximas etapas de desenvolvimento.
-> Baseado no estado actual v1.9.7 (Fevereiro 2026).
+> Baseado no estado actual v1.10.3 (Março 2026).
 > Classificação: **histórico de planeamento**. Para prioridades atuais, consultar `docs/ROADMAP.md` e `CHANGELOG.md`.
 
 ---
@@ -13,7 +13,7 @@
 | Dimensão | Estado | Potencial |
 |----------|--------|-----------|
 | **Base técnica** | React 19, Vite, PWA, offline-first | Solidez para escalar; stack moderna |
-| **Cobertura E2E** | 447 testes em 18 specs | Regressão controlada; refactoring seguro |
+| **Cobertura E2E** | ~450 testes em 18 specs | Regressão controlada; refactoring seguro |
 | **Módulos maduros** | Clientes, Equipamentos, Manutenções, Reparações | Núcleo completo para operação diária |
 | **Integrações** | ISTOBAL (webhook), Kaeser (PDF), SAF-T (Gestor.32) | Ecossistema alargado; dados centralizados |
 | **UX em campo** | Modo campo, QR Code, assinatura digital, fotos | Adequado a técnicos em instalações |
@@ -33,7 +33,7 @@
 | Risco | Mitigação |
 |-------|-----------|
 | Dependência de um desenvolvedor | Documentação detalhada; testes E2E como rede de segurança |
-| Dados em cPanel/MySQL | Backup automático; considerar migração para Supabase/PostgreSQL a longo prazo |
+| Dados em cPanel/MySQL | Backup automático; considerar migração para Supabase/PostgreSQL a longo prazo (fora do âmbito actual do AT_Manut — MySQL é a fonte de verdade) |
 | Complexidade crescente | Manter specs E2E actualizados; modularizar por domínio |
 
 ---
@@ -81,7 +81,7 @@
 | # | Funcionalidade | Impacto | Esforço | Decisão |
 |---|----------------|---------|---------|---------|
 | 4.1 | **App nativa** — Capacitor (iOS + Android) | Alto | Muito alto | Quando >5 técnicos |
-| 4.2 | **Migração backend** — Supabase ou PostgreSQL dedicado | Médio | Alto | Se cPanel limitar |
+| 4.2 | **Migração backend** — Supabase ou PostgreSQL dedicado (fora do âmbito actual do AT_Manut — MySQL é a fonte de verdade) | Médio | Alto | Se cPanel limitar |
 | 4.3 | **API pública** — webhooks de saída para integrações | Baixo | Médio | Se parceiros precisarem |
 
 ---
@@ -131,4 +131,4 @@ A aplicação AT_Manut está **madura e estável** para operação diária. O m�
 
 ---
 
-*Documento criado: 2026-02-26 — v1.9.7*
+*Documento criado: 2026-03-12 — v1.10.3*

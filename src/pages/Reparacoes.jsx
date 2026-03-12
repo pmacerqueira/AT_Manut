@@ -14,9 +14,8 @@ import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { TECNICOS } from '../config/users'
+import { MESES_PT } from '../constants/locale'
 import './Reparacoes.css'
-
-const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 const STATUS_LABELS = {
   pendente:     { label: 'Pendente',     cls: 'badge-warning' },
@@ -274,6 +273,60 @@ export default function Reparacoes() {
           </button>
         </div>
       ) : (
+        <>
+        {/* Card view — tablet/mobile */}
+        <div className="reparacoes-cards">
+          {listaFiltrada.map(rep => {
+            const maq = getMaquina(rep.maquinaId)
+            const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+            const cli = maq ? getCliente(maq.clienteNif) : null
+            const rel = getRelatorioByReparacao(rep.id)
+            const concluida = rep.status === 'concluida'
+            return (
+              <div key={rep.id} className={`rc-card${concluida ? ' rc-concluida' : ''}`}>
+                <div className="rc-top">
+                  {renderStatusBadge(rep.status)}
+                  <span className="rc-data">{formatDataAzores(rep.data)}</span>
+                  {renderOrigem(rep)}
+                </div>
+                <div className="rc-body">
+                  <div className="rc-maquina">
+                    {maq ? `${maq.marca} ${maq.modelo}` : 'Máquina removida'}
+                    {sub && <span className="rc-sub">{sub.nome}</span>}
+                  </div>
+                  <div className="rc-meta">
+                    {cli?.nome ?? '—'}
+                    {rep.numeroAviso && <span className="rc-aviso">#{rep.numeroAviso}</span>}
+                  </div>
+                </div>
+                <div className="rc-actions">
+                  {!concluida && (
+                    <button type="button" className="rc-btn-primary" onClick={() => setModalExecucao(rep)}>
+                      <Play size={16} /> Executar
+                    </button>
+                  )}
+                  {concluida && rel && (
+                    <>
+                      <button type="button" className="icon-btn" title="Ver relatório" onClick={() => setModalRelatorio({ rel, rep, maq, cli })}>
+                        <FileText size={18} />
+                      </button>
+                      <button type="button" className="icon-btn" title="Enviar email" onClick={() => handleAbrirEmail(rep)}>
+                        <Mail size={18} />
+                      </button>
+                    </>
+                  )}
+                  {canDelete && (
+                    <button type="button" className="icon-btn danger" title="Eliminar" onClick={() => handleEliminar(rep)}>
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Table view — desktop */}
         <div className="reparacoes-table card">
           <table className="data-table">
             <thead>
@@ -358,6 +411,7 @@ export default function Reparacoes() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* ── Modal: Nova Reparação ─────────────────────────────────────────── */}

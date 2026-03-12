@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: var(--z-install);
   padding: 1rem;
   animation: install-prompt-fade 0.2s ease;
 }
@@ -101,7 +101,7 @@
 
 .install-prompt-btn.primary {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-white);
   font-weight: 600;
 }
 

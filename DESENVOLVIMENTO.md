@@ -3,7 +3,7 @@
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
 **Versão:** 1.10.3 · **Última actualização:** 2026-03-01
-**Localização:** `c:\AT_Manut\`
+**Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
 
@@ -154,7 +154,7 @@ Próximo passo:
 # 2. Incrementar versão em src/config/version.js
 #    MAJOR.MINOR.PATCH → patches para correcções, minor para novas funcionalidades
 
-# 3. Build e zip (no terminal: cd c:\AT_Manut)
+# 3. Build e zip (no terminal: cd c:\Cursor_Projetos\NAVEL\AT_Manut)
 npm run build:zip   # ou: npm run build && npm run zip
 
 # 4. Verificar warnings/erros no output; corrigir e repetir se necessário

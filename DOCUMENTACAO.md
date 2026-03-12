@@ -37,7 +37,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — 441 testes (17 specs) |
+| Testes | Playwright E2E — ~450 testes (18 specs) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---
@@ -45,7 +45,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 ## 3. Estrutura do projecto
 
 ```
-c:\AT_Manut\
+c:\Cursor_Projetos\NAVEL\AT_Manut\
 ├── src/
 │   ├── main.jsx                        # Ponto de entrada
 │   ├── App.jsx                         # Rotas + Layout
@@ -54,7 +54,9 @@ c:\AT_Manut\
 │   │   ├── users.js                    # Utilizadores e roles (verificados no servidor)
 │   │   ├── version.js                  # APP_VERSION, APP_FOOTER_TEXT
 │   │   ├── alertasConfig.js            # getDiasAviso(), getManutencoesPendentesAlertas()
-│   │   └── emailConfig.js              # configuração de email
+│   │   ├── emailConfig.js              # configuração de email
+│   │   ├── limits.js                   # Limites da aplicação (fotos, peças, etc.)
+│   │   └── storageKeys.js              # Chaves localStorage/sessionStorage (fonte única)
 │   │
 │   ├── context/
 │   │   ├── AuthContext.jsx             # Login/logout, JWT, user, isAdmin
@@ -118,6 +120,8 @@ c:\AT_Manut\
 │   │
 │   └── constants/
 │       ├── assets.js                   # ASSETS.LOGO, ASSETS.LOGO_ICON
+│       ├── empresa.js                  # Dados da empresa (Navel)
+│       ├── locale.js                   # Configuração de localização
 │       └── relatorio.js                # Constantes de relatório
 │
 ├── servidor-cpanel/
@@ -190,23 +194,21 @@ c:\AT_Manut\
 
 ### Chaves localStorage
 
+**Fonte de verdade:** MySQL no cPanel via `api/data.php`. O `localStorage` é usado apenas como cache offline e para preferências locais.
+
+**Referência canónica:** `src/config/storageKeys.js` — todas as chaves estão centralizadas neste ficheiro.
+
 | Chave | Conteúdo |
 |-------|----------|
-| `atm_clientes` | Array de clientes |
-| `atm_maquinas` | Array de máquinas |
-| `atm_manutencoes` | Array de manutenções |
-| `atm_relatorios` | Array de relatórios de manutenção |
-| `atm_reparacoes` | Array de reparações |
-| `atm_relatorios_reparacao` | Array de relatórios de reparação |
-| `atm_categorias` | Array de categorias |
-| `atm_subcategorias` | Array de subcategorias |
-| `atm_checklist` | Array de itens de checklist |
-| `atm_log` | Array de entradas de log |
-| `atm_app_version` | Versão instalada (detecção de upgrade) |
+| `atm_cache_v1` | Cache principal — snapshot de todos os dados do servidor (TTL 30 dias). Usado quando offline. |
+| `atm_sync_queue` | Fila de operações offline pendentes — enviadas ao reconectar |
+| `atm_app_version` | Versão instalada (detecção de upgrade / cache busting) |
 | `atm_config_alertas` | `{ diasAviso: 7 }` — configuração de alertas |
 | `atm_alertas_dismiss` | Data ISO do último dismiss do modal proactivo |
-| `atm_cache_v1` | Cache de dados do servidor (TTL 30 dias) |
-| `atm_sync_queue` | Fila de operações offline pendentes |
+| `atm_log` | Array de entradas de log (flush para servidor quando online) |
+| `atm_modo_campo` | Preferência modo campo (alto contraste) |
+| `atm_pecas_plano` | Rascunho de peças em plano de reparação |
+| Outras | Ver `storageKeys.js` para a lista completa (INSTALL_DISMISSED, MANUTENCOES_FILTER, etc.) |
 
 ### Entidades principais
 
@@ -366,7 +368,7 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ```js
 // src/config/version.js
-export const APP_VERSION = '1.9.3'
+export const APP_VERSION = '1.10.3'
 export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
 ```
 

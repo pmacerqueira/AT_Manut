@@ -17,10 +17,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-gray-700);
   padding: 0.35rem 0.75rem;
   cursor: pointer;
 }
@@ -43,9 +43,9 @@
 }
 
 .marcas-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -72,7 +72,7 @@
 
 .marcas-btn {
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.8rem;
   display: inline-flex;
   align-items: center;
@@ -82,8 +82,8 @@
 }
 
 .marcas-btn-primary {
-  background: #1a4880;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-white);
 }
 
 .marcas-list {
@@ -96,9 +96,9 @@
 
 .marcas-item {
   width: 100%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-gray-200);
   border-radius: 9px;
-  background: #f9fafb;
+  background: var(--color-gray-50);
   padding: 0.55rem 0.6rem;
   display: flex;
   align-items: center;
@@ -110,7 +110,7 @@
 }
 
 .marcas-item.is-selected {
-  border-color: #1a4880;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 1px #1a488033;
   background: #f1f6ff;
 }
@@ -142,13 +142,13 @@
 }
 
 .marcas-badge-muted {
-  color: #6b7280;
+  color: var(--color-gray-500);
   background: #eef2f7;
 }
 
 .marcas-empty {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--color-gray-500);
   margin: 0.5rem 0;
 }
 
@@ -161,12 +161,12 @@
 }
 
 .marcas-input {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
   padding: 0.55rem 0.65rem;
   font-size: 0.94rem;
-  color: #111827;
-  background: #fff;
+  color: var(--color-gray-900);
+  background: var(--color-white);
 }
 
 .marcas-color-row {
@@ -178,10 +178,10 @@
 .marcas-color-picker {
   width: 54px;
   height: 40px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
   padding: 0.2rem;
-  background: #fff;
+  background: var(--color-white);
 }
 
 .marcas-upload {
@@ -189,7 +189,7 @@
   align-items: center;
   gap: 0.4rem;
   border: 1px dashed #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.55rem 0.7rem;
   color: #1e293b;
   cursor: pointer;
@@ -236,15 +236,15 @@
 
 .marcas-preview {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: #f8fafc;
   padding: 0.75rem;
 }
 
 .rpt-head {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -265,7 +265,7 @@
   width: 138px;
   height: 44px;
   border: 1px dashed #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: #64748b;
   display: flex;
   align-items: center;

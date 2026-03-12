@@ -228,13 +228,13 @@ $RESOURCE_MAP = [
     'manutencoes' => [
         'table'      => 'manutencoes',
         'json_cols'  => [],
-        'allowed'    => ['id','maquina_id','tipo','data','tecnico','status','observacoes','horas_totais','horas_servico','criado_em'],
+        'allowed'    => ['id','maquina_id','tipo','data','tecnico','status','periodicidade','observacoes','horas_totais','horas_servico','criado_em'],
         'order'      => 'data DESC',
     ],
     'relatorios' => [
         'table'      => 'relatorios',
-        'json_cols'  => ['checklist_respostas','fotos'],
-        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','notas','fotos','ultimo_envio','criado_em'],
+        'json_cols'  => ['checklist_respostas','fotos','pecas_usadas'],
+        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
     'reparacoes' => [

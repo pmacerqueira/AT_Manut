@@ -7,8 +7,8 @@ import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   LayoutDashboard, Users, FolderTree, Cpu, Wrench,
-  Calendar, LogOut, Menu, X, CalendarPlus, ScrollText,
-  Settings, RefreshCw, Search, QrCode, BarChart2, Hammer, Palette,
+  Calendar, LogOut, X, CalendarPlus, ScrollText,
+  Settings, RefreshCw, Search, QrCode, BarChart2, Hammer, Palette, MoreHorizontal,
 } from 'lucide-react'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
@@ -40,15 +40,10 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('keydown', handleGlobalKey)
   }, [handleGlobalKey])
 
+  const isActive = (path) => location.pathname === path
+
   return (
     <div className="layout">
-      <button type="button" className="sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label={sidebarOpen ? 'Fechar menu' : 'Abrir menu'}>
-        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
-      <button type="button" className="logout-btn-mobile" onClick={() => { closeSidebar(); logout() }} aria-label="Terminar sessão">
-        <LogOut size={20} />
-        <span>Sair</span>
-      </button>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={closeSidebar} aria-hidden="true" />}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
@@ -156,9 +151,9 @@ export default function Layout({ children }) {
       <main className="main">
         {loading
           ? (
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'60vh', gap:'1rem', color:'#6b7280' }}>
+            <div className="layout-loading">
               <RefreshCw size={32} style={{ animation:'spin 1s linear infinite' }} />
-              <span style={{ fontSize:'0.9rem' }}>A carregar dados…</span>
+              <span className="layout-loading-text">A carregar dados…</span>
             </div>
           )
           : (
@@ -176,6 +171,30 @@ export default function Layout({ children }) {
           )
         }
       </main>
+
+      {/* Bottom nav — visível em tablet/mobile (<1024px) */}
+      <nav className="bottom-nav" aria-label="Navegação rápida">
+        <NavLink to="/" className={`bnav-item ${isActive('/') ? 'bnav-active' : ''}`} onClick={closeSidebar}>
+          <LayoutDashboard size={22} />
+          <span>Início</span>
+        </NavLink>
+        <NavLink to="/manutencoes" className={`bnav-item ${isActive('/manutencoes') ? 'bnav-active' : ''}`} onClick={closeSidebar}>
+          <Wrench size={22} />
+          <span>Manut.</span>
+        </NavLink>
+        <NavLink to="/reparacoes" className={`bnav-item ${isActive('/reparacoes') ? 'bnav-active' : ''}`} onClick={closeSidebar}>
+          <Hammer size={22} />
+          <span>Repar.</span>
+        </NavLink>
+        <button type="button" className="bnav-item" onClick={() => { closeSidebar(); setQrReaderOpen(true) }}>
+          <QrCode size={22} />
+          <span>QR</span>
+        </button>
+        <button type="button" className={`bnav-item ${sidebarOpen ? 'bnav-active' : ''}`} onClick={() => setSidebarOpen(o => !o)}>
+          {sidebarOpen ? <X size={22} /> : <MoreHorizontal size={22} />}
+          <span>Menu</span>
+        </button>
+      </nav>
 
       {/* Modais globais — fora do <main> para z-index correcto */}
       {pesquisaOpen && <PesquisaGlobal onClose={() => setPesquisaOpen(false)} />}

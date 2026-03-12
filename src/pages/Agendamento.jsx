@@ -7,10 +7,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useData } from '../context/DataContext'
+import { INTERVALOS } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from '../components/Toast'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Search, CalendarPlus, CalendarClock, Archive, ChevronDown, ChevronUp } from 'lucide-react'
 import { useDebounce } from '../hooks/useDebounce'
+import { logger } from '../utils/logger'
 import './Agendamento.css'
 
 /** Formata entrada para DD-MM-YYYY */
@@ -70,9 +73,26 @@ function proxDiaLivre(dataStr, manutencoes) {
   return null
 }
 
+function gerarDatasRecorrentes(dataInicioISO, periodicidade, horizonteAnos) {
+  const intervaloDias = INTERVALOS[periodicidade]?.dias
+  if (!intervaloDias) return []
+  const inicio = new Date(dataInicioISO + 'T12:00:00')
+  const limite = new Date(inicio)
+  limite.setFullYear(limite.getFullYear() + horizonteAnos)
+  const datas = []
+  let d = new Date(inicio.getTime() + intervaloDias * 24 * 3600 * 1000)
+  while (d <= limite) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    datas.push(iso)
+    d = new Date(d.getTime() + intervaloDias * 24 * 3600 * 1000)
+  }
+  return datas
+}
+
 export default function Agendamento() {
-  const { clientes, maquinas, manutencoes, addManutencao, getSubcategoria } = useData()
+  const { clientes, maquinas, manutencoes, addManutencao, addManutencoesBatch, getSubcategoria } = useData()
   const { user } = useAuth()
+  const { isAdmin } = usePermissions()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -82,6 +102,16 @@ export default function Agendamento() {
   const [periodicidade, setPeriodicidade] = useState('anual')
   const [dataInput, setDataInput] = useState('')
   const [horaInput, setHoraInput] = useState('')
+  const [recorrente, setRecorrente] = useState(false)
+  const [horizonteAnos, setHorizonteAnos] = useState(2)
+
+  // ── Inserção em lote de históricos ──
+  const [loteAberto, setLoteAberto] = useState(false)
+  const [loteClienteNif, setLoteClienteNif] = useState('')
+  const [loteMaquinaIds, setLoteMaquinaIds] = useState([])
+  const [lotePeriodicidade, setLotePeriodicidade] = useState('anual')
+  const [loteDatasManual, setLoteDatasManual] = useState('')
+  const [loteErro, setLoteErro] = useState('')
 
   useEffect(() => {
     const state = location.state
@@ -123,6 +153,19 @@ export default function Agendamento() {
     clienteNif ? maquinas.filter(m => m.clienteNif === clienteNif) : [],
   [clienteNif, maquinas])
 
+  const maquinaSelecionada = useMemo(() =>
+    maquinas.find(m => m.id === maquinaId),
+  [maquinaId, maquinas])
+
+  const periodicidadeEfetiva = tipo === 'montagem' ? periodicidade : (maquinaSelecionada?.periodicidadeManut || null)
+
+  const datasRecorrentes = useMemo(() => {
+    if (!recorrente || !periodicidadeEfetiva) return []
+    const dataStr = parseDataPT(dataInput)
+    if (!dataStr) return []
+    return gerarDatasRecorrentes(dataStr, periodicidadeEfetiva, horizonteAnos)
+  }, [recorrente, periodicidadeEfetiva, dataInput, horizonteAnos])
+
   const handleDataChange = (e) => {
     setDataInput(formatDataInput(e.target.value))
     setErro('')
@@ -146,14 +189,36 @@ export default function Agendamento() {
     addManutencao({
       maquinaId,
       tipo,
-      periodicidade: tipo === 'montagem' ? periodicidade : undefined,
+      periodicidade: tipo === 'montagem' ? periodicidade : (recorrente && periodicidadeEfetiva ? periodicidadeEfetiva : undefined),
       data: dataStr,
       tecnico,
       status: 'agendada',
       observacoes,
     })
+
+    if (recorrente && periodicidadeEfetiva && datasRecorrentes.length > 0) {
+      const batch = datasRecorrentes.map(d => ({
+        maquinaId,
+        tipo: 'periodica',
+        periodicidade: periodicidadeEfetiva,
+        data: d,
+        tecnico,
+        status: 'agendada',
+        observacoes: 'Agendamento recorrente automático.',
+      }))
+      addManutencoesBatch(batch)
+      logger.action('Agendamento', 'executarAgendamento',
+        `Agendamento recorrente: 1 + ${batch.length} futuras (${periodicidadeEfetiva})`,
+        { maquinaId, tipo, periodicidade: periodicidadeEfetiva, dataInicio: dataStr, futuras: batch.length })
+      showToast(`Agendamento registado + ${batch.length} manutenções futuras criadas.`, 'success')
+    } else {
+      logger.action('Agendamento', 'executarAgendamento',
+        `Agendamento pontual (${tipo}) para ${dataStr}`,
+        { maquinaId, tipo, data: dataStr })
+      showToast('Agendamento registado com sucesso.', 'success')
+    }
+
     setSugestaoData(null)
-    showToast('Agendamento registado com sucesso.', 'success')
     setTimeout(() => navigate('/manutencoes?filter=proximas'), 1500)
   }
 
@@ -188,6 +253,66 @@ export default function Agendamento() {
     }
 
     executarAgendamento(dataStr)
+  }
+
+  // ── Inserção em lote ──
+  const loteEquipamentos = useMemo(() =>
+    loteClienteNif ? maquinas.filter(m => m.clienteNif === loteClienteNif) : [],
+  [loteClienteNif, maquinas])
+
+  const { loteDatasPreview, loteDatasIgnoradas } = useMemo(() => {
+    const raw = loteDatasManual.trim()
+    if (!raw) return { loteDatasPreview: [], loteDatasIgnoradas: 0 }
+    const seen = new Set()
+    let ignoradas = 0
+    const validas = raw.split(/[\n,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => {
+        const parsed = parseDataPT(s)
+        if (!parsed) { ignoradas++; return null }
+        if (seen.has(parsed)) { ignoradas++; return null }
+        seen.add(parsed)
+        return { display: s, iso: parsed }
+      })
+      .filter(Boolean)
+    return { loteDatasPreview: validas, loteDatasIgnoradas: ignoradas }
+  }, [loteDatasManual])
+
+  const handleLoteSubmit = () => {
+    setLoteErro('')
+    if (!loteClienteNif) { setLoteErro('Selecione o cliente.'); return }
+    if (loteMaquinaIds.length === 0) { setLoteErro('Selecione pelo menos um equipamento.'); return }
+    if (loteDatasPreview.length === 0) { setLoteErro('Insira pelo menos uma data válida (DD-MM-AAAA).'); return }
+
+    const tecnico = user?.nome ?? user?.username ?? ''
+    const batch = []
+    for (const mId of loteMaquinaIds) {
+      for (const d of loteDatasPreview) {
+        batch.push({
+          maquinaId: mId,
+          tipo: 'periodica',
+          periodicidade: lotePeriodicidade,
+          data: d.iso,
+          tecnico,
+          status: 'agendada',
+          observacoes: 'Registo histórico inserido em lote.',
+        })
+      }
+    }
+    addManutencoesBatch(batch)
+    logger.action('Agendamento', 'inserirLoteHistoricos',
+      `${batch.length} registos históricos inseridos em lote (${loteMaquinaIds.length} equip. × ${loteDatasPreview.length} datas)`,
+      { clienteNif: loteClienteNif, maquinaIds: loteMaquinaIds, datas: loteDatasPreview.map(d => d.iso), periodicidade: lotePeriodicidade, count: batch.length })
+    showToast(`${batch.length} registos históricos criados com sucesso.`, 'success')
+    setLoteMaquinaIds([])
+    setLoteDatasManual('')
+  }
+
+  const toggleLoteMaquina = (mId) => {
+    setLoteMaquinaIds(prev =>
+      prev.includes(mId) ? prev.filter(id => id !== mId) : [...prev, mId]
+    )
   }
 
   return (
@@ -272,6 +397,65 @@ export default function Agendamento() {
           </label>
         )}
 
+        {tipo === 'periodica' && maquinaId && (
+          <div className="agendamento-recorrente-section">
+            <label className="agendamento-toggle-row">
+              <input
+                type="checkbox"
+                checked={recorrente}
+                onChange={e => setRecorrente(e.target.checked)}
+              />
+              <span>
+                <CalendarPlus size={16} />
+                Agendar recorrente para os próximos períodos?
+              </span>
+            </label>
+
+            {recorrente && (
+              <>
+                {!periodicidadeEfetiva && (
+                  <p className="form-erro" style={{ marginTop: '0.5rem' }}>
+                    O equipamento selecionado não tem periodicidade definida. Configure-a em Equipamentos antes de agendar recorrente.
+                  </p>
+                )}
+                {periodicidadeEfetiva && (
+                  <div className="agendamento-recorrente-config">
+                    <label>
+                      <span>Horizonte</span>
+                      <select value={horizonteAnos} onChange={e => setHorizonteAnos(Number(e.target.value))}>
+                        <option value={1}>1 ano</option>
+                        <option value={2}>2 anos</option>
+                        <option value={3}>3 anos</option>
+                      </select>
+                    </label>
+                    <p className="agendamento-recorrente-info">
+                      Periodicidade: <strong>{INTERVALOS[periodicidadeEfetiva]?.label ?? periodicidadeEfetiva}</strong>
+                      {' · '}Horizonte: <strong>{horizonteAnos} ano{horizonteAnos > 1 ? 's' : ''}</strong>
+                    </p>
+                    {datasRecorrentes.length > 0 && (
+                      <div className="agendamento-recorrente-preview">
+                        <p className="preview-titulo">
+                          <CalendarClock size={14} /> {datasRecorrentes.length} manutenções futuras a criar:
+                        </p>
+                        <ul className="preview-datas">
+                          {datasRecorrentes.map(d => (
+                            <li key={d}>{toDataPT(d)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {datasRecorrentes.length === 0 && parseDataPT(dataInput) && (
+                      <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+                        Nenhuma data futura gerada — verifique a data de início e o horizonte.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <div className="form-row">
           <label>
             <span>Data (DD-MM-AAAA)</span>
@@ -316,6 +500,114 @@ export default function Agendamento() {
         <p className="text-muted agendamento-empty">
           Não existem clientes com equipamentos registados. Contacte o administrador para registar clientes e equipamentos.
         </p>
+      )}
+
+      {/* ── Inserção em lote — históricos (Admin) ────────────────────────── */}
+      {isAdmin && (
+        <div className="card agendamento-lote-section">
+          <button
+            type="button"
+            className="agendamento-lote-toggle"
+            onClick={() => setLoteAberto(v => !v)}
+          >
+            <Archive size={18} />
+            <span>Inserir manutenções históricas em lote</span>
+            {loteAberto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {loteAberto && (
+            <div className="agendamento-lote-body">
+              <p className="agendamento-lote-desc">
+                Insira registos de manutenções passadas (em papel) de uma só vez.
+                Selecione o cliente, os equipamentos e indique as datas.
+              </p>
+
+              <label>
+                <span>Cliente</span>
+                <select
+                  value={loteClienteNif}
+                  onChange={e => { setLoteClienteNif(e.target.value); setLoteMaquinaIds([]); setLoteErro('') }}
+                >
+                  <option value="">— Selecione o cliente —</option>
+                  {clientesComEquipamento.map(c => (
+                    <option key={c.nif} value={c.nif}>{c.nome}</option>
+                  ))}
+                </select>
+              </label>
+
+              {loteClienteNif && loteEquipamentos.length > 0 && (
+                <div className="agendamento-lote-equipamentos">
+                  <span className="agendamento-form-label">Equipamentos (selecione um ou vários)</span>
+                  {loteEquipamentos.map(m => {
+                    const sub = getSubcategoria(m.subcategoriaId)
+                    return (
+                      <label key={m.id} className="agendamento-lote-equip-item">
+                        <input
+                          type="checkbox"
+                          checked={loteMaquinaIds.includes(m.id)}
+                          onChange={() => toggleLoteMaquina(m.id)}
+                        />
+                        <span>{sub?.nome || ''} — {m.marca} {m.modelo} {m.numeroSerie ? `(${m.numeroSerie})` : ''}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+
+              <label>
+                <span>Periodicidade</span>
+                <select value={lotePeriodicidade} onChange={e => setLotePeriodicidade(e.target.value)}>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Datas (DD-MM-AAAA, uma por linha ou separadas por vírgula)</span>
+                <textarea
+                  value={loteDatasManual}
+                  onChange={e => { setLoteDatasManual(e.target.value); setLoteErro('') }}
+                  placeholder={"15-01-2025\n15-07-2025\n15-01-2026"}
+                  rows={5}
+                  className="textarea-full"
+                />
+              </label>
+
+              {loteDatasPreview.length > 0 && (
+                <div className="agendamento-lote-preview">
+                  <p className="preview-titulo">
+                    <CalendarClock size={14} />
+                    {loteDatasPreview.length} data(s) × {loteMaquinaIds.length} equipamento(s)
+                    = <strong>{loteDatasPreview.length * loteMaquinaIds.length}</strong> registos a criar
+                  </p>
+                  {loteDatasIgnoradas > 0 && (
+                    <p className="form-erro" style={{ fontSize: '0.82rem', margin: '0.3rem 0' }}>
+                      {loteDatasIgnoradas} entrada(s) ignorada(s) (formato inválido ou duplicada).
+                    </p>
+                  )}
+                  <ul className="preview-datas">
+                    {loteDatasPreview.map(d => (
+                      <li key={d.iso}>{d.display}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {loteErro && <p className="form-erro">{loteErro}</p>}
+
+              <div className="form-actions" style={{ marginTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={handleLoteSubmit}
+                  disabled={loteDatasPreview.length === 0 || loteMaquinaIds.length === 0}
+                >
+                  <Archive size={15} /> Criar registos históricos
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {sugestaoData && (

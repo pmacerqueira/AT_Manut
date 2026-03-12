@@ -101,7 +101,7 @@
 .met-card-icon--yellow { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
 .met-card-icon--purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
 .met-card-icon--red    { background: rgba(239, 68, 68, 0.15);  color: var(--color-danger); }
-.met-card-icon--orange { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+.met-card-icon--orange { background: rgba(249, 115, 22, 0.15); color: var(--color-warning); }
 
 .met-card-body {
   display: flex;
@@ -253,7 +253,7 @@
   font-size: 0.74rem;
   font-weight: 600;
   padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   white-space: nowrap;
 }
 

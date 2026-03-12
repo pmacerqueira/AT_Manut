@@ -65,7 +65,3 @@ export function cacheTimestamp() {
     return null
   }
 }
-
-export function clearCache() {
-  localStorage.removeItem(CACHE_KEY)
-}
