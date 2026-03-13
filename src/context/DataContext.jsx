@@ -720,44 +720,6 @@ export function DataProvider({ children }) {
     }
   }, [processSync, fetchTodos])
 
-  // ── Auto-criar manutenções em falta para máquinas com proximaManut ────────
-  const syncManutRef = useRef(false)
-  useEffect(() => {
-    if (loading || syncManutRef.current) return
-    if (maquinas.length === 0) return
-    syncManutRef.current = true
-    const pendentes = new Set(
-      manutencoes
-        .filter(m => m.status === 'pendente' || m.status === 'agendada')
-        .map(m => m.maquinaId)
-    )
-    let criadas = 0
-    maquinas.forEach(maq => {
-      if (!maq.proximaManut || pendentes.has(maq.id)) return
-      const id = 'msync' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
-      const novo = {
-        id,
-        maquinaId: maq.id,
-        data: maq.proximaManut,
-        tipo: 'periodica',
-        status: 'pendente',
-        observacoes: '',
-        tecnico: '',
-        criadoEm: new Date().toISOString(),
-      }
-      setManutencoes(prev => [...prev, novo])
-      import('../services/apiService').then(({ apiManutencoes }) =>
-        persist(() => apiManutencoes.create(novo),
-                { resource: 'manutencoes', action: 'create', data: novo })
-      ).catch(() => {})
-      criadas++
-    })
-    if (criadas > 0) {
-      logger.action('DataContext', 'syncManutencoesFalta',
-        `Criadas ${criadas} manutenção(ões) em falta a partir de proximaManut`, { criadas })
-    }
-  }, [loading, maquinas, manutencoes, persist])
-
   const getSubcategoria = useCallback((id) => subcategorias.find(s => s.id === id), [subcategorias])
   const getCategoria = useCallback((id) => categorias.find(c => c.id === id), [categorias])
   const getSubcategoriasByCategoria = useCallback((categoriaId) =>
@@ -830,6 +792,44 @@ export function DataProvider({ children }) {
       }
     }
   }, [])
+
+  // ── Auto-criar manutenções em falta para máquinas com proximaManut ────────
+  const syncManutRef = useRef(false)
+  useEffect(() => {
+    if (loading || syncManutRef.current) return
+    if (maquinas.length === 0) return
+    syncManutRef.current = true
+    const pendentes = new Set(
+      manutencoes
+        .filter(m => m.status === 'pendente' || m.status === 'agendada')
+        .map(m => m.maquinaId)
+    )
+    let criadas = 0
+    maquinas.forEach(maq => {
+      if (!maq.proximaManut || pendentes.has(maq.id)) return
+      const id = 'msync' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
+      const novo = {
+        id,
+        maquinaId: maq.id,
+        data: maq.proximaManut,
+        tipo: 'periodica',
+        status: 'pendente',
+        observacoes: '',
+        tecnico: '',
+        criadoEm: new Date().toISOString(),
+      }
+      setManutencoes(prev => [...prev, novo])
+      import('../services/apiService').then(({ apiManutencoes }) =>
+        persist(() => apiManutencoes.create(novo),
+                { resource: 'manutencoes', action: 'create', data: novo })
+      ).catch(() => {})
+      criadas++
+    })
+    if (criadas > 0) {
+      logger.action('DataContext', 'syncManutencoesFalta',
+        `Criadas ${criadas} manutenção(ões) em falta a partir de proximaManut`, { criadas })
+    }
+  }, [loading, maquinas, manutencoes, persist])
 
   // ── Subcategorias ─────────────────────────────────────────────────────────
   const addSubcategoria = useCallback((s) => {
