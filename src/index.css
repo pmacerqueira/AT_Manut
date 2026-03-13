@@ -210,6 +210,30 @@ form input, form select, form textarea { width: 100%; }
 .textarea-full { width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px; display: block; }
 form input.readonly { background: var(--color-bg-elevated); color: var(--color-text-muted); cursor: not-allowed; }
 
+/* ── Caixa de declaração de aceitação (modais de assinatura) ─────────────── */
+.declaracao-assinatura-box {
+  background: var(--color-bg-elevated, #f8fafc);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-left: 3px solid var(--color-primary, #0f4c81);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.declaracao-assinatura-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary, #0f4c81);
+  margin: 0 0 0.3rem;
+}
+.declaracao-assinatura-texto {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-text-muted, #64748b);
+  margin: 0;
+}
+
 /* Loading state para lazy routes */
 .page-loader {
   display: flex;

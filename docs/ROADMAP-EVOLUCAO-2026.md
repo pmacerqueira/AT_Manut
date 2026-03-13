@@ -1,7 +1,7 @@
 # AT_Manut — Análise de Potencial e Roadmap de Evolução 2026
 
 > Documento estratégico para decisão das próximas etapas de desenvolvimento.
-> Baseado no estado actual v1.11.0 (Março 2026).
+> Baseado no estado actual v1.12.0 (Março 2026).
 > Classificação: **histórico de planeamento**. Para prioridades atuais, consultar `docs/ROADMAP.md` e `CHANGELOG.md`.
 
 ---
@@ -13,6 +13,7 @@
 | Dimensão | Estado | Potencial |
 |----------|--------|-----------|
 | **Base técnica** | React 19, Vite, PWA, offline-first | Solidez para escalar; stack moderna |
+| **Integridade de dados** | Cascatas CRUD completas, confirmações de eliminação | Dados consistentes; protecção contra erros |
 | **Cobertura E2E** | ~450 testes em 18 specs | Regressão controlada; refactoring seguro |
 | **Módulos maduros** | Clientes, Equipamentos, Manutenções, Reparações | Núcleo completo para operação diária |
 | **Integrações** | ISTOBAL (webhook), Kaeser (PDF), SAF-T (Gestor.32) | Ecossistema alargado; dados centralizados |
@@ -40,7 +41,7 @@
 
 ## 2. Roadmap refinado — Próximas etapas
 
-### Etapa 1 — Estabilização (v1.9.8) — 1–2 dias
+### Etapa 1 — Estabilização (v1.9.8) — ✓ DONE
 **Objectivo:** Garantir que v1.9.7 está 100% estável em produção.
 
 | Acção | Prioridade | Notas |
@@ -58,7 +59,7 @@
 | # | Funcionalidade | Impacto | Esforço | Decisão |
 |---|----------------|---------|---------|---------|
 | 2.1 | **Actualização multi-tab** — BroadcastChannel API para sincronizar dados entre abas abertas | Baixo | Baixo | Recomendado |
-| 2.2 | **Relatório executivo PDF** — visão da frota para cliente (baseado em KPIs) | Médio | Médio | Avaliar necessidade |
+| 2.2 | **Relatório executivo PDF** — visão da frota para cliente (baseado em KPIs) | Médio | Médio | **IN PROGRESS** (v1.12.0) |
 | 2.3 | **Valores custo/venda em peças** — fase de faturação (invisível no relatório cliente) | Alto | Médio | Backlog prioritário |
 | 2.4 | **E2E: botões Pré-visualizar e Ver/Guardar PDF** em reparações | Baixo | Baixo | Recomendado |
 
@@ -122,13 +123,13 @@
 
 ## 5. Resumo executivo
 
-A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T de clientes foi corrigida e integrada.
+A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T de clientes foi corrigida e integrada. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
 
-**Próximo passo imediato:** Estabilizar v1.9.7, validar em produção, e decidir entre:
+**Próximo passo imediato:** O **Relatório executivo PDF** (N3) está em implementação. Decidir entre:
 - **Opção A** — Manter modo conservador: apenas correcções e pequenas melhorias (Etapa 2.1, 2.4).
 - **Opção B** — Avançar com faturação (Etapa 2.3) se houver necessidade de negócio.
 - **Opção C** — Investir em notificações push (Etapa 3.1) se alertas em tempo real forem prioritários.
 
 ---
 
-*Documento criado: 2026-03-12 — v1.11.0*
+*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-03-13 — v1.12.0*

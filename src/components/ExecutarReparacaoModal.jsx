@@ -15,6 +15,7 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { MAX_FOTOS } from '../config/limits'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 import './ExecutarReparacaoModal.css'
 
 const FOTO_MAX_W   = 1200
@@ -797,6 +798,12 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
               {/* Secção: Assinatura */}
               <div className="exec-section assinatura-section">
                 <h3 className="exec-section-title">Assinatura do cliente</h3>
+                <div className="declaracao-assinatura-box">
+                  <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
+                  <p className="declaracao-assinatura-texto">
+                    {getDeclaracaoCliente('reparacao')}
+                  </p>
+                </div>
                 <div className="form-group">
                   <label>Nome do assinante <span className="required">*</span></label>
                   <input

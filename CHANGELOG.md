@@ -9,6 +9,28 @@ Política de continuidade:
 
 ---
 
+## [1.13.0] — 2026-03-13 — Relatório executivo de frota N3, declaração de aceitação do cliente
+
+### Relatório Executivo de Frota (N3) — Enriquecido
+- **Agrupamento por categoria** — equipamentos organizados por tipo (Elevadores, Compressores, etc.) para frotas grandes
+- **Coluna "Dias"** — dias de atraso (+N) ou dias até próxima manutenção (-N), ordenados por urgência
+- **Secção de reparações** — reparações concluídas dos últimos 12 meses incluídas no relatório
+- **Resumo anual** — manutenções e reparações executadas/pendentes/em atraso para o ano corrente
+- **KPIs expandidos** — 5 cards: Equipamentos, Conformidade%, Em atraso, Manutenções ano, Reparações ano
+- **Envio por email** — novo botão "Enviar frota" na lista e ficha de cliente (via send-report.php com CC a comercial@navel.pt)
+
+### Declaração de aceitação/compromisso do cliente
+- **Texto actualizado** com legislação em vigor: EN 1493:2022, Diretiva 2006/42/CE, Regulamento (UE) 2023/1230, DL 50/2005
+- **Referência ao fornecedor NAVEL** e ao período mínimo de conservação de 2 anos
+- **Texto dinâmico** que se adapta ao tipo de serviço (montagem / manutenção / reparação) via `getDeclaracaoCliente(tipo)`
+- **Visível antes de assinar** — declaração apresentada ao cliente nos 3 modais de assinatura digital (RecolherAssinaturaModal, ExecutarManutencaoModal, ExecutarReparacaoModal)
+- **Uniforme em todos os PDFs** — mesmo texto usado nos relatórios HTML de manutenção e reparação
+
+### Documentação
+- `docs/ROADMAP.md` e `docs/ROADMAP-EVOLUCAO-2026.md` actualizados para v1.12.0+
+
+---
+
 ## [1.12.0] — 2026-03-13 — Integridade de dados, cascatas, pipeline de agendamento, UX defensiva
 
 ### Agendamento de manutenções — Pipeline intuitivo

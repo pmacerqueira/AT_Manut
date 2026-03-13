@@ -22,6 +22,7 @@ import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
 import { MAX_FOTOS } from '../config/limits'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 
 const FOTO_MAX_W = 1200
 const FOTO_MAX_H = 1200
@@ -950,6 +951,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 ))}
               </select>
             </label>
+
+            <div className="declaracao-assinatura-box">
+              <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
+              <p className="declaracao-assinatura-texto">
+                {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
+              </p>
+            </div>
 
             <label className="label-required">
               <span>Nome do cliente que assina <span className="req-star">*</span></span>

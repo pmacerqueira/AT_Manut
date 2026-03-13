@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-03-12 — v1.11.0
+> Última revisão: 2026-03-13 — v1.12.0
 
 ---
 
-## Estado actual (v1.11.0) — O que está implementado
+## Estado actual (v1.12.0) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -51,6 +51,16 @@
 | **Gestão de técnicos** | Ficha (nome, telefone, assinatura digital) na BD; Admin-only | **v1.11.0** |
 | **Assinatura técnico em PDFs** | Relatórios incluem identificação + assinatura do técnico | **v1.11.0** |
 | **CSS responsivo centralizado** | 15 variáveis de layout em :root (clamp/min) | **v1.11.0** |
+| **Pipeline de agendamento** | Cliente→Categoria→Máquina | **v1.12.0** |
+| **Coluna "Dias" + ordenação por urgência** | Em manutenções | **v1.12.0** |
+| **Sincronização automática de manutenções em falta** | Criação automática de registos pendentes | **v1.12.0** |
+| **Cascatas CRUD completas** | Frontend + backend | **v1.12.0** |
+| **Protecção contra eliminação acidental** | Modais de confirmação | **v1.12.0** |
+| **Bloqueio eliminação de relatórios assinados** | Relatórios assinados não podem ser eliminados | **v1.12.0** |
+| **Validação feriados/fins-de-semana** | No agendamento | **v1.12.0** |
+| **Gestão completa de checklists** | CRUD + snapshot imutável | **v1.12.0** |
+| **Email CC garantido** | comercial@navel.pt em todos os envios | **v1.12.0** |
+| **Relatório executivo PDF** | Visão da frota para apresentar ao cliente, baseado nos KPIs | **v1.12.0** |
 
 ---
 
@@ -148,7 +158,6 @@
 |---|---|---|---|---|
 | N1 | **Notificações push** (Web Push API) — manutenções a vencer em 3 dias | Alto | Alto | Service Worker necessário; independente do cron |
 | N2 | **Entrada por voz** nos campos de texto (SpeechRecognition API, `pt-PT`) | Médio | Médio | Útil em ambiente de campo com luvas |
-| N3 | **Relatório executivo PDF** — visão da frota para apresentar ao cliente, baseado nos KPIs | Médio | Médio | Gerado a partir do `kpis.js` existente |
 | N4 | **Valores de custo/venda em reparações** — fase de faturação (invisível no relatório do cliente) | Alto | Médio | Já existe estrutura de peças usadas; falta a camada de preços |
 
 ### Fase 3 — Escalabilidade (horizonte 6-12 meses)
@@ -178,9 +187,12 @@
 - **Assinatura do técnico em PDFs** — identificação e assinatura pré-preenchida
 - **~450 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
+- **Cascatas CRUD completas** — frontend e backend alinhados para integridade de dados
+- **Protecção contra eliminação acidental** — modais de confirmação em operações críticas
+- **Pipeline intuitivo de agendamento** — Cliente→Categoria→Máquina para criação de manutenções
 
 ---
 
-*Última actualização: 2026-03-12 — v1.11.0*
+*Última actualização: 2026-03-13 — v1.12.0*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

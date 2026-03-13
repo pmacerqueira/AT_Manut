@@ -5,7 +5,7 @@
  * @see DESENVOLVIMENTO.md §4.1
  */
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
-import { DECLARACAO_CLIENTE } from '../constants/relatorio'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
 import {
@@ -489,7 +489,7 @@ section{margin-bottom:10px;page-break-inside:avoid}
       ${safeAssinatura ? `<div class="rpt-assinatura-img"><img src="${safeAssinatura}" alt="Assinatura do cliente" style="max-height:55px;max-width:200px"></div>` : ''}
     </div>
   </div>
-  <div class="rpt-declaracao" style="margin-top:6px;font-size:8px">${esc(DECLARACAO_CLIENTE)}</div>
+  <div class="rpt-declaracao" style="margin-top:6px;font-size:8px">${esc(getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'))}</div>
 </section>
 
 ${ultimoEnvioLinha ? `<p style="font-size:8.5px;color:#888;margin-bottom:5px">${ultimoEnvioLinha}</p>` : ''}

@@ -2,7 +2,7 @@ import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { safeHttpUrl } from '../utils/sanitize'
 import { ExternalLink } from 'lucide-react'
 import { TIPOS_DOCUMENTO } from '../context/DataContext'
-import { DECLARACAO_CLIENTE } from '../constants/relatorio'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import './RelatorioView.css'
 
@@ -86,7 +86,7 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
       </section>
 
       <section className="relatorio-section declaracao">
-        <p className="declaracao-texto">{DECLARACAO_CLIENTE}</p>
+        <p className="declaracao-texto">{getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}</p>
       </section>
 
       {relatorio.assinadoPeloCliente && (

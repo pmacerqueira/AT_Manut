@@ -8,6 +8,7 @@ import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
@@ -331,7 +332,7 @@ ${fotosSafe.length > 0 ? `
     </div>
   </div>
   <p style="font-size:8px;color:#64748b;margin-top:6px;line-height:1.5;">
-    O cliente declara ter recebido e aprovado a intervenção descrita neste documento.
+    ${esc(getDeclaracaoCliente('reparacao'))}
   </p>
 </section>
 

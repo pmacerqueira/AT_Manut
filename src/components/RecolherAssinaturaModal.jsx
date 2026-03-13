@@ -5,6 +5,7 @@ import { logger } from '../utils/logger'
 import SignaturePad from './SignaturePad'
 import { PenLine, X } from 'lucide-react'
 import { formatDataAzores } from '../utils/datasAzores'
+import { getDeclaracaoCliente } from '../constants/relatorio'
 
 export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, maquina }) {
   const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes } = useData()
@@ -102,6 +103,13 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         <div className="recolher-data-aviso">
           Data de assinatura: <strong>{formatDataAzores(manutencao.data)}</strong>
           <span className="recolher-data-hint">(bloqueada — corresponde à data da manutenção)</span>
+        </div>
+
+        <div className="declaracao-assinatura-box">
+          <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
+          <p className="declaracao-assinatura-texto">
+            {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
+          </p>
         </div>
 
         {erro && <p className="form-erro">{erro}</p>}

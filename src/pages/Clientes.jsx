@@ -8,7 +8,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload, Play, Calendar, QrCode, FileDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload, Play, Calendar, QrCode, FileDown, Send } from 'lucide-react'
 import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
 import { imprimirOuGuardarPdf, abrirPdfRelatorio } from '../utils/gerarPdfRelatorio'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
@@ -19,6 +19,7 @@ import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
+import { enviarRelatorioHtmlEmail } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
@@ -62,6 +63,8 @@ export default function Clientes() {
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalEmail, setModalEmail] = useState(null)
   const [modalDocumentoEmail, setModalDocumentoEmail] = useState(null)
+  const [modalFrotaEmail, setModalFrotaEmail] = useState(null) // { cliente }
+  const [frotaEmailDest, setFrotaEmailDest] = useState('')
   const [form, setForm] = useState({ nif: '', nome: '', morada: '', codigoPostal: '', localidade: '', telefone: '', email: '' })
   const [erro, setErro] = useState('')
   const [searchCliente, setSearchCliente] = useState('')
@@ -253,13 +256,68 @@ export default function Clientes() {
         maqsCliente,
         manutencoes,
         relatorios ?? [],
+        reparacoes ?? [],
         getSubcategoria,
+        getCategoria,
         { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png` }
       )
       const nomeArquivo = `frota_${cliente.nif}_${new Date().toISOString().slice(0, 10)}.pdf`
       await imprimirOuGuardarPdf(html, nomeArquivo)
     } catch (err) {
       showToast('Erro ao gerar relatório de frota.', 'error', 4000)
+    } finally {
+      hideGlobalLoading()
+    }
+  }
+
+  const openFrotaEmail = (cliente) => {
+    const maqsCliente = getMaquinasDoCliente(cliente.nif)
+    if (maqsCliente.length === 0) {
+      showToast('Este cliente não tem equipamentos registados.', 'warning')
+      return
+    }
+    setFrotaEmailDest(cliente.email ?? '')
+    setModalFrotaEmail({ cliente })
+  }
+
+  const handleEnviarFrotaEmail = async (e) => {
+    e.preventDefault()
+    const email = frotaEmailDest.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Indique um email válido.', 'warning')
+      return
+    }
+    const cli = modalFrotaEmail.cliente
+    const maqsCliente = getMaquinasDoCliente(cli.nif)
+    showGlobalLoading()
+    try {
+      const html = gerarRelatorioFrotaHtml(
+        cli,
+        maqsCliente,
+        manutencoes,
+        relatorios ?? [],
+        reparacoes ?? [],
+        getSubcategoria,
+        getCategoria,
+        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png` }
+      )
+      const ano = new Date().getFullYear()
+      const assunto = `Relatório Executivo de Frota ${ano} — ${cli.nome} — Navel`
+      const result = await enviarRelatorioHtmlEmail({
+        destinatario: email,
+        assunto,
+        html,
+        nomeCliente: cli.nome,
+      })
+      if (result.ok) {
+        showToast(result.message, 'success')
+        setModalFrotaEmail(null)
+      } else {
+        showToast(result.message, 'error', 4000)
+      }
+    } catch (err) {
+      showToast('Erro ao enviar relatório de frota por email.', 'error', 4000)
+      logger.error('Clientes', 'enviarFrotaEmail', err.message, { nif: cli.nif })
     } finally {
       hideGlobalLoading()
     }
@@ -467,9 +525,10 @@ export default function Clientes() {
                 </td>
                 <td data-label="Máq.">{getMaquinasCount(c.nif)}</td>
                 <td className="actions" data-label="">
-                  {getMaquinasCount(c.nif) > 0 && (
+                  {getMaquinasCount(c.nif) > 0 && (<>
                     <button className="icon-btn secondary" onClick={() => handleRelatorioFrota(c)} title="Relatório executivo de frota (PDF)"><FileBarChart size={16} /></button>
-                  )}
+                    <button className="icon-btn secondary" onClick={() => openFrotaEmail(c)} title="Enviar relatório de frota por email"><Send size={16} /></button>
+                  </>)}
                   {canEditCliente && (
                     <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
                   )}
@@ -548,6 +607,13 @@ export default function Clientes() {
                   title="Relatório executivo de frota (PDF)"
                 >
                   <FileBarChart size={15} /> Relatório de frota
+                </button>
+                <button
+                  className="btn secondary ficha-btn-frota"
+                  onClick={() => openFrotaEmail(fichaCliente)}
+                  title="Enviar relatório de frota por email ao cliente"
+                >
+                  <Send size={15} /> Enviar frota
                 </button>
                 {fichaView !== 'flat' && fichaView !== 'maquina-detalhe' && (
                   <button className="btn secondary ficha-btn-flat" onClick={() => setFichaView('flat')}>
@@ -853,6 +919,35 @@ export default function Clientes() {
           documento={modalDocumentoEmail.documento}
           maquina={modalDocumentoEmail.maquina}
         />
+      )}
+
+      {/* ── Modal enviar frota por email ──────────────────────────────────────── */}
+      {modalFrotaEmail && (
+        <div className="modal-overlay" onClick={() => setModalFrotaEmail(null)}>
+          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
+            <h2><Send size={18} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Enviar relatório de frota</h2>
+            <p className="text-muted" style={{ margin: '0.5rem 0', fontSize: '0.88rem' }}>
+              Relatório executivo de frota de <strong>{modalFrotaEmail.cliente.nome}</strong> será enviado por email.
+            </p>
+            <form onSubmit={handleEnviarFrotaEmail}>
+              <div className="form-group">
+                <label>Destinatário</label>
+                <input
+                  type="email"
+                  value={frotaEmailDest}
+                  onChange={e => setFrotaEmailDest(e.target.value)}
+                  placeholder="email@cliente.pt"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="secondary" onClick={() => setModalFrotaEmail(null)}>Cancelar</button>
+                <button type="submit"><Send size={15} /> Enviar</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ── Modal confirmar eliminar todos ───────────────────────────────────── */}
