@@ -52,23 +52,17 @@
   color: var(--color-white) !important;
   background: var(--color-success-dark) !important;
 }
-.icon-btn.btn-iniciar-manut {
-  color: var(--color-warning) !important;
-}
-.icon-btn.btn-iniciar-manut:hover {
-  color: var(--color-white) !important;
-  background: var(--color-warning) !important;
-}
 /* Tipo, Data, Técnico e Status em linha única — evita badge "Em atraso" partir em 2 linhas */
-.manutencoes-table .data-table td:nth-child(2),
+/* Cols: 1=Dias, 2=Equip, 3=Cliente, 4=Tipo, 5=Data, 6=Técnico, 7=Status, 8=Ações */
 .manutencoes-table .data-table td:nth-child(3),
 .manutencoes-table .data-table td:nth-child(4),
 .manutencoes-table .data-table td:nth-child(5),
+.manutencoes-table .data-table td:nth-child(6),
 .manutencoes-table .data-table td.col-status {
   white-space: nowrap;
 }
 /* Status: min-width para garantir que badge fica inteiro */
-.manutencoes-table .data-table th:nth-child(6),
+.manutencoes-table .data-table th:nth-child(7),
 .manutencoes-table .data-table td.col-status {
   min-width: 6rem;
 }
@@ -198,7 +192,7 @@
 .form-tecnico-hint { font-size: 0.85em; color: var(--color-text-muted); font-weight: 400; margin-left: 0.25rem; }
 .form-section { display: block; margin-bottom: 1.25rem; }
 .form-section h3 { margin: 0 0 0.75rem; font-size: clamp(0.6rem, 2.2vw, 0.88rem); font-weight: 500; color: var(--color-text-muted); }
-.checklist-respostas { max-height: min(280px, 35dvh); overflow-y: auto; margin-bottom: 0.5rem; }
+.checklist-respostas { max-height: var(--scroll-max-sm); overflow-y: auto; margin-bottom: 0.5rem; }
 .checklist-item-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); font-size: 0.85em; }
 .checklist-item-row:last-child { border-bottom: none; }
 .checklist-item-num { flex-shrink: 0; color: var(--color-text-muted); min-width: 1.5rem; }
@@ -359,6 +353,47 @@
   margin-left: auto;
 }
 
+/* ── Overflow menu (mobile cards) ── */
+.mc-overflow-wrapper {
+  position: relative;
+}
+.mc-overflow-menu {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 50;
+  min-width: 10rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  padding: 0.3rem 0;
+  margin-bottom: 0.25rem;
+}
+.mc-overflow-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mc-overflow-menu button:hover {
+  background: var(--color-accent-muted);
+}
+.mc-overflow-danger {
+  color: var(--color-danger, #dc2626) !important;
+}
+.mc-overflow-danger:hover {
+  background: rgba(220, 38, 38, 0.08) !important;
+}
+
 /* Botão acção primária "Executar" — thumb-zone, prominent */
 .mc-btn-primary {
   display: inline-flex;
@@ -387,7 +422,7 @@
     gap: 0.5rem;
     padding-bottom: 1.5rem;
   }
-  .checklist-respostas { max-height: min(280px, 40dvh); }
+  .checklist-respostas { max-height: var(--scroll-max-sm); }
   .btn-simnao { padding: 0.45rem 0.85rem; min-height: var(--touch-min); min-width: var(--touch-min); }
   /* Melhorar legibilidade do card */
   .mc-tipo-label { font-size: 0.78em; }
@@ -594,7 +629,7 @@
 
 /* ── RecolherAssinaturaModal ───────────────────────────────────────────────── */
 .modal-recolher-assinatura {
-  max-width: 520px;
+  max-width: var(--modal-width-md);
 }
 .modal-header-row {
   display: flex;
@@ -652,3 +687,27 @@
   border-radius: var(--radius-xs);
   border: 1px solid var(--color-warning, #f59e0b);
 }
+
+/* ── Coluna "Dias" na tabela desktop ─────────────────────────────────────── */
+.col-dias { width: 4rem; text-align: center; }
+.col-dias-val {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.col-dias-val.dias-atraso { color: var(--color-danger, #ef4444); }
+.col-dias-val.dias-hoje   { color: var(--color-primary, #3b82f6); }
+.col-dias-val.dias-futuro { color: var(--color-success, #22c55e); }
+
+/* ── Badge de dias no card mobile ────────────────────────────────────────── */
+.mc-dias-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: var(--radius-xs);
+  font-variant-numeric: tabular-nums;
+}
+.mc-dias-badge.dias-atraso { background: rgba(239,68,68,.15); color: var(--color-danger, #ef4444); }
+.mc-dias-badge.dias-hoje   { background: rgba(59,130,246,.15); color: var(--color-primary, #3b82f6); }
+.mc-dias-badge.dias-futuro { background: rgba(34,197,94,.12); color: var(--color-success, #22c55e); }

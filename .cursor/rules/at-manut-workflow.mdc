@@ -24,6 +24,16 @@ alwaysApply: true
 - Em cada início de conversa, escrever resumo curto com: objetivo, estado atual, risco principal, ficheiros canónicos e próxima ação.
 - A memória operacional persistente deste projeto é: código + `.cursor/rules` + `CHANGELOG.md` + documentação canónica.
 
+## Recuperação pós-crash
+
+O workspace NAVEL contém múltiplos projectos. Após um crash, o Cursor pode reiniciar na pasta raiz sem contexto do projecto activo.
+
+**Protocolo obrigatório:**
+1. **Confirmar projecto** — se o utilizador pede build/zip/deploy, confirmar que se refere ao AT_Manut (não ao app-ftecnicas ou outro). Pistas: "public_html/manut" = AT_Manut; "app-ftecnicas" = outro projecto.
+2. **Verificar estado** — `git status` + `git log --oneline -5` + `git diff --stat` dentro de `c:\Cursor_Projetos\NAVEL\AT_Manut\`.
+3. **Nunca cruzar projectos** — não executar comandos do AT_Manut na pasta do app-ftecnicas ou vice-versa.
+4. **Consultar regra global** — ver `.cursor/rules/navel-workspace.mdc` na raiz do workspace para mapa completo de projectos.
+
 ## Imagens e ícones
 
 **Regra obrigatória:** Todas as imagens em `public/` e `src/assets/` devem ser otimizadas. O script `npm run optimize-images` é executado automaticamente antes do build (`prebuild`).
@@ -167,11 +177,12 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 **GitHub:** Manter o repo atualizado após cada build fechado — backup em cloud, histórico de versões (tags), base para CI/CD futuro.
 
 ```powershell
-# Build
-npm run build
+# Build + zip (recomendado)
+npm run build:zip
 
-# Zip para upload cPanel (public_html/manut/)
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+# Ou separado:
+# npm run build
+# npm run zip
 
 # Push para GitHub (após cada build fechado)
 git add -A

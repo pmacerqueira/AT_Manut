@@ -2,7 +2,7 @@
 
 .reparacoes-page {
   padding: 1rem;
-  max-width: 1100px;
+  max-width: var(--page-max);
   margin: 0 auto;
 }
 
@@ -164,14 +164,14 @@
 /* ── Modal Nova Reparação ─────────────────────────────────────────────────── */
 
 .modal-nova-rep {
-  max-width: 560px;
+  max-width: var(--modal-width-md);
   width: 95vw;
 }
 
 /* ── Modal Relatório Reparação ───────────────────────────────────────────── */
 
 .modal-relatorio-rep {
-  max-width: 680px;
+  max-width: var(--modal-width-lg);
   width: 97vw;
 }
 
@@ -320,7 +320,7 @@
 /* ── Modal Mensal ISTOBAL ────────────────────────────────────────────────── */
 
 .modal-mensal-istobal {
-  max-width: 800px;
+  max-width: var(--modal-width-lg);
   width: 97vw;
 }
 

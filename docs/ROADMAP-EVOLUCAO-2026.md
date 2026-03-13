@@ -1,7 +1,7 @@
 # AT_Manut — Análise de Potencial e Roadmap de Evolução 2026
 
 > Documento estratégico para decisão das próximas etapas de desenvolvimento.
-> Baseado no estado actual v1.10.3 (Março 2026).
+> Baseado no estado actual v1.11.0 (Março 2026).
 > Classificação: **histórico de planeamento**. Para prioridades atuais, consultar `docs/ROADMAP.md` e `CHANGELOG.md`.
 
 ---
@@ -131,4 +131,4 @@ A aplicação AT_Manut está **madura e estável** para operação diária. O m�
 
 ---
 
-*Documento criado: 2026-03-12 — v1.10.3*
+*Documento criado: 2026-03-12 — v1.11.0*

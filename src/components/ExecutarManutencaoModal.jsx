@@ -3,13 +3,12 @@
  * Fluxo: checklist → notas + fotos → técnico (obrigatório) → nome cliente (obrigatório) → assinatura digital (obrigatória).
  * Fotos: capturadas pela câmara ou galeria, comprimidas no browser (canvas), guardadas como base64.
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
 import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER, tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../context/DataContext'
-import { TECNICOS } from '../config/users'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
 import { pt } from 'date-fns/locale'
@@ -82,9 +81,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     getSubcategoria,
     updateMaquina,
     getPecasPlanoByMaquina,
+    tecnicos,
+    getTecnicoByNome,
   } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
+  const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
 
   const [form, setForm] = useState({
     checklistRespostas: {},
@@ -114,6 +116,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const drawingRef  = useRef(false)
   const lastPosRef  = useRef({ x: 0, y: 0 })
   const fotoInputRef = useRef(null)
+  const fotoCameraRef = useRef(null)
+  const initRef = useRef(false)
 
   const maq = maquina
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
@@ -122,7 +126,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const isCompressor = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) { initRef.current = false; return }
+    if (initRef.current) return
+    initRef.current = true
     let m = manutencao
     if (!m && maq) {
       const existente = manutencoes.find(
@@ -267,6 +273,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     } finally {
       setFotoCarregando(false)
       if (fotoInputRef.current) fotoInputRef.current.value = ''
+      if (fotoCameraRef.current) fotoCameraRef.current.value = ''
     }
   }, [fotos.length])
 
@@ -292,12 +299,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       dataAssinatura: rel?.dataAssinatura ?? nowISO(),
       dataCriacao: rel?.dataCriacao ?? nowISO(),
     }
+    const tecObj = getTecnicoByNome(form.tecnico)
     const html = relatorioParaHtml(tempRel, manutencaoAtual, maq, cliente, items, {
       subcategoriaNome: sub?.nome ?? '',
       logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+      tecnicoObj: tecObj,
     })
     if (html) imprimirOuGuardarPdf(html)
-  }, [maq, maquina, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, canvasRef])
+  }, [maq, maquina, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, canvasRef, getTecnicoByNome])
 
   const gravar = (semAssinatura = false) => {
     setErroChecklist('')
@@ -339,6 +348,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     const relPayload = {
       checklistRespostas: form.checklistRespostas,
+      checklistSnapshot: items.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
       notas: form.notas.slice(0, 300),
       fotos,
       tecnico: form.tecnico,
@@ -456,6 +466,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const sub     = maq ? getSubcategoria(maq.subcategoriaId) : null
       const cliente = clientes.find(c => c.nif === maq?.clienteNif) ?? null
       try {
+        const tecObj = getTecnicoByNome(relFinal?.tecnico || manutFinal?.tecnico)
         const resultado = await enviarRelatorioEmail({
           emailDestinatario: emailDestinatario.trim(),
           relatorio:        relFinal,
@@ -465,6 +476,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           checklistItems:   items,
           subcategoriaNome: sub?.nome ?? '',
           logoUrl:          `${import.meta.env.BASE_URL}logo-navel.png`,
+          tecnicoObj:       tecObj,
         })
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
@@ -861,23 +873,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 Fotografias de apoio
                 <span className="fotos-count"> ({fotos.length}/{MAX_FOTOS})</span>
               </span>
-              {fotos.length < MAX_FOTOS && (
-                <>
-                  <input
-                    ref={fotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="fotos-input-hidden"
-                    onChange={handleFotoChange}
-                    id="foto-input"
-                  />
-                  <label htmlFor="foto-input" className="btn-foto">
-                    <Camera size={15} />
-                    {fotoCarregando ? 'A processar…' : 'Adicionar foto'}
-                  </label>
-                </>
+              {fotos.length < MAX_FOTOS && !fotoCarregando && (
+                <div className="fotos-btns">
+                  <input ref={fotoCameraRef} type="file" accept="image/*" capture="environment" className="fotos-input-hidden" onChange={handleFotoChange} />
+                  <button type="button" className="btn-foto" onClick={() => fotoCameraRef.current?.click()}>
+                    <Camera size={15} /> Tirar foto
+                  </button>
+                  <input ref={fotoInputRef} type="file" accept="image/*" multiple className="fotos-input-hidden" onChange={handleFotoChange} />
+                  <button type="button" className="btn-foto btn-foto-gallery" onClick={() => fotoInputRef.current?.click()}>
+                    <FolderOpen size={15} /> Galeria
+                  </button>
+                </div>
               )}
+              {fotoCarregando && <span className="fotos-loading">A processar…</span>}
             </div>
             {fotos.length > 0 && (
               <div className="fotos-grid">
@@ -933,18 +941,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             )}
 
             <label className="label-required">
-              Técnico que realizou a manutenção <span className="req-star">*</span>
+              <span>Técnico que realizou a manutenção <span className="req-star">*</span></span>
               <select value={form.tecnico}
                 onChange={e => setForm(f => ({ ...f, tecnico: e.target.value }))} required>
                 <option value="">— Selecionar técnico —</option>
-                {TECNICOS.map(nome => (
+                {nomesTecnicos.map(nome => (
                   <option key={nome} value={nome}>{nome}</option>
                 ))}
               </select>
             </label>
 
             <label className="label-required">
-              Nome do cliente que assina <span className="req-star">*</span>
+              <span>Nome do cliente que assina <span className="req-star">*</span></span>
               <input type="text" value={form.nomeAssinante}
                 onChange={e => setForm(f => ({ ...f, nomeAssinante: e.target.value }))}
                 placeholder="Nome completo do responsável"
@@ -984,7 +992,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               Envio do comprovativo
             </h3>
             <label className="label-required">
-              Email do cliente para envio do relatório <span className="req-star">*</span>
+              <span>Email do cliente para envio do relatório <span className="req-star">*</span></span>
               <input
                 type="email"
                 value={emailDestinatario}

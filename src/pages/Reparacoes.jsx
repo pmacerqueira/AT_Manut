@@ -9,11 +9,10 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package } from 'lucide-react'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package, Clock } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
-import { TECNICOS } from '../config/users'
 import { MESES_PT } from '../constants/locale'
 import './Reparacoes.css'
 
@@ -41,8 +40,10 @@ export default function Reparacoes() {
     getRelatorioByReparacao,
     getSubcategoria,
     getChecklistBySubcategoria,
+    tecnicos,
+    getTecnicoByNome,
   } = useData()
-  const { canDelete } = usePermissions()
+  const { canDelete, canDeleteReparacao, isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
 
@@ -56,6 +57,7 @@ export default function Reparacoes() {
   const [emailDestino, setEmailDestino] = useState('')
   const [emailEnviando, setEmailEnviando] = useState(false)
   const [modalEliminar, setModalEliminar] = useState(null)
+  const [filtroClienteNova, setFiltroClienteNova] = useState('')
   const [modalMensal, setModalMensal] = useState(false)
   const [avisoExpandido, setAvisoExpandido] = useState(null) // id da reparação com detalhe expandido
   const [modoPrint, setModoPrint] = useState(false)
@@ -100,6 +102,8 @@ export default function Reparacoes() {
   const getMaquina  = useCallback((id) => maquinas.find(m => m.id === id), [maquinas])
   const getCliente  = useCallback((nif) => clientes.find(c => c.nif === nif), [clientes])
 
+  const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
+
   const maquinasOrdenadas = useMemo(() =>
     [...maquinas].sort((a, b) => {
       const ca = clientes.find(c => c.nif === a.clienteNif)
@@ -107,6 +111,16 @@ export default function Reparacoes() {
       return (ca?.nome ?? '').localeCompare(cb?.nome ?? '', 'pt')
     }),
   [maquinas, clientes])
+
+  const clientesComMaquinas = useMemo(() => {
+    const nifs = [...new Set(maquinas.map(m => m.clienteNif).filter(Boolean))]
+    return nifs.map(nif => clientes.find(c => c.nif === nif)).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'))
+  }, [maquinas, clientes])
+
+  const maquinasFiltradas = useMemo(() => {
+    if (!filtroClienteNova) return maquinasOrdenadas
+    return maquinasOrdenadas.filter(m => m.clienteNif === filtroClienteNova)
+  }, [maquinasOrdenadas, filtroClienteNova])
 
   // ── Lista filtrada ────────────────────────────────────────────────────────
 
@@ -156,12 +170,21 @@ export default function Reparacoes() {
     setModalNova(false)
     setFormNova({ maquinaId: '', tecnico: '', data: getHojeAzores(), numeroAviso: '', descricaoAvaria: '' })
     setErrorsNova({})
+    setFiltroClienteNova('')
   }
 
   // ── Eliminar ──────────────────────────────────────────────────────────────
 
   const handleEliminar = (rep) => {
-    if (!canDelete) { showToast('Sem permissão para eliminar', 'warning'); return }
+    if (!canDeleteReparacao(rep.id)) {
+      const rel = getRelatorioByReparacao(rep.id)
+      if (rel?.assinadoPeloCliente) {
+        showToast('Não é possível eliminar — relatório assinado pelo cliente.', 'warning')
+      } else {
+        showToast('Sem permissão para eliminar.', 'warning')
+      }
+      return
+    }
     setModalEliminar(rep)
   }
 
@@ -191,18 +214,23 @@ export default function Reparacoes() {
     setEmailEnviando(true)
     try {
       const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-      const { enviarRelatorioEmail }       = await import('../services/emailService')
+      const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
       const itensChecklist = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
-      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist)
-      await enviarRelatorioEmail({
+      const tecObj = getTecnicoByNome(rep.tecnico || rel?.tecnico)
+      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist, { tecnicoObj: tecObj })
+      const resultado = await enviarRelatorioHtmlEmail({
         destinatario: emailDestino.trim(),
-        assunto:      `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
+        assunto: `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
         html,
-        nomeCliente:  cli?.nome ?? '',
+        nomeCliente: cli?.nome ?? '',
       })
-      showToast('Relatório enviado com sucesso', 'success')
-      logger.action('Reparacoes', 'enviarEmail', `Email enviado para ${emailDestino}`, { relId: rel.id })
-      setModalEmail(null)
+      if (resultado.ok) {
+        showToast('Relatório enviado com sucesso', 'success')
+        logger.action('Reparacoes', 'enviarEmail', `Email enviado para ${emailDestino}`, { relId: rel.id })
+        setModalEmail(null)
+      } else {
+        showToast(resultado.message || 'Erro ao enviar email.', 'error', 4000)
+      }
     } catch (err) {
       showToast('Erro ao enviar email: ' + err.message, 'error')
       logger.error('Reparacoes', 'enviarEmail', err.message)
@@ -239,9 +267,11 @@ export default function Reparacoes() {
           )}
         </div>
         <div className="page-header-actions">
-          <button type="button" className="btn secondary" onClick={() => setModalMensal(true)} title="Relatório mensal ISTOBAL">
-            <BarChart2 size={16} /> Mensal ISTOBAL
-          </button>
+          {isAdmin && (
+            <button type="button" className="btn secondary" onClick={() => setModalMensal(true)} title="Relatório mensal ISTOBAL">
+              <BarChart2 size={16} /> Mensal ISTOBAL
+            </button>
+          )}
           <button type="button" className="btn primary" onClick={() => setModalNova(true)}>
             <Plus size={16} /> Nova Reparação
           </button>
@@ -315,7 +345,7 @@ export default function Reparacoes() {
                       </button>
                     </>
                   )}
-                  {canDelete && (
+                  {canDeleteReparacao(rep.id) && (
                     <button type="button" className="icon-btn danger" title="Eliminar" onClick={() => handleEliminar(rep)}>
                       <Trash2 size={18} />
                     </button>
@@ -393,7 +423,7 @@ export default function Reparacoes() {
                             </button>
                           </>
                         )}
-                        {canDelete && (
+                        {canDeleteReparacao(rep.id) && (
                           <button
                             type="button"
                             className="icon-btn danger"
@@ -423,13 +453,20 @@ export default function Reparacoes() {
             <div className="modal modal-nova-rep">
               <div className="modal-header">
                 <h2><Hammer size={18} /> Nova Reparação</h2>
-                <button type="button" className="icon-btn" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
+                <button type="button" className="icon-btn" onClick={() => { setModalNova(false); setErrorsNova({}); setFiltroClienteNova('') }}>
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
 
-                {/* Máquina — linha completa */}
+                {/* Cliente (filtro) + Máquina */}
+                <div className="form-group">
+                  <label>Cliente <span className="text-muted" style={{ fontWeight: 'normal', fontSize: '0.8em' }}>filtro</span></label>
+                  <select value={filtroClienteNova} onChange={e => { setFiltroClienteNova(e.target.value); setFormNova(p => ({ ...p, maquinaId: '' })) }}>
+                    <option value="">Todos os clientes</option>
+                    {clientesComMaquinas.map(c => <option key={c.nif} value={c.nif}>{c.nome}</option>)}
+                  </select>
+                </div>
                 <div className="form-group">
                   <label>Máquina <span className="required">*</span></label>
                   <select
@@ -438,7 +475,7 @@ export default function Reparacoes() {
                     onChange={e => setFormNova(p => ({ ...p, maquinaId: e.target.value }))}
                   >
                     <option value="">— Seleccione —</option>
-                    {maquinasOrdenadas.map(m => {
+                    {maquinasFiltradas.map(m => {
                       const c = getCliente(m.clienteNif)
                       return (
                         <option key={m.id} value={m.id}>
@@ -460,7 +497,7 @@ export default function Reparacoes() {
                       onChange={e => setFormNova(p => ({ ...p, tecnico: e.target.value }))}
                     >
                       <option value="">— Seleccione —</option>
-                      {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
+                      {nomesTecnicos.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                     {errorsNova.tecnico && <span className="field-error">{errorsNova.tecnico}</span>}
                   </div>
@@ -509,7 +546,7 @@ export default function Reparacoes() {
 
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn secondary" onClick={() => { setModalNova(false); setErrorsNova({}) }}>
+                <button type="button" className="btn secondary" onClick={() => { setModalNova(false); setErrorsNova({}); setFiltroClienteNova('') }}>
                   Cancelar
                 </button>
                 <button type="button" className="btn primary" onClick={handleCriarReparacao}>
@@ -796,7 +833,7 @@ export default function Reparacoes() {
                   </div>
                 )
               })()}
-              <p className="text-danger">Esta acção é irreversível. O relatório associado também será eliminado.</p>
+              <p className="text-danger">Esta acção é irreversível. A reparação e o relatório associado serão eliminados permanentemente.</p>
             </div>
             <div className="modal-footer">
               <button type="button" className="btn secondary" onClick={() => setModalEliminar(null)}>Cancelar</button>

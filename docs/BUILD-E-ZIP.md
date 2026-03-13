@@ -55,8 +55,10 @@ npm run zip
 ```powershell
 cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
+npm run zip
 ```
+
+> **Nota:** `npm run zip` usa `tar` internamente para criar `dist_upload.zip` a partir de `dist/`.
 
 ---
 

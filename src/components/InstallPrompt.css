@@ -19,7 +19,7 @@
   background: var(--color-bg-card);
   border-radius: var(--radius);
   padding: 1.5rem;
-  max-width: 380px;
+  max-width: min(380px, 95vw);
   width: 100%;
   box-shadow: var(--shadow);
   border: 1px solid var(--color-border);

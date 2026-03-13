@@ -89,6 +89,7 @@ export default function Logs() {
   const [expanded,     setExpanded]     = useState(null)
   const [logSource,    setLogSource]    = useState('local')
   const [loadingServer, setLoadingServer] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const reload = useCallback(async () => {
     if (logSource === 'server') {
@@ -183,9 +184,10 @@ export default function Logs() {
   }
 
   function handleClear() {
-    if (!window.confirm('Apagar todo o log permanentemente? Esta acção não pode ser desfeita.')) return
+    if (!confirmClear) { setConfirmClear(true); return }
     clearLog()
     reload()
+    setConfirmClear(false)
   }
 
   if (!isAdmin) return null
@@ -297,9 +299,16 @@ export default function Logs() {
             <Download size={16} />
             <span className="log-btn-label">JSON</span>
           </button>
-          <button type="button" className="icon-btn danger" onClick={handleClear} title="Limpar todo o log">
-            <Trash2 size={16} />
-          </button>
+          {confirmClear ? (
+            <>
+              <button type="button" className="danger" onClick={handleClear} style={{ fontSize: '0.8rem' }}>Confirmar</button>
+              <button type="button" className="secondary" onClick={() => setConfirmClear(false)} style={{ fontSize: '0.8rem' }}>Cancelar</button>
+            </>
+          ) : (
+            <button type="button" className="icon-btn danger" onClick={handleClear} title="Limpar todo o log">
+              <Trash2 size={16} />
+            </button>
+          )}
         </div>
       </div>
 

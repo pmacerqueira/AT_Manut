@@ -82,7 +82,7 @@ envios com estado detalhado e possíveis erros.
 
 Quando quiseres publicar a app:
 1. `cd c:\Cursor_Projetos\NAVEL\AT_Manut`
-2. `npm run build`  → cria a pasta `dist/`
+2. `npm run build:zip`  → cria a pasta `dist/` e o `dist_upload.zip`
 3. Fazer upload do conteúdo de `dist/` para `public_html/manut/`
    (criar a pasta `manut/` primeiro)
 

@@ -11,21 +11,21 @@ import { ROLES } from '../config/users'
  * ATecnica (permissoes limitadas):
  * - NÃO pode editar nem eliminar Clientes
  * - NÃO pode editar nem eliminar manutenções já realizadas e assinadas pelo cliente
+ *
+ * Ninguém pode eliminar manutenções/reparações com relatório assinado pelo cliente.
  */
 export function usePermissions() {
   const { user } = useAuth()
-  const { getRelatorioByManutencao } = useData()
+  const { getRelatorioByManutencao, getRelatorioByReparacao } = useData()
 
   return useMemo(() => {
     const isAdmin = user?.role === ROLES.ADMIN
 
     const canDelete = isAdmin
 
-    /** Admin: sim. ATecnica: não. */
     const canEditCliente = isAdmin
     const canAddCliente = isAdmin
 
-    /** Admin: pode editar qualquer. ATecnica: apenas se relatório NÃO estiver assinado. */
     const canEditManutencao = (manutencaoId) => {
       if (isAdmin) return true
       const relatorio = getRelatorioByManutencao(manutencaoId)
@@ -37,13 +37,29 @@ export function usePermissions() {
       return !!relatorio?.assinadoPeloCliente
     }
 
+    /** Bloqueia eliminação de manutenção com relatório assinado */
+    const canDeleteManutencao = (manutencaoId) => {
+      if (!isAdmin) return false
+      const relatorio = getRelatorioByManutencao(manutencaoId)
+      return !relatorio?.assinadoPeloCliente
+    }
+
+    /** Bloqueia eliminação de reparação com relatório assinado */
+    const canDeleteReparacao = (reparacaoId) => {
+      if (!isAdmin) return false
+      const relatorio = getRelatorioByReparacao(reparacaoId)
+      return !relatorio?.assinadoPeloCliente
+    }
+
     return {
       canDelete,
       canEditCliente,
       canAddCliente,
       canEditManutencao,
       isManutencaoAssinada,
+      canDeleteManutencao,
+      canDeleteReparacao,
       isAdmin,
     }
-  }, [user?.role, getRelatorioByManutencao])
+  }, [user?.role, getRelatorioByManutencao, getRelatorioByReparacao])
 }

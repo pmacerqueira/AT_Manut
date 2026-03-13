@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.10.3 · **Última actualização:** 2026-03-01
+**Versão:** 1.11.0 · **Última actualização:** 2026-03-12
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -93,6 +93,8 @@ Próximo passo:
 | **Reparações — execução** | `ExecutarReparacaoModal.jsx` (fotos, peças, assinatura, email) |
 | **Reparações — API** | `DataContext.jsx` → `addReparacao`, `updateReparacao`, `removeReparacao` |
 | **Reparações — relatório mensal ISTOBAL** | `Reparacoes.jsx` → `RelatorioMensalISTOBAL`, `RelatorioReparacaoView` |
+| **Gestão de técnicos** | `Definicoes.jsx`, `DataContext.jsx` → `addTecnico`, `updateTecnico`, `removeTecnico` |
+| **Assinatura em 2 passos** | `RecolherAssinaturaModal.jsx`, `Manutencoes.jsx` |
 
 ---
 
@@ -115,7 +117,7 @@ Próximo passo:
 ```js
 { id, maquinaId, tipo, data, hora, tecnico, status, observacoes }
 // tipo: 'montagem' | 'periodica'
-// status: 'pendente' | 'agendada' | 'concluida'
+// status: 'pendente' | 'agendada' | 'concluida' | 'historica' | 'pendenteAssinatura'
 ```
 
 ### Relatórios de manutenção
@@ -231,21 +233,16 @@ const addXxx = useCallback((data) => {
 ## 9. Variáveis CSS relevantes
 
 ```css
-/* index.css */
---color-accent: #0d2340           /* azul Navel — acções principais */
---color-accent-hover: ...
---color-danger: #b90211           /* vermelho — eliminar, atraso crítico */
---color-warning: #f59e0b          /* laranja — aviso, sem email */
---color-success: #22c55e          /* verde — concluído */
-
-.btn-executar-manut { color: #39ff14 }  /* verde fluorescente — botão Executar */
-.badge-sem-email { ... }                /* badge laranja clientes sem email */
-.stat-card-pulse { animation: pulse }  /* card pulsante no Dashboard */
-
-/* Reparações */
-.rep-origem-istobal { ... }       /* badge ISTOBAL nas linhas de reparação */
-.rel-section-equipamento { ... }  /* secção máquina/cliente no relatório */
-.rel-footer { ... }               /* rodapé Navel no relatório de reparação */
+/* index.css :root — Layout responsivo centralizado */
+--sidebar-width: clamp(240px, 20vw, 280px);
+--nav-height: clamp(48px, 8vh, 60px);
+--page-max: min(1200px, 96vw);
+--modal-width-sm/md/lg/xl: min(Xpx, 95-96vw);
+--scroll-max-sm/md/lg: min(Xpx, 35-50dvh);
+--card-pad: clamp(0.6rem, 2vw, 1.25rem);
+--page-pad: clamp(0.75rem, 2.5vw, 1.5rem);
+--grid-min-col: clamp(120px, 28vw, 200px);
+/* + espaçamento (--space-xs..2xl), tipografia (--text-2xs..lg), raios (--radius-xs..lg) */
 ```
 
 ---

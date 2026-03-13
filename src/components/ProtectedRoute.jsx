@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { usePermissions } from '../hooks/usePermissions'
 import { STORAGE } from '../config/storageKeys'
 
 export default function ProtectedRoute({ children }) {
@@ -29,5 +30,11 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={redirectState} replace />
   }
 
+  return children
+}
+
+export function AdminRoute({ children }) {
+  const { isAdmin } = usePermissions()
+  if (!isAdmin) return <Navigate to="/" replace />
   return children
 }

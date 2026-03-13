@@ -42,3 +42,64 @@
 .horas-cell { font-size: 0.9em; }
 .consumiveis-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
 .consumiveis-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text-muted); }
+
+/* ── Maquina row — atraso highlight ── */
+.maquina-row--atraso {
+  border-left: 3px solid var(--color-danger, #dc2626);
+}
+
+/* ── Badges row inside equip row ── */
+.equip-badges-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Badge periodicidade ── */
+.badge-periodicidade {
+  background: rgba(99, 102, 241, 0.10);
+  color: #6366f1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+/* ── Badge conforme (verde) ── */
+.badge-conforme-equip {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--color-success, #16a34a);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+/* ── Badge sem data ── */
+.badge-sem-data-equip {
+  background: rgba(100, 116, 139, 0.10);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+/* ── Badge documentação ── */
+.badge-docs {
+  background: rgba(245, 158, 11, 0.10);
+  color: #b45309;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+.badge-docs--ok {
+  background: rgba(22, 163, 74, 0.10);
+  color: var(--color-success, #16a34a);
+}

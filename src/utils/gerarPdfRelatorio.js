@@ -7,6 +7,7 @@
  */
 import { logger } from './logger'
 import { APP_FOOTER_TEXT } from '../config/version'
+import { resolveChecklist } from './resolveChecklist'
 
 /** Deteta se o dispositivo parece ser mobile (para abrir visualizador em vez de impressão) */
 export function isMobileDevice() {
@@ -17,19 +18,20 @@ export function isMobileDevice() {
  * Em mobile: gera PDF e abre num visualizador. Em desktop: abre diálogo de impressão.
  * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, html }} params
  */
-export async function abrirPdfRelatorio({ relatorio, manutencao, maquina, cliente, checklistItems = [], subcategoriaNome = '', html }) {
+export async function abrirPdfRelatorio({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', html, tecnicoObj = null }) {
+  const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   if (isMobileDevice()) {
     try {
-      const blob = await gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome })
+      const blob = await gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, tecnicoObj })
       const url = URL.createObjectURL(blob)
       const w = window.open(url, '_blank')
       if (!w) {
-        alert('Permita pop-ups para visualizar o PDF.')
+        throw new Error('Permita pop-ups para visualizar o PDF.')
       }
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (err) {
       logger.error('gerarPdfRelatorio', 'abrirPdfRelatorio', 'Erro ao gerar PDF em mobile', { msg: err?.message })
-      alert('Não foi possível gerar o PDF.')
+      throw err
     }
   } else {
     imprimirOuGuardarPdf(html)
@@ -44,8 +46,7 @@ export async function abrirPdfRelatorio({ relatorio, manutencao, maquina, client
 export function imprimirOuGuardarPdf(html) {
   const w = window.open('', '_blank')
   if (!w) {
-    alert('Permita pop-ups para obter o PDF.')
-    return
+    throw new Error('Permita pop-ups para obter o PDF.')
   }
   w.document.write(html)
   w.document.close()
@@ -78,7 +79,8 @@ export function imprimirOuGuardarPdf(html) {
  * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome }} params
  * @returns {Promise<Blob>}
  */
-export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems = [], subcategoriaNome = '' }) {
+export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null }) {
+  const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { jsPDF } = await import('jspdf')
 
   const pdf  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -182,19 +184,46 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     pdf.text(lines, M, y); y += lines.length * 5 + 5
   }
 
-  // ── Assinatura digital (caixa de confirmação — sem imagem para manter PDF leve) ──
-  if (y > 255) { pdf.addPage(); y = 20 }
-  pdf.setFillColor(240, 253, 244)
-  pdf.setDrawColor(187, 247, 208)
-  pdf.rect(M, y - 4, cW, 16, 'FD')
-  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(22, 163, 74)
-  pdf.text('\u2713 Relat\u00f3rio assinado digitalmente', M + 3, y + 1)
-  pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-  const assinTexto = relatorio?.nomeAssinante
-    ? `Assinado por ${relatorio.nomeAssinante} em ${dataAssin}. Assinatura manuscrita arquivada no sistema.`
-    : `Assinado em ${dataAssin}. Assinatura manuscrita arquivada no sistema.`
-  pdf.text(assinTexto, M + 3, y + 8, { maxWidth: cW - 6 })
-  y += 20
+  // ── Bloco de assinaturas (técnico + cliente) ──
+  if (y > 230) { pdf.addPage(); y = 20 }
+
+  const halfW = (cW - 4) / 2
+  const sigBoxH = tecnicoObj?.assinaturaDigital ? 38 : 20
+
+  // Caixa do técnico (esquerda)
+  pdf.setFillColor(243, 244, 246); pdf.setDrawColor(209, 213, 219)
+  pdf.rect(M, y - 4, halfW, sigBoxH, 'FD')
+  pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+  pdf.text('T\u00c9CNICO RESPONS\u00c1VEL', M + 2, y)
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+  pdf.text(relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014', M + 2, y + 5)
+  if (tecnicoObj?.telefone) {
+    pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
+    pdf.text('Tel: ' + tecnicoObj.telefone, M + 2, y + 10)
+  }
+  if (tecnicoObj?.assinaturaDigital) {
+    try {
+      pdf.addImage(tecnicoObj.assinaturaDigital, 'PNG', M + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
+    } catch { /* fallback: sem imagem */ }
+  }
+
+  // Caixa do cliente (direita)
+  const xRight = M + halfW + 4
+  pdf.setFillColor(240, 253, 244); pdf.setDrawColor(187, 247, 208)
+  pdf.rect(xRight, y - 4, halfW, sigBoxH, 'FD')
+  pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(22, 163, 74)
+  pdf.text('ASSINATURA DO CLIENTE', xRight + 2, y)
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+  pdf.text(relatorio?.nomeAssinante ?? '\u2014', xRight + 2, y + 5)
+  pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
+  pdf.text(`Assinado em ${dataAssin}`, xRight + 2, y + 10)
+  if (relatorio?.assinaturaDigital) {
+    try {
+      pdf.addImage(relatorio.assinaturaDigital, 'PNG', xRight + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
+    } catch { /* fallback: sem imagem */ }
+  }
+
+  y += sigBoxH + 6
 
   // ── Fotos (menção) ────────────────────────────────────────────────────────
   const nFotos = (relatorio?.fotos ?? []).length

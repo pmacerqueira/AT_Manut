@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-03-12 — v1.10.3
+> Última revisão: 2026-03-12 — v1.11.0
 
 ## Resumo da verificação da base de dados
 
@@ -16,6 +16,7 @@
 | relatorios | — | 13 | — |
 | reparacoes | — | — | relatorios_reparacao.reparacao_id |
 | relatorios_reparacao | — | — | — |
+| tecnicos | 3 (Aldevino, Carlos, Emanuel) | — | relatorios.tecnico, relatorios_reparacao.tecnico |
 
 ---
 
@@ -72,6 +73,7 @@ Se a BD foi criada antes das migrações mais recentes:
 3. `add_sub4_checklists.sql` — checklists sub4
 4. `add_sub12_checklists.sql` — checklists sub12
 5. Scripts de migração para tabelas `reparacoes` e `relatorios_reparacao` (se não existirem no schema actual)
+6. `add_tecnicos_table.sql` — tabela de técnicos (nome, telefone, assinatura digital)
 
 **Nota:** O `setup.sql` atual já inclui tudo. Migrações só são necessárias para BDs antigas.
 

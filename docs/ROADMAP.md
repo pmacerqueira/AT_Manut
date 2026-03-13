@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-03-12 — v1.10.3
+> Última revisão: 2026-03-12 — v1.11.0
 
 ---
 
-## Estado actual (v1.10.3) — O que está implementado
+## Estado actual (v1.11.0) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -44,6 +44,13 @@
 | **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
 | **Importação SAF-T clientes** | Modal Admin, preview, modos Ignorar/Actualizar, persistência API | **v1.10.3** |
 | **Suite de testes E2E** | ~450 testes Playwright (18 specs) — importação SAF-T incluída | **v1.10.3** |
+| **Manutenções históricas** | Inserção de registos passados, badges "Histórico"/"Pendente assinatura" | **v1.11.0** |
+| **Assinatura em 2 passos** | RecolherAssinaturaModal — gravar → recolher assinatura depois | **v1.11.0** |
+| **Agendamento recorrente** | Criação automática de manutenções futuras (1–3 anos) | **v1.11.0** |
+| **Inserção em lote** | Admin cria múltiplos registos históricos de uma vez | **v1.11.0** |
+| **Gestão de técnicos** | Ficha (nome, telefone, assinatura digital) na BD; Admin-only | **v1.11.0** |
+| **Assinatura técnico em PDFs** | Relatórios incluem identificação + assinatura do técnico | **v1.11.0** |
+| **CSS responsivo centralizado** | 15 variáveis de layout em :root (clamp/min) | **v1.11.0** |
 
 ---
 
@@ -168,11 +175,12 @@
 - **Dashboard KPIs executivo** — taxa de cumprimento, gráficos, top clientes em atraso
 - **Modo campo** — alto contraste para técnicos ao sol
 - **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
+- **Assinatura do técnico em PDFs** — identificação e assinatura pré-preenchida
 - **~450 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 
 ---
 
-*Última actualização: 2026-03-12 — v1.10.3*
+*Última actualização: 2026-03-12 — v1.11.0*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

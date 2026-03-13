@@ -7,12 +7,14 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { Plus, ExternalLink, Trash2, FolderPlus } from 'lucide-react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
+import { parseDateLocal } from '../utils/datasAzores'
 
 export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
   const { maquinas, addDocumentoMaquina, removeDocumentoMaquina } = useData()
   const { showToast } = useToast()
   const { isAdmin } = usePermissions()
   const [formDoc, setFormDoc] = useState({ tipo: 'manual_utilizador', titulo: '', url: '' })
+  const [confirmDeleteDocId, setConfirmDeleteDocId] = useState(null)
 
   if (!isOpen) return null
 
@@ -41,7 +43,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
           <div className="consumiveis-card">
             <h4>Contadores (à data da última manutenção)</h4>
             <div className="consumiveis-grid">
-              {maq.ultimaManutencaoData && <span><strong>Última manut.:</strong> {format(new Date(maq.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}</span>}
+              {maq.ultimaManutencaoData && <span><strong>Última manut.:</strong> {format(parseDateLocal(maq.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}</span>}
               {maq.horasTotaisAcumuladas != null && <span><strong>Horas totais:</strong> {maq.horasTotaisAcumuladas}h</span>}
               {maq.horasServicoAcumuladas != null && <span><strong>Horas serviço:</strong> {maq.horasServicoAcumuladas}h</span>}
             </div>
@@ -69,8 +71,13 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
               </div>
               <div className="doc-item-actions">
                 <a href={safeHttpUrl(d.url)} target="_blank" rel="noopener noreferrer" className="icon-btn secondary" title="Abrir"><ExternalLink size={16} /></a>
-                {isAdmin && (
-                  <button type="button" className="icon-btn danger" onClick={() => removeDocumentoMaquina(maq.id, d.id)} title="Remover"><Trash2 size={16} /></button>
+                {isAdmin && confirmDeleteDocId === d.id ? (
+                  <>
+                    <button type="button" className="icon-btn danger" onClick={() => { removeDocumentoMaquina(maq.id, d.id); setConfirmDeleteDocId(null); showToast('Documento removido.', 'success') }} title="Confirmar">Sim</button>
+                    <button type="button" className="icon-btn secondary" onClick={() => setConfirmDeleteDocId(null)} title="Cancelar">Não</button>
+                  </>
+                ) : isAdmin && (
+                  <button type="button" className="icon-btn danger" onClick={() => setConfirmDeleteDocId(d.id)} title="Remover"><Trash2 size={16} /></button>
                 )}
               </div>
             </div>

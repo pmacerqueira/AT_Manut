@@ -1,7 +1,7 @@
 /* Definicoes.css */
 
 .def-page {
-  max-width: 720px;
+  max-width: var(--modal-width-lg);
   margin: 0 auto;
   padding: 1.5rem 1rem 3rem;
   display: flex;
@@ -333,6 +333,113 @@
   .def-stat-card--size { grid-column: span 1; }
   .def-btn { width: 100%; justify-content: center; min-height: 44px; }
   .def-title { font-size: clamp(1.1rem, 5vw, 1.35rem); }
+}
+
+/* ── Gestão de Técnicos ── */
+.def-tec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.def-tec-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-elevated);
+}
+.def-tec-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.def-tec-nome {
+  font-size: 0.92rem;
+}
+.def-tec-tel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.def-tec-sig-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--color-success);
+  font-weight: 600;
+}
+.def-tec-sig-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--color-warning);
+  font-weight: 600;
+}
+.def-tec-sig-preview {
+  width: 80px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+.def-tec-sig-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.def-tec-card-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Modal técnico */
+.modal-tecnico .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.def-tec-sig-section {
+  margin-top: 0.25rem;
+}
+.def-tec-sig-label {
+  font-weight: 600;
+  font-size: 0.88rem;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.def-tec-sig-current {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: #fff;
+}
+.def-tec-sig-current img {
+  height: 50px;
+  object-fit: contain;
+}
+.btn-limpar-sig {
+  font-size: 0.78rem !important;
+  padding: 0.25rem 0.5rem !important;
+}
+.def-tec-sig-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.35rem;
 }
 
 /* Landscape: menos padding vertical */

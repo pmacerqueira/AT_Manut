@@ -1,6 +1,6 @@
 /* ── PecasPlanoModal ─────────────────────────────────────────────────────── */
 .modal-pecas-plano {
-  width: min(860px, 96vw);
+  width: var(--modal-width-xl);
   max-height: 92vh;
   display: flex;
   flex-direction: column;

@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.10.3 · **Última actualização:** 2026-03-01
+**Versão:** 1.11.0 · **Última actualização:** 2026-03-12
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -79,10 +79,12 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── RelatorioView.jsx / .css    # Visualização de relatório de manutenção
 │   │   ├── ExecutarManutencaoModal.jsx # Modal execução manutenção (checklist+assinatura+email)
 │   │   ├── ExecutarReparacaoModal.jsx  # Modal execução reparação (fotos+assinatura+email+peças)
+│   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
 │   │   ├── DocumentacaoModal.jsx       # Documentação de equipamento
 │   │   ├── EnviarEmailModal.jsx        # Envio de email
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
+│   │   ├── PecasPlanoModal.jsx / .css   # Plano de peças e consumíveis
 │   │   ├── QrEtiquetaModal.jsx / .css  # QR Code + etiqueta 90×50mm
 │   │   ├── QrReaderModal.jsx / .css    # Leitura QR por câmara (@zxing/browser)
 │   │   ├── PesquisaGlobal.jsx / .css   # Pesquisa global Ctrl+K (clientes+maquinas+manut.)
@@ -187,6 +189,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 | Aceder a Logs | ✅ | ❌ |
 | Ver modal de alertas proactivos | ✅ | ❌ |
 | Ver secção "Alertas de conformidade" nas Definições | ✅ | ❌ |
+| Gerir técnicos (ficha, assinatura) | ✅ | ❌ |
 
 ---
 
@@ -229,7 +232,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 ```json
 { "id": "mt01", "maquinaId": "m01", "tipo": "periodica",
   "data": "2026-03-15", "hora": "09:00", "tecnico": "Admin",
-  "status": "pendente", "observacoes": "" }
+  "status": "pendente", "historica": false, "observacoes": "" }
+// status: 'pendente' | 'agendada' | 'concluida' | 'historica' | 'pendenteAssinatura'
 ```
 
 **Relatórios de manutenção:**
@@ -238,6 +242,12 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
   "nomeAssinante": "João Silva", "assinaturaDigital": "data:image/png;base64,...",
   "assinadoPeloCliente": true, "dataAssinatura": "2026-03-15T10:05:00Z",
   "checklistItems": [...], "fotos": [...], "horasServico": 2 }
+```
+
+**Técnicos:**
+```json
+{ "id": "tec01", "nome": "Aldevino Costa", "telefone": "912345678",
+  "assinatura_digital": "data:image/png;base64,...", "ativo": true }
 ```
 
 **Reparações:**
@@ -302,8 +312,9 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
    - Campo de fotos (opcional)
    - Horas de serviço (opcional)
 3. Submit → valida checklist + assinatura → guarda relatório + atualiza manutenção
-4. **Se periódica:** `recalcularPeriodicasAposExecucao` recalcula próximas 2 anos
-5. **Se email disponível:** envia relatório PDF por email automaticamente
+4. **Assinatura em 2 passos (opcional):** Se a assinatura não for recolhida no momento, o status fica `pendenteAssinatura`. O modal `RecolherAssinaturaModal` permite recolher a assinatura posteriormente.
+5. **Se periódica:** `recalcularPeriodicasAposExecucao` recalcula próximas 2 anos
+6. **Se email disponível:** envia relatório PDF por email automaticamente
 
 ### Reagendamento automático
 Após execução de qualquer manutenção (montagem ou periódica):
@@ -368,7 +379,7 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ```js
 // src/config/version.js
-export const APP_VERSION = '1.10.3'
+export const APP_VERSION = '1.11.0'
 export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
 ```
 

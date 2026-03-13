@@ -6,15 +6,16 @@
  *  - Importar/restaurar dados a partir de ficheiro JSON
  *  - Aviso sobre a natureza do armazenamento (localStorage)
  */
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useData } from '../context/DataContext'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
+import SignaturePad from '../components/SignaturePad'
 import { logger } from '../utils/logger'
 import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
-import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive } from 'lucide-react'
+import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive, Users, Plus, Pencil, Trash2, X, Phone, PenLine } from 'lucide-react'
 import { STORAGE } from '../config/storageKeys'
 import './Definicoes.css'
 
@@ -23,7 +24,7 @@ export default function Definicoes() {
   const navigate                = useNavigate()
   const { showToast }           = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
-  const { exportarDados, restaurarDados, clientes, maquinas, manutencoes, relatorios } = useData()
+  const { exportarDados, restaurarDados, clientes, maquinas, manutencoes, relatorios, tecnicos, addTecnico, updateTecnico, removeTecnico } = useData()
 
   const fileInputRef = useRef(null)
   const [importing,    setImporting]   = useState(false)
@@ -31,6 +32,11 @@ export default function Definicoes() {
   const [diasAviso,     setDiasAvisoUI]  = useState(() => getDiasAviso())
   const [diasAvisoErro, setDiasAvisoErro] = useState('')
   const [modoCampo,     setModoCampoUI]  = useState(() => localStorage.getItem(STORAGE.MODO_CAMPO) === 'true')
+  const [modalTecnico, setModalTecnico] = useState(null)
+  const [formTec, setFormTec] = useState({ nome: '', telefone: '', assinaturaDigital: null })
+  const [formTecErro, setFormTecErro] = useState('')
+  const [sigKey, setSigKey] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   const handleToggleModoCampo = (activo) => {
     setModoCampoUI(activo)
@@ -164,6 +170,48 @@ export default function Definicoes() {
     }
     reader.readAsText(file)
   }
+
+  const openTecnicoModal = useCallback((tec = null) => {
+    if (tec) {
+      setFormTec({ nome: tec.nome, telefone: tec.telefone || '', assinaturaDigital: tec.assinaturaDigital || null })
+      setModalTecnico(tec)
+    } else {
+      setFormTec({ nome: '', telefone: '', assinaturaDigital: null })
+      setModalTecnico('new')
+    }
+    setFormTecErro('')
+    setSigKey(k => k + 1)
+  }, [])
+
+  const handleSaveTecnico = useCallback(async () => {
+    const nome = formTec.nome.trim()
+    if (!nome) { setFormTecErro('O nome é obrigatório.'); return }
+    const dup = tecnicos.find(t => t.nome.toLowerCase() === nome.toLowerCase() && (modalTecnico === 'new' || t.id !== modalTecnico?.id))
+    if (dup) { setFormTecErro('Já existe um técnico com este nome.'); return }
+
+    try {
+      if (modalTecnico === 'new') {
+        await addTecnico({ nome, telefone: formTec.telefone.trim(), assinaturaDigital: formTec.assinaturaDigital })
+        showToast(`Técnico "${nome}" adicionado.`, 'success')
+      } else {
+        await updateTecnico(modalTecnico.id, { nome, telefone: formTec.telefone.trim(), assinaturaDigital: formTec.assinaturaDigital })
+        showToast(`Técnico "${nome}" actualizado.`, 'success')
+      }
+      setModalTecnico(null)
+    } catch (err) {
+      setFormTecErro(err?.message || 'Erro ao gravar.')
+    }
+  }, [formTec, modalTecnico, tecnicos, addTecnico, updateTecnico, showToast])
+
+  const handleDeleteTecnico = useCallback(async (tec) => {
+    try {
+      await removeTecnico(tec.id)
+      showToast(`Técnico "${tec.nome}" eliminado.`, 'success')
+      setConfirmDelete(null)
+    } catch (err) {
+      showToast(err?.message || 'Erro ao eliminar.', 'error')
+    }
+  }, [removeTecnico, showToast])
 
   const fmtTs = (iso) => iso
     ? new Date(iso).toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
@@ -299,6 +347,104 @@ export default function Definicoes() {
           por email ao cliente registado em cada máquina. Padrão recomendado: <strong>7 dias</strong>.
         </p>
       </section>
+
+      {/* Gestão de Técnicos */}
+      <section className="def-section">
+        <h2 className="def-section-title">
+          <Users size={17} />
+          Gestão de Técnicos
+        </h2>
+        <p className="def-section-desc">
+          Regista os dados e a assinatura digitalizada de cada técnico. A assinatura é incluída automaticamente em todos os relatórios e PDFs emitidos pela aplicação.
+        </p>
+
+        <div className="def-tec-list">
+          {tecnicos.filter(t => t.ativo !== false).length === 0 && (
+            <p className="text-muted">Nenhum técnico registado.</p>
+          )}
+          {tecnicos.filter(t => t.ativo !== false).map(t => (
+            <div key={t.id} className="def-tec-card">
+              <div className="def-tec-card-info">
+                <strong className="def-tec-nome">{t.nome}</strong>
+                {t.telefone && <span className="def-tec-tel"><Phone size={12} /> {t.telefone}</span>}
+                {t.assinaturaDigital ? (
+                  <span className="def-tec-sig-ok"><PenLine size={12} /> Assinatura registada</span>
+                ) : (
+                  <span className="def-tec-sig-missing"><AlertTriangle size={12} /> Sem assinatura</span>
+                )}
+              </div>
+              {t.assinaturaDigital && (
+                <div className="def-tec-sig-preview">
+                  <img src={t.assinaturaDigital} alt={`Assinatura de ${t.nome}`} />
+                </div>
+              )}
+              <div className="def-tec-card-actions">
+                <button type="button" className="icon-btn secondary" onClick={() => openTecnicoModal(t)} title="Editar"><Pencil size={15} /></button>
+                <button type="button" className="icon-btn danger" onClick={() => setConfirmDelete(t)} title="Eliminar"><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className="def-btn def-btn--primary def-btn--sm" onClick={() => openTecnicoModal()} style={{ marginTop: '0.75rem' }}>
+          <Plus size={16} />
+          Adicionar técnico
+        </button>
+      </section>
+
+      {/* Modal: Adicionar/Editar Técnico */}
+      {modalTecnico && (
+        <div className="modal-overlay" onClick={() => setModalTecnico(null)}>
+          <div className="modal modal-tecnico" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{modalTecnico === 'new' ? 'Novo Técnico' : `Editar — ${modalTecnico.nome}`}</h2>
+              <button type="button" className="icon-btn" onClick={() => setModalTecnico(null)} aria-label="Fechar"><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              {formTecErro && <p className="form-erro">{formTecErro}</p>}
+              <label>
+                Nome <span className="required">*</span>
+                <input type="text" value={formTec.nome} onChange={e => setFormTec(f => ({ ...f, nome: e.target.value }))} placeholder="Nome completo do técnico" maxLength={100} />
+              </label>
+              <label>
+                Telefone
+                <input type="tel" value={formTec.telefone} onChange={e => setFormTec(f => ({ ...f, telefone: e.target.value }))} placeholder="Ex: 296 123 456" maxLength={30} />
+              </label>
+              <div className="def-tec-sig-section">
+                <label className="def-tec-sig-label">Assinatura digitalizada</label>
+                {formTec.assinaturaDigital && (
+                  <div className="def-tec-sig-current">
+                    <img src={formTec.assinaturaDigital} alt="Assinatura actual" />
+                    <button type="button" className="btn-limpar-sig secondary" onClick={() => { setFormTec(f => ({ ...f, assinaturaDigital: null })); setSigKey(k => k + 1) }}>
+                      Limpar assinatura
+                    </button>
+                  </div>
+                )}
+                <p className="def-tec-sig-hint">Desenhe a assinatura no quadro abaixo{formTec.assinaturaDigital ? ' para substituir a actual' : ''}:</p>
+                <SignaturePad key={sigKey} onChange={sig => setFormTec(f => ({ ...f, assinaturaDigital: sig }))} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setModalTecnico(null)}>Cancelar</button>
+              <button type="button" onClick={handleSaveTecnico}><CheckCircle size={16} /> Gravar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar eliminação de técnico */}
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="modal modal-confirm" onClick={e => e.stopPropagation()}>
+            <h2>Eliminar técnico?</h2>
+            <p>Tens a certeza de que queres eliminar <strong>{confirmDelete.nome}</strong>? A assinatura registada será perdida.</p>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setConfirmDelete(null)}>Cancelar</button>
+              <button type="button" className="danger" onClick={() => handleDeleteTecnico(confirmDelete)}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Backup */}
       <section className="def-section">

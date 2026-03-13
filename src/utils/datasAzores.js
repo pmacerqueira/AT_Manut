@@ -27,7 +27,7 @@ export function nowISO() {
  * Ex: "12 de fevereiro de 2026 às 14:30"
  */
 export function formatDataHoraAzores(dateOrISO) {
-  const d = dateOrISO instanceof Date ? dateOrISO : new Date(dateOrISO)
+  const d = parseDateLocal(dateOrISO)
   return d.toLocaleString('pt-PT', {
     ...optsBase,
     dateStyle: 'long',
@@ -40,7 +40,7 @@ export function formatDataHoraAzores(dateOrISO) {
  * Ex: "12 fev 2026, 14:30"
  */
 export function formatDataHoraCurtaAzores(dateOrISO) {
-  const d = dateOrISO instanceof Date ? dateOrISO : new Date(dateOrISO)
+  const d = parseDateLocal(dateOrISO)
   const parts = d.toLocaleString('pt-PT', {
     ...optsBase,
     day: 'numeric',
@@ -57,11 +57,25 @@ export function formatDataHoraCurtaAzores(dateOrISO) {
  * Ex: "12 fev 2026" ou "12 de fevereiro de 2026"
  */
 export function formatDataAzores(dateOrISO, long = false) {
-  const d = dateOrISO instanceof Date ? dateOrISO : new Date(dateOrISO)
+  const d = parseDateLocal(dateOrISO)
   return d.toLocaleDateString('pt-PT', {
     ...optsBase,
     day: 'numeric',
     month: long ? 'long' : 'short',
     year: 'numeric',
   })
+}
+
+/**
+ * Parseia uma string 'yyyy-MM-dd' como data local (meio-dia), evitando
+ * o bug de timezone onde `new Date('2026-03-13')` (UTC midnight) recua
+ * 1 dia em fusos negativos como Atlantic/Azores (UTC-1).
+ * Se receber um Date, devolve-o sem alteração.
+ */
+export function parseDateLocal(v) {
+  if (v instanceof Date) return v
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return new Date(v + 'T12:00:00')
+  }
+  return new Date(v)
 }

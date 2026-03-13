@@ -231,8 +231,8 @@ export default function Agendamento() {
       setErro('Introduza uma data válida (DD-MM-AAAA).')
       return
     }
-    if (!horaStr) {
-      setErro('Introduza uma hora válida (HH:MM).')
+    if (horaInput.trim() && !horaStr) {
+      setErro('Hora inválida (formato HH:MM).')
       return
     }
     if (!maquinaId) {
@@ -397,7 +397,7 @@ export default function Agendamento() {
           </label>
         )}
 
-        {tipo === 'periodica' && maquinaId && (
+        {tipo === 'periodica' && maquinaId && isAdmin && (
           <div className="agendamento-recorrente-section">
             <label className="agendamento-toggle-row">
               <input
@@ -470,11 +470,10 @@ export default function Agendamento() {
             />
           </label>
           <label>
-            <span>Hora (HH:MM)</span>
+            <span>Hora (HH:MM) <span className="text-muted" style={{ fontWeight: 'normal', fontSize: '0.8em' }}>opcional</span></span>
             <input
               type="text"
               inputMode="numeric"
-              required
               value={horaInput}
               onChange={handleHoraChange}
               placeholder="HH:MM"

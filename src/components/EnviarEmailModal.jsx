@@ -3,24 +3,24 @@ import { useData } from '../context/DataContext'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { relatorioParaHtml } from '../utils/relatorioHtml'
-import { EMAIL_CONFIG } from '../config/emailConfig'
-import { format } from 'date-fns'
-import { pt } from 'date-fns/locale'
+import { enviarRelatorioHtmlEmail } from '../services/emailService'
+import { formatDataAzores } from '../utils/datasAzores'
+import { logger } from '../utils/logger'
 
 const CC_NAVEL = 'comercial@navel.pt'
 
 export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatorio, maquina, cliente }) {
-  const { getChecklistBySubcategoria, getSubcategoria, updateRelatorio } = useData()
+  const { getChecklistBySubcategoria, getSubcategoria, updateRelatorio, getTecnicoByNome } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
-  const [destinatario, setDestinatario] = useState('')
+  const [destinatario, setDestinatario] = useState(() => cliente?.email ?? '')
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
 
   if (!isOpen) return null
 
   const checklistItems = maquina ? getChecklistBySubcategoria(maquina.subcategoriaId, manutencao?.tipo || 'periodica') : []
-  const dataManut = manutencao?.data ? format(new Date(manutencao.data), 'd MMM yyyy', { locale: pt }) : ''
+  const dataManut = manutencao?.data ? formatDataAzores(manutencao.data, true) : ''
   const subject = `Relatório de manutenção — ${maquina?.marca} ${maquina?.modelo} (${dataManut}) — Navel`
 
   const handleSubmit = async (e) => {
@@ -41,37 +41,38 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
     showGlobalLoading()
     try {
       const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
+      const tecObj = getTecnicoByNome(manutencao?.tecnico || relatorio?.tecnico)
       const htmlBody = relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItems, {
         subcategoriaNome: sub?.nome,
         ultimoEnvio: relatorio.ultimoEnvio,
         logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+        tecnicoObj: tecObj,
       })
-      // URL absoluta em produção (https://www.navel.pt) ou relativa em dev
-      const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-      const url = apiBase ? `${apiBase.replace(/\/$/, '')}/api/send-report.php` : '/api/send-report.php'
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auth_token: EMAIL_CONFIG.AUTH_TOKEN,
-          destinatario: email,
-          cc: CC_NAVEL,
-          assunto: subject,
-          corpoHtml: htmlBody,
-        }),
+
+      const resultado = await enviarRelatorioHtmlEmail({
+        destinatario: email,
+        assunto: subject,
+        html: htmlBody,
+        cc: CC_NAVEL,
+        nomeCliente: cliente?.nome ?? '',
       })
-      if (!res.ok) {
-        const txt = await res.text()
-        throw new Error(txt || `Erro ${res.status}`)
+
+      if (resultado.ok) {
+        updateRelatorio(relatorio.id, {
+          ultimoEnvio: { data: new Date().toISOString(), destinatario: email },
+        })
+        showToast(`Email enviado para ${email}.`, 'success')
+        logger.action('EnviarEmailModal', 'enviarEmail',
+          `Relatório ${relatorio.numeroRelatorio} enviado para ${email}`,
+          { relId: relatorio.id, destinatario: email })
+        setDestinatario('')
+        onClose()
+      } else {
+        setErro(resultado.message || 'Erro ao enviar email.')
       }
-      updateRelatorio(relatorio.id, {
-        ultimoEnvio: { data: new Date().toISOString(), destinatario: email },
-      })
-      showToast(`Email enviado para ${email}.`, 'success')
-      setDestinatario('')
-      onClose()
     } catch (err) {
       setErro(err.message || 'Erro ao enviar email.')
+      logger.error('EnviarEmailModal', 'enviarEmail', err.message, { relId: relatorio?.id })
     } finally {
       setEnviando(false)
       hideGlobalLoading()

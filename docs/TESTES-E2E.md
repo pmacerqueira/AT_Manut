@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
 > ~450 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
-> Última revisão: 2026-03-12 — v1.10.3
+> Última revisão: 2026-03-12 — v1.11.0
 
 ---
 
@@ -403,4 +403,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-03-12 — v1.10.3*
+*Última actualização: 2026-03-12 — v1.11.0*

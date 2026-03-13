@@ -3,17 +3,16 @@
  * Fluxo único: dados → avaria → trabalho → peças → checklist → fotos → assinatura.
  * No final gera o relatório, marca a reparação como concluída, e oferece envio imediato por email.
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { TECNICOS } from '../config/users'
 import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
-import { Hammer, X, Camera, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
+import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { MAX_FOTOS } from '../config/limits'
 import './ExecutarReparacaoModal.css'
@@ -65,7 +64,11 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     getRelatorioByReparacao,
     getChecklistBySubcategoria,
     getSubcategoria,
+    tecnicos,
+    getTecnicoByNome,
   } = useData()
+
+  const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
 
   // Emails fixos para envio após conclusão de cada reparação
   const EMAIL_ADMIN   = 'comercial@navel.pt'
@@ -117,10 +120,14 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const drawingRef  = useRef(false)
   const lastPosRef  = useRef({ x: 0, y: 0 })
   const fotoInputRef = useRef(null)
+  const fotoCameraRef = useRef(null)
+  const initRef = useRef(null)
 
   // ── Carregar relatório existente (se já foi iniciado antes) ─────────────
 
   useEffect(() => {
+    if (initRef.current === reparacao.id) return
+    initRef.current = reparacao.id
     const existente = getRelatorioByReparacao(reparacao.id)
     if (!existente) return
     setForm(p => ({
@@ -228,6 +235,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     } finally {
       setFotoCarregando(false)
       if (fotoInputRef.current) fotoInputRef.current.value = ''
+      if (fotoCameraRef.current) fotoCameraRef.current.value = ''
     }
   }
 
@@ -254,6 +262,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         trabalhoRealizado:  form.trabalhoRealizado.trim(),
         horasMaoObra:       form.horasMaoObra ? parseFloat(form.horasMaoObra) : null,
         checklistRespostas: JSON.stringify(form.checklistRespostas),
+        checklistSnapshot:  JSON.stringify(checklistItems.map(it => ({ id: it.id, texto: it.texto ?? it.nome, ordem: it.ordem, grupo: it.grupo ?? null }))),
         pecasUsadas:        JSON.stringify(pecasFiltradas),
         fotos:              JSON.stringify(fotos),
         notas:              form.notas.trim(),
@@ -295,11 +304,11 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
   const enviarEmailsAutomaticos = async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-    const { enviarRelatorioEmail }       = await import('../services/emailService')
-    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems)
+    const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
+    const tecObj  = getTecnicoByNome(relGerado.tecnico)
+    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
     const assunto = `Relatório de Reparação ${relGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
 
-    // Construir lista de destinatários únicos e válidos
     const destsSet = new Set()
     destsSet.add(EMAIL_ADMIN)
     if (reparacao.origem === 'istobal_email') destsSet.add(EMAIL_ISTOBAL)
@@ -309,9 +318,19 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     const falhados  = []
     for (const dest of destsSet) {
       try {
-        await enviarRelatorioEmail({ destinatario: dest, assunto, html, nomeCliente: cli?.nome ?? '' })
-        enviados.push(dest)
-        logger.action('ExecutarReparacaoModal', 'envioAuto', `Email enviado para ${dest}`, { relId: relGerado.id })
+        const resultado = await enviarRelatorioHtmlEmail({
+          destinatario: dest,
+          assunto,
+          html,
+          nomeCliente: cli?.nome ?? '',
+        })
+        if (resultado.ok) {
+          enviados.push(dest)
+          logger.action('ExecutarReparacaoModal', 'envioAuto', `Email enviado para ${dest}`, { relId: relGerado.id })
+        } else {
+          falhados.push(dest)
+          logger.error('ExecutarReparacaoModal', 'envioAuto', `Falha: ${resultado.message}`, { dest })
+        }
       } catch (err) {
         falhados.push(dest)
         logger.error('ExecutarReparacaoModal', 'envioAuto', `Falha ao enviar para ${dest}: ${err.message}`)
@@ -319,8 +338,6 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     }
 
     setEmailsAutoEnviados(enviados)
-    // Se o cliente não tem email na ficha, deixar o campo manual preenchido em branco
-    // para o técnico poder inserir o endereço manualmente se necessário
     if (!cli?.email?.trim()) setEmailDestinatario('')
     return { enviados, falhados }
   }
@@ -377,6 +394,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         trabalhoRealizado:   form.trabalhoRealizado.trim(),
         horasMaoObra:        form.horasMaoObra ? parseFloat(form.horasMaoObra) : null,
         checklistRespostas:  JSON.stringify(form.checklistRespostas),
+        checklistSnapshot:   JSON.stringify(checklistItems.map(it => ({ id: it.id, texto: it.texto ?? it.nome, ordem: it.ordem, grupo: it.grupo ?? null }))),
         pecasUsadas:         JSON.stringify(pecasFiltradas),
         fotos:               JSON.stringify(fotos),
         notas:               form.notas.trim(),
@@ -418,7 +436,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
       // Envio automático (não bloqueia o UI — corre em background)
       if (isEmailConfigured()) {
-        enviarEmailsAutomaticos(relFinal).catch(() => {})
+        enviarEmailsAutomaticos(relFinal).catch(err => {
+          logger.error('ExecutarReparacaoModal', 'envioAutoFallback', err.message)
+        })
       }
     } catch (err) {
       showToast('Erro ao concluir reparação: ' + err.message, 'error')
@@ -451,15 +471,17 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       nomeAssinante:      form.nomeAssinante,
       numeroRelatorio:    '(pré-visualização)',
     }
-    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems)
+    const tecObj = getTecnicoByNome(form.tecnico)
+    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
     if (html) imprimirOuGuardarPdf(html)
-  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin])
+  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome])
 
   const handleVerPdf = useCallback(async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems)
+    const tecObj = getTecnicoByNome(relGerado.tecnico)
+    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
     if (html) imprimirOuGuardarPdf(html)
-  }, [reparacao, maq, cli, checklistItems])
+  }, [reparacao, maq, cli, checklistItems, getTecnicoByNome])
 
   // ── Envio de email ────────────────────────────────────────────────────────
 
@@ -469,16 +491,21 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     setEmailEnviando(true)
     try {
       const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-      const { enviarRelatorioEmail }       = await import('../services/emailService')
-      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems)
-      await enviarRelatorioEmail({
+      const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
+      const tecObj = getTecnicoByNome(relatorioGerado.tecnico)
+      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
+      const resultado = await enviarRelatorioHtmlEmail({
         destinatario: emailDestinatario.trim(),
-        assunto:      `Relatório de Reparação ${relatorioGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
+        assunto: `Relatório de Reparação ${relatorioGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
         html,
-        nomeCliente:  cli?.nome ?? '',
+        nomeCliente: cli?.nome ?? '',
       })
-      showToast('Relatório enviado com sucesso!', 'success')
-      logger.action('ExecutarReparacaoModal', 'enviarEmail', `Email enviado (${relatorioGerado.numeroRelatorio})`, { dest: emailDestinatario })
+      if (resultado.ok) {
+        showToast('Relatório enviado com sucesso!', 'success')
+        logger.action('ExecutarReparacaoModal', 'enviarEmail', `Email enviado (${relatorioGerado.numeroRelatorio})`, { dest: emailDestinatario })
+      } else {
+        showToast(resultado.message || 'Erro ao enviar email.', 'error', 4000)
+      }
     } catch (err) {
       showToast('Erro ao enviar email: ' + err.message, 'error')
       logger.error('ExecutarReparacaoModal', 'enviarEmail', err.message)
@@ -580,7 +607,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                       onChange={e => setForm(p => ({ ...p, tecnico: e.target.value }))}
                     >
                       <option value="">— Seleccionar técnico —</option>
-                      {TECNICOS.map(t => <option key={t} value={t}>{t}</option>)}
+                      {nomesTecnicos.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
@@ -737,21 +764,22 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                       <button type="button" className="foto-remove" onClick={() => removerFoto(i)}><X size={12} /></button>
                     </div>
                   ))}
-                  {fotos.length < MAX_FOTOS && (
-                    <button type="button" className="foto-add" onClick={() => fotoInputRef.current?.click()} disabled={fotoCarregando}>
-                      {fotoCarregando ? '...' : <><Camera size={20} /><span>Foto</span></>}
-                    </button>
+                  {fotos.length < MAX_FOTOS && !fotoCarregando && (
+                    <>
+                      <button type="button" className="foto-add" onClick={() => fotoCameraRef.current?.click()}>
+                        <Camera size={20} /><span>Câmara</span>
+                      </button>
+                      <button type="button" className="foto-add foto-add-gallery" onClick={() => fotoInputRef.current?.click()}>
+                        <FolderOpen size={20} /><span>Galeria</span>
+                      </button>
+                    </>
+                  )}
+                  {fotoCarregando && (
+                    <div className="foto-add foto-add-loading"><span>…</span></div>
                   )}
                 </div>
-                <input
-                  ref={fotoInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  capture="environment"
-                  style={{ display: 'none' }}
-                  onChange={handleFotoChange}
-                />
+                <input ref={fotoCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFotoChange} />
+                <input ref={fotoInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFotoChange} />
               </div>
 
               {/* Secção: Notas */}

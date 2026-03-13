@@ -226,7 +226,7 @@
 
 /* ── Modal de importação SAF-T ──────────────────────────────────────────── */
 .modal-import {
-  max-width: 520px;
+  max-width: var(--modal-width-md);
 }
 
 .import-file-label {
@@ -304,6 +304,125 @@
 .import-radio input[type="radio"] {
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+/* ── KPI bar na ficha do cliente ── */
+.ficha-kpi-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.ficha-kpi-item {
+  flex: 1;
+  min-width: 4.5rem;
+  text-align: center;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+.ficha-kpi-num {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-accent);
+}
+.ficha-kpi-label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.15rem;
+}
+.ficha-kpi-danger .ficha-kpi-num { color: var(--color-danger, #dc2626); }
+.ficha-kpi-danger { border-color: rgba(220, 38, 38, 0.25); background: rgba(220, 38, 38, 0.06); }
+.ficha-kpi-ok .ficha-kpi-num { color: var(--color-success, #16a34a); }
+.ficha-kpi-ok { border-color: rgba(22, 163, 74, 0.25); background: rgba(22, 163, 74, 0.06); }
+.ficha-kpi-muted .ficha-kpi-num { color: var(--color-text-muted); }
+
+/* ── Top actions (frota + ver todos) ── */
+.ficha-top-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.ficha-btn-flat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+/* ── Badges de manutenção (próxima manut) ── */
+.badge-atraso {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-danger, #dc2626);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+.badge-conforme {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--color-success, #16a34a);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+.badge-sem-data {
+  background: rgba(100, 116, 139, 0.10);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+/* ── Machine card layout with badge ── */
+.maquina-ficha-card-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.maquina-ficha-card-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 0.25rem;
+}
+
+/* ── Quick actions na ficha de máquina ── */
+.maq-quick-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.btn-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-quick:hover {
+  background: var(--color-accent-muted);
 }
 
 /* Badge de aviso para clientes sem email */

@@ -9,7 +9,83 @@ Política de continuidade:
 
 ---
 
-## [1.11.0] — 2026-03-12 — Históricos, assinatura em 2 passos, agendamento recorrente, purga dead code
+## [1.12.0] — 2026-03-13 — Integridade de dados, cascatas, pipeline de agendamento, UX defensiva
+
+### Agendamento de manutenções — Pipeline intuitivo
+- **Nova manutenção** redesenhada com pipeline: Cliente → Categoria → Equipamento → Data + Técnico
+- Dropdowns filtrados em cascata (só mostra categorias/máquinas do cliente seleccionado)
+- Técnico agora é dropdown (lista de técnicos registados) em vez de campo livre
+- Bloco de horas totais/serviço removido do agendamento (preenchido na execução)
+
+### Coluna "Dias" na lista de manutenções
+- Nova coluna com cálculo automático: `+N` (atraso, vermelho), `Hoje` (azul), `-N` (futuro, verde)
+- Ordenação por dias de atraso (mais urgente primeiro)
+- Badge de dias visível também nos cards mobile
+
+### Sincronização automática de manutenções
+- Ao carregar dados, detecta máquinas com `proximaManut` sem manutenção agendada e cria automaticamente
+- Editar `proximaManut` na ficha do equipamento actualiza/cria manutenção correspondente
+- Eliminar manutenção concluída remove em cascata todas as periódicas futuras geradas
+
+### Integridade de dados — Cascatas completas (auditoria CRUD)
+- **removeCliente**: agora elimina em cascata máquinas, manutenções, relatórios, reparações, relatórios de reparação e peças plano
+- **removeMaquina**: agora elimina reparações e relatórios de reparação (faltava)
+- **removeSubcategoria**: elimina checklists via API (antes só do estado local)
+- **clearAllClientesAndRelated**: limpa pecasPlano do estado e localStorage
+- **Backend data.php**: DELETE em cascata — cliente→máquinas→manutenções→relatórios→reparações; subcategoria→checklists
+
+### Protecção contra eliminação acidental e indevida
+- Modal de confirmação obrigatório antes de eliminar: manutenções, documentos, peças, categorias, subcategorias, checklists
+- Manutenções e reparações com relatório assinado pelo cliente **não podem ser eliminadas** (nem por Admin)
+- `window.confirm()` substituído por modais consistentes em Categorias e Logs
+- Removida opção "Executada" do dropdown de edição de manutenção (execução obrigatória via modal)
+
+### Correcções e melhorias UX
+- `alert()` eliminado de `gerarPdfRelatorio.js` (substituído por `throw` — chamadores usam `showToast`)
+- Mensagem de eliminação de reparação corrigida (agora reflecte o comportamento real)
+- Feedback de eliminação normalizado (`'success'` em vez de `'info'`)
+- Validação de nome vazio em `addCategoria`/`addSubcategoria`
+- NIFs duplicados no mesmo ficheiro de importação detectados e ignorados
+
+### Email
+- Reply-To e CC alterados de `geral@navel.pt` para `comercial@navel.pt`
+- CC garantido em **todos** os pontos de envio (relatórios com PDF incluídos)
+
+## [1.11.0] — 2026-03-12 — Históricos, assinatura em 2 passos, agendamento recorrente, técnicos, responsivo
+
+### CSS responsivo centralizado (última actualização)
+- **15 variáveis de layout** em `:root` (`--sidebar-width`, `--nav-height`, `--page-max`, `--modal-width-sm/md/lg/xl`, `--scroll-max-sm/md/lg`, `--card-pad`, `--page-pad`, `--grid-min-col`) — todas usam `clamp()` e `min()` para adaptação automática
+- Substituídos ~180 valores hardcoded `px` em 20+ ficheiros CSS por variáveis centralizadas
+- Qualquer ajuste responsivo futuro faz-se num único local (`:root` em `index.css`)
+- Modais, scroll containers, paddings, sidebar e navbar adaptam-se automaticamente ao ecrã
+- Signature canvas com `clamp(120px, 18vh, 180px)` — adapta a qualquer viewport
+
+### Gestão de técnicos
+- Ficha completa por técnico (nome, telefone, assinatura digital) na BD (`tecnicos` table)
+- CRUD restrito ao Admin (Definições → Técnicos)
+- Assinatura digitalizada armazenada como base64 na BD
+- Relatórios PDF incluem identificação + assinatura do técnico (lado esquerdo) e do cliente (lado direito)
+- Fallback de tecnicos via `TECNICOS_FALLBACK` quando BD não tem registos
+
+### Correcções email e relatórios
+- Nova função `enviarRelatorioHtmlEmail` em `emailService.js` para envio de HTML pré-renderizado
+- Corrigido: reparações usavam parâmetros errados no envio de email (silent failure)
+- `send-report.php`: resposta normalizada para `{ ok, message }`, tags HTML preservadas
+- Logging completo em todos os fluxos de email (success + error)
+- `EnviarEmailModal` pré-preenche email do cliente
+
+### UI/UX tablet (Samsung Galaxy S10 Lite)
+- Corrigido scroll táctil em todos os painéis (`.layout` → `height: 100dvh; overflow: hidden`)
+- `-webkit-overflow-scrolling: touch` em `.main` e modais
+- Contraste de texto aumentado: `--color-text` → `#f4f7fa` (WCAG AAA), `--color-text-muted` → `#b0c0d0`
+- `--color-accent` → `#1ab8f0` para melhor visibilidade de itens activos
+
+### Documentação actualizada (15 ficheiros)
+- Versão → 1.11.0 em todos os docs
+- Funcionalidades v1.11.0 documentadas (históricas, técnicos, CSS responsivo, assinatura 2 passos)
+- `servidor-cpanel/MIGRACAO_MYSQL.md` → secção 8 com DDL da tabela `tecnicos`
+- Comando zip corrigido para `npm run zip` (tar) em BUILD-E-ZIP e CHANGELOG
+- Caminho workspace corrigido em GIT-SETUP
 
 ### Novas funcionalidades
 - **Manutenções históricas**: Admin pode inserir registos passados (ex.: papel do ano anterior) com datas retroactivas
@@ -876,123 +952,15 @@ Política de continuidade:
 
 ---
 
-## Arquitectura geral do projecto
+## Referências de arquitectura
 
-```
-c:\AT_Manut\
-├── src/                          # Código React (Vite)
-│   ├── components/               # Componentes reutilizáveis
-│   │   ├── Layout.jsx/.css       # Sidebar + layout geral
-│   │   ├── OfflineBanner.jsx/.css # Indicador de estado de ligação (v1.3)
-│   │   ├── ExecutarManutencaoModal.jsx  # Modal de execução de manutenção
-│   │   ├── RelatorioView.jsx     # Visualizador de relatório
-│   │   └── SignaturePad.jsx      # Assinatura digital (canvas)
-│   ├── pages/                    # Painéis principais
-│   │   ├── Dashboard.jsx         # Visão geral / KPIs
-│   │   ├── Manutencoes.jsx       # Lista de manutenções (principal)
-│   │   ├── Clientes.jsx          # Gestão de clientes
-│   │   ├── Equipamentos.jsx      # Gestão de equipamentos/máquinas
-│   │   ├── Agendamento.jsx       # Agendar nova manutenção
-│   │   ├── Calendario.jsx        # Calendário visual
-│   │   ├── Categorias.jsx        # Categorias e subcategorias
-│   │   ├── Definicoes.jsx        # Configurações (Admin only)
-│   │   └── Logs.jsx              # Logs do sistema (Admin only)
-│   ├── context/
-│   │   ├── DataContext.jsx       # Estado global + localStorage + offline cache/queue (v1.3)
-│   │   └── AuthContext.jsx       # Autenticação JWT + evento atm:login
-│   ├── services/
-│   │   ├── apiService.js         # Chamadas à API cPanel
-│   │   ├── localCache.js         # Cache offline de dados (v1.3)
-│   │   ├── syncQueue.js          # Fila de operações offline (v1.3)
-│   │   └── emailService.js       # Envio de relatórios por email
-│   ├── config/
-│   │   ├── version.js            # APP_VERSION + APP_FOOTER_TEXT
-│   │   └── emailConfig.js        # Token e URL do endpoint PHP
-│   └── utils/
-│       ├── relatorioHtml.js      # Gerador HTML do relatório (view local)
-│       └── gerarPdfRelatorio.js  # PDF client-side (jsPDF)
-├── tests/                        # Suite de testes E2E (v1.4)
-│   └── e2e/
-│       ├── helpers.js            # Utilitários partilhados (login, mock API, canvas)
-│       ├── 01-auth.spec.js       # Autenticação
-│       ├── 02-dashboard.spec.js  # Dashboard
-│       ├── 03-clientes.spec.js   # Clientes
-│       ├── 04-manutencoes.spec.js # Manutenções
-│       ├── 05-montagem.spec.js   # Montagens
-│       ├── 06-agendamento.spec.js # Agendamento
-│       ├── 07-permissions.spec.js # Permissões RBAC
-│       ├── 08-equipamentos-categorias.spec.js # Equipamentos e Categorias
-│       └── 09-edge-cases.spec.js # Casos limite e responsividade
-├── playwright.config.js          # Configuração Playwright (v1.4)
-├── servidor-cpanel/              # Ficheiros para upload no cPanel (navel.pt)
-│   ├── send-email.php            # Endpoint de envio de email + geração PDF (FPDF)
-│   └── fpdf184/                  # Biblioteca FPDF v1.84
-├── docs/                         # Documentação técnica
-│   ├── CHANGELOG.md → (este ficheiro)
-│   ├── DEPLOY_CHECKLIST.md       # Instruções de deploy cPanel
-│   ├── GIT-SETUP.md              # Configuração Git/GitHub
-│   ├── MANUAL-UX-UI.md           # Regras de UX/UI (Toast, loading, feedback)
-│   ├── IMAGENS-E-ICONES.md       # Otimização de imagens e ícones
-│   ├── ROADMAP.md                # Roadmap de evolução
-│   ├── MANUT-APP-INSIGHTS.md     # Investigação de boas práticas CMMS
-│   └── TESTES-E2E.md             # Documentação da suite de testes (v1.4)
-├── dist/                         # Build de produção (gerado por `npm run build`)
-├── dist_upload.zip               # Zip para upload ao cPanel
-└── CHANGELOG.md                  # Este ficheiro
-```
-
-### Deployment
-
-```powershell
-# Build (prebuild otimiza imagens automaticamente)
-npm run build
-
-# Zip para upload ao cPanel (public_html/manut/)
-Compress-Archive -Path "dist\*" -DestinationPath dist_upload.zip -Force
-
-# Push para GitHub
-git add -A
-git commit -m "v{versão} - resumo"
-git tag -a v{versão} -m "Release v{versão}"
-git push origin master
-git push origin v{versão}
-```
-
-### Executar testes E2E
-
-```powershell
-# Arrancar servidor de desenvolvimento (pré-requisito)
-npm run dev
-
-# Executar toda a suite (137 testes)
-npx playwright test tests/e2e/
-
-# Executar um ficheiro específico
-npx playwright test tests/e2e/04-manutencoes.spec.js
-
-# Modo UI interactivo
-npx playwright test --ui
-```
-
-### Configuração de email
-
-- Ficheiro: `src/config/emailConfig.js`
-- `ENDPOINT_URL`: `https://www.navel.pt/api/send-email.php`
-- `AUTH_TOKEN`: token de segurança partilhado entre frontend e PHP
-- Servidor de envio: `no-reply@navel.pt` via `mail()` do cPanel
-
-### Persistência de dados (modelo actual desde v1.4)
-
-**Fonte de verdade:** MySQL no cPanel (via `apiService.js` → `data.php`). O `localStorage` serve apenas como cache offline.
-
-| Chave | Conteúdo |
-|---|---|
-| `atm_cache_v1` | Snapshot completo dos dados do servidor (TTL 30 dias) |
-| `atm_sync_queue` | Fila de operações offline pendentes |
-| `atm_app_version` | Versão para cache busting |
-
-> As chaves individuais `atm_clientes`, `atm_maquinas`, etc. são legacy (pre-v1.4) e já não são usadas. Ver `src/config/storageKeys.js` para referência canónica.
+> A estrutura do projecto, deployment, testes e persistência estão documentados nos ficheiros canónicos.
+> Evitar duplicar essa informação aqui — consultar directamente:
+> - **Estrutura e fluxos:** `DOCUMENTACAO.md`
+> - **Desenvolvimento:** `DESENVOLVIMENTO.md`
+> - **Deploy:** `docs/DEPLOY_CHECKLIST.md` e `docs/BUILD-E-ZIP.md`
+> - **Testes E2E:** `docs/TESTES-E2E.md`
 
 ---
 
-*Última actualização: 2026-03-12 — v1.10.3*
+*Última actualização: 2026-03-12 — v1.11.0*

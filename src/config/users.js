@@ -7,8 +7,13 @@ export const ROLES = {
   TECNICO: 'tecnico',
 }
 
-/** Técnicos de serviço — usados nas fichas de manutenção e relatórios */
-export const TECNICOS = [
+/**
+ * @deprecated — Técnicos são agora geridos na BD (tabela `tecnicos`).
+ * Esta constante serve apenas como fallback se a tabela ainda não existir.
+ * Os componentes devem usar `tecnicos` do DataContext.
+ */
+export const TECNICOS_FALLBACK = [
+  'Admin',
   'Aurélio Almeida',
   'Paulo Medeiros',
   'Aldevino Costa',

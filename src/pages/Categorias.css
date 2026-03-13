@@ -169,6 +169,42 @@
   flex: 1;
 }
 
+.checklist-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.checklist-item-actions .icon-btn {
+  padding: 0.25rem !important;
+  min-width: 1.6rem !important;
+  min-height: 1.6rem !important;
+}
+
+.btn-add-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82em;
+  background: transparent;
+  color: var(--color-accent);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-top: 0.35rem;
+}
+
+.btn-add-check:hover {
+  background: var(--color-accent-muted);
+}
+
+.icon-btn.success {
+  color: var(--color-success, #28a745);
+}
+
 .checklist-item.edit {
   padding: 0.5rem 0;
 }
@@ -272,7 +308,13 @@
   .badge-intervalo,
   .badge-count { font-size: 0.78em; }
   .btn-add-sub { font-size: 0.9em; min-height: var(--touch-min); }
+  .btn-add-check { font-size: 0.88em; min-height: var(--touch-min); }
+  .checklist-item-actions .icon-btn {
+    min-width: var(--touch-min) !important;
+    min-height: var(--touch-min) !important;
+  }
   /* Inputs inline: sem min-width para não causar overflow */
   .edit-form-inline input,
   .edit-form-inline select { min-width: 0; width: 100%; }
+  .inline-edit input { min-width: 0; }
 }

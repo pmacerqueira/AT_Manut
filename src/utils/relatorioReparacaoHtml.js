@@ -7,6 +7,7 @@ import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
+import { resolveChecklist } from './resolveChecklist'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
@@ -27,7 +28,7 @@ function hexToRgba(hex, alpha) {
 
 export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
-  const { subcategoriaNome, logoUrl, istobalLogoUrl } = options
+  const { subcategoriaNome, logoUrl, istobalLogoUrl, tecnicoObj } = options
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -60,6 +61,8 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
 
   const safeAssinatura = relatorio.assinaturaDigital
     ? safeDataImageUrl(relatorio.assinaturaDigital) : ''
+  const tecSigSafe = tecnicoObj?.assinaturaDigital ? safeDataImageUrl(tecnicoObj.assinaturaDigital) : ''
+  const tecTelefone = tecnicoObj?.telefone ? esc(tecnicoObj.telefone) : ''
 
   // ── Peças ──
   let pecas = []
@@ -306,25 +309,30 @@ ${fotosSafe.length > 0 ? `
 <!-- Assinatura -->
 <section class="no-break">
   <div class="rpt-section-title">Assinatura e Declaração</div>
+  <div class="rpt-field" style="margin-bottom:4px"><span class="rpt-label">Data</span><span class="rpt-value">${esc(dataAssinatura)}</span></div>
   <div class="rpt-assinatura-bloco">
     <div class="rpt-assinatura-left">
-      <div class="rpt-field"><span class="rpt-label">Data</span><span class="rpt-value">${esc(dataAssinatura)}</span></div>
-      ${relatorio.nomeAssinante ? `<div class="rpt-field"><span class="rpt-label">Assinado por</span><span class="rpt-value">${esc(relatorio.nomeAssinante)}</span></div>` : ''}
-      ${cliente?.nome ? `<div class="rpt-field"><span class="rpt-label">Entidade</span><span class="rpt-value">${esc(cliente.nome)}</span></div>` : ''}
-      <p style="font-size:8px;color:#64748b;margin-top:6px;line-height:1.5;">
-        O cliente declara ter recebido e aprovado a intervenção descrita neste documento.
-      </p>
+      <div class="rpt-assinatura-label" style="margin-bottom:2px">Técnico responsável</div>
+      <div class="rpt-assinatura-nome">${esc(relatorio.tecnico ?? '—')}</div>
+      ${tecTelefone ? `<div style="font-size:8px;color:#64748b">Tel: ${tecTelefone}</div>` : ''}
+      ${tecSigSafe
+        ? `<img class="rpt-assinatura-canvas" src="${tecSigSafe}" alt="Assinatura do técnico" style="max-height:55px" />`
+        : ''
+      }
     </div>
     <div class="rpt-assinatura-right">
-      ${safeAssinatura
-        ? `<img class="rpt-assinatura-canvas" src="${safeAssinatura}" alt="Assinatura digital" />`
-        : '<div style="height:60px;border-bottom:1px solid #cbd5e1;margin-bottom:4px;"></div>'
-      }
+      <div class="rpt-assinatura-label" style="margin-bottom:2px">Assinatura do Cliente</div>
       <div class="rpt-assinatura-nome">${esc(relatorio.nomeAssinante ?? '—')}</div>
-      <div class="rpt-assinatura-label">Assinatura do Cliente</div>
-      <div class="rpt-assinatura-legenda">Relatório assinado pelo cliente / responsável no local: <strong>${esc(relatorio.nomeAssinante ?? '—')}</strong></div>
+      ${cliente?.nome ? `<div style="font-size:8px;color:#64748b">${esc(cliente.nome)}</div>` : ''}
+      ${safeAssinatura
+        ? `<img class="rpt-assinatura-canvas" src="${safeAssinatura}" alt="Assinatura digital" style="max-height:55px" />`
+        : '<div style="height:55px;border-bottom:1px solid #cbd5e1;margin-bottom:4px;"></div>'
+      }
     </div>
   </div>
+  <p style="font-size:8px;color:#64748b;margin-top:6px;line-height:1.5;">
+    O cliente declara ter recebido e aprovado a intervenção descrita neste documento.
+  </p>
 </section>
 
 <!-- Rodapé -->

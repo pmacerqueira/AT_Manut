@@ -1,7 +1,7 @@
 # AT_Manut — Continuidade entre Agentes e Memória Operacional
 
 > Documento canónico para manter continuidade quando muda o agente/modelo no Cursor.
-> Última revisão: 2026-03-01.
+> Última revisão: 2026-03-12.
 
 ---
 
@@ -52,7 +52,30 @@ Evitar duplicar as mesmas instruções em vários ficheiros. Se existir conflito
 
 ---
 
-## 5) Política de limpeza documental
+## 5) Recuperação pós-crash — workspace multi-projecto
+
+O workspace `c:\Cursor_Projetos\NAVEL` contém vários projectos independentes (AT_Manut, app-ftecnicas, app-stocks-next, navel-site). Quando o Cursor crasha e reinicia, pode perder o contexto de qual projecto estava activo.
+
+### Problema documentado (2026-03-12)
+- Agente estava a trabalhar no AT_Manut.
+- Cursor crashou e reiniciou na raiz do workspace NAVEL.
+- Novo agente assumiu incorrectamente que estava no app-ftecnicas e fez build do projecto errado.
+- Utilizador teve de intervir manualmente para corrigir.
+
+### Solução implementada
+- **Regra global** (`.cursor/rules/navel-workspace.mdc`) com mapa de projectos, regras de build/deploy por projecto, e protocolo de recuperação.
+- **Regra AT_Manut** (`.cursor/rules/at-manut-workflow.mdc`) actualizada com secção de crash recovery.
+- **Pistas de contexto** para agentes: "public_html/manut" = AT_Manut; "app-ftecnicas" = outro projecto.
+
+### Protocolo obrigatório pós-crash
+1. Verificar agent-transcripts e ficheiros abertos para identificar projecto activo.
+2. Se ambíguo, **perguntar ao utilizador** — nunca assumir.
+3. Confirmar com `git status` dentro da pasta correcta antes de qualquer acção.
+4. Nunca executar build/deploy sem confirmar o projecto.
+
+---
+
+## 6) Política de limpeza documental
 
 - Conteúdo redundante deve ser removido ou substituído por referência ao documento canónico.
 - Conteúdo obsoleto deve ser reescrito com estado atual ou marcado explicitamente como histórico.

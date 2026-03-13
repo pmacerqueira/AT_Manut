@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.10.3` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.11.0` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 
@@ -26,6 +26,11 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | **Métricas / KPIs** | Taxa de cumprimento, gráficos mensais, top clientes em atraso (Admin) | ✅ |
 | **Importação Kaeser** | Leitura de PDF de relatórios Kaeser (compressores) e importação de dados | ✅ |
 | **Modo campo** | Alto contraste para uso exterior, persistido nas Definições | ✅ |
+| **Manutenções históricas** | Inserção de registos passados, assinatura em 2 passos, badges | ✅ |
+| **Agendamento recorrente** | Agendamento automático para 1–3 anos conforme periodicidade | ✅ |
+| **Inserção em lote** | Criação de múltiplos registos históricos (equipamentos × datas) | ✅ |
+| **Gestão de técnicos** | Ficha completa (nome, telefone, assinatura digital) na BD | ✅ |
+| **CSS responsivo centralizado** | 15 variáveis de layout em :root — ajuste único para todos os ecrãs | ✅ |
 | **Definições** | Backup/restauro, config alertas, modo campo, indicador de armazenamento | ✅ |
 | **Logs** | Registo de sistema (acções, erros, eventos de autenticação) | ✅ |
 | **PWA** | Instalável no ecrã inicial, offline-first com cache + sync queue | ✅ |

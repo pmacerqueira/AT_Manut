@@ -4,7 +4,7 @@
  * e análise de conformidade. Entregue ao cliente como PDF.
  */
 import { escapeHtml } from './sanitize'
-import { formatDataAzores } from './datasAzores'
+import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 
@@ -240,7 +240,7 @@ ${totalAtraso > 0 ? `
   </thead>
   <tbody>
     ${linhas.filter(l => l.emAtraso).map(({ m, sub, proxima }) => {
-      const diasAtraso = Math.max(0, Math.floor((new Date(hoje) - new Date(proxima.data)) / 86400000))
+      const diasAtraso = Math.max(0, Math.floor((parseDateLocal(hoje) - parseDateLocal(proxima.data)) / 86400000))
       return `<tr>
         <td><strong>${esc(m.marca)} ${esc(m.modelo)}</strong>${sub ? ` <span style="color:var(--muted);font-size:7pt">· ${esc(sub.nome)}</span>` : ''}</td>
         <td style="font-family:monospace;font-size:7.5pt">${esc(m.numeroSerie)}</td>

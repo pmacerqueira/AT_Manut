@@ -1,14 +1,15 @@
 /**
- * emailService.js — Envio de relatórios de manutenção por email.
+ * emailService.js — Envio de relatórios por email.
  *
- * Utiliza o script PHP em public_html/api/send-email.php no cPanel de navel.pt,
- * que envia via conta noreply@navel.pt.
+ * Dois endpoints no cPanel:
+ *   send-email.php  — recebe dados estruturados, gera PDF com FPDF, envia com anexo
+ *   send-report.php — recebe HTML pré-renderizado, envia como corpo do email (sem PDF)
  *
- * Fallback: se o endpoint não estiver configurado (token de placeholder),
- * abre o cliente de email local via mailto:.
+ * Funções exportadas:
+ *   enviarRelatorioEmail       — manutenções (dados → send-email.php → PDF anexo)
+ *   enviarRelatorioHtmlEmail   — reparações e envio genérico (HTML → send-report.php)
+ *   enviarLembreteEmail        — alertas de manutenção próxima (dados → send-email.php)
  */
-import { format } from 'date-fns'
-import { pt } from 'date-fns/locale'
 import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { EMAIL_CONFIG, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
@@ -71,6 +72,7 @@ export async function enviarRelatorioEmail({
   checklistItems  = [],
   subcategoriaNome = '',
   logoUrl          = '',
+  tecnicoObj       = null,
 }) {
   if (!emailDestinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
@@ -88,9 +90,11 @@ export async function enviarRelatorioEmail({
   // ── Envio via PHP no cPanel ──────────────────────────────────────────────────
   if (isEmailConfigured()) {
     try {
-      // Checklist como JSON pequeno (~1-2 KB)
+      // Usar snapshot do relatório quando disponível (imutabilidade)
+      const { resolveChecklist } = await import('../utils/resolveChecklist')
+      const itemsResolvidos = resolveChecklist(relatorio, checklistItems)
       const checklistJson = JSON.stringify(
-        checklistItems.map(item => ({
+        itemsResolvidos.map(item => ({
           texto: item.texto,
           resp:  relatorio?.checklistRespostas?.[item.id] ?? '',
         }))
@@ -133,6 +137,12 @@ export async function enviarRelatorioEmail({
         assinaturaB64 = comma >= 0 ? relatorio.assinaturaDigital.substring(comma + 1) : relatorio.assinaturaDigital
       }
 
+      let tecnicoAssinaturaB64 = ''
+      if (tecnicoObj?.assinaturaDigital) {
+        const c = tecnicoObj.assinaturaDigital.indexOf(',')
+        tecnicoAssinaturaB64 = c >= 0 ? tecnicoObj.assinaturaDigital.substring(c + 1) : tecnicoObj.assinaturaDigital
+      }
+
       const payload = {
         auth_token:       EMAIL_CONFIG.AUTH_TOKEN,
         app_version:      APP_VERSION,
@@ -151,12 +161,11 @@ export async function enviarRelatorioEmail({
         photos_json:      photosJson,
         n_fotos:          fotosOriginais.length,
         proxima_manut:    proximaManutFmt,
+        tecnico_telefone:       tecnicoObj?.telefone ?? '',
+        tecnico_assinatura_b64: tecnicoAssinaturaB64,
       }
 
       const bodyStr = JSON.stringify(payload)
-      logger.warn('emailService', 'sendEmail',
-        `[DEBUG] Payload: ${bodyStr.length} chars (fotos: ${photosJson.length} chars, n=${fotosOriginais.length})`,
-        { numeroRel, payloadChars: bodyStr.length, fotosChars: photosJson.length })
 
       const response = await fetch(EMAIL_CONFIG.ENDPOINT_URL, {
         method:  'POST',
@@ -179,7 +188,6 @@ export async function enviarRelatorioEmail({
         { numeroRel, destinatario: emailDestinatario, status: response.status })
       return { ok: false, message: errMsg }
     } catch (err) {
-      console.error('[emailService] Erro de rede:', err)
       logger.error('emailService', 'sendEmail',
         `Erro de rede ao enviar relatório ${numeroRel}: ${err.message}`,
         { numeroRel, destinatario: emailDestinatario, errorMessage: err.message })
@@ -206,6 +214,81 @@ export async function enviarRelatorioEmail({
     ok:       true,
     message:  `Cliente de email aberto para ${emailDestinatario}. Anexe o PDF e envie.\n(Endpoint PHP não configurado — ver src/config/emailConfig.js)`,
     isMailto: true,
+  }
+}
+
+// ── Envio de relatório com HTML pré-renderizado (reparações, etc.) ───────────
+
+/**
+ * Envia um relatório cujo HTML já foi gerado no frontend (via send-report.php).
+ * Usado para reparações e qualquer fluxo onde o HTML é criado client-side.
+ *
+ * @param {object} params
+ * @param {string} params.destinatario  - Email do destinatário
+ * @param {string} params.assunto       - Assunto do email
+ * @param {string} params.html          - Corpo HTML completo pré-renderizado
+ * @param {string} [params.cc]          - Email em cópia (default: comercial@navel.pt)
+ * @param {string} [params.nomeCliente] - Nome do cliente (para logging)
+ * @returns {Promise<{ ok: boolean, message: string }>}
+ */
+export async function enviarRelatorioHtmlEmail({
+  destinatario,
+  assunto,
+  html,
+  cc = 'comercial@navel.pt',
+  nomeCliente = '',
+}) {
+  if (!destinatario?.trim()) {
+    return { ok: false, message: 'Endereço de email em falta.' }
+  }
+
+  if (!isEmailConfigured()) {
+    const subject = encodeURIComponent(assunto || 'Relatório — Navel')
+    const body = encodeURIComponent(
+      `Exmo(a) Sr(a) ${nomeCliente},\n\nSegue em anexo o relatório.\n\nNAVEL-AÇORES\n296 205 290 / 296 630 120`
+    )
+    window.open(`mailto:${destinatario}?subject=${subject}&body=${body}`, '_blank')
+    return { ok: true, message: `Cliente de email aberto para ${destinatario}.`, isMailto: true }
+  }
+
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE_URL
+      || (typeof window !== 'undefined' ? window.location.origin : '')
+    const url = apiBase
+      ? `${apiBase.replace(/\/$/, '')}/api/send-report.php`
+      : '/api/send-report.php'
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_token: EMAIL_CONFIG.AUTH_TOKEN,
+        destinatario: destinatario.trim(),
+        cc,
+        assunto: assunto || 'Relatório — Navel',
+        corpoHtml: html,
+      }),
+    })
+
+    const json = await response.json().catch(() => ({ ok: false, message: `HTTP ${response.status}` }))
+
+    if (response.ok && json.ok) {
+      logger.action('emailService', 'sendHtmlEmail',
+        `Relatório HTML enviado para ${destinatario}`,
+        { destinatario, assunto: assunto?.substring(0, 60) })
+      return { ok: true, message: `Email enviado com sucesso para ${destinatario}.` }
+    }
+
+    const errMsg = json.message ?? json.erro ?? `Erro no servidor (HTTP ${response.status}).`
+    logger.error('emailService', 'sendHtmlEmail', errMsg, { destinatario, status: response.status })
+    return { ok: false, message: errMsg }
+  } catch (err) {
+    logger.error('emailService', 'sendHtmlEmail',
+      `Erro de rede: ${err.message}`, { destinatario, errorMessage: err.message })
+    return {
+      ok: false,
+      message: `Não foi possível contactar o servidor de email. (${err.message})`,
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 /* ── Logs — Painel de log do sistema ─────────────────────────────────────── */
 
-.logs-page { max-width: 1200px; }
+.logs-page { max-width: var(--page-max); }
 
 /* ── Caixa de ajuda ─────────────────────────────────────────────────────────── */
 .log-help-box {

@@ -3,10 +3,12 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { ExternalLink } from 'lucide-react'
 import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { DECLARACAO_CLIENTE } from '../constants/relatorio'
+import { resolveChecklist } from '../utils/resolveChecklist'
 import './RelatorioView.css'
 
 export default function RelatorioView({ relatorio, manutencao, maquina, cliente, checklistItems = [] }) {
   if (!relatorio) return null
+  const items = resolveChecklist(relatorio, checklistItems)
 
   const dataCriacaoFormatada = relatorio.dataCriacao
     ? formatDataHoraAzores(relatorio.dataCriacao)
@@ -44,12 +46,12 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
         )}
       </section>
 
-      {checklistItems.length > 0 && (
+      {items.length > 0 && (
         <section className="relatorio-section checklist-section">
           <h3>Checklist de verificação</h3>
           <table className="checklist-table">
             <tbody>
-              {checklistItems.map((item, i) => (
+              {items.map((item, i) => (
                 <tr key={item.id}>
                   <td className="checklist-num">{i + 1}.</td>
                   <td className="checklist-texto">{item.texto}</td>

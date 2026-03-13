@@ -8,16 +8,15 @@ import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import SignaturePad from '../components/SignaturePad'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, FolderOpen, Paperclip, X, CheckCircle, Wrench, Play, FileDown, ArrowLeft, Mail, Zap, Clock, Archive } from 'lucide-react'
-import { format, addDays, isBefore, startOfDay } from 'date-fns'
-import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores } from '../utils/datasAzores'
-import { safeHttpUrl } from '../utils/sanitize'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, Clock, Archive, MoreHorizontal } from 'lucide-react'
+import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
+import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
+import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 import { pt } from 'date-fns/locale'
 import { relatorioParaHtml } from '../utils/relatorioHtml'
 import { abrirPdfRelatorio, imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
@@ -33,9 +32,16 @@ const SETE_DIAS_MS = 7 * 24 * 3600 * 1000
 const getDisplayStatus = (m) => {
   if (m.status === 'concluida')    return 'concluida'
   if (m.status === 'em_progresso') return 'em_progresso'
-  const dataManut = startOfDay(new Date(m.data))
+  const dataManut = startOfDay(parseDateLocal(m.data))
   const hoje = startOfDay(new Date())
   return isBefore(dataManut, hoje) ? 'emAtraso' : 'proxima'
+}
+
+/** Dias de atraso: positivo = em atraso, 0 = hoje, negativo = futuro */
+const calcDiasAtraso = (dataStr) => {
+  const hoje = startOfDay(new Date())
+  const d = startOfDay(parseDateLocal(dataStr))
+  return differenceInCalendarDays(hoje, d)
 }
 
 export default function Manutencoes() {
@@ -43,6 +49,8 @@ export default function Manutencoes() {
     clientes,
     maquinas,
     manutencoes,
+    categorias,
+    getSubcategoriasByCategoria,
     addManutencao,
     updateManutencao,
     removeManutencao,
@@ -54,14 +62,16 @@ export default function Manutencoes() {
     getIntervaloDiasByMaquina,
     getSubcategoria,
     getChecklistBySubcategoria,
+    getTecnicoByNome,
+    tecnicos,
   } = useData()
-  const { canDelete, canEditManutencao, isAdmin } = usePermissions()
+  const { canDelete, canEditManutencao, canDeleteManutencao, isAdmin } = usePermissions()
+  const [modalConfirmDelete, setModalConfirmDelete] = useState(null)
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const location = useLocation()
   const navigate = useNavigate()
   const [modal, setModal] = useState(null)
-  const [modalAssinatura, setModalAssinatura] = useState(null)
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalExecucao, setModalExecucao] = useState(null)
   const [modalFotos, setModalFotos] = useState(null) // { fotos: string[] }
@@ -70,8 +80,41 @@ export default function Manutencoes() {
   const [emailDestino, setEmailDestino] = useState('')
   const [emailEnviando, setEmailEnviando] = useState(false)
   const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasTotais: '', horasServico: '' })
-  const [formAssinatura, setFormAssinatura] = useState({ checklistRespostas: {}, notas: '', nomeAssinante: '', assinaturaDigital: null })
-  const [erroChecklistAssinatura, setErroChecklistAssinatura] = useState('')
+  const [addClienteNif, setAddClienteNif] = useState('')
+  const [addCategoriaId, setAddCategoriaId] = useState('')
+  const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
+  const [avisoData, setAvisoData] = useState('')
+  const feriadosSetManut = useMemo(() => {
+    const ano = new Date().getFullYear()
+    const set = new Set()
+    for (let a = ano - 1; a <= ano + 3; a++) getFeriadosAno(a).forEach(f => set.add(f))
+    return set
+  }, [])
+  const validarDataManut = useCallback((dateStr) => {
+    if (!dateStr) { setAvisoData(''); return true }
+    const d = new Date(dateStr + 'T12:00:00')
+    if (isFimDeSemana(d)) {
+      const dia = d.getDay() === 0 ? 'Domingo' : 'Sábado'
+      setAvisoData(`${dia} — não é dia útil. Escolha um dia de semana.`)
+      return false
+    }
+    if (isFeriado(d, feriadosSetManut)) {
+      setAvisoData('Esta data é feriado. Escolha outro dia.')
+      return false
+    }
+    setAvisoData('')
+    return true
+  }, [feriadosSetManut])
+  const [overflowOpen, setOverflowOpen] = useState(null)
+
+  useEffect(() => {
+    if (!overflowOpen) return
+    const close = (e) => {
+      if (!e.target.closest('.mc-overflow-wrapper')) setOverflowOpen(null)
+    }
+    document.addEventListener('click', close, true)
+    return () => document.removeEventListener('click', close, true)
+  }, [overflowOpen])
 
   const STORAGE_KEY = STORAGE.MANUTENCOES_FILTER
 
@@ -113,7 +156,7 @@ export default function Manutencoes() {
 
   const isHistorico = (m) => {
     if (!m.criadoEm) return false
-    const dataManut = new Date(m.data).getTime()
+    const dataManut = parseDateLocal(m.data).getTime()
     const dataCriacao = new Date(m.criadoEm).getTime()
     return dataManut < Date.now() && (dataCriacao - dataManut) > SETE_DIAS_MS
   }
@@ -137,8 +180,10 @@ export default function Manutencoes() {
 
   const openAdd = () => {
     const hoje = getHojeAzores()
+    setAddClienteNif('')
+    setAddCategoriaId('')
     setForm({
-      maquinaId: maquinas[0]?.id || '',
+      maquinaId: '',
       tipo: 'periodica',
       data: hoje,
       tecnico: '',
@@ -147,6 +192,7 @@ export default function Manutencoes() {
       horasTotais: '',
       horasServico: '',
     })
+    setAvisoData('')
     setModal('add')
   }
 
@@ -167,6 +213,10 @@ export default function Manutencoes() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!isAdmin && !validarDataManut(form.data)) {
+      showToast('A data escolhida não é dia útil. Selecione outro dia.', 'warning')
+      return
+    }
     const { equipamentoId, maquinaId, ...rest } = form
     const mId = maquinaId ?? equipamentoId
     const payload = { ...rest, maquinaId: mId }
@@ -174,7 +224,7 @@ export default function Manutencoes() {
     const updateMaqData = {}
     if (form.status === 'concluida') {
       const dias = getIntervaloDiasByMaquina(maq)
-      const proxima = addDays(new Date(form.data), dias)
+      const proxima = addDays(parseDateLocal(form.data), dias)
       updateMaqData.proximaManut = format(proxima, 'yyyy-MM-dd')
       updateMaqData.ultimaManutencaoData = form.data
       if (temContadorHoras(maq?.subcategoriaId) && (form.horasTotais !== '' || form.horasServico !== '')) {
@@ -194,58 +244,6 @@ export default function Manutencoes() {
     setModal(null)
   }
 
-  const openAssinatura = (m) => {
-    const rel = getRelatorioByManutencao(m.id)
-    const maq = getMaquina(m.maquinaId)
-    const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
-    const checklistRespostas = {}
-    items.forEach(it => {
-      checklistRespostas[it.id] = rel?.checklistRespostas?.[it.id] ?? ''
-    })
-    setFormAssinatura({
-      checklistRespostas: rel?.checklistRespostas ?? checklistRespostas,
-      notas: (rel?.notas ?? '').slice(0, 300),
-      nomeAssinante: rel?.nomeAssinante ?? '',
-      assinaturaDigital: rel?.assinaturaDigital ?? null,
-    })
-    setErroChecklistAssinatura('')
-    setModalAssinatura(m)
-  }
-
-  const handleAssinaturaSubmit = (e) => {
-    e.preventDefault()
-    setErroChecklistAssinatura('')
-    const m = modalAssinatura
-    const maq = getMaquina(m.maquinaId)
-    const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
-    const todasMarcadas = checklistItems.length === 0 || checklistItems.every(it =>
-      formAssinatura.checklistRespostas[it.id] === 'sim' || formAssinatura.checklistRespostas[it.id] === 'nao'
-    )
-    if (!todasMarcadas) {
-      setErroChecklistAssinatura('Todas as linhas da checklist devem ser verificadas pelo utilizador.')
-      return
-    }
-    const now = new Date().toISOString()
-    const rel = getRelatorioByManutencao(m.id)
-    const payload = {
-      checklistRespostas: formAssinatura.checklistRespostas,
-      notas: formAssinatura.notas.slice(0, 300),
-      nomeAssinante: formAssinatura.nomeAssinante.trim(),
-      assinaturaDigital: formAssinatura.assinaturaDigital,
-      dataAssinatura: now,
-      assinadoPeloCliente: true,
-    }
-    if (rel) {
-      updateRelatorio(rel.id, payload)
-    } else {
-      addRelatorio({
-        manutencaoId: m.id,
-        dataCriacao: now,
-        ...payload,
-      })
-    }
-    setModalAssinatura(null)
-  }
 
   // Data de hoje como string estável para dependências de useMemo (só muda uma vez por dia)
   const hojeStr = getHojeAzores()
@@ -255,15 +253,15 @@ export default function Manutencoes() {
   // Em atraso: data < hoje (não executadas até ontem)
   const manutencoesEmAtraso = useMemo(() =>
     manutencoesPendentes
-      .filter(m => isBefore(startOfDay(new Date(m.data)), hoje))
-      .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime()),
+      .filter(m => isBefore(startOfDay(parseDateLocal(m.data)), hoje))
+      .sort((a, b) => parseDateLocal(a.data).getTime() - parseDateLocal(b.data).getTime()),
   [manutencoesPendentes, hojeStr])
 
   // Próximas: data >= hoje (hoje e dias seguintes)
   const manutencoesProximas = useMemo(() =>
     manutencoesPendentes
-      .filter(m => !isBefore(startOfDay(new Date(m.data)), hoje))
-      .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime()),
+      .filter(m => !isBefore(startOfDay(parseDateLocal(m.data)), hoje))
+      .sort((a, b) => parseDateLocal(a.data).getTime() - parseDateLocal(b.data).getTime()),
   [manutencoesPendentes, hojeStr])
 
   const manutencoesExecutadasOrdenadas = useMemo(() =>
@@ -272,19 +270,13 @@ export default function Manutencoes() {
       const relB = getRelatorioByManutencao(b.id)
       const dA = relA?.dataAssinatura || relA?.dataCriacao || a.data
       const dB = relB?.dataAssinatura || relB?.dataCriacao || b.data
-      return new Date(dB).getTime() - new Date(dA).getTime()
+      return parseDateLocal(dB).getTime() - parseDateLocal(dA).getTime()
     }),
   [manutencoesExecutadas, getRelatorioByManutencao])
 
-  // Ordenação padrão: em atraso primeiro, depois por data asc
+  // Ordenação: mais dias em atraso primeiro (diasAtraso desc) → próximas por data asc
   const manutencoesOrdenadas = useMemo(() =>
-    [...manutencoesPendentes].sort((a, b) => {
-      const statusA = getDisplayStatus(a)
-      const statusB = getDisplayStatus(b)
-      if (statusA === 'emAtraso' && statusB !== 'emAtraso') return -1
-      if (statusA !== 'emAtraso' && statusB === 'emAtraso') return 1
-      return new Date(a.data).getTime() - new Date(b.data).getTime()
-    }),
+    [...manutencoesPendentes].sort((a, b) => calcDiasAtraso(b.data) - calcDiasAtraso(a.data)),
   [manutencoesPendentes, hojeStr])
 
   const handleEnviarEmail = async (e) => {
@@ -295,6 +287,7 @@ export default function Manutencoes() {
     try {
       const { manutencao: m, maquina: maq, rel, sub, cliente } = modalEmail
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
+      const tecObj = getTecnicoByNome(rel?.tecnico || m?.tecnico)
       const resultado = await enviarRelatorioEmail({
         emailDestinatario: emailDestino,
         relatorio: rel,
@@ -304,6 +297,7 @@ export default function Manutencoes() {
         checklistItems,
         subcategoriaNome: sub?.nome || '',
         logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+        tecnicoObj: tecObj,
       })
       if (resultado?.ok) {
         showToast(`Email enviado para ${emailDestino}.`, 'success')
@@ -324,10 +318,12 @@ export default function Manutencoes() {
     showGlobalLoading()
     try {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
+      const tecObj = getTecnicoByNome(m.tecnico || rel?.tecnico)
       const html = relatorioParaHtml(rel, m, maq, cliente, checklistItems, {
         subcategoriaNome: sub?.nome,
         ultimoEnvio: rel.ultimoEnvio,
         logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+        tecnicoObj: tecObj,
       })
       await abrirPdfRelatorio({
         relatorio: rel,
@@ -337,6 +333,7 @@ export default function Manutencoes() {
         checklistItems,
         subcategoriaNome: sub?.nome ?? '',
         html,
+        tecnicoObj: tecObj,
       })
     } finally {
       hideGlobalLoading()
@@ -374,7 +371,7 @@ export default function Manutencoes() {
       ? [...manutencoesOrdenadas, ...manutencoesExecutadasOrdenadas]
       : manutencoesOrdenadas
     tituloPagina = 'Manutenções'
-    subtituloPagina = 'Lista das manutenções em atraso e próximas'
+    subtituloPagina = 'Ordenado por dias de atraso (mais urgente primeiro)'
   }
 
   return (
@@ -422,6 +419,7 @@ export default function Manutencoes() {
               const cliente     = getCliente(maq?.clienteNif)
               const st          = isConcluida ? 'concluida' : getDisplayStatus(m)
               const isPrimary   = !isConcluida && (m.status === 'pendente' || m.status === 'agendada')
+              const dias        = isConcluida ? null : calcDiasAtraso(m.data)
               const equipNome   = maq ? `${maq.marca} ${maq.modelo}` : 'N/A'
               const equipSub    = sub?.nome || ''
 
@@ -434,6 +432,11 @@ export default function Manutencoes() {
                     {/* Linha 1: tipo + badge + número + badge KAESER */}
                     <div className="mc-top">
                       <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
+                      {dias != null && (
+                        <span className={`mc-dias-badge ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
+                          {dias > 0 ? `+${dias}d` : dias === 0 ? 'Hoje' : `${dias}d`}
+                        </span>
+                      )}
                       {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
                       {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
                       {maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId) && maq.posicaoKaeser != null && !isConcluida && (
@@ -486,38 +489,51 @@ export default function Manutencoes() {
                       {isPrimary && (
                         <button
                           className="mc-btn-primary"
-                          onClick={() => setModalExecucao({ manutencao: m, maquina: maq })}
+                          onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: maq }) }}
                         >
                           <Play size={14} /> Executar
                         </button>
                       )}
+                      {!isConcluida && m.status === 'em_progresso' && (
+                        <button
+                          className="mc-btn-primary"
+                          onClick={() => setModalExecucao({ manutencao: m, maquina: maq })}
+                        >
+                          <Play size={14} /> Continuar
+                        </button>
+                      )}
                       <div className="mc-icons">
-                        {rel?.fotos?.length > 0 && (
-                          <button className="icon-btn secondary" onClick={() => setModalFotos({ fotos: rel.fotos })} title="Fotografias registadas"><Paperclip size={15} /></button>
-                        )}
-                        {isConcluida && rel && (
-                          <>
-                            <button className="icon-btn secondary" onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)} title="Obter PDF"><FileDown size={15} /></button>
-                            <button className="icon-btn secondary" onClick={() => abrirModalEmail(m)} title="Enviar email"><Mail size={15} /></button>
-                          </>
-                        )}
                         {isConcluida && rel?.assinadoPeloCliente && (
-                          <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver manutenção"><FileText size={15} /></button>
+                          <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver relatório"><FileText size={15} /></button>
                         )}
                         {isConcluida && rel && !rel.assinadoPeloCliente && (
-                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Recolher assinatura do cliente"><FileSignature size={15} /></button>
+                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Recolher assinatura"><FileSignature size={15} /></button>
                         )}
                         {isConcluida && !rel && (
-                          <button className="icon-btn secondary" onClick={() => openAssinatura(m)} title="Registar assinatura"><FileSignature size={15} /></button>
+                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Registar assinatura"><FileSignature size={15} /></button>
                         )}
-                        {canEditManutencao(m.id) ? (
-                          <button className="icon-btn secondary" onClick={() => openEdit(m)} title="Editar"><Pencil size={15} /></button>
-                        ) : (
-                          <span className="icon-btn readonly" title="Assinado"><Lock size={15} /></span>
-                        )}
-                        {canDelete && (
-                          <button className="icon-btn danger" onClick={() => removeManutencao(m.id)} title="Eliminar"><Trash2 size={15} /></button>
-                        )}
+                        <div className="mc-overflow-wrapper">
+                          <button className="icon-btn secondary" onClick={() => setOverflowOpen(overflowOpen === m.id ? null : m.id)} title="Mais acções"><MoreHorizontal size={15} /></button>
+                          {overflowOpen === m.id && (
+                            <div className="mc-overflow-menu" onClick={() => setOverflowOpen(null)}>
+                              {rel?.fotos?.length > 0 && (
+                                <button onClick={() => setModalFotos({ fotos: rel.fotos })}><Paperclip size={14} /> Fotografias</button>
+                              )}
+                              {isConcluida && rel && (
+                                <>
+                                  <button onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)}><FileDown size={14} /> PDF</button>
+                                  <button onClick={() => abrirModalEmail(m)}><Mail size={14} /> Enviar email</button>
+                                </>
+                              )}
+                              {canEditManutencao(m.id) && (
+                                <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
+                              )}
+                              {canDeleteManutencao(m.id) && (
+                                <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m.id)}><Trash2 size={14} /> Eliminar</button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -532,6 +548,7 @@ export default function Manutencoes() {
           <table className="data-table">
             <thead>
               <tr>
+                <th className="col-dias">Dias</th>
                 <th>Equipamento</th>
                 <th>Cliente</th>
                 <th>Tipo</th>
@@ -549,8 +566,12 @@ export default function Manutencoes() {
                   const rel = getRelatorioByManutencao(m.id)
                   const dataExecucao = rel?.dataAssinatura || rel?.dataCriacao
                   const isConcluida = m.status === 'concluida'
+                  const dias = isConcluida ? null : calcDiasAtraso(m.data)
                   return (
                     <tr key={m.id}>
+                      <td data-label="Dias" className={`col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
+                        {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
+                      </td>
                       <td data-label="Equipamento">
                         <div className="equip-desc-block">
                           <strong>{desc}</strong>
@@ -590,12 +611,12 @@ export default function Manutencoes() {
                       <td className="actions" data-label="">
                         <div className="actions-inner">
                           {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') && (
-                            <button className="icon-btn btn-iniciar-manut" onClick={() => iniciarManutencao(m.id)} title="Iniciar manutenção (registar início)">
-                              <Zap size={16} />
+                            <button className="icon-btn btn-executar-manut" onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: getMaquina(m.maquinaId) }) }} title="Executar manutenção">
+                              <Play size={16} />
                             </button>
                           )}
-                          {!isConcluida && (m.status === 'pendente' || m.status === 'agendada' || m.status === 'em_progresso') && (
-                            <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Executar / concluir manutenção">
+                          {!isConcluida && m.status === 'em_progresso' && (
+                            <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Continuar execução">
                               <Play size={16} />
                             </button>
                           )}
@@ -615,15 +636,15 @@ export default function Manutencoes() {
                             <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Recolher assinatura do cliente"><FileSignature size={16} /></button>
                           )}
                           {isConcluida && !rel && (
-                            <button className="icon-btn secondary" onClick={() => openAssinatura(m)} title="Registar assinatura"><FileSignature size={16} /></button>
+                            <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Registar assinatura"><FileSignature size={16} /></button>
                           )}
                           {canEditManutencao(m.id) ? (
                             <button className="icon-btn secondary" onClick={() => openEdit(m)} title="Editar"><Pencil size={16} /></button>
                           ) : (
                             <span className="icon-btn readonly" title="Manutenção assinada"><Lock size={16} /></span>
                           )}
-                          {canDelete && (
-                            <button className="icon-btn danger" onClick={() => removeManutencao(m.id)} title="Eliminar"><Trash2 size={16} /></button>
+                          {canDeleteManutencao(m.id) && (
+                            <button className="icon-btn danger" onClick={() => setModalConfirmDelete(m.id)} title="Eliminar"><Trash2 size={16} /></button>
                           )}
                         </div>
                       </td>
@@ -644,84 +665,116 @@ export default function Manutencoes() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>{modal === 'add' ? 'Nova manutenção' : 'Editar manutenção'}</h2>
             <form onSubmit={handleSubmit}>
-              <label>
-                Máquina
-                <select
-                  required
-                  value={form.maquinaId}
-                  onChange={e => setForm(f => ({ ...f, maquinaId: e.target.value }))}
-                >
-                  {maquinas.map(maq => {
-                    const sub = getSubcategoria(maq.subcategoriaId)
-                    return (
-                      <option key={maq.id} value={maq.id}>{sub?.nome || ''} — {maq.marca} {maq.modelo} — {maq.numeroSerie}</option>
+              {modal === 'add' ? (
+                <>
+                  {/* Pipeline: Cliente → Categoria → Máquina */}
+                  <label>
+                    Cliente
+                    <select required value={addClienteNif} onChange={e => { setAddClienteNif(e.target.value); setAddCategoriaId(''); setForm(f => ({ ...f, maquinaId: '' })) }}>
+                      <option value="">— Selecionar cliente —</option>
+                      {clientes
+                        .filter(c => maquinas.some(m => m.clienteNif === c.nif))
+                        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''))
+                        .map(c => <option key={c.nif} value={c.nif}>{c.nome}</option>)}
+                    </select>
+                  </label>
+                  {addClienteNif && (() => {
+                    const maqsCliente = maquinas.filter(m => m.clienteNif === addClienteNif)
+                    const catsComMaquinas = categorias.filter(cat =>
+                      getSubcategoriasByCategoria(cat.id).some(sub => maqsCliente.some(m => m.subcategoriaId === sub.id))
                     )
-                  })}
-                </select>
-              </label>
+                    return (
+                      <label>
+                        Categoria de equipamento
+                        <select value={addCategoriaId} onChange={e => { setAddCategoriaId(e.target.value); setForm(f => ({ ...f, maquinaId: '' })) }}>
+                          <option value="">— Selecionar categoria —</option>
+                          {catsComMaquinas.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                        </select>
+                      </label>
+                    )
+                  })()}
+                  {addClienteNif && addCategoriaId && (() => {
+                    const subsIds = getSubcategoriasByCategoria(addCategoriaId).map(s => s.id)
+                    const maqsFiltradas = maquinas.filter(m => m.clienteNif === addClienteNif && subsIds.includes(m.subcategoriaId))
+                    return (
+                      <label>
+                        Equipamento
+                        <select required value={form.maquinaId} onChange={e => setForm(f => ({ ...f, maquinaId: e.target.value }))}>
+                          <option value="">— Selecionar equipamento —</option>
+                          {maqsFiltradas.map(maq => {
+                            const sub = getSubcategoria(maq.subcategoriaId)
+                            return <option key={maq.id} value={maq.id}>{sub?.nome || ''} — {maq.marca} {maq.modelo} — {maq.numeroSerie}</option>
+                          })}
+                        </select>
+                      </label>
+                    )
+                  })()}
+                </>
+              ) : (
+                <label>
+                  Máquina
+                  <select required value={form.maquinaId} onChange={e => setForm(f => ({ ...f, maquinaId: e.target.value }))}>
+                    {maquinas.map(maq => {
+                      const sub = getSubcategoria(maq.subcategoriaId)
+                      return <option key={maq.id} value={maq.id}>{sub?.nome || ''} — {maq.marca} {maq.modelo} — {maq.numeroSerie}</option>
+                    })}
+                  </select>
+                </label>
+              )}
               <label>
                 Data
                 <input
                   type="date"
                   required
                   value={form.data}
-                  onChange={e => setForm(f => ({ ...f, data: e.target.value }))}
+                  onChange={e => {
+                    const v = e.target.value
+                    setForm(f => ({ ...f, data: v }))
+                    validarDataManut(v)
+                  }}
                 />
+                {avisoData && <span className="form-aviso-data">{avisoData}</span>}
               </label>
               <label className="form-tecnico-destaque">
                 Técnico responsável <span className="form-tecnico-hint">(recomendado atribuir ao agendar)</span>
-                <input
-                  value={form.tecnico}
-                  onChange={e => setForm(f => ({ ...f, tecnico: e.target.value }))}
-                  placeholder="Ex: Aurélio Almeida, Paulo Medeiros..."
-                />
+                <select value={form.tecnico} onChange={e => setForm(f => ({ ...f, tecnico: e.target.value }))}>
+                  <option value="">— Selecionar técnico —</option>
+                  {nomesTecnicos.map(nome => <option key={nome} value={nome}>{nome}</option>)}
+                </select>
               </label>
               {modal === 'edit' && (
-                <label>
-                  Status
-                  <select
-                    value={form.status}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                  >
-                    <option value="pendente">Pendente</option>
-                    <option value="agendada">Agendada</option>
-                    <option value="em_progresso">Em progresso</option>
-                    <option value="concluida">Executada</option>
-                  </select>
-                </label>
-              )}
-              {temContadorHoras(getMaquina(form.maquinaId)?.subcategoriaId) && (
-                <div className="form-row">
+                <>
                   <label>
-                    Horas totais (contador)
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={form.horasTotais}
-                      onChange={e => setForm(f => ({ ...f, horasTotais: e.target.value }))}
-                      placeholder="Ex: 1250"
-                    />
+                    Status
+                    <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                      <option value="pendente">Pendente</option>
+                      <option value="agendada">Agendada</option>
+                      <option value="em_progresso">Em progresso</option>
+                    </select>
+                    <span className="form-hint">Para marcar como executada, use o botão ▶ Executar</span>
                   </label>
-                  <label>
-                    Horas de serviço
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={form.horasServico}
-                      onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                      placeholder="Ex: 1180"
-                    />
-                  </label>
-                </div>
+                  {temContadorHoras(getMaquina(form.maquinaId)?.subcategoriaId) && (
+                    <div className="form-row">
+                      <label>
+                        Horas totais (contador)
+                        <input type="number" min={0} step={1} value={form.horasTotais}
+                          onChange={e => setForm(f => ({ ...f, horasTotais: e.target.value }))} placeholder="Ex: 1250" />
+                      </label>
+                      <label>
+                        Horas de serviço
+                        <input type="number" min={0} step={1} value={form.horasServico}
+                          onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))} placeholder="Ex: 1180" />
+                      </label>
+                    </div>
+                  )}
+                </>
               )}
               <label>
                 Observações
                 <textarea
                   value={form.observacoes}
                   onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))}
-                  rows={4}
+                  rows={3}
                   className="textarea-full"
                   placeholder="Notas da manutenção..."
                 />
@@ -730,7 +783,7 @@ export default function Manutencoes() {
                 <button type="button" className="secondary" onClick={() => setModal(null)}>
                   Cancelar
                 </button>
-                <button type="submit">
+                <button type="submit" disabled={modal === 'add' && !form.maquinaId}>
                   {modal === 'add' ? 'Agendar' : 'Guardar'}
                 </button>
               </div>
@@ -739,104 +792,6 @@ export default function Manutencoes() {
         </div>
       )}
 
-      {modalAssinatura && (() => {
-        const maq = getMaquina(modalAssinatura.maquinaId)
-        const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, modalAssinatura.tipo || 'periodica') : []
-        return (
-          <div className="modal-overlay" onClick={() => setModalAssinatura(null)}>
-            <div className="modal modal-assinatura modal-relatorio-form" onClick={e => e.stopPropagation()}>
-              <h2>Preencher relatório e registar assinatura</h2>
-              <p className="modal-hint">
-                Preencha o checklist (Sim/Não), notas importantes e a assinatura do cliente.
-              </p>
-              {(maq?.documentos ?? []).length > 0 && (
-                <div className="doc-links-inline">
-                  <FolderOpen size={14} />
-                  {maq.documentos.map(d => {
-                    const tipoLabel = TIPOS_DOCUMENTO.find(t => t.id === d.tipo)?.label ?? d.tipo
-                    return (
-                      <a key={d.id} href={safeHttpUrl(d.url)} target="_blank" rel="noopener noreferrer" className="doc-link-inline" title={d.titulo}>
-                        {tipoLabel}
-                      </a>
-                    )
-                  })}
-                </div>
-              )}
-              <form onSubmit={handleAssinaturaSubmit}>
-                {erroChecklistAssinatura && (
-                  <p className="form-erro">{erroChecklistAssinatura}</p>
-                )}
-                {checklistItems.length > 0 && (
-                  <div className="form-section">
-                    <h3>Checklist de verificação</h3>
-                    <div className="checklist-respostas">
-                      {checklistItems.map((item, i) => (
-                        <div key={item.id} className="checklist-item-row">
-                          <span className="checklist-item-num">{i + 1}.</span>
-                          <span className="checklist-item-texto">{item.texto}</span>
-                          <div className="checklist-item-btns">
-                            <button
-                              type="button"
-                              className={`btn-simnao ${formAssinatura.checklistRespostas[item.id] === 'sim' ? 'active-sim' : ''}`}
-                              onClick={() => setFormAssinatura(f => ({
-                                ...f,
-                                checklistRespostas: { ...f.checklistRespostas, [item.id]: 'sim' },
-                              }))}
-                            >
-                              Sim
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn-simnao ${formAssinatura.checklistRespostas[item.id] === 'nao' ? 'active-nao' : ''}`}
-                              onClick={() => setFormAssinatura(f => ({
-                                ...f,
-                                checklistRespostas: { ...f.checklistRespostas, [item.id]: 'nao' },
-                              }))}
-                            >
-                              Não
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <label className="form-section">
-                  Notas importantes <span className="char-count">({formAssinatura.notas.length}/300)</span>
-                  <textarea
-                    value={formAssinatura.notas}
-                    onChange={e => setFormAssinatura(f => ({ ...f, notas: e.target.value.slice(0, 300) }))}
-                    rows={4}
-                    className="textarea-full"
-                    maxLength={300}
-                    placeholder="Escreva aqui notas relevantes da manutenção..."
-                  />
-                </label>
-                <label>
-                  Nome de quem assinou <span className="required">*</span>
-                  <input
-                    required
-                    value={formAssinatura.nomeAssinante}
-                    onChange={e => setFormAssinatura(f => ({ ...f, nomeAssinante: e.target.value }))}
-                    placeholder="Ex: Carlos Silva (representante do cliente)"
-                  />
-                </label>
-                <label>
-                  Assinatura manuscrita do cliente
-                  <SignaturePad
-                    value={formAssinatura.assinaturaDigital}
-                    onChange={sig => setFormAssinatura(f => ({ ...f, assinaturaDigital: sig }))}
-                  />
-                </label>
-                <div className="form-actions">
-                  <button type="button" className="secondary" onClick={() => setModalAssinatura(null)}>Cancelar</button>
-                  <button type="submit">Guardar relatório</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )
-      })()}
 
       {modalFotos && (
         <div className="modal-overlay" onClick={() => setModalFotos(null)}>
@@ -942,6 +897,19 @@ export default function Manutencoes() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {modalConfirmDelete && (
+        <div className="modal-overlay" onClick={() => setModalConfirmDelete(null)}>
+          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
+            <h2>Confirmar eliminação</h2>
+            <p>Tem a certeza que pretende eliminar esta manutenção? Esta acção é irreversível e eliminará também o relatório associado e manutenções periódicas futuras (se aplicável).</p>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setModalConfirmDelete(null)}>Cancelar</button>
+              <button type="button" className="danger" onClick={() => { removeManutencao(modalConfirmDelete); setModalConfirmDelete(null); showToast('Manutenção eliminada.', 'success') }}>Eliminar</button>
+            </div>
           </div>
         </div>
       )}

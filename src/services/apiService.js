@@ -200,6 +200,7 @@ export const apiManutencoes         = crud('manutencoes')
 export const apiRelatorios          = crud('relatorios')
 export const apiReparacoes          = crud('reparacoes')
 export const apiRelatoriosReparacao = crud('relatoriosReparacao')
+export const apiTecnicos           = crud('tecnicos')
 
 export async function apiUploadMarcaLogo({ dataUrl, brandName }) {
   return call('uploads', 'brand_logo', {
@@ -236,21 +237,27 @@ export async function fetchTodosOsDados() {
     apiReparacoes.list(),
     apiRelatoriosReparacao.list(),
   ])
-  // Recurso opcional durante migração: se a tabela "marcas" ainda não existir no backend,
-  // não bloqueia a app — usa lista vazia e mantém funcionamento atual.
+  // Recursos opcionais durante migração: se a tabela ainda não existir no backend,
+  // não bloqueia a app — usa lista vazia e mantém funcionamento actual.
   let marcas = []
   try {
     marcas = await apiMarcas.list()
   } catch (err) {
     logger.warn('apiService', 'fetchTodosOsDados', 'Falha ao listar marcas (continuar com fallback)', {
-      resource: 'marcas',
-      action: 'list',
-      status: err?.status || 0,
-      failureMode: apiFailureMode(err?.status || 0, err?.message),
-      msg: err?.message,
-      endpoint: API_URL,
+      resource: 'marcas', action: 'list', status: err?.status || 0,
+      failureMode: apiFailureMode(err?.status || 0, err?.message), msg: err?.message, endpoint: API_URL,
     })
     marcas = []
   }
-  return { clientes, categorias, subcategorias, checklistItems, maquinas, marcas, manutencoes, relatorios, reparacoes, relatoriosReparacao }
+  let tecnicos = []
+  try {
+    tecnicos = await apiTecnicos.list()
+  } catch (err) {
+    logger.warn('apiService', 'fetchTodosOsDados', 'Falha ao listar tecnicos (continuar com fallback)', {
+      resource: 'tecnicos', action: 'list', status: err?.status || 0,
+      failureMode: apiFailureMode(err?.status || 0, err?.message), msg: err?.message, endpoint: API_URL,
+    })
+    tecnicos = []
+  }
+  return { clientes, categorias, subcategorias, checklistItems, maquinas, marcas, tecnicos, manutencoes, relatorios, reparacoes, relatoriosReparacao }
 }

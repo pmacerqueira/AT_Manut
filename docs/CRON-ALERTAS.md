@@ -3,7 +3,7 @@
 > Automatiza o envio de lembretes de manutenção por email aos clientes,
 > sem necessidade de o Admin estar na app.
 > Ficheiro PHP: `servidor-cpanel/cron-alertas.php`
-> Última revisão: 2026-03-12 — v1.10.3
+> Última revisão: 2026-03-12 — v1.11.0
 
 ---
 
@@ -256,4 +256,4 @@ um lembrete a cada 6 dias. Se estás a receber duplicados, verificar a tabela `a
 
 ---
 
-*Criado: 2026-03-12 — v1.10.3*
+*Criado: 2026-03-12 — v1.11.0*

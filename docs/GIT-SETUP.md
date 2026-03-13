@@ -40,7 +40,7 @@ git config --global user.email "pmcerqueira@navel.pt"
 
 ## 3. Inicializar o repositório no projeto
 
-Se a pasta `c:\AT_Manut` ainda não for um repositório Git:
+Se a pasta `c:\Cursor_Projetos\NAVEL\AT_Manut` ainda não for um repositório Git:
 
 ```powershell
 cd c:\Cursor_Projetos\NAVEL\AT_Manut

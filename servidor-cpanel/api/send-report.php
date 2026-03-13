@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['erro' => 'Método não permitido']);
+    echo json_encode(['ok' => false, 'message' => 'Método não permitido']);
     exit;
 }
 
@@ -39,7 +39,7 @@ $data = json_decode($body, true);
 
 if (!is_array($data)) {
     http_response_code(400);
-    echo json_encode(['erro' => 'Dados inválidos']);
+    echo json_encode(['ok' => false, 'message' => 'Dados inválidos']);
     exit;
 }
 
@@ -47,7 +47,7 @@ if (!is_array($data)) {
 $token = trim($data['auth_token'] ?? '');
 if (!hash_equals(REPORT_AUTH_TOKEN, $token)) {
     http_response_code(403);
-    echo json_encode(['erro' => 'Acesso negado']);
+    echo json_encode(['ok' => false, 'message' => 'Acesso negado']);
     exit;
 }
 
@@ -58,7 +58,7 @@ $corpoHtmlRaw = $data['corpoHtml'] ?? '';
 
 if (empty($destinatario) || !filter_var($destinatario, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
-    echo json_encode(['erro' => 'Endereço de destinatário inválido']);
+    echo json_encode(['ok' => false, 'message' => 'Endereço de destinatário inválido']);
     exit;
 }
 
@@ -69,7 +69,7 @@ if (empty($assunto)) {
 }
 
 // Sanitizar corpo HTML: strip_tags com tags permitidas seguras para email
-$allowedTags = '<p><br><strong><em><b><i><u><a><ul><ol><li><span><div><table><tr><td><th><thead><tbody><img><h1><h2><h3>';
+$allowedTags = '<html><head><body><style><p><br><strong><em><b><i><u><a><ul><ol><li><span><div><table><tr><td><th><thead><tbody><img><h1><h2><h3><h4><hr><meta><title>';
 $corpoHtml = strip_tags($corpoHtmlRaw, $allowedTags);
 // Remover atributos event handlers e javascript: em links
 $corpoHtml = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $corpoHtml);
@@ -100,9 +100,9 @@ $enviado = @mail($destinatario, $assunto, $corpoHtml, $headersStr . "\r\n" . $cc
 
 if (!$enviado) {
     http_response_code(500);
-    echo json_encode(['erro' => 'Falha ao enviar o email']);
+    echo json_encode(['ok' => false, 'message' => 'Falha ao enviar o email (mail() retornou false).']);
     exit;
 }
 
 http_response_code(200);
-echo json_encode(['ok' => true]);
+echo json_encode(['ok' => true, 'message' => 'Email enviado com sucesso para ' . $destinatario]);

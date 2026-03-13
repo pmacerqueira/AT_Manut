@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft, ArrowUp, ArrowDown, Check, X } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import './Categorias.css'
 
@@ -22,6 +22,9 @@ export default function Categorias() {
     addSubcategoria,
     updateSubcategoria,
     removeSubcategoria,
+    addChecklistItem,
+    updateChecklistItem,
+    removeChecklistItem,
   } = useData()
 
   const [expandedCat, setExpandedCat] = useState(new Set())
@@ -32,6 +35,42 @@ export default function Categorias() {
   const [editingSubcategoria, setEditingSubcategoria] = useState(null)
   const [formCat, setFormCat] = useState({ nome: '', intervaloTipo: 'semestral' })
   const [formSub, setFormSub] = useState({ nome: '' })
+
+  const [editingCheckItem, setEditingCheckItem] = useState(null)
+  const [editCheckTexto, setEditCheckTexto] = useState('')
+  const [addingCheckSub, setAddingCheckSub] = useState(null)
+  const [newCheckTexto, setNewCheckTexto] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
+  const handleAddCheckItem = useCallback((subcategoriaId, items) => {
+    const texto = newCheckTexto.trim()
+    if (!texto) return
+    const maxOrdem = items.length > 0 ? Math.max(...items.map(it => it.ordem)) : 0
+    addChecklistItem({ subcategoriaId, texto, ordem: maxOrdem + 1, tipo: 'periodica' })
+    setNewCheckTexto('')
+    showToast('Item adicionado à checklist.', 'success')
+  }, [newCheckTexto, addChecklistItem, showToast])
+
+  const handleEditCheckItem = useCallback((item) => {
+    const texto = editCheckTexto.trim()
+    if (!texto || texto === item.texto) { setEditingCheckItem(null); return }
+    updateChecklistItem(item.id, { texto })
+    setEditingCheckItem(null)
+    showToast('Item actualizado.', 'success')
+  }, [editCheckTexto, updateChecklistItem, showToast])
+
+  const handleRemoveCheckItem = useCallback((item) => {
+    setConfirmDelete({ type: 'checklist', id: item.id, label: item.texto?.slice(0, 60) })
+  }, [])
+
+  const handleMoveCheckItem = useCallback((items, index, direction) => {
+    const targetIndex = index + direction
+    if (targetIndex < 0 || targetIndex >= items.length) return
+    const a = items[index]
+    const b = items[targetIndex]
+    updateChecklistItem(a.id, { ordem: b.ordem })
+    updateChecklistItem(b.id, { ordem: a.ordem })
+  }, [updateChecklistItem])
 
   if (!isAdmin) return <Navigate to="/" replace />
 
@@ -88,11 +127,7 @@ export default function Categorias() {
       showToast(`Elimine primeiro as ${subs.length} subcategoria(s) de "${cat.nome}".`, 'warning', 4000)
       return
     }
-    if (window.confirm(`Eliminar a categoria "${cat.nome}"? Esta acção é irreversível.`)) {
-      removeCategoria(cat.id)
-      setExpandedCat(prev => { const n = new Set(prev); n.delete(cat.id); return n })
-      showToast('Categoria eliminada.', 'info')
-    }
+    setConfirmDelete({ type: 'categoria', id: cat.id, label: cat.nome })
   }
 
   const openEditSubcategoria = (sub) => {
@@ -114,11 +149,7 @@ export default function Categorias() {
       showToast(`Não é possível eliminar: existem equipamentos associados a "${sub.nome}".`, 'warning', 4000)
       return
     }
-    if (window.confirm(`Eliminar subcategoria "${sub.nome}"?`)) {
-      removeSubcategoria(sub.id)
-      setExpandedSub(prev => { const n = new Set(prev); n.delete(sub.id); return n })
-      showToast('Subcategoria eliminada.', 'info')
-    }
+    setConfirmDelete({ type: 'subcategoria', id: sub.id, label: sub.nome })
   }
 
   return (
@@ -270,13 +301,59 @@ export default function Categorias() {
                         )}
                         {subExpanded && (
                           <div className="checklist-list">
-                            <strong>Checklist</strong>
+                            <div className="checklist-header">
+                              <strong>Checklist ({items.length} itens)</strong>
+                            </div>
                             {items.map((item, i) => (
-                              <div key={item.id} className="checklist-item">
-                                <span className="ordem">{i + 1}.</span>
-                                <span className="texto">{item.texto}</span>
+                              <div key={item.id} className={`checklist-item${editingCheckItem === item.id ? ' edit' : ''}`}>
+                                {editingCheckItem === item.id ? (
+                                  <>
+                                    <span className="ordem">{i + 1}.</span>
+                                    <div className="inline-edit">
+                                      <input
+                                        value={editCheckTexto}
+                                        onChange={e => setEditCheckTexto(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleEditCheckItem(item); if (e.key === 'Escape') setEditingCheckItem(null) }}
+                                        autoFocus
+                                      />
+                                      <button type="button" className="icon-btn success" onClick={() => handleEditCheckItem(item)} title="Guardar"><Check size={14} /></button>
+                                      <button type="button" className="icon-btn secondary" onClick={() => setEditingCheckItem(null)} title="Cancelar"><X size={14} /></button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="ordem">{i + 1}.</span>
+                                    <span className="texto">{item.texto}</span>
+                                    <div className="checklist-item-actions">
+                                      <button type="button" className="icon-btn secondary" onClick={() => handleMoveCheckItem(items, i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /></button>
+                                      <button type="button" className="icon-btn secondary" onClick={() => handleMoveCheckItem(items, i, 1)} disabled={i === items.length - 1} title="Mover para baixo"><ArrowDown size={13} /></button>
+                                      <button type="button" className="icon-btn secondary" onClick={() => { setEditingCheckItem(item.id); setEditCheckTexto(item.texto) }} title="Editar texto"><Pencil size={13} /></button>
+                                      <button type="button" className="icon-btn danger" onClick={() => handleRemoveCheckItem(item)} title="Eliminar item"><Trash2 size={13} /></button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             ))}
+                            {addingCheckSub === sub.id ? (
+                              <div className="checklist-item edit">
+                                <span className="ordem">{items.length + 1}.</span>
+                                <div className="inline-edit">
+                                  <input
+                                    value={newCheckTexto}
+                                    onChange={e => setNewCheckTexto(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { handleAddCheckItem(sub.id, items); } if (e.key === 'Escape') { setAddingCheckSub(null); setNewCheckTexto('') } }}
+                                    placeholder="Texto do novo item de verificação"
+                                    autoFocus
+                                  />
+                                  <button type="button" className="icon-btn success" onClick={() => handleAddCheckItem(sub.id, items)} title="Adicionar"><Check size={14} /></button>
+                                  <button type="button" className="icon-btn secondary" onClick={() => { setAddingCheckSub(null); setNewCheckTexto('') }} title="Cancelar"><X size={14} /></button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button type="button" className="btn-add-check" onClick={() => { setAddingCheckSub(sub.id); setNewCheckTexto('') }}>
+                                <Plus size={13} /> Adicionar item
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -288,6 +365,34 @@ export default function Categorias() {
           )
         })}
       </div>
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
+            <h2>Confirmar eliminação</h2>
+            <p>Eliminar {confirmDelete.type === 'categoria' ? 'a categoria' : confirmDelete.type === 'subcategoria' ? 'a subcategoria' : 'o item'} <strong>"{confirmDelete.label}"</strong>?</p>
+            {confirmDelete.type === 'checklist' && <p className="text-muted" style={{ fontSize: '0.85rem' }}>Relatórios já emitidos mantêm o snapshot da checklist original.</p>}
+            <p className="text-danger" style={{ fontSize: '0.85rem' }}>Esta acção é irreversível.</p>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setConfirmDelete(null)}>Cancelar</button>
+              <button type="button" className="danger" onClick={() => {
+                const { type, id } = confirmDelete
+                if (type === 'categoria') {
+                  removeCategoria(id)
+                  setExpandedCat(prev => { const n = new Set(prev); n.delete(id); return n })
+                } else if (type === 'subcategoria') {
+                  removeSubcategoria(id)
+                  setExpandedSub(prev => { const n = new Set(prev); n.delete(id); return n })
+                } else {
+                  removeChecklistItem(id)
+                }
+                showToast(`${type === 'categoria' ? 'Categoria' : type === 'subcategoria' ? 'Subcategoria' : 'Item'} eliminado(a).`, 'success')
+                setConfirmDelete(null)
+              }}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

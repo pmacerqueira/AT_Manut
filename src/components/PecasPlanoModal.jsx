@@ -33,6 +33,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
   const [editandoId, setEditandoId] = useState(null)
   const [formEdit, setFormEdit] = useState(PECA_VAZIA)
   const [confirmarLimpar, setConfirmarLimpar] = useState(false)
+  const [confirmDeletePecaId, setConfirmDeletePecaId] = useState(null)
 
   const sub          = maquina ? getSubcategoria(maquina.subcategoriaId) : null
   const isCompressor = maquina && SUBCATEGORIAS_COMPRESSOR.includes(maquina.subcategoriaId)
@@ -257,7 +258,14 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
                       <button className="icon-btn secondary" onClick={() => { setEditandoId(p.id); setFormEdit({ posicao: p.posicao || '', codigoArtigo: p.codigoArtigo, descricao: p.descricao, quantidade: p.quantidade, unidade: p.unidade }) }} title="Editar">
                         <ChevronDown size={14} />
                       </button>
-                      <button className="icon-btn danger" onClick={() => removePecaPlano(p.id)} title="Remover"><Trash2 size={14} /></button>
+                      {confirmDeletePecaId === p.id ? (
+                        <>
+                          <button className="icon-btn danger" onClick={() => { removePecaPlano(p.id); setConfirmDeletePecaId(null); showToast('Peça removida.', 'success') }} title="Confirmar">Sim</button>
+                          <button className="icon-btn secondary" onClick={() => setConfirmDeletePecaId(null)} title="Cancelar">Não</button>
+                        </>
+                      ) : (
+                        <button className="icon-btn danger" onClick={() => setConfirmDeletePecaId(p.id)} title="Remover"><Trash2 size={14} /></button>
+                      )}
                     </td>
                   </tr>
                 ))}

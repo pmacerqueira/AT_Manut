@@ -7,7 +7,7 @@ import { PenLine, X } from 'lucide-react'
 import { formatDataAzores } from '../utils/datasAzores'
 
 export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, maquina }) {
-  const { updateRelatorio, getRelatorioByManutencao, clientes } = useData()
+  const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes } = useData()
   const { showToast } = useToast()
 
   const [nomeAssinante, setNomeAssinante] = useState('')
@@ -37,39 +37,47 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
       setErro('A assinatura digital do cliente é obrigatória.')
       return
     }
-    if (!rel) {
-      setErro('Relatório não encontrado.')
-      return
-    }
-
     try {
       const dataAssinatura = manutencao.data
         ? `${manutencao.data}T12:00:00.000Z`
-        : rel.dataCriacao
+        : (rel?.dataCriacao ?? new Date().toISOString())
 
-      updateRelatorio(rel.id, {
+      const payload = {
         assinadoPeloCliente: true,
         nomeAssinante: nomeAssinante.trim(),
         assinaturaDigital,
         dataAssinatura,
-      })
+      }
 
-      logger.action('RecolherAssinaturaModal', 'assinar',
-        `Assinatura recolhida — ${rel.numeroRelatorio} — por "${nomeAssinante.trim()}" (data: ${manutencao.data})`,
-        { manutencaoId: manutencao.id, relatorioId: rel.id, nomeAssinante: nomeAssinante.trim() }
-      )
+      if (rel) {
+        updateRelatorio(rel.id, payload)
+        logger.action('RecolherAssinaturaModal', 'assinar',
+          `Assinatura recolhida — ${rel.numeroRelatorio} — por "${nomeAssinante.trim()}" (data: ${manutencao.data})`,
+          { manutencaoId: manutencao.id, relatorioId: rel.id, nomeAssinante: nomeAssinante.trim() }
+        )
+      } else {
+        addRelatorio({
+          manutencaoId: manutencao.id,
+          dataCriacao: dataAssinatura,
+          ...payload,
+        })
+        logger.action('RecolherAssinaturaModal', 'criarEAssinar',
+          `Relatório criado e assinado — por "${nomeAssinante.trim()}" (data: ${manutencao.data})`,
+          { manutencaoId: manutencao.id, nomeAssinante: nomeAssinante.trim() }
+        )
+      }
 
       showToast('Assinatura recolhida com sucesso!', 'success')
       onClose()
     } catch (err) {
       logger.error('RecolherAssinaturaModal', 'assinar',
         `Erro ao gravar assinatura: ${err.message}`,
-        { relatorioId: rel.id, stack: err.stack?.slice(0, 400) })
+        { relatorioId: rel?.id, stack: err.stack?.slice(0, 400) })
       setErro('Erro ao gravar assinatura. Tente novamente.')
     }
-  }, [nomeAssinante, assinaturaDigital, rel, manutencao, updateRelatorio, showToast, onClose])
+  }, [nomeAssinante, assinaturaDigital, rel, manutencao, updateRelatorio, addRelatorio, showToast, onClose])
 
-  if (!isOpen || !manutencao || !maquina || !rel) return null
+  if (!isOpen || !manutencao || !maquina) return null
 
   const desc = `${maquina.marca ?? ''} ${maquina.modelo ?? ''} — Nº Série: ${maquina.numeroSerie ?? ''}`
 
@@ -84,11 +92,11 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         </div>
 
         <div className="recolher-resumo">
-          <p className="recolher-info"><strong>Relatório:</strong> {rel.numeroRelatorio}</p>
+          {rel?.numeroRelatorio && <p className="recolher-info"><strong>Relatório:</strong> {rel.numeroRelatorio}</p>}
           <p className="recolher-info"><strong>Data da manutenção:</strong> {formatDataAzores(manutencao.data)}</p>
           <p className="recolher-info"><strong>Equipamento:</strong> {desc}</p>
           {cliente && <p className="recolher-info"><strong>Cliente:</strong> {cliente.nome}</p>}
-          <p className="recolher-info"><strong>Técnico:</strong> {rel.tecnico}</p>
+          {(rel?.tecnico || manutencao.tecnico) && <p className="recolher-info"><strong>Técnico:</strong> {rel?.tecnico || manutencao.tecnico}</p>}
         </div>
 
         <div className="recolher-data-aviso">
@@ -99,7 +107,7 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         {erro && <p className="form-erro">{erro}</p>}
 
         <label className="label-required">
-          Nome do assinante <span className="req-star">*</span>
+          <span>Nome do assinante <span className="req-star">*</span></span>
           <input
             type="text"
             value={nomeAssinante}
@@ -110,9 +118,9 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         </label>
 
         <div className="recolher-assinatura-pad">
-          <label className="assinatura-canvas-label">
+          <div className="assinatura-canvas-label">
             Assinatura digital <span className="req-star">*</span>
-          </label>
+          </div>
           <SignaturePad key={key} onChange={setAssinaturaDigital} />
         </div>
 

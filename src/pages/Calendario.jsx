@@ -26,11 +26,16 @@ export default function Calendario() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const navigate = useNavigate()
-  const { maquinas, manutencoes, getSubcategoria } = useData()
+  const { maquinas, manutencoes, reparacoes, getSubcategoria } = useData()
 
   const getManutencoesForDay = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
     return manutencoes.filter(m => m.data === dateStr)
+  }
+
+  const getReparacoesForDay = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    return reparacoes.filter(r => r.data === dateStr)
   }
 
   const getMaquinasForDay = (date) => {
@@ -41,13 +46,26 @@ export default function Calendario() {
   const getDayStatus = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
     const hojeStr = getHojeAzores()
-    const list = manutencoes.filter(m => m.data === dateStr)
-    const executadas = list.filter(m => m.status === 'concluida').length
-    const pendentesList = list.filter(m => m.status === 'pendente' || m.status === 'agendada')
-    const proximas = pendentesList.filter(m => dateStr >= hojeStr).length
-    const atrasoManut = pendentesList.filter(m => dateStr < hojeStr).length
+    const listManut = manutencoes.filter(m => m.data === dateStr)
+    const listRep = reparacoes.filter(r => r.data === dateStr)
+
+    const executadas = listManut.filter(m => m.status === 'concluida').length
+      + listRep.filter(r => r.status === 'concluida').length
+
+    const pendentesManut = listManut.filter(m =>
+      m.status === 'pendente' || m.status === 'agendada' || m.status === 'em_progresso'
+    )
+    const pendentesRep = listRep.filter(r =>
+      r.status === 'pendente' || r.status === 'em_progresso'
+    )
+
+    const proximas = (dateStr >= hojeStr)
+      ? pendentesManut.length + pendentesRep.length
+      : 0
+    const atrasoManut = (dateStr < hojeStr) ? pendentesManut.length : 0
+    const atrasoRep = (dateStr < hojeStr) ? pendentesRep.length : 0
     const atrasoMaq = (dateStr < hojeStr) ? maquinas.filter(e => e.proximaManut === dateStr).length : 0
-    const atraso = atrasoManut + atrasoMaq
+    const atraso = atrasoManut + atrasoRep + atrasoMaq
     return { executadas, proximas, atraso }
   }
 
@@ -115,6 +133,7 @@ export default function Calendario() {
         <div className="calendar-grid">
           {days.map(d => {
             const manuts = getManutencoesForDay(d)
+            const reps = getReparacoesForDay(d)
             const maqs = getMaquinasForDay(d)
             const status = getDayStatus(d)
             const statusClass = status.atraso > 0 ? 'cal-status-red' : status.proximas > 0 ? 'cal-status-orange' : status.executadas > 0 ? 'cal-status-green' : ''
@@ -131,12 +150,18 @@ export default function Calendario() {
                     const maq = maquinas.find(e => e.id === m.maquinaId)
                     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
                     const desc = maq ? `${sub?.nome || ''} ${maq.marca}`.trim() : ''
-                    return <div key={m.id} className="event event-manut" title={desc}>{desc?.slice(0, 12)}…</div>
+                    return <div key={m.id} className="event event-manut" title={`Manutenção: ${desc}`}>{desc?.slice(0, 12)}…</div>
+                  })}
+                  {reps.map(r => {
+                    const maq = maquinas.find(e => e.id === r.maquinaId)
+                    const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+                    const desc = maq ? `${sub?.nome || ''} ${maq.marca}`.trim() : (r.descricaoAvaria?.slice(0, 20) || 'Reparação')
+                    return <div key={r.id} className="event event-reparacao" title={`Reparação: ${desc}`}>{desc?.slice(0, 12)}…</div>
                   })}
                   {maqs.filter(e => !manuts.some(m => m.maquinaId === e.id)).map(e => {
                     const sub = getSubcategoria(e.subcategoriaId)
                     const desc = `${sub?.nome || ''} ${e.marca}`.trim()
-                    return <div key={e.id} className="event event-previsto" title={desc}>{desc?.slice(0, 12)}…</div>
+                    return <div key={e.id} className="event event-previsto" title={`Prevista: ${desc}`}>{desc?.slice(0, 12)}…</div>
                   })}
                 </div>
               </div>
@@ -148,6 +173,9 @@ export default function Calendario() {
         <span><span className="dot dot-green"></span> Executadas</span>
         <span><span className="dot dot-orange"></span> Próximas</span>
         <span><span className="dot dot-red"></span> Em atraso</span>
+        <span><span className="dot dot-blue"></span> Manutenção</span>
+        <span><span className="dot dot-purple"></span> Reparação</span>
+        <span><span className="dot dot-gray"></span> Prevista</span>
       </div>
     </div>
   )

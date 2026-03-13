@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
-import { useData } from '../context/DataContext'
+import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR, INTERVALOS, tipoKaeserNaPosicao } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
@@ -14,9 +13,10 @@ import '../components/QrEtiquetaModal.css'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
-import { format, isBefore } from 'date-fns'
+import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
+import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import './Equipamentos.css'
 
 export default function Equipamentos() {
@@ -24,11 +24,12 @@ export default function Equipamentos() {
     clientes,
     categorias,
     maquinas,
-    INTERVALOS,
     getSubcategoriasByCategoria,
     getSubcategoria,
     manutencoes,
     relatorios,
+    reparacoes,
+    tecnicos,
     removeMaquina,
   } = useData()
   const { canDelete, isAdmin } = usePermissions()
@@ -42,7 +43,8 @@ export default function Equipamentos() {
   const [modalExecucao, setModalExecucao] = useState(null)
   const [modalQr, setModalQr] = useState(null)
   const [modalPecas, setModalPecas] = useState(null)
-  const [loadingHistorico, setLoadingHistorico] = useState(null) // id da máquina a gerar
+  const [loadingHistorico, setLoadingHistorico] = useState(null)
+  const [modalConfirmDelete, setModalConfirmDelete] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -95,6 +97,7 @@ export default function Equipamentos() {
       const cat      = sub ? categorias.find(c => c.id === sub.categoriaId) : null
       const cli      = getCliente(maquina.clienteNif)
       const manutsMaq = manutencoes.filter(m => m.maquinaId === maquina.id)
+      const repsMaq   = reparacoes.filter(r => r.maquinaId === maquina.id)
       const html = gerarHtmlHistoricoMaquina({
         maquina,
         cliente:      cli,
@@ -102,6 +105,8 @@ export default function Equipamentos() {
         categoria:    cat,
         manutencoes:  manutsMaq,
         relatorios,
+        reparacoes:   repsMaq,
+        tecnicos,
       })
       imprimirOuGuardarPdf(html)
     } catch (err) {
@@ -111,7 +116,7 @@ export default function Equipamentos() {
       setLoadingHistorico(null)
     }
   }
-  const maquinasEmAtraso = maquinas.filter(e => isBefore(new Date(e.proximaManut), new Date()))
+  const maquinasEmAtraso = maquinas.filter(e => e.proximaManut && isBefore(parseDateLocal(e.proximaManut), new Date()))
 
   const handleCategoriaClick = (cat) => {
     setSelectedCategoria(cat)
@@ -203,7 +208,7 @@ export default function Equipamentos() {
                               </span>
                             )}
                             <span className="badge badge-danger">
-                              Próx. manut.: {format(new Date(m.proximaManut), 'd MMM yyyy', { locale: pt })}
+                              Próx. manut.: {format(parseDateLocal(m.proximaManut), 'd MMM yyyy', { locale: pt })}
                             </span>
                           </div>
                         </div>
@@ -292,26 +297,49 @@ export default function Equipamentos() {
               clientesOrdenados.map(nomeCliente => (
                 <div key={nomeCliente} className="maquinas-por-cliente">
                   <h4>{nomeCliente}</h4>
-                  {maquinasAgrupadasPorCliente[nomeCliente].map(m => (
-                    <div key={m.id} className="maquina-row">
-                      <div>
-                        <strong>{m.marca} {m.modelo}</strong>
-                        <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
-                        {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
-                          <span
-                            className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
-                            title={`Ciclo de manutenção — próximo: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
-                          >
-                            {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                  {maquinasAgrupadasPorCliente[nomeCliente].map(m => {
+                    const hoje = startOfDay(new Date(getHojeAzores()))
+                    const temProxima = !!m.proximaManut
+                    const proxVencida = temProxima && isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)
+                    const docsCount = (m.documentos ?? []).length
+                    const docsTotal = TIPOS_DOCUMENTO.length
+                    return (
+                    <div key={m.id} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
+                      <div className="maquina-row-info">
+                        <div className="equip-desc-block">
+                          <strong>{m.marca} {m.modelo}</strong>
+                          <span className="text-muted equip-num-serie">Nº Série: {m.numeroSerie}</span>
+                        </div>
+                        <div className="equip-badges-row">
+                          {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
+                            <span
+                              className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
+                              title={`Ciclo de manutenção — próximo: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
+                            >
+                              {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                            </span>
+                          )}
+                          {m.periodicidadeManut && INTERVALOS[m.periodicidadeManut] && (
+                            <span className="badge badge-periodicidade" title="Periodicidade da manutenção">
+                              {INTERVALOS[m.periodicidadeManut].label}
+                            </span>
+                          )}
+                          {temProxima ? (
+                            <span className={`badge ${proxVencida ? 'badge-danger' : 'badge-conforme-equip'}`}>
+                              Próx.: {format(parseDateLocal(m.proximaManut), 'd MMM yyyy', { locale: pt })}
+                            </span>
+                          ) : (
+                            <span className="badge badge-sem-data-equip">Sem manut. agendada</span>
+                          )}
+                          <span className={`badge badge-docs${docsCount === docsTotal ? ' badge-docs--ok' : ''}`} title="Documentação obrigatória">
+                            {docsCount}/{docsTotal} docs
                           </span>
-                        )}
-                        {m.ultimaManutencaoData && (
-                          <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.85em' }}>
-                            · Última manut.: {format(new Date(m.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}
-                          </span>
-                        )}
+                        </div>
                       </div>
                       <div className="actions">
+                        <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
+                          <Play size={12} /> Executar
+                        </button>
                         <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
@@ -322,11 +350,12 @@ export default function Equipamentos() {
                           </>
                         )}
                         {canDelete && (
-                          <button className="icon-btn danger" onClick={() => { removeMaquina(m.id); showToast('Equipamento eliminado.', 'info') }} title="Eliminar"><Trash2 size={16} /></button>
+                          <button className="icon-btn danger" onClick={() => setModalConfirmDelete(m)} title="Eliminar"><Trash2 size={16} /></button>
                         )}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ))
             )}
@@ -369,6 +398,20 @@ export default function Equipamentos() {
         onClose={() => setModalPecas(null)}
         maquina={modalPecas}
       />
+
+      {modalConfirmDelete && (
+        <div className="modal-overlay" onClick={() => setModalConfirmDelete(null)}>
+          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
+            <h2>Confirmar eliminação</h2>
+            <p>Tem a certeza que pretende eliminar <strong>{modalConfirmDelete.marca} {modalConfirmDelete.modelo}</strong> (S/N: {modalConfirmDelete.numeroSerie})?</p>
+            <p className="text-danger">Todas as manutenções, reparações e relatórios deste equipamento serão eliminados.</p>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setModalConfirmDelete(null)}>Cancelar</button>
+              <button type="button" className="danger" onClick={() => { removeMaquina(modalConfirmDelete.id); setModalConfirmDelete(null); showToast('Equipamento eliminado.', 'success') }}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

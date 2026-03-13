@@ -491,6 +491,18 @@ INSERT IGNORE INTO `checklist_items` (`id`, `subcategoria_id`, `ordem`, `texto`)
 ('ch914','sub9', 14, 'Teste de desmontagem/montagem com pneu e jante'),
 ('ch915','sub9', 15, 'Limpeza final do equipamento e teste em funcionamento');
 
+-- ── Técnicos — ficha de dados com assinatura digitalizada ─────
+CREATE TABLE IF NOT EXISTS `tecnicos` (
+  `id`                  VARCHAR(32)  NOT NULL,
+  `nome`                VARCHAR(100) NOT NULL,
+  `telefone`            VARCHAR(30)  DEFAULT NULL,
+  `assinatura_digital`  LONGTEXT     DEFAULT NULL,
+  `ativo`               TINYINT(1)   NOT NULL DEFAULT 1,
+  `criado_em`           DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_nome` (`nome`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ── Notas de configuração ─────────────────────────────────────

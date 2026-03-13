@@ -8,8 +8,9 @@ import { usePermissions } from '../hooks/usePermissions'
 import {
   LayoutDashboard, Users, FolderTree, Cpu, Wrench,
   Calendar, LogOut, X, CalendarPlus, ScrollText,
-  Settings, RefreshCw, Search, QrCode, BarChart2, Hammer, Palette, MoreHorizontal,
+  Settings, RefreshCw, Search, QrCode, BarChart2, Hammer, Palette, MoreHorizontal, Sun, Moon,
 } from 'lucide-react'
+import { STORAGE } from '../config/storageKeys'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
 import PesquisaGlobal from './PesquisaGlobal'
@@ -23,7 +24,17 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen]   = useState(false)
   const [pesquisaOpen, setPesquisaOpen] = useState(false)
   const [qrReaderOpen, setQrReaderOpen] = useState(false)
+  const [modoCampo, setModoCampo] = useState(() => {
+    try { return localStorage.getItem(STORAGE.MODO_CAMPO) === 'true' } catch { return false }
+  })
   const location = useLocation()
+
+  const toggleModoCampo = () => {
+    const next = !modoCampo
+    setModoCampo(next)
+    try { localStorage.setItem(STORAGE.MODO_CAMPO, String(next)) } catch { /* noop */ }
+    document.body.classList.toggle('modo-campo', next)
+  }
 
   const closeSidebar = () => setSidebarOpen(false)
 
@@ -139,9 +150,19 @@ export default function Layout({ children }) {
           )}
         </nav>
         <div className="sidebar-footer">
-          <span className="user-name" title={user?.role === 'admin' ? 'Administrador' : 'Técnico Navel'}>
-            {user?.nome ?? user?.username}
-          </span>
+          <div className="sidebar-footer-row">
+            <span className="user-name" title={user?.role === 'admin' ? 'Administrador' : 'Técnico Navel'}>
+              {user?.nome ?? user?.username}
+            </span>
+            <button
+              type="button"
+              className={`btn-modo-campo${modoCampo ? ' modo-campo-active' : ''}`}
+              onClick={toggleModoCampo}
+              title={modoCampo ? 'Desativar modo campo' : 'Ativar modo campo (alto contraste)'}
+            >
+              {modoCampo ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+          </div>
           <button type="button" className="btn-logout" onClick={logout} title="Terminar sessão">
             <LogOut size={18} />
             <span>Sair</span>
@@ -182,9 +203,9 @@ export default function Layout({ children }) {
           <Wrench size={22} />
           <span>Manut.</span>
         </NavLink>
-        <NavLink to="/reparacoes" className={`bnav-item ${isActive('/reparacoes') ? 'bnav-active' : ''}`} onClick={closeSidebar}>
-          <Hammer size={22} />
-          <span>Repar.</span>
+        <NavLink to="/equipamentos" className={`bnav-item ${isActive('/equipamentos') ? 'bnav-active' : ''}`} onClick={closeSidebar}>
+          <Cpu size={22} />
+          <span>Equip.</span>
         </NavLink>
         <button type="button" className="bnav-item" onClick={() => { closeSidebar(); setQrReaderOpen(true) }}>
           <QrCode size={22} />

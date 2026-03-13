@@ -1,0 +1,57 @@
+---
+description: Contexto para criação de materiais de estudo para a Leonor Cerqueira (filha do Pedro)
+alwaysApply: false
+---
+
+# Materiais de Estudo — Leonor Cerqueira
+
+## Contexto
+
+- **Aluna:** Leonor Cerqueira, 12 anos
+- **Ano escolar:** 6.º Ano (2025/2026)
+- **Escola:** Colégio do Castanheiro, Ponta Delgada, Açores
+- **Pai:** Pedro Cerqueira (utilizador deste workspace)
+
+## Pasta de output
+
+Todos os materiais devem ser gravados em:
+```
+c:\Users\Pedro\OneDrive - 512012962 - JOSÉ G. CERQUEIRA (NAVEL-AÇORES) LDA\Ambiente de Trabalho\Estudo_Leonor\
+```
+
+## Formato dos materiais (2 ficheiros por disciplina)
+
+### 1. Manual de Estudo (`Manual_Estudo_{Disciplina}.html`)
+- Ficheiro HTML formatado para impressão A4 (max-width: 210mm, @media print)
+- **Resumos teóricos** antes de cada secção (com tabelas, esquemas, conceitos-chave)
+- **Exercícios variados** com espaço para resolução (escolha múltipla, V/F, completar, resposta aberta, correspondência, legendar)
+- **Níveis de dificuldade** assinalados (Fácil / Médio / Desafio)
+- Textos de leitura incluídos no manual quando aplicável
+- Nome da aluna, disciplina, data do teste no cabeçalho
+- Cores distintas por disciplina/secção (CSS variables)
+- Google Fonts: Inter (corpo) + Caveat (motivação) + Merriweather (textos literários)
+
+### 2. Caderno de Soluções (`Solucoes_{Disciplina}.html`)
+- Ficheiro HTML separado — a Leonor resolve primeiro, confere depois
+- Respostas passo a passo com cálculos intermédios (Matemática)
+- Respostas-modelo detalhadas (Ciências, Português)
+- Correção das afirmações falsas (V/F)
+- Notas explicativas nos exercícios mais complexos
+- Tabela-resumo de fórmulas/conceitos no final
+
+## Fluxo de trabalho
+
+1. O Pedro envia a **matriz de estudo** (PDF do professor)
+2. Ler e analisar a matriz — extrair tópicos, objetivos e páginas de referência
+3. Pesquisar na web conteúdo complementar alinhado com o currículo português
+4. Criar o Manual de Estudo com exercícios progressivos e resumos teóricos
+5. Criar o Caderno de Soluções com respostas completas
+6. Gravar ambos na pasta `Estudo_Leonor`
+
+## Estilo pedagógico
+
+- Linguagem clara e acessível para 12 anos
+- Contextos do dia a dia nos problemas (Açores, escola, desporto, animais...)
+- Mensagens motivacionais no início e fim
+- Dicas (💡) nos exercícios mais difíceis
+- Referências ao manual e caderno de atividades quando indicados na matriz

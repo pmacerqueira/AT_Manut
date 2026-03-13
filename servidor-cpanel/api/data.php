@@ -17,6 +17,7 @@
  *   maquinas       — CRUD
  *   manutencoes    — CRUD
  *   relatorios     — CRUD + geração de número
+ *   tecnicos       — CRUD (admin only para escrita)
  *
  * Acções: list | get | create | update | delete | bulk_create | bulk_restore
  */
@@ -233,8 +234,8 @@ $RESOURCE_MAP = [
     ],
     'relatorios' => [
         'table'      => 'relatorios',
-        'json_cols'  => ['checklist_respostas','fotos','pecas_usadas'],
-        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','criado_em'],
+        'json_cols'  => ['checklist_respostas','checklist_snapshot','fotos','pecas_usadas'],
+        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
     'reparacoes' => [
@@ -245,9 +246,15 @@ $RESOURCE_MAP = [
     ],
     'relatoriosReparacao' => [
         'table'      => 'relatorios_reparacao',
-        'json_cols'  => ['checklist_respostas','pecas_usadas','fotos'],
-        'allowed'    => ['id','reparacao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','numero_aviso','descricao_avaria','trabalho_realizado','horas_mao_obra','checklist_respostas','pecas_usadas','fotos','notas','ultimo_envio','criado_em'],
+        'json_cols'  => ['checklist_respostas','checklist_snapshot','pecas_usadas','fotos'],
+        'allowed'    => ['id','reparacao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','numero_aviso','descricao_avaria','trabalho_realizado','horas_mao_obra','checklist_respostas','checklist_snapshot','pecas_usadas','fotos','notas','ultimo_envio','criado_em'],
         'order'      => 'data_criacao DESC',
+    ],
+    'tecnicos' => [
+        'table'      => 'tecnicos',
+        'json_cols'  => [],
+        'allowed'    => ['id','nome','telefone','assinatura_digital','ativo','criado_em'],
+        'order'      => 'nome ASC',
     ],
 ];
 
@@ -602,7 +609,33 @@ function generate_text_pk(string $prefix = 'mk'): string {
     return $prefix . date('YmdHis') . substr(bin2hex(random_bytes(3)), 0, 6);
 }
 
-// ══ 8. ROUTER ════════════════════════════════════════════════════════════════
+// ══ 8. ROLE-BASED ACCESS CONTROL ═════════════════════════════════════════════
+// Técnicos (role != admin) têm restrições de escrita em certos recursos.
+$_user_role = $authPayload['role'] ?? '';
+
+if ($_user_role !== 'admin') {
+    $blocked = false;
+    // Clientes: admin only para qualquer escrita
+    if ($resource === 'clientes' && in_array($action, ['create','update','delete','bulk_create','bulk_restore'], true)) {
+        $blocked = true;
+    }
+    // Maquinas: admin only para criar/eliminar (update permitido — necessário ao executar manutenção)
+    if ($resource === 'maquinas' && in_array($action, ['create','delete','bulk_create','bulk_restore'], true)) {
+        $blocked = true;
+    }
+    // Categorias, subcategorias, checklistItems, marcas, tecnicos: admin only para qualquer escrita
+    if (in_array($resource, ['categorias','subcategorias','checklistItems','marcas','tecnicos'], true)
+        && in_array($action, ['create','update','delete','bulk_create','bulk_restore'], true)) {
+        $blocked = true;
+    }
+    if ($blocked) {
+        atm_log_api('warn', 'API', 'rbac', "Técnico tentou $action em $resource — bloqueado",
+            ['user' => $authPayload['username'] ?? '-', 'resource' => $resource, 'action' => $action]);
+        json_error('Acesso negado. Esta operação requer permissão de administrador.', 403);
+    }
+}
+
+// ══ 9. ROUTER ════════════════════════════════════════════════════════════════
 // Qualquer PDOException (create/update/delete/list/get) é logada e devolvida ao cliente
 
 try {
@@ -810,9 +843,36 @@ switch ($action) {
         json_ok($row ? row_to_js($row, $json_cols) : null);
     }
 
-    // ── DELETE ───────────────────────────────────────────────────────────────
+    // ── DELETE (com cascade para registos dependentes) ─────────────────────
     case 'delete': {
         if (!$id) json_error('ID em falta.');
+
+        // Cascade: eliminar registos filhos antes do pai
+        if ($table === 'clientes') {
+            $maqStmt = $pdo->prepare("SELECT id FROM maquinas WHERE cliente_nif = ? OR cliente_id = ?");
+            $maqStmt->execute([$id, $id]);
+            $maqIds = $maqStmt->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($maqIds)) {
+                $ph = implode(',', array_fill(0, count($maqIds), '?'));
+                $pdo->prepare("DELETE FROM relatorios WHERE manutencao_id IN (SELECT id FROM manutencoes WHERE maquina_id IN ($ph))")->execute($maqIds);
+                $pdo->prepare("DELETE FROM relatorios_reparacao WHERE reparacao_id IN (SELECT id FROM reparacoes WHERE maquina_id IN ($ph))")->execute($maqIds);
+                $pdo->prepare("DELETE FROM manutencoes WHERE maquina_id IN ($ph)")->execute($maqIds);
+                $pdo->prepare("DELETE FROM reparacoes WHERE maquina_id IN ($ph)")->execute($maqIds);
+                $pdo->prepare("DELETE FROM maquinas WHERE id IN ($ph)")->execute($maqIds);
+            }
+        } elseif ($table === 'maquinas') {
+            $pdo->prepare("DELETE FROM relatorios WHERE manutencao_id IN (SELECT id FROM manutencoes WHERE maquina_id = ?)")->execute([$id]);
+            $pdo->prepare("DELETE FROM relatorios_reparacao WHERE reparacao_id IN (SELECT id FROM reparacoes WHERE maquina_id = ?)")->execute([$id]);
+            $pdo->prepare("DELETE FROM manutencoes WHERE maquina_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM reparacoes WHERE maquina_id = ?")->execute([$id]);
+        } elseif ($table === 'manutencoes') {
+            $pdo->prepare("DELETE FROM relatorios WHERE manutencao_id = ?")->execute([$id]);
+        } elseif ($table === 'reparacoes') {
+            $pdo->prepare("DELETE FROM relatorios_reparacao WHERE reparacao_id = ?")->execute([$id]);
+        } elseif ($table === 'subcategorias') {
+            $pdo->prepare("DELETE FROM checklist_items WHERE subcategoria_id = ?")->execute([$id]);
+        }
+
         $stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
         $stmt->execute([$id]);
         json_ok();

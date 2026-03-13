@@ -1,9 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useData } from '../context/DataContext'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
+import { ROLES } from '../config/users'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from './Toast'
+import { getHojeAzores } from '../utils/datasAzores'
+import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 
 const isElevadores = (getCategoria, categoriaId) => {
   const cat = getCategoria(categoriaId)
@@ -74,8 +78,37 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     addMarca,
     addMaquina,
     updateMaquina,
+    addManutencao,
+    manutencoes,
+    updateManutencao,
   } = useData()
   const { showToast } = useToast()
+  const { user } = useAuth()
+  const isAdmin = user?.role === ROLES.ADMIN
+  const [avisoData, setAvisoData] = useState('')
+  const feriadosSet = useMemo(() => {
+    const ano = new Date().getFullYear()
+    const set = new Set()
+    for (let a = ano - 1; a <= ano + 3; a++) getFeriadosAno(a).forEach(f => set.add(f))
+    return set
+  }, [])
+
+  const validarDataManut = useCallback((dateStr) => {
+    if (!dateStr) { setAvisoData(''); return true }
+    const d = new Date(dateStr + 'T12:00:00')
+    if (isFimDeSemana(d)) {
+      const dia = d.getDay() === 0 ? 'Domingo' : 'Sábado'
+      setAvisoData(`${dia} — não é dia útil. Escolha um dia de semana.`)
+      return false
+    }
+    if (isFeriado(d, feriadosSet)) {
+      setAvisoData('Esta data é feriado. Escolha outro dia.')
+      return false
+    }
+    setAvisoData('')
+    return true
+  }, [feriadosSet])
+
   // Ref para detectar apenas a transição fechado→aberto e não re-inicializar
   // o formulário quando dependências do DataContext mudam em background (refresh silencioso)
   const wasOpenRef = useRef(false)
@@ -135,9 +168,6 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
       const subs = getSubcategoriasByCategoria(catId)
       const subId = subs[0]?.id || ''
       const periodicidade = isElevadores(getCategoria, catId) ? 'anual' : ''
-      const dias = periodicidade ? (INTERVALOS[periodicidade]?.dias ?? 90) : (INTERVALOS[firstCat?.intervaloTipo]?.dias ?? 90)
-      const proxima = new Date()
-      proxima.setDate(proxima.getDate() + dias)
       setForm({
         clienteNif: clienteNifLocked || clientes[0]?.nif || '',
         categoriaId: catId,
@@ -151,7 +181,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         numeroSerie: '',
         anoFabrico: new Date().getFullYear(),
         numeroDocumentoVenda: '',
-        proximaManut: format(proxima, 'yyyy-MM-dd'),
+        proximaManut: getHojeAzores(),
         refKitManut3000h: '',
         refKitManut6000h: '',
         refCorreia: '',
@@ -197,6 +227,10 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!isAdmin && !validarDataManut(form.proximaManut)) {
+      showToast('A data escolhida não é dia útil. Selecione outro dia.', 'warning')
+      return
+    }
     const { categoriaId: _cid, id, ...payloadBase } = form
     let payload = { ...payloadBase }
 
@@ -229,10 +263,38 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
 
       if (mode === 'add') {
         const novoId = await addMaquina(payload)
+        if (payload.proximaManut) {
+          addManutencao({
+            maquinaId: novoId,
+            data: payload.proximaManut,
+            tipo: 'periodica',
+            status: 'pendente',
+            observacoes: '',
+            tecnico: '',
+          })
+        }
         showToast('Equipamento adicionado com sucesso.', 'success')
         onSave?.({ id: novoId, ...payload }, 'add')
       } else {
         await updateMaquina(id, payload)
+        // A5: Se proximaManut mudou, sincronizar manutenção pendente
+        if (payload.proximaManut && payload.proximaManut !== maquina?.proximaManut) {
+          const pendente = manutencoes.find(m =>
+            m.maquinaId === id && (m.status === 'pendente' || m.status === 'agendada')
+          )
+          if (pendente) {
+            updateManutencao(pendente.id, { data: payload.proximaManut })
+          } else {
+            addManutencao({
+              maquinaId: id,
+              data: payload.proximaManut,
+              tipo: 'periodica',
+              status: 'pendente',
+              observacoes: '',
+              tecnico: '',
+            })
+          }
+        }
         showToast('Equipamento actualizado com sucesso.', 'success')
         onSave?.({ id, ...payload }, 'edit')
       }
@@ -450,7 +512,13 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           </div>
           <label>
             Próxima data de manutenção
-            <input type="date" required value={form.proximaManut} onChange={e => setForm(f => ({ ...f, proximaManut: e.target.value }))} />
+            <input type="date" required value={form.proximaManut}
+              onChange={e => {
+                const v = e.target.value
+                setForm(f => ({ ...f, proximaManut: v }))
+                validarDataManut(v)
+              }} />
+            {avisoData && <span className="form-aviso-data">{avisoData}</span>}
           </label>
           {mode === 'edit' && (() => {
             const maqAtual = maquinas.find(x => x.id === form.id)
@@ -460,7 +528,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
               <div className="form-section horas-acumuladas-section">
                 <h3>Contadores (atualizados à última manutenção)</h3>
                 <p className="horas-info">
-                  {maqAtual.ultimaManutencaoData && <span>Última manutenção: {format(new Date(maqAtual.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}</span>}
+                  {maqAtual.ultimaManutencaoData && <span>Última manutenção: {format(new Date(maqAtual.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}</span>}
                   {maqAtual.ultimaManutencaoData && (maqAtual.horasTotaisAcumuladas != null || maqAtual.horasServicoAcumuladas != null) && ' · '}
                   {maqAtual.horasTotaisAcumuladas != null && <span>Horas totais: {maqAtual.horasTotaisAcumuladas}h</span>}
                   {maqAtual.horasTotaisAcumuladas != null && maqAtual.horasServicoAcumuladas != null && ' · '}

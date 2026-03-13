@@ -8,16 +8,18 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload, Play, Calendar, QrCode, FileDown } from 'lucide-react'
 import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
-import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { imprimirOuGuardarPdf, abrirPdfRelatorio } from '../utils/gerarPdfRelatorio'
+import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { safeHttpUrl } from '../utils/sanitize'
-import { format } from 'date-fns'
+import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
+import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
@@ -30,6 +32,8 @@ export default function Clientes() {
     maquinas,
     manutencoes,
     relatorios,
+    reparacoes,
+    tecnicos,
     addCliente,
     updateCliente,
     removeCliente,
@@ -46,7 +50,9 @@ export default function Clientes() {
   const navigate = useNavigate()
   const [modal, setModal] = useState(null)
   const [fichaCliente, setFichaCliente] = useState(null)
-  const [fichaView, setFichaView] = useState('categorias')
+  const [fichaView, setFichaViewRaw] = useState('categorias')
+  const [prevFichaView, setPrevFichaView] = useState(null)
+  const setFichaView = (v) => { setPrevFichaView(fichaView); setFichaViewRaw(v) }
   const [fichaCategoria, setFichaCategoria] = useState(null)
   const [fichaSubcategoria, setFichaSubcategoria] = useState(null)
   const [fichaMaquina, setFichaMaquina] = useState(null)
@@ -64,6 +70,7 @@ export default function Clientes() {
 
   useEffect(() => { setPage(1) }, [searchClienteDebounced])
 
+  const [modalConfirmDeleteCliente, setModalConfirmDeleteCliente] = useState(null)
   // ── Modal eliminar todos ────────────────────────────────────────────────────
   const [modalEliminarTodos, setModalEliminarTodos] = useState(false)
 
@@ -259,6 +266,19 @@ export default function Clientes() {
   }
 
   const maquinasCliente = fichaCliente ? getMaquinasDoCliente(fichaCliente.nif) : []
+
+  const fichaKpis = useMemo(() => {
+    if (!maquinasCliente.length) return null
+    const hoje = startOfDay(new Date(getHojeAzores()))
+    let emAtraso = 0, conformes = 0, semData = 0
+    for (const m of maquinasCliente) {
+      if (!m.proximaManut) { semData++; continue }
+      if (isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)) emAtraso++
+      else conformes++
+    }
+    return { total: maquinasCliente.length, emAtraso, conformes, semData }
+  }, [maquinasCliente])
+
   const categoriasComMaquinas = maquinasCliente.reduce((acc, m) => {
     const sub = getSubcategoria(m.subcategoriaId)
     const cat = sub ? getCategoria(sub.categoriaId) : null
@@ -285,7 +305,19 @@ export default function Clientes() {
     : []
 
   const getManutencoesDaMaquina = (maquinaId) =>
-    manutencoes.filter(m => m.maquinaId === maquinaId).sort((a, b) => new Date(b.data) - new Date(a.data))
+    manutencoes.filter(m => m.maquinaId === maquinaId).sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
+
+  const renderProximaManut = (maq) => {
+    if (!maq.proximaManut) return <span className="badge badge-sem-data">Sem data</span>
+    const data = parseDateLocal(maq.proximaManut)
+    const hoje = startOfDay(new Date(getHojeAzores() + 'T12:00:00'))
+    const vencida = isBefore(startOfDay(data), hoje)
+    return (
+      <span className={`badge ${vencida ? 'badge-atraso' : 'badge-conforme'}`}>
+        {format(data, 'd MMM yyyy', { locale: pt })}
+      </span>
+    )
+  }
 
   const clientesFiltrados = useMemo(() => {
     const q = searchClienteDebounced.trim().toLowerCase()
@@ -442,7 +474,7 @@ export default function Clientes() {
                     <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
                   )}
                   {canDelete && (
-                    <button className="icon-btn danger" onClick={() => { removeCliente(c.nif); showToast('Cliente eliminado.', 'info') }} disabled={getMaquinasCount(c.nif) > 0} title={getMaquinasCount(c.nif) > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /></button>
+                    <button className="icon-btn danger" onClick={() => setModalConfirmDeleteCliente(c)} disabled={getMaquinasCount(c.nif) > 0} title={getMaquinasCount(c.nif) > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /></button>
                   )}
                 </td>
               </tr>
@@ -486,14 +518,43 @@ export default function Clientes() {
               <p><strong>NIF:</strong> {fichaCliente.nif} · <strong>Morada:</strong> {fichaCliente.morada || '—'}</p>
               <p><strong>Localidade:</strong> {fichaCliente.codigoPostal} {fichaCliente.localidade} · <strong>Telefone:</strong> {fichaCliente.telefone || '—'} · <strong>Email:</strong> {fichaCliente.email || '—'}</p>
             </div>
+
+            {fichaKpis && (
+              <div className="ficha-kpi-bar">
+                <div className="ficha-kpi-item">
+                  <span className="ficha-kpi-num">{fichaKpis.total}</span>
+                  <span className="ficha-kpi-label">Equipamentos</span>
+                </div>
+                <div className="ficha-kpi-item ficha-kpi-danger">
+                  <span className="ficha-kpi-num">{fichaKpis.emAtraso}</span>
+                  <span className="ficha-kpi-label">Em atraso</span>
+                </div>
+                <div className="ficha-kpi-item ficha-kpi-ok">
+                  <span className="ficha-kpi-num">{fichaKpis.conformes}</span>
+                  <span className="ficha-kpi-label">Conformes</span>
+                </div>
+                <div className="ficha-kpi-item ficha-kpi-muted">
+                  <span className="ficha-kpi-num">{fichaKpis.semData}</span>
+                  <span className="ficha-kpi-label">Sem data</span>
+                </div>
+              </div>
+            )}
+
             {maquinasCliente.length > 0 && (
-              <button
-                className="btn secondary ficha-btn-frota"
-                onClick={() => handleRelatorioFrota(fichaCliente)}
-                title="Relatório executivo de frota (PDF)"
-              >
-                <FileBarChart size={15} /> Relatório de frota
-              </button>
+              <div className="ficha-top-actions">
+                <button
+                  className="btn secondary ficha-btn-frota"
+                  onClick={() => handleRelatorioFrota(fichaCliente)}
+                  title="Relatório executivo de frota (PDF)"
+                >
+                  <FileBarChart size={15} /> Relatório de frota
+                </button>
+                {fichaView !== 'flat' && fichaView !== 'maquina-detalhe' && (
+                  <button className="btn secondary ficha-btn-flat" onClick={() => setFichaView('flat')}>
+                    Ver todos os equipamentos
+                  </button>
+                )}
+              </div>
             )}
 
             {maquinasCliente.length === 0 ? (
@@ -559,11 +620,44 @@ export default function Clientes() {
                     <div className="maquinas-ficha-lista">
                       {maquinasDaSubcategoria.map(m => (
                         <button key={m.id} type="button" className="maquina-ficha-card" onClick={() => { setFichaMaquina(m); setFichaView('maquina-detalhe'); }}>
-                          <strong>{m.marca} {m.modelo}</strong>
-                          <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
-                          <ChevronRight size={18} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+                          <div className="maquina-ficha-card-info">
+                            <strong>{m.marca} {m.modelo}</strong>
+                            <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
+                          </div>
+                          <div className="maquina-ficha-card-badge">
+                            {renderProximaManut(m)}
+                          </div>
+                          <ChevronRight size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {fichaView === 'flat' && (
+                  <div className="ficha-flat-view">
+                    <div className="equipamentos-nav">
+                      <button type="button" className="breadcrumb-btn" onClick={() => setFichaView('categorias')}>
+                        <ArrowLeft size={16} /> Categorias
+                      </button>
+                      <span className="breadcrumb">/ Todos os equipamentos</span>
+                    </div>
+                    <div className="maquinas-ficha-lista">
+                      {maquinasCliente
+                        .map(m => ({ ...m, _sub: getSubcategoria(m.subcategoriaId) }))
+                        .sort((a, b) => (a._sub?.nome || '').localeCompare(b._sub?.nome || '') || `${a.marca} ${a.modelo}`.localeCompare(`${b.marca} ${b.modelo}`))
+                        .map(m => (
+                          <button key={m.id} type="button" className="maquina-ficha-card" onClick={() => { setFichaMaquina(m); setFichaView('maquina-detalhe'); }}>
+                            <div className="maquina-ficha-card-info">
+                              <strong>{m._sub?.nome ? `${m._sub.nome} — ` : ''}{m.marca} {m.modelo}</strong>
+                              <span className="text-muted"> — Nº Série: {m.numeroSerie}</span>
+                            </div>
+                            <div className="maquina-ficha-card-badge">
+                              {renderProximaManut(m)}
+                            </div>
+                            <ChevronRight size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
+                          </button>
+                        ))}
                     </div>
                   </div>
                 )}
@@ -576,7 +670,7 @@ export default function Clientes() {
                     return (
                   <div className="ficha-maquina-detalhe">
                     <div className="equipamentos-nav">
-                      <button type="button" className="breadcrumb-btn" onClick={() => { setFichaMaquina(null); setFichaView('maquinas'); }}><ArrowLeft size={16} /> Frota</button>
+                      <button type="button" className="breadcrumb-btn" onClick={() => { setFichaMaquina(null); setFichaView(prevFichaView === 'flat' ? 'flat' : 'maquinas'); }}><ArrowLeft size={16} /> {prevFichaView === 'flat' ? 'Todos' : 'Frota'}</button>
                       <span className="breadcrumb">/ {fichaMaquina.marca} {fichaMaquina.modelo}</span>
                     </div>
                     <div className="maquina-detalhe-header">
@@ -589,6 +683,25 @@ export default function Clientes() {
                           </>
                         )}
                       </div>
+                    </div>
+                    <div className="maq-quick-actions">
+                      <button type="button" className="btn-quick" onClick={() => navigate(`/agendamento?maquinaId=${fichaMaquina.id}`)}><Calendar size={14} /> Agendar</button>
+                      <button type="button" className="btn-quick" onClick={() => navigate(`/equipamentos?qr=${fichaMaquina.id}`)}><QrCode size={14} /> QR</button>
+                      <button type="button" className="btn-quick" onClick={() => {
+                        const sub = getSubcategoria(fichaMaquina.subcategoriaId)
+                        const cat = sub ? getCategoria(sub.categoriaId) : null
+                        const html = gerarHtmlHistoricoMaquina({
+                          maquina: fichaMaquina,
+                          cliente: fichaCliente,
+                          subcategoria: sub,
+                          categoria: cat,
+                          manutencoes: manutencoes.filter(m => m.maquinaId === fichaMaquina.id),
+                          relatorios,
+                          reparacoes: reparacoes.filter(r => r.maquinaId === fichaMaquina.id),
+                          tecnicos,
+                        })
+                        imprimirOuGuardarPdf(html)
+                      }}><FileDown size={14} /> Histórico PDF</button>
                     </div>
                     <h4>Documentação obrigatória</h4>
                     <div className="doc-table-wrapper">
@@ -639,7 +752,7 @@ export default function Clientes() {
                                 onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
                               >
                                 <div>
-                                  <strong>{format(new Date(manut.data), 'd MMM yyyy', { locale: pt })}</strong>
+                                  <strong>{format(parseDateLocal(manut.data), 'd MMM yyyy', { locale: pt })}</strong>
                                   <span className="text-muted"> — {manut.tecnico || (rel?.tecnico) || 'Não atribuído'}</span>
                                 </div>
                                 <span className={`badge badge-${manut.status}`}>{statusLabel[manut.status]}</span>
@@ -870,6 +983,19 @@ export default function Clientes() {
                 <button type="submit">{modal === 'add' ? 'Adicionar' : 'Guardar'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {modalConfirmDeleteCliente && (
+        <div className="modal-overlay" onClick={() => setModalConfirmDeleteCliente(null)}>
+          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
+            <h2>Confirmar eliminação</h2>
+            <p>Tem a certeza que pretende eliminar o cliente <strong>{modalConfirmDeleteCliente.nome}</strong> (NIF: {modalConfirmDeleteCliente.nif})?</p>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setModalConfirmDeleteCliente(null)}>Cancelar</button>
+              <button type="button" className="danger" onClick={() => { removeCliente(modalConfirmDeleteCliente.nif); setModalConfirmDeleteCliente(null); showToast('Cliente eliminado.', 'success') }}>Eliminar</button>
+            </div>
           </div>
         </div>
       )}

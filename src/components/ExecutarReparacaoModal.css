@@ -1,7 +1,7 @@
 /* ── Modal Executar Reparação ───────────────────────────────────────────── */
 
 .modal-exec-rep {
-  max-width: 700px;
+  max-width: var(--modal-width-lg);
   width: 97vw;
   max-height: 92vh;
   display: flex;
@@ -258,6 +258,15 @@
   border-color: var(--primary, #3b82f6);
   color: var(--primary, #3b82f6);
 }
+.foto-add-gallery {
+  border-style: solid;
+  border-color: var(--color-border, #cbd5e1);
+  background: var(--color-bg-elevated, #f0f4f8);
+}
+.foto-add-loading {
+  border-style: dotted;
+  cursor: default;
+}
 
 /* ── Assinatura ───────────────────────────────────────────────────────────── */
 
@@ -318,7 +327,7 @@
 }
 .concluido-email {
   width: 100%;
-  max-width: 380px;
+  max-width: min(380px, 95vw);
   text-align: left;
   padding: 1rem;
   display: flex;
@@ -348,7 +357,7 @@
 /* Emails auto-enviados ao concluir */
 .concluido-auto-email {
   width: 100%;
-  max-width: 380px;
+  max-width: min(380px, 95vw);
   text-align: left;
   padding: 0.75rem 1rem;
   background: #f0fdf4;

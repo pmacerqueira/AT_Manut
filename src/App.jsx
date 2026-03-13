@@ -1,6 +1,6 @@
 import { lazy, Suspense, Component, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import ProtectedRoute from './components/ProtectedRoute'
+import ProtectedRoute, { AdminRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import { logEntry } from './utils/logger'
@@ -87,16 +87,16 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/clientes" element={<Clientes />} />
-                      <Route path="/categorias" element={<Categorias />} />
+                      <Route path="/categorias" element={<AdminRoute><Categorias /></AdminRoute>} />
                       <Route path="/equipamentos" element={<Equipamentos />} />
                       <Route path="/manutencoes" element={<Manutencoes />} />
                       <Route path="/reparacoes" element={<Reparacoes />} />
                       <Route path="/calendario" element={<Calendario />} />
                       <Route path="/agendamento" element={<Agendamento />} />
-                      <Route path="/logs" element={<Logs />} />
-                      <Route path="/definicoes" element={<Definicoes />} />
-                      <Route path="/marcas" element={<Marcas />} />
-                      <Route path="/metricas" element={<Metricas />} />
+                      <Route path="/logs" element={<AdminRoute><Logs /></AdminRoute>} />
+                      <Route path="/definicoes" element={<AdminRoute><Definicoes /></AdminRoute>} />
+                      <Route path="/marcas" element={<AdminRoute><Marcas /></AdminRoute>} />
+                      <Route path="/metricas" element={<AdminRoute><Metricas /></AdminRoute>} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </Suspense>

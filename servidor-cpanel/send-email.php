@@ -137,7 +137,7 @@ register_shutdown_function(function () use ($atm_log_loaded) {
 // ══ 4. CONFIG ════════════════════════════════════════════════════════════════
 define('AUTH_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
 define('FROM_EMAIL', 'no-reply@navel.pt');
-define('REPLY_TO',   'geral@navel.pt');
+define('REPLY_TO',   'comercial@navel.pt');
 
 // ── Ler dados ─────────────────────────────────────────────────────────────────
 // NÃO dependemos de $_SERVER['CONTENT_TYPE'] — em LiteSpeed/LSAPI esse header
@@ -177,6 +177,8 @@ $data_assinatura = $g('data_assinatura');
 $assinatura_b64  = $g('assinatura_digital');
 $proxima_manut   = $g('proxima_manut');
 $app_version     = $g('app_version') ?: '1.8.0';
+$tecnico_tel     = $g('tecnico_telefone');
+$tecnico_sig_b64 = $g('tecnico_assinatura_b64');
 
 // Auth
 if ($token !== AUTH_TOKEN) {
@@ -194,7 +196,7 @@ if (!$to_email) {
 }
 
 // Sanitise user-supplied fields
-foreach (['to_name', 'equipamento', 'tecnico', 'assinado_por', 'notas'] as $v) {
+foreach (['to_name', 'equipamento', 'tecnico', 'assinado_por', 'notas', 'tecnico_tel'] as $v) {
     $$v = mb_substr(strip_tags(str_replace(["\r", "\n", "\0"], '', $$v)), 0, 500, 'UTF-8');
 }
 $to_email = str_replace(["\r", "\n", "\0"], '', $to_email);
@@ -347,11 +349,18 @@ if ($photos_json && $photos_json !== '[]') {
     }
 }
 
-// Assinatura digital: raw base64 (PNG do canvas). Decodificar para binário.
+// Assinatura digital do cliente: raw base64 (PNG do canvas) → binário
 $assinatura_bin = null;
 if ($assinatura_b64) {
     $dec = base64_decode($assinatura_b64, true);
     if ($dec !== false && strlen($dec) > 0) $assinatura_bin = $dec;
+}
+
+// Assinatura digital do técnico: raw base64 → binário
+$tecnico_sig_bin = null;
+if ($tecnico_sig_b64) {
+    $dec = base64_decode($tecnico_sig_b64, true);
+    if ($dec !== false && strlen($dec) > 0) $tecnico_sig_bin = $dec;
 }
 
 // -- Helper: converte UTF-8 (dados do formulario) para Latin-1 (FPDF) --------
@@ -580,34 +589,67 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->Ln(2);
     }
 
-    // Assinatura — incluir imagem da assinatura manuscrita (prova de presença, cumprimento legal)
-    if ($pdf->GetY() > 230) $pdf->AddPage();
+    // Bloco de assinaturas — técnico (esquerda) + cliente (direita)
+    if ($pdf->GetY() > 220) $pdf->AddPage();
+    $halfW = ($cW - 4) / 2;
+    $hasTecSig = ($tecnico_sig_bin !== null);
+    $hasCliSig = ($assinatura_bin !== null);
+    $boxH = ($hasTecSig || $hasCliSig) ? 42 : 24;
+    $y0 = $pdf->GetY();
+
+    // Caixa do técnico (esquerda)
+    $pdf->SetFillColor(243, 244, 246);
+    $pdf->SetDrawColor(209, 213, 219);
+    $pdf->Rect($M, $y0, $halfW, $boxH, 'FD');
+    $pdf->SetFont('Arial', 'B', 7);
+    $pdf->SetTextColor(30, 58, 95);
+    $pdf->SetXY($M + 2, $y0 + 2);
+    $pdf->Cell($halfW - 4, 4, 'TECNICO RESPONSAVEL', 0, 1);
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->SetTextColor(17, 24, 39);
+    $pdf->SetXY($M + 2, $y0 + 7);
+    $pdf->Cell($halfW - 4, 4, f($tecnico), 0, 1);
+    if ($tecnico_tel) {
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->SetTextColor(107, 114, 128);
+        $pdf->SetXY($M + 2, $y0 + 12);
+        $pdf->Cell($halfW - 4, 4, 'Tel: ' . f($tecnico_tel), 0, 1);
+    }
+    if ($hasTecSig) {
+        $fmt = detect_image_format($tecnico_sig_bin);
+        if ($fmt) {
+            $tmp = tempnam(sys_get_temp_dir(), 'nav') . $fmt['ext'];
+            if (file_put_contents($tmp, $tecnico_sig_bin)) {
+                $pdf->Image($tmp, $M + 2, $y0 + 17, $halfW - 8, 22, $fmt['type']);
+                @unlink($tmp);
+            }
+        }
+    }
+
+    // Caixa do cliente (direita)
+    $xR = $M + $halfW + 4;
     $pdf->SetFillColor(240, 253, 244);
     $pdf->SetDrawColor(187, 247, 208);
-    $y0 = $pdf->GetY();
-    $boxH = $assinatura_bin ? 42 : 28;
-    $pdf->Rect($M, $y0, $cW, $boxH, 'FD');
-    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->Rect($xR, $y0, $halfW, $boxH, 'FD');
+    $pdf->SetFont('Arial', 'B', 7);
     $pdf->SetTextColor(22, 163, 74);
-    $pdf->SetXY($M + 3, $y0 + 2);
-    $pdf->Cell(0, 0, 'Relatorio assinado digitalmente', 0, 1);
-    $pdf->SetFont('Arial', '', 8);
-    $pdf->SetTextColor(55, 65, 81);
-    $sig_name = $assinado_por ? f($assinado_por) : '';
-    $sig_txt  = $sig_name
-        ? 'Assinado por ' . $sig_name . ' em ' . f($data_real) . '.'
-        : 'Assinado em ' . f($data_real) . '.';
-    $pdf->SetXY($M + 3, $y0 + 7);
-    $pdf->Cell(0, 0, $sig_txt, 0, 1);
-
-    if ($assinatura_bin) {
+    $pdf->SetXY($xR + 2, $y0 + 2);
+    $pdf->Cell($halfW - 4, 4, 'ASSINATURA DO CLIENTE', 0, 1);
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->SetTextColor(17, 24, 39);
+    $pdf->SetXY($xR + 2, $y0 + 7);
+    $sig_name = $assinado_por ? f($assinado_por) : '-';
+    $pdf->Cell($halfW - 4, 4, $sig_name, 0, 1);
+    $pdf->SetFont('Arial', '', 7);
+    $pdf->SetTextColor(107, 114, 128);
+    $pdf->SetXY($xR + 2, $y0 + 12);
+    $pdf->Cell($halfW - 4, 4, 'Assinado em ' . f($data_real), 0, 1);
+    if ($hasCliSig) {
         $fmt = detect_image_format($assinatura_bin);
         if ($fmt) {
             $tmp = tempnam(sys_get_temp_dir(), 'nav') . $fmt['ext'];
             if (file_put_contents($tmp, $assinatura_bin)) {
-                $sigW = 65;
-                $sigH = 28;
-                $pdf->Image($tmp, $M + 3, $y0 + 12, $sigW, $sigH, $fmt['type']);
+                $pdf->Image($tmp, $xR + 2, $y0 + 17, $halfW - 8, 22, $fmt['type']);
                 @unlink($tmp);
             }
         }
@@ -741,6 +783,7 @@ if ($pdf_data) {
 }
 $hdr .= 'From: ' . FROM_EMAIL . "\r\n"
       . 'Reply-To: ' . REPLY_TO . "\r\n"
+      . 'Cc: ' . REPLY_TO . "\r\n"
       . 'X-Mailer: PHP/' . phpversion() . "\r\n";
 
 $sent = false;

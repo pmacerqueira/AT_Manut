@@ -32,6 +32,13 @@ async function sessionFromToken() {
   }
 }
 
+// ── DEV BYPASS — remover antes de build de produção ──
+const DEV_BYPASS = import.meta.env.DEV && window.location.hostname === 'localhost'
+const DEV_USERS = {
+  Admin:    { id: 'dev-admin', username: 'Admin', nome: 'Admin (Dev)', role: ROLES.ADMIN },
+  ATecnica: { id: 'dev-tec',  username: 'ATecnica', nome: 'Técnico (Dev)', role: ROLES.TECNICO },
+}
+
 export function AuthProvider({ children }) {
   const [session,   setSession]   = useState(null)
   const [hydrated,  setHydrated]  = useState(false)
@@ -39,6 +46,10 @@ export function AuthProvider({ children }) {
 
   // Restaurar sessão a partir do JWT existente (sem chamada de rede)
   useEffect(() => {
+    if (DEV_BYPASS) {
+      setHydrated(true)
+      return
+    }
     sessionFromToken().then(sess => {
       setSession(sess)
       setHydrated(true)
@@ -50,6 +61,18 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     setLoginError(null)
+    // ── DEV BYPASS ──
+    if (DEV_BYPASS) {
+      const devUser = DEV_USERS[username]
+      if (devUser) {
+        setSession({ user: devUser })
+        setHydrated(true)
+        window.dispatchEvent(new Event('atm:login'))
+        return true
+      }
+      setLoginError('Dev bypass: use "Admin" ou "ATecnica".')
+      return false
+    }
     try {
       const { apiLogin } = await getApi()
       const result = await apiLogin(username, password)

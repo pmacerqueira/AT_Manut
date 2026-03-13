@@ -22,7 +22,7 @@ import {
   isSameMonth,
   isSameDay,
 } from 'date-fns'
-import { getHojeAzores } from '../utils/datasAzores'
+import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import RelatorioView from '../components/RelatorioView'
 import AlertaProactivoModal from '../components/AlertaProactivoModal'
 import { getManutencoesPendentesAlertas, getDiasAviso, isAlertsModalDismissedToday, dismissAlertsModalToday } from '../config/alertasConfig'
@@ -68,11 +68,11 @@ export default function Dashboard() {
   [manutencoes])
 
   const emAtraso = useMemo(() =>
-    pendentes.filter(m => isBefore(new Date(m.data), new Date())),
+    pendentes.filter(m => isBefore(parseDateLocal(m.data), new Date())),
   [pendentes])
 
   const proximas = useMemo(() =>
-    pendentes.filter(m => !isBefore(new Date(m.data), new Date())),
+    pendentes.filter(m => !isBefore(parseDateLocal(m.data), new Date())),
   [pendentes])
 
   // Reparações pendentes (não concluídas)
@@ -80,11 +80,24 @@ export default function Dashboard() {
     (reparacoes ?? []).filter(r => r.status !== 'concluida'),
   [reparacoes])
 
-  // "O meu dia" — manutenções pendentes de hoje e em atraso, ordenadas por data
+  // "O meu dia" — manutenções pendentes de hoje, ordenadas por data
   const hoje = getHojeAzores()
-  const paraHoje = useMemo(() =>
+  const manutHoje = useMemo(() =>
     manutencoes
-      .filter(m => (m.status === 'pendente' || m.status === 'agendada') && m.data <= hoje)
+      .filter(m => (m.status === 'pendente' || m.status === 'agendada') && m.data === hoje)
+      .sort((a, b) => a.data.localeCompare(b.data)),
+  [manutencoes, hoje])
+
+  const reparacoesHoje = useMemo(() =>
+    (reparacoes ?? []).filter(r => r.status !== 'concluida' && r.data === hoje),
+  [reparacoes, hoje])
+
+  const totalHoje = manutHoje.length + reparacoesHoje.length
+
+  // Manutenções em atraso (data < hoje) — secção dedicada
+  const manutEmAtraso = useMemo(() =>
+    manutencoes
+      .filter(m => (m.status === 'pendente' || m.status === 'agendada') && m.data < hoje)
       .sort((a, b) => a.data.localeCompare(b.data)),
   [manutencoes, hoje])
 
@@ -189,7 +202,7 @@ export default function Dashboard() {
             <span className="stat-label">Executadas</span>
           </div>
         </Link>
-        <Link to="/reparacoes" className={`card stat-card stat-card-link stat-card-mobile stat-card-orange${reparacoesPendentes.length > 0 ? ' stat-card-pulse' : ''}`}>
+        <Link to="/reparacoes" className="card stat-card stat-card-link stat-card-mobile stat-card-orange">
           <Hammer size={24} className="stat-icon" />
           <div>
             <span className="stat-value">{reparacoesPendentes.length}</span>
@@ -198,7 +211,7 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* ── Etapa 1: O meu dia ─────────────────────────────────────────── */}
+      {/* ── O meu dia ─────────────────────────────────────────── */}
       <div className={`meu-dia-section card${!isAdmin ? ' meu-dia-destaque' : ''}`}>
         <div className="meu-dia-header">
           <div className="meu-dia-titulo">
@@ -208,24 +221,85 @@ export default function Dashboard() {
               {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Atlantic/Azores' })}
             </span>
           </div>
-          {paraHoje.length > 0 && (
-            <span className="badge badge-danger">{paraHoje.length} pendente{paraHoje.length > 1 ? 's' : ''}</span>
+          {totalHoje > 0 && (
+            <span className="badge badge-danger">{totalHoje} pendente{totalHoje > 1 ? 's' : ''}</span>
           )}
         </div>
 
-        {paraHoje.length === 0 ? (
+        {totalHoje === 0 ? (
           <div className="meu-dia-vazio">
             <PartyPopper size={22} />
             <span>Sem intervenções pendentes para hoje!</span>
           </div>
         ) : (
           <ul className="meu-dia-lista">
-            {paraHoje.map(m => {
+            {manutHoje.map(m => {
               const maq = getMaquina(m.maquinaId)
               const sub = getSubcategoria(maq?.subcategoriaId)
               const cli = maq ? getCliente(maq.clienteNif) : null
-              const diasAtraso = Math.floor((new Date() - new Date(m.data)) / (1000 * 60 * 60 * 24))
-              const filtro = isBefore(new Date(m.data), new Date()) ? 'atraso' : 'proximas'
+              return (
+                <li key={m.id} className="meu-dia-item">
+                  <div className="meu-dia-item-info">
+                    <span className="meu-dia-item-nome">
+                      <Wrench size={13} className="meu-dia-tipo-icon" />
+                      {sub?.nome ? `${sub.nome} — ` : ''}{maq?.marca} {maq?.modelo}
+                    </span>
+                    <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
+                  </div>
+                  <div className="meu-dia-item-right">
+                    <button
+                      type="button"
+                      className="btn primary btn-sm"
+                      onClick={() => navigate('/manutencoes?filter=proximas', { state: { openExecucaoId: m.id } })}
+                    >
+                      <Play size={13} /> Executar
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+            {reparacoesHoje.map(rep => {
+              const maq = getMaquina(rep.maquinaId)
+              const cli = maq ? getCliente(maq.clienteNif) : null
+              const sub = maq ? getSubcategoria(maq?.subcategoriaId) : null
+              return (
+                <li key={rep.id} className="meu-dia-item">
+                  <div className="meu-dia-item-info">
+                    <span className="meu-dia-item-nome">
+                      <Hammer size={13} className="meu-dia-tipo-icon" />
+                      {sub?.nome ? `${sub.nome} — ` : ''}{maq?.marca ?? '—'} {maq?.modelo ?? ''}
+                    </span>
+                    <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
+                  </div>
+                  <div className="meu-dia-item-right">
+                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>Reparação</span>
+                    <button type="button" className="btn primary btn-sm" onClick={() => navigate('/reparacoes')}>
+                      <Play size={13} /> Ver
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* ── Manutenções em atraso ──────────────────────────────────────────── */}
+      {manutEmAtraso.length > 0 && (
+        <div className="meu-dia-section card manut-atraso-section">
+          <div className="meu-dia-header">
+            <div className="meu-dia-titulo">
+              <AlertTriangle size={18} />
+              <span>Manutenções em atraso</span>
+            </div>
+            <span className="badge badge-danger">{manutEmAtraso.length} em atraso</span>
+          </div>
+          <ul className="meu-dia-lista">
+            {manutEmAtraso.slice(0, 5).map(m => {
+              const maq = getMaquina(m.maquinaId)
+              const sub = getSubcategoria(maq?.subcategoriaId)
+              const cli = maq ? getCliente(maq.clienteNif) : null
+              const diasAtraso = Math.floor((new Date() - parseDateLocal(m.data)) / (1000 * 60 * 60 * 24))
               return (
                 <li key={m.id} className="meu-dia-item">
                   <div className="meu-dia-item-info">
@@ -235,15 +309,13 @@ export default function Dashboard() {
                     <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
                   </div>
                   <div className="meu-dia-item-right">
-                    {diasAtraso > 0 && (
-                      <span className="badge badge-danger meu-dia-badge-atraso">
-                        {diasAtraso}d atraso
-                      </span>
-                    )}
+                    <span className="badge badge-danger meu-dia-badge-atraso">
+                      {diasAtraso}d atraso
+                    </span>
                     <button
                       type="button"
                       className="btn primary btn-sm"
-                      onClick={() => navigate(`/manutencoes?filter=${filtro}`, { state: { openExecucaoId: m.id } })}
+                      onClick={() => navigate('/manutencoes?filter=atraso', { state: { openExecucaoId: m.id } })}
                     >
                       <Play size={13} /> Executar
                     </button>
@@ -252,8 +324,11 @@ export default function Dashboard() {
               )
             })}
           </ul>
-        )}
-      </div>
+          {manutEmAtraso.length > 5 && (
+            <Link to="/manutencoes?filter=atraso" className="meu-dia-ver-mais">+ {manutEmAtraso.length - 5} mais em atraso</Link>
+          )}
+        </div>
+      )}
 
       {/* ── Reparações pendentes ──────────────────────────────────────────── */}
       {reparacoesPendentes.length > 0 && (
@@ -442,7 +517,7 @@ export default function Dashboard() {
                     const maq = maquinas.find(x => x.id === m.maquinaId)
                     const sub = getSubcategoria(maq?.subcategoriaId)
                     const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() : 'Equipamento'
-                    const dataManut = new Date(m.data)
+                    const dataManut = parseDateLocal(m.data)
                     const statusBadge = m.status === 'concluida' ? 'badge-success' : !isBefore(dataManut, new Date()) ? 'badge-warning' : 'badge-danger'
                     const statusLabel = m.status === 'concluida' ? 'Executada' : !isBefore(dataManut, new Date()) ? 'Próxima' : 'Em atraso'
                     const podeExecutar = m.status === 'pendente' || m.status === 'agendada'
@@ -472,7 +547,7 @@ export default function Dashboard() {
                               className="btn primary btn-sm"
                               onClick={() => {
                                 setSelectedDay(null)
-                                const filtro = isBefore(new Date(m.data), new Date()) ? 'atraso' : 'proximas'
+                                const filtro = isBefore(parseDateLocal(m.data), new Date()) ? 'atraso' : 'proximas'
                                 navigate(`/manutencoes?filter=${filtro}`, { state: { openExecucaoId: m.id } })
                               }}
                             >
@@ -497,8 +572,8 @@ export default function Dashboard() {
           const relatorio = getRelatorioByManutencao(m?.id)
           const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
           const checklistItems = sub ? getChecklistBySubcategoria(sub.id, m?.tipo || 'periodica') : []
-          const dataFormatada = m?.data ? format(new Date(m.data), "d 'de' MMMM 'de' yyyy", { locale: pt }) : '—'
-          const statusLabel = m?.status === 'concluida' ? 'Executada' : !isBefore(new Date(m?.data || 0), new Date()) ? 'Próxima' : 'Em atraso'
+          const dataFormatada = m?.data ? format(parseDateLocal(m.data), "d 'de' MMMM 'de' yyyy", { locale: pt }) : '—'
+          const statusLabel = m?.status === 'concluida' ? 'Executada' : !isBefore(parseDateLocal(m?.data || '1970-01-01'), new Date()) ? 'Próxima' : 'Em atraso'
           return (
             <div
               className="day-panel-overlay manutencao-detalhe-overlay"

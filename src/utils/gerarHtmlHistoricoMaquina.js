@@ -6,7 +6,7 @@
  * Formato: capa com dados da máquina + estatísticas + tabela cronológica
  * de todas as manutenções + última assinatura.
  */
-import { formatDataAzores, formatDataHoraAzores } from './datasAzores'
+import { formatDataAzores, formatDataHoraAzores, parseDateLocal } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
@@ -19,6 +19,7 @@ import { EMPRESA } from '../constants/empresa'
  * @param {object|null} params.categoria
  * @param {Array}       params.manutencoes   — manutenções desta máquina (qualquer estado)
  * @param {Array}       params.relatorios    — todos os relatórios do sistema
+ * @param {Array}       [params.reparacoes]  — reparações desta máquina
  * @param {string}      [params.logoUrl]
  * @returns {string}    HTML completo
  */
@@ -29,6 +30,8 @@ export function gerarHtmlHistoricoMaquina({
   categoria,
   manutencoes = [],
   relatorios  = [],
+  reparacoes  = [],
+  tecnicos    = [],
   logoUrl,
 }) {
   const esc     = escapeHtml
@@ -46,8 +49,8 @@ export function gerarHtmlHistoricoMaquina({
   const total      = manutOrdenadas.length
   const executadas = manutOrdenadas.filter(m => m.status === 'concluida')
   const pendentes  = manutOrdenadas.filter(m => m.status !== 'concluida')
-  const emAtraso   = pendentes.filter(m => new Date(m.data) < hoje)
-  const proximas   = pendentes.filter(m => new Date(m.data) >= hoje)
+  const emAtraso   = pendentes.filter(m => parseDateLocal(m.data) < hoje)
+  const proximas   = pendentes.filter(m => parseDateLocal(m.data) >= hoje)
   const ultimaExec = executadas[0]
   const proximaAge = proximas.reduce((min, m) => (!min || m.data < min.data) ? m : min, null)
 
@@ -64,6 +67,11 @@ export function gerarHtmlHistoricoMaquina({
   const safeAssin = ultimoRelAssin?.assinaturaDigital
     ? safeDataImageUrl(ultimoRelAssin.assinaturaDigital)
     : null
+
+  // ── Último técnico com assinatura registada ─────────────────────────────────
+  const ultimoTecNome = ultimaExec?.tecnico || ultimoRelAssin?.tecnico || null
+  const tecObj = ultimoTecNome ? tecnicos.find(t => t.nome === ultimoTecNome && t.ativo !== false) : null
+  const safeTecAssin = tecObj?.assinaturaDigital ? safeDataImageUrl(tecObj.assinaturaDigital) : null
 
   // ── Descrição curta do equipamento ──────────────────────────────────────────
   const equipDesc = subcategoria
@@ -83,7 +91,7 @@ export function gerarHtmlHistoricoMaquina({
 
     const statusBadge = m.status === 'concluida'
       ? '<span class="badge-ok">Executada</span>'
-      : new Date(m.data) < hoje
+      : parseDateLocal(m.data) < hoje
         ? '<span class="badge-err">Em atraso</span>'
         : '<span class="badge-pend">Agendada</span>'
 
@@ -96,6 +104,29 @@ export function gerarHtmlHistoricoMaquina({
       <td>${tecnico}</td>
       <td>${assinante}</td>
       <td class="td-notes">${notas}</td>
+    </tr>`
+  }
+
+  // ── Reparações ──────────────────────────────────────────────────────────────
+  const repsOrdenadas = [...reparacoes].sort((a, b) => (b.data || '').localeCompare(a.data || ''))
+
+  const statusRepLabel = { pendente: 'Pendente', em_progresso: 'Em progresso', concluida: 'Concluída' }
+  const statusRepClass = { pendente: 'badge-pend', em_progresso: 'badge-pend', concluida: 'badge-ok' }
+
+  const buildRepRow = (r, i) => {
+    const dataStr   = r.data ? formatDataAzores(r.data, true) : '—'
+    const tecnico   = esc(r.tecnico ?? '—')
+    const estado    = `<span class="${statusRepClass[r.status] ?? 'badge-pend'}">${statusRepLabel[r.status] ?? r.status}</span>`
+    const descAvaria = esc((r.descricaoAvaria || '—').slice(0, 100))
+    const obs       = esc((r.observacoes || '—').slice(0, 80))
+    const rowClass  = i % 2 === 1 ? ' class="row-alt"' : ''
+    return `<tr${rowClass}>
+      <td class="td-c">${i + 1}</td>
+      <td>${dataStr}</td>
+      <td>${tecnico}</td>
+      <td class="td-c">${estado}</td>
+      <td class="td-notes">${descAvaria}</td>
+      <td class="td-notes">${obs}</td>
     </tr>`
   }
 
@@ -283,13 +314,41 @@ ${total === 0
 </table>`
 }
 
-${safeAssin ? `<div class="section-title">Última assinatura registada</div>
-<div class="assin-box">
-  <span class="ficha-label">Assinatura manuscrita do cliente</span>
-  <img src="${safeAssin}" alt="Assinatura do cliente">
-  ${ultimoRelAssin?.nomeAssinante
-    ? `<div class="assin-meta">Assinado por: <strong>${esc(ultimoRelAssin.nomeAssinante)}</strong>${ultimoRelAssin.dataAssinatura ? ` &nbsp;&mdash;&nbsp; ${formatDataHoraAzores(ultimoRelAssin.dataAssinatura)}` : ''}</div>`
-    : ''}
+${repsOrdenadas.length > 0 ? `
+<div class="section-title" style="margin-top:14px">
+  Reparações — ${repsOrdenadas.length} registo${repsOrdenadas.length === 1 ? '' : 's'}
+</div>
+<table class="hist-table">
+  <thead>
+    <tr>
+      <th class="td-c" style="width:22px">#</th>
+      <th style="width:62px">Data</th>
+      <th style="width:70px">Técnico</th>
+      <th class="td-c" style="width:68px">Estado</th>
+      <th>Descrição da avaria</th>
+      <th>Observações</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${repsOrdenadas.map((r, i) => buildRepRow(r, i)).join('\n    ')}
+  </tbody>
+</table>` : ''}
+
+${(safeAssin || safeTecAssin) ? `<div class="section-title">Última assinatura registada</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+  ${safeTecAssin ? `<div class="assin-box">
+    <span class="ficha-label">Técnico responsável</span>
+    <div style="font-weight:600;font-size:10px;margin:3px 0">${esc(tecObj?.nome || '')}</div>
+    ${tecObj?.telefone ? `<div style="font-size:8px;color:#666">Tel: ${esc(tecObj.telefone)}</div>` : ''}
+    <img src="${safeTecAssin}" alt="Assinatura do técnico" style="max-height:50px">
+  </div>` : '<div></div>'}
+  ${safeAssin ? `<div class="assin-box">
+    <span class="ficha-label">Assinatura do cliente</span>
+    <img src="${safeAssin}" alt="Assinatura do cliente" style="max-height:50px">
+    ${ultimoRelAssin?.nomeAssinante
+      ? `<div class="assin-meta">Assinado por: <strong>${esc(ultimoRelAssin.nomeAssinante)}</strong>${ultimoRelAssin.dataAssinatura ? ` &nbsp;&mdash;&nbsp; ${formatDataHoraAzores(ultimoRelAssin.dataAssinatura)}` : ''}</div>`
+      : ''}
+  </div>` : '<div></div>'}
 </div>` : ''}
 
 <footer class="rpt-footer">

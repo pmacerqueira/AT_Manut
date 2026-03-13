@@ -107,9 +107,14 @@
   color: var(--color-accent);
 }
 
+.event-reparacao {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+}
+
 .event-previsto {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--color-warning);
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--color-text-muted);
 }
 
 .calendar-legend {
@@ -131,6 +136,9 @@
 .dot-green { background: var(--color-success); }
 .dot-orange { background: var(--color-warning); }
 .dot-red { background: var(--color-danger); }
+.dot-blue { background: var(--color-accent); }
+.dot-purple { background: #a855f7; }
+.dot-gray { background: var(--color-text-muted); }
 
 /* Mobile - vista semana */
 @media (max-width: 600px) {

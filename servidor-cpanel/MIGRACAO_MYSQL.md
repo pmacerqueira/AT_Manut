@@ -181,3 +181,29 @@ No ficheiro `servidor-cpanel/api/data.php`, verificar que as queries de INSERT/U
 - `manutencoes`: mapear `inicioExecucao → inicio_execucao`, `tipoManutKaeser → tipo_manut_kaeser`
 - `relatorios`: mapear `pecasUsadas → pecas_usadas` (JSON encode), `tipoManutKaeser → tipo_manut_kaeser`
 - No SELECT, fazer `json_decode` em `pecas_usadas` antes de retornar
+
+---
+
+## 8. Tabela `tecnicos` — v1.11.0
+
+### 8.1 Criar a tabela
+
+```sql
+CREATE TABLE IF NOT EXISTS tecnicos (
+  id                  VARCHAR(40)  NOT NULL PRIMARY KEY,
+  nome                VARCHAR(120) NOT NULL,
+  telefone            VARCHAR(20)  NULL,
+  assinatura_digital  LONGTEXT     NULL COMMENT 'Base64 da assinatura digitalizada',
+  ativo               TINYINT(1)   NOT NULL DEFAULT 1,
+  criado_em           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 8.2 Dados iniciais
+
+```sql
+INSERT INTO tecnicos (id, nome, ativo) VALUES
+  ('tec-init-1', 'Aldevino Costa', 1),
+  ('tec-init-2', 'Carlos Ferreira', 1),
+  ('tec-init-3', 'Emanuel Santos', 1);
+```
