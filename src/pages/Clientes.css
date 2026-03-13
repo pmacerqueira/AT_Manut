@@ -174,22 +174,22 @@
 .clientes-table .data-table th:nth-child(5),
 .clientes-table .data-table td:nth-child(5) { width: 4rem; text-align: center; }
 
-/* col 6 — Acções: largura exacta para 3 botões */
+/* col 6 — Acções */
 .clientes-table .data-table th:nth-child(6),
-.clientes-table .data-table td:nth-child(6) { width: 7rem; }
+.clientes-table .data-table td:nth-child(6) { width: auto; white-space: nowrap; }
 .clientes-table .data-table .actions {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.2rem;
+  gap: 0.25rem;
   justify-content: flex-end;
+  align-items: center;
 }
-/* Botões de acção compactos na tabela (área de toque suficiente em desktop) */
 .clientes-table .data-table .actions .icon-btn {
-  min-width: 1.85rem !important;
-  min-height: 1.85rem !important;
-  width: 1.85rem;
-  height: 1.85rem;
-  padding: 0.25rem !important;
+  min-width: 1.75rem !important;
+  min-height: 1.75rem !important;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0.2rem !important;
 }
 
 /* ── Ficha do cliente — header e acções ── */

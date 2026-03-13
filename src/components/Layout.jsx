@@ -160,7 +160,7 @@ export default function Layout({ children }) {
               onClick={toggleModoCampo}
               title={modoCampo ? 'Desativar modo campo' : 'Ativar modo campo (alto contraste)'}
             >
-              {modoCampo ? <Moon size={16} /> : <Sun size={16} />}
+              {modoCampo ? <Sun size={18} /> : <Moon size={16} />}
             </button>
           </div>
           <button type="button" className="btn-logout" onClick={logout} title="Terminar sessão">

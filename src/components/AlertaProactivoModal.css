@@ -17,7 +17,7 @@
   box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: var(--modal-width-md);
-  max-height: 82vh;
+  max-height: min(82vh, 82dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -76,8 +76,10 @@
 
 /* ── Corpo ──────────────────────────────────────────────────────────────────── */
 .alerta-body {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
