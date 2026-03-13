@@ -89,10 +89,12 @@ $from = 'noreply@navel.pt';
 $headers[] = "From: Navel Manutenções <{$from}>";
 $headers[] = "Reply-To: comercial@navel.pt";
 
-$ccHeader = '';
-if (!empty($cc) && filter_var($cc, FILTER_VALIDATE_EMAIL)) {
-    $ccHeader = "Cc: {$cc}\r\n";
+$adminCc = 'comercial@navel.pt';
+$ccList = [$adminCc];
+if (!empty($cc) && filter_var($cc, FILTER_VALIDATE_EMAIL) && strtolower($cc) !== strtolower($adminCc)) {
+    $ccList[] = $cc;
 }
+$ccHeader = "Cc: " . implode(', ', $ccList) . "\r\n";
 
 $headersStr = implode("\r\n", $headers);
 
