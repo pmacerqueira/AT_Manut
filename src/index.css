@@ -1187,31 +1187,33 @@ body.modo-campo .sidebar {
   border-right: 2px solid #3a4a60;
 }
 body.modo-campo .sidebar .nav-link {
-  color: #e0e8f0;
+  color: #f4f7fa;
   padding: 0.85rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
 }
 body.modo-campo .sidebar .nav-link:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
 }
 body.modo-campo .sidebar .nav-link.active {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-accent);
   color: #ffffff;
-  border-left: 3px solid var(--color-accent);
+  font-weight: 700;
 }
 body.modo-campo .sidebar .user-name {
-  color: #e0e8f0;
+  color: #f4f7fa;
 }
 body.modo-campo .sidebar .btn-logout {
   color: #fca5a5;
-  background: rgba(220, 40, 40, 0.2);
-  border: 1px solid rgba(220, 40, 40, 0.5);
+  background: rgba(220, 40, 40, 0.22);
+  border: 2px solid rgba(220, 40, 40, 0.55);
+  font-weight: 600;
 }
 body.modo-campo .sidebar .sidebar-search-btn {
-  color: #c0cce0;
-  border-color: #3a4a60;
+  color: #f4f7fa;
+  border-color: #4a5a70;
+  font-weight: 500;
 }
 
 /* Indicador visual de modo campo activo na sidebar */
