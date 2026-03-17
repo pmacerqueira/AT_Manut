@@ -176,7 +176,8 @@
 .preview-datas li {
   font-size: 0.83rem;
   padding: 0.2rem 0.5rem;
-  background: var(--color-accent-alpha, rgba(59, 130, 246, 0.12));
+  background: var(--color-accent-alpha, rgba(26, 184, 240, 0.16));
+  border: 1px solid rgba(26, 184, 240, 0.35);
   border-radius: var(--radius-xs);
   color: var(--color-accent);
   font-weight: 500;

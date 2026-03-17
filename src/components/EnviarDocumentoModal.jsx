@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Mail } from 'lucide-react'
 import { escapeHtml, safeHttpUrl } from '../utils/sanitize'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -94,11 +95,11 @@ export default function EnviarDocumentoModal({ isOpen, onClose, documento, maqui
           </label>
           {erro && <p className="form-erro">{erro}</p>}
           <div className="form-actions">
-            <button type="button" className="secondary" onClick={onClose} disabled={enviando}>
+            <button type="button" className="btn secondary" onClick={onClose} disabled={enviando}>
               Cancelar
             </button>
-            <button type="submit" disabled={enviando}>
-              {enviando ? 'A enviar…' : 'Enviar'}
+            <button type="submit" className="btn" disabled={enviando}>
+              {enviando ? 'A enviar…' : <><Mail size={16} /> Enviar</>}
             </button>
           </div>
         </form>

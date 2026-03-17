@@ -37,12 +37,8 @@ export function usePermissions() {
       return !!relatorio?.assinadoPeloCliente
     }
 
-    /** Bloqueia eliminação de manutenção com relatório assinado */
-    const canDeleteManutencao = (manutencaoId) => {
-      if (!isAdmin) return false
-      const relatorio = getRelatorioByManutencao(manutencaoId)
-      return !relatorio?.assinadoPeloCliente
-    }
+    /** Admin pode eliminar qualquer manutenção (incluindo assinada) */
+    const canDeleteManutencao = (_manutencaoId) => isAdmin
 
     /** Bloqueia eliminação de reparação com relatório assinado */
     const canDeleteReparacao = (reparacaoId) => {

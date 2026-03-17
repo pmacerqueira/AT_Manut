@@ -9,6 +9,8 @@
 import { useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import { usePermissions } from '../hooks/usePermissions'
 import {
   calcResumoCounts,
@@ -39,6 +41,7 @@ export default function Metricas() {
   const { isAdmin }     = usePermissions()
   const navigate        = useNavigate()
   const { clientes, maquinas, manutencoes, relatorios } = useData()
+  const contentReady = useDeferredReady(manutencoes.length >= 0)
 
   // Redirige se não for admin (useEffect para não chamar navigate durante render)
   useEffect(() => {
@@ -69,9 +72,9 @@ export default function Metricas() {
 
       {/* Cabeçalho */}
       <div className="met-header">
-        <button type="button" className="met-back-btn" onClick={() => navigate(-1)}>
+        <button type="button" className="btn-back met-back-btn" onClick={() => navigate(-1)}>
           <ArrowLeft size={18} />
-          <span>Voltar</span>
+          <span>Voltar atrás</span>
         </button>
         <div className="met-title-wrap">
           <BarChart2 size={22} className="met-title-icon" />
@@ -79,6 +82,7 @@ export default function Metricas() {
         </div>
       </div>
 
+      <ContentLoader loading={!contentReady} message="A carregar métricas…" hint="Por favor aguarde.">
       {/* ── Cards de resumo ─────────────────────────────────────────────── */}
       <section className="met-section">
         <div className="met-cards">
@@ -263,6 +267,7 @@ export default function Metricas() {
           <p>Todos os equipamentos estão dentro do prazo de manutenção.</p>
         </div>
       )}
+      </ContentLoader>
     </div>
   )
 }

@@ -12,8 +12,7 @@ import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
-import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye } from 'lucide-react'
-import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 import './ExecutarReparacaoModal.css'
@@ -60,6 +59,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const {
     clientes, maquinas,
     updateReparacao,
+    updateCliente,
     addRelatorioReparacao,
     updateRelatorioReparacao,
     getRelatorioByReparacao,
@@ -94,7 +94,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
   const [form, setForm] = useState({
     tecnico:           reparacao.tecnico ?? '',
-    nomeAssinante:     '',
+    nomeAssinante:     cli?.nomeContacto ?? '',
     dataRealizacao:    reparacao.data ?? '', // Admin: data histórica (execução real)
     dataEmissao:       '',            // Admin: data de emissão do relatório
     numeroAviso:       reparacao.numeroAviso ?? '',
@@ -134,7 +134,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     setForm(p => ({
       ...p,
       tecnico:           existente.tecnico           ?? p.tecnico,
-      nomeAssinante:     existente.nomeAssinante      ?? '',
+      nomeAssinante:     existente.nomeAssinante      || cli?.nomeContacto || '',
       dataEmissao:       existente.dataCriacao        ? String(existente.dataCriacao).slice(0, 10) : p.dataEmissao,
       numeroAviso:       existente.numeroAviso        ?? p.numeroAviso,
       descricaoAvaria:   existente.descricaoAvaria    ?? p.descricaoAvaria,
@@ -177,7 +177,21 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     ctx.lineCap     = 'round'
   }, [])
 
-  useEffect(() => { initCanvas() }, [initCanvas])
+  useEffect(() => {
+    initCanvas()
+    const existente = getRelatorioByReparacao(reparacao.id)
+    const assSalva = !existente?.assinaturaDigital && cli?.assinaturaContacto
+    if (assSalva) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const img = new Image()
+      img.onload = () => {
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        setAssinaturaFeita(true)
+      }
+      img.src = cli.assinaturaContacto
+    }
+  }, [initCanvas, reparacao.id, getRelatorioByReparacao, cli?.assinaturaContacto])
 
   const getPos = (e) => {
     const canvas = canvasRef.current
@@ -213,6 +227,23 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     initCanvas()
     setAssinaturaFeita(false)
   }
+
+  const guardarNomeContacto = useCallback(() => {
+    const nome = form.nomeAssinante.trim()
+    if (!nome || !maq?.clienteNif) return
+    updateCliente(maq.clienteNif, { nomeContacto: nome })
+    showToast('Nome do contacto guardado para futuras intervenções', 'success')
+    logger.action('ExecutarReparacaoModal', 'guardarNomeContacto', `Nome "${nome}" guardado para cliente ${maq.clienteNif}`)
+  }, [form.nomeAssinante, maq?.clienteNif, updateCliente, showToast])
+
+  const guardarAssinaturaContacto = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !assinaturaFeita || !maq?.clienteNif) return
+    const dataUrl = canvas.toDataURL('image/png')
+    updateCliente(maq.clienteNif, { assinaturaContacto: dataUrl })
+    showToast('Assinatura guardada para futuras intervenções', 'success')
+    logger.action('ExecutarReparacaoModal', 'guardarAssinaturaContacto', `Assinatura guardada para cliente ${maq.clienteNif}`)
+  }, [assinaturaFeita, maq?.clienteNif, updateCliente, showToast])
 
   // ── Fotos ────────────────────────────────────────────────────────────────
 
@@ -474,14 +505,24 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     }
     const tecObj = getTecnicoByNome(form.tecnico)
     const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
-    if (html) imprimirOuGuardarPdf(html)
+    if (html) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    }
   }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome])
 
   const handleVerPdf = useCallback(async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
     const tecObj = getTecnicoByNome(relGerado.tecnico)
     const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
-    if (html) imprimirOuGuardarPdf(html)
+    if (html) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    }
   }, [reparacao, maq, cli, checklistItems, getTecnicoByNome])
 
   // ── Envio de email ────────────────────────────────────────────────────────
@@ -806,12 +847,21 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 </div>
                 <div className="form-group">
                   <label>Nome do assinante <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    value={form.nomeAssinante}
-                    onChange={e => setForm(p => ({ ...p, nomeAssinante: e.target.value }))}
-                    placeholder="Nome completo"
-                  />
+                  <div className="campo-com-guardar">
+                    <input
+                      type="text"
+                      value={form.nomeAssinante}
+                      onChange={e => setForm(p => ({ ...p, nomeAssinante: e.target.value }))}
+                      placeholder="Nome completo"
+                    />
+                    {form.nomeAssinante.trim() && (
+                      <button type="button" className="btn-guardar-contacto" onClick={guardarNomeContacto}
+                        title="Guardar este nome para futuras intervenções deste cliente">
+                        <Bookmark size={14} />
+                        {cli?.nomeContacto === form.nomeAssinante.trim() ? 'Guardado' : 'Guardar'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {erroAssinatura && <p className="field-error">{erroAssinatura}</p>}
                 <div className="canvas-wrapper">
@@ -829,11 +879,19 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                     onTouchEnd={stopDraw}
                     style={{ touchAction: 'none' }}
                   />
-                  {assinaturaFeita && (
-                    <button type="button" className="btn secondary btn-sm btn-limpar-assinatura" onClick={limparAssinatura}>
-                      <PenLine size={13} /> Limpar
-                    </button>
-                  )}
+                  <div className="assinatura-canvas-actions">
+                    {assinaturaFeita && (
+                      <>
+                        <button type="button" className="btn secondary btn-sm btn-limpar-assinatura" onClick={limparAssinatura}>
+                          <PenLine size={13} /> Limpar
+                        </button>
+                        <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
+                          title="Guardar esta assinatura para futuras intervenções deste cliente">
+                          <Bookmark size={14} /> Guardar assinatura
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 {!assinaturaFeita && (
                   <p className="assinatura-hint">Peça ao cliente para assinar no campo acima</p>

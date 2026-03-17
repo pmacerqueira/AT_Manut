@@ -1,5 +1,5 @@
 .met-page {
-  max-width: 960px;
+  max-width: min(960px, 96vw);
   margin: 0 auto;
   padding: 0 0 3rem;
 }
@@ -96,12 +96,12 @@
   flex-shrink: 0;
 }
 
-.met-card-icon--blue   { background: rgba(0, 163, 224, 0.15); color: var(--color-accent); }
-.met-card-icon--green  { background: rgba(34, 197, 94, 0.15);  color: var(--color-success); }
-.met-card-icon--yellow { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
-.met-card-icon--purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
-.met-card-icon--red    { background: rgba(239, 68, 68, 0.15);  color: var(--color-danger); }
-.met-card-icon--orange { background: rgba(249, 115, 22, 0.15); color: var(--color-warning); }
+.met-card-icon--blue   { background: rgba(0, 163, 224, 0.18); color: var(--color-accent); }
+.met-card-icon--green  { background: rgba(34, 197, 94, 0.18);  color: var(--color-success); }
+.met-card-icon--yellow { background: rgba(245, 158, 11, 0.18); color: var(--color-warning); }
+.met-card-icon--purple { background: rgba(168, 85, 247, 0.18); color: #c4b5fd; }
+.met-card-icon--red    { background: rgba(239, 68, 68, 0.18);  color: var(--color-danger); }
+.met-card-icon--orange { background: rgba(249, 115, 22, 0.18); color: var(--color-warning); }
 
 .met-card-body {
   display: flex;
@@ -130,6 +130,10 @@
   grid-template-columns: 280px 1fr;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+  .met-row-2 { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -248,18 +252,19 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
   font-size: 0.74rem;
   font-weight: 600;
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-xs);
   white-space: nowrap;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .met-top-btn {
   padding: 0.3rem 0.5rem;
-  min-height: unset;
+  min-height: var(--touch-min, 44px);
 }
 
 /* ─── Tudo bem ─── */

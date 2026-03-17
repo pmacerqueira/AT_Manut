@@ -27,15 +27,19 @@
   --color-primary-light: #2563eb;
   --color-primary-rgb: 26, 72, 128;
   --color-white: #ffffff;
-  --color-success: #22c55e;
-  --color-success-dark: #16a34a;
+  --color-success: #34d399;
+  --color-success-dark: #22c55e;
   --color-success-bg: #f0fdf4;
-  --color-warning: #f59e0b;
+  --color-warning: #fbbf24;
   --color-warning-bg: #fffbeb;
   --color-danger: #ef4444;
+  --color-danger-rgb: 239, 68, 68;
   --color-danger-bg: #fef2f2;
+  --color-execute: #39ff14;
+  --color-execute-hover: #52ff33;
+  --color-execute-text: #0a1f08;
   --color-text: #f4f7fa;
-  --color-text-muted: #b0c0d0;
+  --color-text-muted: #c8d6e3;
   --color-border: #2d3a4d;
 
   /* Paleta cinza (absoluta — não muda com tema) */
@@ -73,6 +77,7 @@
   --space-lg: 1rem;
   --space-xl: 1.25rem;
   --space-2xl: 1.5rem;
+  --space-3xl: 2.5rem;
   --spacing-page: 1.25rem;
 
   /* ── Sombras ── */
@@ -100,6 +105,8 @@
 
   /* ── Touch ── */
   --touch-min: 48px;
+  --touch-min-sm: 24px;
+
 
   /* ── Layout responsivo ── */
   --sidebar-width: clamp(240px, 20vw, 280px);
@@ -167,20 +174,34 @@ button:active {
   transform: scale(0.98);
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+  pointer-events: none;
 }
 button.secondary,
 .btn.secondary {
-  background: rgba(0, 163, 224, 0.18);
-  color: var(--color-accent-hover);
-  border: 1px solid rgba(0, 163, 224, 0.5);
+  background: var(--color-accent-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
 }
 button.secondary:hover,
 .btn.secondary:hover {
-  background: rgba(0, 163, 224, 0.28);
+  background: rgba(0, 163, 224, 0.32);
   border-color: var(--color-accent);
+  color: var(--color-white);
+}
+
+button.danger,
+.btn.danger {
+  background: rgba(var(--color-danger-rgb), 0.22);
+  color: var(--color-danger);
+  border: 1px solid rgba(var(--color-danger-rgb), 0.5);
+}
+button.danger:hover,
+.btn.danger:hover {
+  background: rgba(var(--color-danger-rgb), 0.35);
+  border-color: var(--color-danger);
   color: var(--color-white);
 }
 
@@ -203,7 +224,7 @@ form label { display: block; margin-bottom: 1rem; }
 form label > span:not(.required) { display: block; margin-bottom: 0.35rem; font-size: 0.9em; color: var(--color-text-muted); }
 form input, form select, form textarea { width: 100%; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+.form-actions { display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-lg); flex-wrap: wrap; }
 .form-erro { color: var(--color-danger); font-size: 0.9em; margin: -0.5rem 0 1rem; }
 .form-aviso-data { display: block; color: var(--color-warning, #f0ad4e); font-size: 0.82rem; margin-top: 0.25rem; font-weight: 500; }
 /* Textarea utilitária — largura total, redimensionável verticalmente */
@@ -230,7 +251,7 @@ form input.readonly { background: var(--color-bg-elevated); color: var(--color-t
 .declaracao-assinatura-texto {
   font-size: 0.75rem;
   line-height: 1.45;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -280,15 +301,23 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   margin-bottom: 1.25rem;
 }
 .page-header button { white-space: nowrap; flex-shrink: 0; }
+.page-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.page-header-badge { margin-left: 0.5rem; }
+.badge-sm { font-size: 0.68rem; }
 .btn-back {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
   background: none;
   border: none;
   color: var(--color-accent);
-  font-size: 0.95em;
+  font-size: var(--text-lg);
   cursor: pointer;
 }
 .btn-back:hover { color: var(--color-accent-hover); }
@@ -327,9 +356,9 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
 .data-table th { font-weight: 600; color: var(--color-text-muted); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
 .data-table tbody tr:hover { background: var(--color-bg-elevated); }
 
-.actions { display: flex; gap: var(--space-sm); flex-wrap: nowrap; flex-shrink: 0; }
+.actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; flex-shrink: 0; }
 .icon-btn {
-  padding: 0.5rem !important;
+  padding: var(--space-sm) !important;
   min-width: var(--touch-min) !important;
   min-height: var(--touch-min) !important;
   display: inline-flex !important;
@@ -339,8 +368,8 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   color: var(--color-text-muted) !important;
   transition: color 0.15s ease, background 0.15s ease;
 }
-.icon-btn:hover { color: var(--color-accent) !important; background: rgba(0, 163, 224, 0.22) !important; }
-.icon-btn.danger:hover { color: var(--color-danger) !important; background: rgba(239,68,68,0.15) !important; }
+.icon-btn:hover { color: var(--color-accent) !important; background: var(--color-accent-muted) !important; }
+.icon-btn.danger:hover { color: var(--color-danger) !important; background: rgba(var(--color-danger-rgb), 0.15) !important; }
 
 /* Modais/Painéis — ecrã completo, fontes ajustadas (experiência consistente) */
 .modal-overlay {
@@ -354,6 +383,8 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 /* Bloquear scroll do body quando qualquer modal está aberto */
 body:has(.modal-overlay) {
@@ -367,10 +398,7 @@ body:has(.modal-overlay) {
   width: 100%;
   flex: 1;
   min-height: min-content;
-  max-height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+  /* sem max-height nem overflow-y aqui: o scroll é feito pelo .modal-overlay */
   box-shadow: none;
   border: none;
   margin: 0;
@@ -408,6 +436,7 @@ body:has(.modal-overlay) {
 
 /* Documentação técnica (Equipamentos + Manutenções) */
 .modal-documentacao .modal-hint { font-size: 0.85em; color: var(--color-text-muted); margin: -0.25rem 0 0.85rem; }
+.modal-documentacao .form-actions { margin-top: 1rem; }
 .doc-lista { max-height: min(280px, 35dvh); overflow-y: auto; margin-bottom: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm); }
 .doc-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: 0.6rem; border-radius: var(--radius-sm); background: var(--color-bg-elevated); margin-bottom: 0.4rem; }
 .doc-item:last-child { margin-bottom: 0; }
@@ -484,16 +513,16 @@ body:has(.modal-overlay) {
 }
 .foto-remover {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  background: rgba(0,0,0,0.65);
-  color: #fff;
+  top: var(--radius-xs);
+  right: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--color-white);
   border: none;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
+  width: var(--touch-min-sm);
+  height: var(--touch-min-sm);
+  min-width: var(--touch-min-sm);
+  min-height: var(--touch-min-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -505,12 +534,12 @@ body:has(.modal-overlay) {
 /* Em touch/mobile: botão maior para ser fácil de tocar */
 @media (max-width: 1024px) {
   .foto-remover {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-    top: 2px;
-    right: 2px;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    top: var(--space-xs);
+    right: var(--space-xs);
   }
 }
 .foto-remover:hover { background: var(--color-danger); }
@@ -565,9 +594,35 @@ body:has(.modal-overlay) {
   touch-action: none;
 }
 .assinatura-canvas--feita { border-style: solid; border-color: var(--color-success, #22c55e); }
-.assinatura-canvas-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.4rem; }
-.assinatura-limpar { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; }
+.assinatura-canvas-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.assinatura-limpar { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-xs); }
 .assinatura-ok { font-size: 0.82rem; color: var(--color-success, #22c55e); font-weight: 600; }
+
+/* ── Guardar contacto (nome + assinatura do cliente) ── */
+.campo-com-guardar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.campo-com-guardar input { flex: 1; min-width: 0; }
+.btn-guardar-contacto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.12);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-guardar-contacto:hover { background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.22); }
+.btn-guardar-contacto:active { opacity: 0.8; }
 
 .form-section.consumiveis-section, .form-section.horas-acumuladas-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
 .form-section.consumiveis-section h3, .form-section.horas-acumuladas-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text-muted); }
@@ -606,7 +661,7 @@ body:has(.modal-overlay) {
 .categoria-card:hover { border-color: var(--color-accent); background: var(--color-accent-muted); box-shadow: 0 2px 8px rgba(99,102,241,0.08); }
 .categoria-card h3 { margin: 0; font-size: 0.92rem; font-weight: 600; line-height: 1.3; }
 .categoria-card p { margin: 0; font-size: 0.75rem; color: var(--color-text-muted); }
-.categoria-card svg { opacity: 0.4; margin-top: 0.1rem; }
+.categoria-card svg { opacity: 0.6; margin-top: 0.1rem; }
 .categorias-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.65rem; }
 .equipamentos-nav { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; font-size: 0.9em; }
 .equipamentos-nav .breadcrumb { color: var(--color-text-muted); }
@@ -619,7 +674,7 @@ body:has(.modal-overlay) {
 .maquinas-por-cliente { margin-top: 1rem; }
 .maquinas-por-cliente h4 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--color-text-muted); padding-bottom: 0.25rem; border-bottom: 1px solid var(--color-border); }
 .maquinas-por-cliente .maquina-row { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); font-size: 0.9em; }
-.maquinas-por-cliente .maquina-row .actions { flex-wrap: nowrap; flex-shrink: 0; }
+.maquinas-por-cliente .maquina-row .actions { flex-wrap: wrap; flex-shrink: 0; }
 .maquinas-por-cliente .maquina-row:last-child { border-bottom: none; }
 .doc-links-inline > .doc-link-inline { padding: 0.2rem 0.5rem; background: var(--color-bg-card); border-radius: var(--radius-sm); color: var(--color-accent); }
 .doc-links-inline > .doc-link-inline:hover { background: var(--color-accent-muted); }
@@ -675,15 +730,52 @@ body:has(.modal-overlay) {
 }
 .manutencao-item-btn:hover { color: var(--color-accent); }
 .btn-enviar-email { font-size: 0.9em; padding: 0.5rem 0.75rem !important; }
+
+/* ── Tabela compacta de histórico de manutenções (ficha de máquina) ── */
+.hist-manut-wrap { overflow-x: auto; margin-top: 0.25rem; }
+.hist-manut-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.hist-manut-table th {
+  padding: 0.4rem 0.65rem;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+.hist-manut-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: middle;
+}
+.hist-manut-table tbody tr:last-child td { border-bottom: none; }
+.hist-manut-table tbody tr:hover td { background: var(--color-bg-elevated); }
+.hist-numrel {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.hist-manut-actions {
+  display: flex;
+  gap: 0.2rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
 .btn-executar-manut {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.45rem;
-  font-size: 0.75em;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
-  background: #39ff14;
-  color: #0a1f08;
+  background: var(--color-execute);
+  color: var(--color-execute-text);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -691,7 +783,7 @@ body:has(.modal-overlay) {
   box-shadow: 0 0 8px rgba(57, 255, 20, 0.4);
 }
 .btn-executar-manut:hover {
-  background: #52ff33;
+  background: var(--color-execute-hover);
   box-shadow: 0 0 12px rgba(57, 255, 20, 0.5);
 }
 
@@ -701,7 +793,9 @@ body:has(.modal-overlay) {
   .page h1 { font-size: 1.35rem; }
   .page-header { flex-direction: column; align-items: stretch; gap: 0.75rem; }
   .page-header > div { order: 1; }
-  .page-header button { order: 2; width: 100%; min-height: var(--touch-min); }
+  .page-header > button { order: 2; width: 100%; min-height: var(--touch-min); }
+  .page-header > .page-header-actions { order: 2; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .page-header > .page-header-actions > button { width: 100%; min-height: var(--touch-min); }
   .search-bar { margin-bottom: 0.75rem; }
   .search-bar input { max-width: none; }
   .table-card {
@@ -748,6 +842,7 @@ body:has(.modal-overlay) {
   .textarea-full { min-height: 120px; }
 
   /* Botões de submit — full-width, altura generosa */
+  .form-actions { flex-wrap: wrap; }
   .form-actions button,
   .modal-footer button {
     min-height: var(--touch-min);
@@ -759,6 +854,13 @@ body:has(.modal-overlay) {
 }
 
 @media (max-width: 480px) {
+  .form-actions {
+    flex-direction: column;
+  }
+  .form-actions button,
+  .form-actions .btn {
+    width: 100%;
+  }
   .data-table thead { display: none; }
   .table-card .data-table { min-width: 0; }
   .data-table tr { display: block; border-bottom: 1px solid var(--color-border); padding: 0.75rem 0; }
@@ -777,7 +879,7 @@ body:has(.modal-overlay) {
     color: var(--color-text-muted);
     flex-shrink: 0;
   }
-  .data-table td.actions { justify-content: flex-end; flex-wrap: nowrap; }
+  .data-table td.actions { justify-content: flex-end; flex-wrap: wrap; }
   .data-table td.actions::before { display: none; }
   .data-table td[data-label="Equipamento"] { flex-direction: column; align-items: flex-start; }
   .data-table td[data-label="Equipamento"] .text-muted { font-size: 0.85em; }
@@ -794,18 +896,18 @@ body:has(.modal-overlay) {
 }
 .email-config-aviso code {
   font-family: 'Courier New', monospace;
-  font-size: 0.78rem;
-  background: rgba(245,158,11,.12);
-  padding: 1px 4px;
-  border-radius: 3px;
+  font-size: var(--text-xs);
+  background: rgba(245, 158, 11, 0.12);
+  padding: var(--space-xs) var(--radius-xs);
+  border-radius: var(--radius-xs);
 }
 .btn-preview {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 0.6rem;
-  padding: 0.45rem 1rem;
-  font-size: 0.85rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--text-base);
   font-weight: 500;
   background: transparent;
   border: 1px solid var(--color-border);
@@ -889,7 +991,29 @@ body:has(.modal-overlay) {
   align-items: center;
   gap: 0.3rem;
 }
-.btn-outline-warning:hover { background: var(--color-warning, #f59e0b); color: #fff; }
+.btn-outline-warning:hover { background: var(--color-warning); color: var(--color-bg); }
+
+/* Gravar (verde sucesso) — salvar sem enviar email */
+.btn-gravar-sucesso {
+  background: rgba(52, 211, 153, 0.18);
+  color: var(--color-success);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+}
+.btn-gravar-sucesso:hover {
+  background: var(--color-success);
+  color: var(--color-bg);
+}
+
+/* Enviar relatório (azul primário) — gravar + enviar email */
+.btn-enviar-relatorio {
+  background: var(--color-accent);
+  color: var(--color-white);
+  border: 1px solid var(--color-accent);
+}
+.btn-enviar-relatorio:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
 
 /* ── Orientação: ajustes para rotação em tablets ──────────────────────────────── */
 @media (max-width: 1024px) and (orientation: landscape) {
@@ -918,31 +1042,41 @@ body:has(.modal-overlay) {
    Activado via toggle em Definições → persiste em localStorage
    ═══════════════════════════════════════════════════════════════ */
 body.modo-campo {
-  --color-bg:           #f0f2f5;
+  --color-bg:           #e8ebf0;
   --color-bg-card:      #ffffff;
-  --color-bg-elevated:  #e4e8ed;
+  --color-bg-elevated:  #dce0e8;
+  --color-bg-secondary: #d0d5de;
   --color-text:         #0a0e14;
-  --color-text-muted:   #3a4455;
-  --color-border:       #b0bbcc;
-  --color-accent:       #005fa3;
-  --color-accent-hover: #004a82;
-  --color-accent-muted: rgba(0, 95, 163, 0.12);
-  --color-primary:      #1a4880;
-  --color-primary-dark: #15396b;
-  --color-success:      #15803d;
-  --color-success-dark: #116e34;
-  --color-success-bg:   #f0fdf4;
-  --color-warning:      #b45309;
-  --color-warning-bg:   #fffbeb;
-  --color-danger:       #b91c1c;
-  --color-danger-bg:    #fef2f2;
-  --shadow-sm:          0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow:             0 4px 20px rgba(0, 0, 0, 0.12);
-  --shadow-lg:          0 20px 60px rgba(0, 0, 0, 0.2);
-  --shadow-sidebar:     4px 0 24px rgba(0, 0, 0, 0.15);
+  --color-text-muted:   #2c3545;
+  --color-border:       #8a95a8;
+  --color-accent:       #0050a0;
+  --color-accent-hover: #003d7a;
+  --color-accent-muted: rgba(0, 80, 160, 0.15);
+  --color-accent-rgb:   0, 80, 160;
+  --color-primary:      #1a3c6e;
+  --color-primary-dark: #132e55;
+  --color-primary-light: #1d4ed8;
+  --color-primary-rgb:  26, 60, 110;
+  --color-white:        #ffffff;
+  --color-success:      #166534;
+  --color-success-dark: #14532d;
+  --color-success-bg:   #dcfce7;
+  --color-warning:      #92400e;
+  --color-warning-bg:   #fef3c7;
+  --color-danger:       #991b1b;
+  --color-danger-rgb:   153, 27, 27;
+  --color-danger-bg:    #fee2e2;
+  --color-execute:      #166534;
+  --color-execute-hover: #14532d;
+  --color-execute-text: #ffffff;
+  --shadow-sm:          0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow:             0 4px 20px rgba(0, 0, 0, 0.14);
+  --shadow-lg:          0 20px 60px rgba(0, 0, 0, 0.22);
+  --shadow-sidebar:     4px 0 24px rgba(0, 0, 0, 0.18);
   font-size: 106%;
 }
 
+/* ── Elementos interactivos: tamanho mínimo e alto contraste ── */
 body.modo-campo .btn,
 body.modo-campo button,
 body.modo-campo .nav-link,
@@ -952,14 +1086,130 @@ body.modo-campo textarea {
   min-height: 46px;
 }
 
-body.modo-campo .nav-link {
+/* ── Botões: reforçar peso; cor herdada do estilo base ou do componente ── */
+body.modo-campo button,
+body.modo-campo .btn {
+  font-weight: 600;
+}
+
+/* ── Botão secundário: fundo visível, texto escuro, borda forte ── */
+body.modo-campo button.secondary,
+body.modo-campo .btn.secondary {
+  background: #d0d8e4;
+  color: var(--color-text);
+  border: 2px solid #8a95a8;
+}
+body.modo-campo button.secondary:hover,
+body.modo-campo .btn.secondary:hover {
+  background: #b8c4d4;
+  color: var(--color-text);
+  border-color: #6b7a90;
+}
+
+/* ── Botão danger: fundo vermelho forte ── */
+body.modo-campo button.danger,
+body.modo-campo .btn.danger {
+  background: #991b1b;
+  color: var(--color-white);
+  border: 2px solid #7f1d1d;
+}
+
+/* ── Botão gravar (verde) ── */
+body.modo-campo .btn-gravar-sucesso {
+  background: #166534;
+  color: var(--color-white);
+  border: 2px solid #14532d;
+}
+body.modo-campo .btn-gravar-sucesso:hover {
+  background: #14532d;
+  color: var(--color-white);
+}
+
+/* ── Botão enviar relatório (azul primário) ── */
+body.modo-campo .btn-enviar-relatorio {
+  background: #0050a0;
+  color: var(--color-white);
+  border: 2px solid #003d7a;
+}
+body.modo-campo .btn-enviar-relatorio:hover {
+  background: #003d7a;
+}
+
+/* ── Botão outline-warning ── */
+body.modo-campo .btn-outline-warning {
+  background: #fef3c7;
+  color: #78350f;
+  border: 2px solid #92400e;
+}
+body.modo-campo .btn-outline-warning:hover {
+  background: #92400e;
+  color: var(--color-white);
+}
+
+/* ── Botão preview / icon buttons ── */
+body.modo-campo .btn-preview,
+body.modo-campo .btn-foto,
+body.modo-campo .btn-link-checklist {
+  color: var(--color-text);
+  font-weight: 600;
+}
+body.modo-campo .icon-btn {
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Botão voltar — texto escuro legível ── */
+body.modo-campo .btn-back {
+  color: var(--color-accent);
+}
+body.modo-campo .btn-back:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ── Overflow menus (3 pontos) — texto escuro sobre fundo claro ── */
+body.modo-campo .mc-overflow-menu {
+  background: var(--color-white);
+  border: 2px solid var(--color-border);
+}
+body.modo-campo .mc-overflow-menu button {
+  color: var(--color-text);
+  background: transparent;
+}
+body.modo-campo .mc-overflow-menu button:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* ── Sidebar ── */
+body.modo-campo .sidebar {
+  background: #1a2332;
+  border-right: 2px solid #3a4a60;
+}
+body.modo-campo .sidebar .nav-link {
+  color: #e0e8f0;
   padding: 0.85rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
 }
-
-body.modo-campo .sidebar {
-  border-right-color: var(--color-border);
+body.modo-campo .sidebar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+body.modo-campo .sidebar .nav-link.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-left: 3px solid var(--color-accent);
+}
+body.modo-campo .sidebar .user-name {
+  color: #e0e8f0;
+}
+body.modo-campo .sidebar .btn-logout {
+  color: #fca5a5;
+  background: rgba(220, 40, 40, 0.2);
+  border: 1px solid rgba(220, 40, 40, 0.5);
+}
+body.modo-campo .sidebar .sidebar-search-btn {
+  color: #c0cce0;
+  border-color: #3a4a60;
 }
 
 /* Indicador visual de modo campo activo na sidebar */
@@ -971,14 +1221,476 @@ body.modo-campo .sidebar-header::after {
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--color-warning);
-  background: rgba(180, 83, 9, 0.1);
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
   border-radius: 4px;
   padding: 0.2rem 0.5rem;
 }
 
-/* Badges maiores */
+/* ── Bottom nav bar (tablet/mobile) ── */
+body.modo-campo .bottom-nav {
+  background: #1a2332;
+  border-top: 2px solid #3a4a60;
+}
+body.modo-campo .bnav-item {
+  color: #b0c0d4;
+  font-weight: 600;
+}
+body.modo-campo .bnav-item:hover,
+body.modo-campo .bnav-item:active {
+  color: #ffffff;
+}
+body.modo-campo .bnav-item.bnav-active {
+  color: #60b8ff;
+}
+
+/* ── Formulários: inputs, selects, textareas ── */
+body.modo-campo input,
+body.modo-campo select,
+body.modo-campo textarea {
+  background: var(--color-white);
+  color: var(--color-text);
+  border: 2px solid #8a95a8;
+}
+body.modo-campo input:focus,
+body.modo-campo select:focus,
+body.modo-campo textarea:focus {
+  border-color: var(--color-accent);
+  outline: 2px solid rgba(0, 80, 160, 0.3);
+}
+body.modo-campo input::placeholder,
+body.modo-campo textarea::placeholder {
+  color: #6b7a8c;
+}
+
+/* ── Labels e texto de formulário ── */
+body.modo-campo label,
+body.modo-campo .form-group label,
+body.modo-campo .label-required span,
+body.modo-campo .exec-section-title,
+body.modo-campo .assinatura-titulo,
+body.modo-campo .form-section h3 {
+  color: var(--color-text);
+  font-weight: 600;
+}
+body.modo-campo .req-star,
+body.modo-campo .required {
+  color: #991b1b;
+}
+body.modo-campo .text-muted,
+body.modo-campo .fotos-vazio,
+body.modo-campo .char-count,
+body.modo-campo .field-hint,
+body.modo-campo .assinatura-hint {
+  color: #3a4a5e;
+}
+
+/* ── Cards e painéis ── */
+body.modo-campo .card,
+body.modo-campo .stat-card,
+body.modo-campo .modal {
+  background: var(--color-white);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+}
+body.modo-campo .modal-header-row h2,
+body.modo-campo .modal h2 {
+  color: var(--color-text);
+}
+
+/* ── Tabelas ── */
+body.modo-campo table th {
+  background: #d0d8e4;
+  color: var(--color-text);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-border);
+}
+body.modo-campo table td {
+  color: var(--color-text);
+  border-bottom: 1px solid #c0c8d4;
+}
+body.modo-campo table tbody tr:hover {
+  background: #e8ecf2;
+}
+
+/* ── Badges: alto contraste ── */
 body.modo-campo .badge {
   font-size: 0.78rem;
   padding: 0.25rem 0.55rem;
+  font-weight: 700;
+  border-width: 2px;
+}
+body.modo-campo .badge-success,
+body.modo-campo .badge-concluida {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #166534;
+}
+body.modo-campo .badge-warning,
+body.modo-campo .badge-em_progresso,
+body.modo-campo .badge-pendente {
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #92400e;
+}
+body.modo-campo .badge-danger {
+  background: #fee2e2;
+  color: #7f1d1d;
+  border-color: #991b1b;
+}
+body.modo-campo .badge-info {
+  background: #dbeafe;
+  color: #1e3a5f;
+  border-color: #1d4ed8;
+}
+
+/* ── Breadcrumbs ── */
+body.modo-campo .breadcrumbs,
+body.modo-campo .breadcrumbs a,
+body.modo-campo .breadcrumbs span,
+body.modo-campo .breadcrumbs-link,
+body.modo-campo .breadcrumbs-current,
+body.modo-campo .breadcrumbs-sep {
+  color: var(--color-text);
+  font-weight: 600;
+}
+body.modo-campo .breadcrumbs-link:hover {
+  color: var(--color-accent);
+}
+
+/* ── Declaração/assinatura ── */
+body.modo-campo .declaracao-assinatura-box {
+  background: #f8f9fb;
+  border: 2px solid var(--color-border);
+}
+body.modo-campo .declaracao-assinatura-titulo {
+  color: var(--color-text);
+  font-weight: 700;
+}
+body.modo-campo .declaracao-assinatura-texto {
+  color: #2c3545;
+}
+
+/* ── Assinatura canvas ── */
+body.modo-campo .assinatura-canvas {
+  background: var(--color-white);
+  border: 2px solid var(--color-border);
+}
+
+/* ── Checklist ── */
+body.modo-campo .checklist-section-wizard {
+  background: rgba(37, 99, 235, 0.05);
+  border-color: rgba(37, 99, 235, 0.25);
+  border-left-color: #2563eb;
+}
+body.modo-campo .checklist-section-wizard h3,
+body.modo-campo .checklist-obrigatorio-badge {
+  color: #1d4ed8;
+}
+body.modo-campo .checklist-item-row:nth-child(even) {
+  background: rgba(0,0,0,0.025);
+}
+body.modo-campo .checklist-item-texto {
+  color: var(--color-text);
+}
+body.modo-campo .btn-simnao {
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  background: #e8ecf2;
+  font-weight: 600;
+}
+body.modo-campo .btn-simnao.active-sim {
+  background: #166534;
+  color: var(--color-white);
+  border-color: #14532d;
+}
+body.modo-campo .btn-simnao.active-nao {
+  background: #991b1b;
+  color: var(--color-white);
+  border-color: #7f1d1d;
+}
+
+/* ── Footer ── */
+body.modo-campo .app-footer {
+  color: #4a5568;
+}
+
+/* ── Guardar contacto ── */
+body.modo-campo .btn-guardar-contacto {
+  background: #dbeafe;
+  color: #1e3a5f;
+  border: 1px solid #3b82f6;
+}
+body.modo-campo .btn-guardar-contacto:hover {
+  background: #bfdbfe;
+}
+
+/* ── Alertas / erros ── */
+body.modo-campo .form-erro {
+  color: #991b1b;
+  font-weight: 600;
+}
+body.modo-campo .field-error {
+  color: #991b1b;
+}
+
+/* ── Botão modo campo (na sidebar) ── */
+body.modo-campo .btn-modo-campo {
+  background: #fbbf24;
+  color: #0a0e14;
+  border-color: #92400e;
+}
+
+/* ── Dashboard: stat cards, calendário, filtros ── */
+body.modo-campo .stat-card,
+body.modo-campo .stat-card-nav,
+body.modo-campo .dash-card,
+body.modo-campo .kpi-card,
+body.modo-campo .dashboard-calendar-card {
+  background: var(--color-white);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+}
+body.modo-campo .stat-card h3,
+body.modo-campo .stat-card-nav h3,
+body.modo-campo .stat-card .stat-value,
+body.modo-campo .stat-card-nav .stat-value,
+body.modo-campo .kpi-card .kpi-value {
+  color: var(--color-text);
+}
+body.modo-campo .stat-card .stat-label,
+body.modo-campo .stat-card-nav .stat-label {
+  color: #2c3545;
+}
+body.modo-campo .stat-card svg,
+body.modo-campo .stat-card-nav svg {
+  opacity: 1;
+}
+
+/* ── Dashboard calendário: dias, header ── */
+body.modo-campo .dashboard-cal-weekday {
+  color: var(--color-text);
+  font-weight: 700;
+}
+body.modo-campo .dashboard-cal-day {
+  color: var(--color-text);
+  border: 1px solid #c0c8d4;
+}
+body.modo-campo .dashboard-cal-day.today {
+  background: #dbeafe;
+  border-color: var(--color-accent);
+  font-weight: 700;
+}
+body.modo-campo .dashboard-calendar-header,
+body.modo-campo .dashboard-calendar-header h3 {
+  color: var(--color-text);
+}
+
+/* ── Filtros / tabs ── */
+body.modo-campo .filter-btn,
+body.modo-campo .tab-btn,
+body.modo-campo .manut-filter-btn {
+  background: #d0d8e4;
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  font-weight: 600;
+}
+body.modo-campo .filter-btn.active,
+body.modo-campo .tab-btn.active,
+body.modo-campo .manut-filter-btn.active {
+  background: var(--color-accent);
+  color: var(--color-white);
+  border-color: var(--color-accent);
+}
+
+/* ── Listas: items de manutenção, reparação, equipamento ── */
+body.modo-campo .manut-card,
+body.modo-campo .rep-card,
+body.modo-campo .equip-card,
+body.modo-campo .cliente-row {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+body.modo-campo .manut-card:hover,
+body.modo-campo .rep-card:hover,
+body.modo-campo .equip-card:hover {
+  background: #e8ecf2;
+}
+
+/* ── Títulos de secções e página ── */
+body.modo-campo h1,
+body.modo-campo h2,
+body.modo-campo h3,
+body.modo-campo h4 {
+  color: var(--color-text);
+}
+
+/* ── Pesquisa global ── */
+body.modo-campo .pq-input {
+  background: var(--color-white);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+}
+body.modo-campo .pq-titulo {
+  color: var(--color-text);
+}
+body.modo-campo .pq-sub {
+  color: #2c3545;
+}
+
+/* ── Dropdown de estado (select) em tabelas ── */
+body.modo-campo .estado-select,
+body.modo-campo .filtro-select {
+  background: var(--color-white);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  font-weight: 600;
+}
+
+/* ── Empty states ── */
+body.modo-campo .empty-state,
+body.modo-campo .no-data {
+  color: #3a4a5e;
+}
+body.modo-campo .empty-icon {
+  opacity: 0.7;
+}
+
+/* ── Toast ── */
+body.modo-campo .toast {
+  border-width: 2px;
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Correcções de contraste por página — badges e elementos com cores pastel
+   concebidas para o tema escuro que ficam ilegíveis sobre fundo claro
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dashboard: badges de estado (já têm override genérico .badge-success etc.
+      mas as regras em Dashboard.css são mais específicas — reforçar) ── */
+body.modo-campo .badge-warning  { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .badge-success  { background: #dcfce7; color: #14532d; border-color: #166534; }
+body.modo-campo .badge-danger   { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; }
+
+/* ── Manutenções: badges e tipos Kaeser ── */
+body.modo-campo .badge-concluida            { background: #dcfce7; color: #14532d; border-color: #166534; }
+body.modo-campo .badge-em_progresso         { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .badge.kaeser-tipo-badge    { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+body.modo-campo .badge.kaeser-tipo-badge--outro { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+body.modo-campo .badge-historico            { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+body.modo-campo .badge-pendente-assinatura  { background: #fef3c7; color: #78350f; border-color: #92400e; }
+
+/* ── Equipamentos: badges ── */
+body.modo-campo .kaeser-tipo-badge          { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+body.modo-campo .kaeser-tipo-badge--outro   { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+body.modo-campo .badge-periodicidade        { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+body.modo-campo .badge-conforme-equip       { background: #dcfce7; color: #14532d; border-color: #166534; }
+body.modo-campo .badge-sem-data-equip       { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+body.modo-campo .badge-docs                 { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .badge-docs--ok             { background: #dcfce7; color: #14532d; border-color: #166534; }
+
+/* ── Clientes: badges de manutenção ── */
+body.modo-campo .badge-atraso     { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; }
+body.modo-campo .badge-conforme   { background: #dcfce7; color: #14532d; border-color: #166534; }
+body.modo-campo .badge-sem-data   { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+
+/* ── Reparações: materiais e stats mensais ── */
+body.modo-campo .badge-materiais               { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+body.modo-campo .materiais-detail-titulo        { color: #1e3a5f; }
+body.modo-campo .materiais-mini-table thead th  { background: #dbeafe; color: #1e3a5f; border-bottom-color: #3b82f6; }
+body.modo-campo .mensal-stat-destaque           { background: #dbeafe !important; border-color: #3b82f6; }
+body.modo-campo .mensal-stat-destaque .mensal-stat-val { color: #1e3a5f; }
+
+/* ── Calendário: eventos ── */
+body.modo-campo .event-reparacao { background: #ede9fe; color: #5b21b6; border-color: #8b5cf6; }
+
+/* ── Logs: badges, user, stats ── */
+body.modo-campo .log-badge--fatal  { background: #fee2e2; color: #7f1d1d; border-color: #be123c; }
+body.modo-campo .log-badge--error  { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; }
+body.modo-campo .log-badge--warn   { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .log-badge--action { background: #dbeafe; color: #155e75; border-color: #0ea5e9; }
+body.modo-campo .log-badge--info   { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
+body.modo-campo .log-user          { background: #ede9fe; color: #5b21b6; }
+body.modo-campo .log-help-box strong       { color: #5b21b6; }
+body.modo-campo .log-stat--info .log-stat-val { color: #5b21b6; }
+
+/* ── Métricas: ícone roxo e badge top ── */
+body.modo-campo .met-card-icon--purple { background: #ede9fe; color: #5b21b6; }
+body.modo-campo .met-top-badge         { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; }
+
+/* ── Definições: alertas e erros ── */
+body.modo-campo .def-alert--info  { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+body.modo-campo .def-alert--warn  { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .def-alerta-erro  { color: #991b1b; }
+
+/* ── Marcas: badges de contraste ── */
+body.modo-campo .marcas-contrast.ok   { background: #dcfce7; color: #14532d; border-color: #166534; }
+body.modo-campo .marcas-contrast.warn { background: #fef3c7; color: #78350f; border-color: #92400e; }
+
+/* ── Alertas proactivos: urgência ── */
+body.modo-campo .alerta-item-dias.urgency-hoje    { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; }
+body.modo-campo .alerta-item-dias.urgency-critico { background: #fff7ed; color: #92400e; border-color: #c2410c; }
+
+/* ── Email panel (shared: Manutencoes, Reparacoes, Clientes, EnviarEmailModal) ── */
+.frota-email-panel {
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-md, 8px);
+  padding: 1rem;
+  margin-top: 0.25rem;
+  background: rgba(13, 110, 253, 0.04);
+}
+.frota-email-panel-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+.frota-email-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--color-border, rgba(255,255,255,0.08));
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.frota-email-check:last-of-type { border-bottom: none; }
+.frota-email-check input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+.frota-email-check span small { color: var(--color-text-muted); }
+.frota-email-outro-wrap { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
+.frota-email-outro-wrap small { font-size: 0.78rem; color: var(--color-text-muted); }
+.frota-email-outro-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.88rem;
+  border: 1px solid var(--color-border, rgba(255,255,255,0.15));
+  border-radius: 6px;
+  background: var(--color-surface, #1e2530);
+  color: var(--color-text);
+}
+.frota-email-actions {
+  margin-top: 0.85rem;
+  justify-content: flex-end;
+}
+
+/* ── Botão voltar e links: garantir texto legível ── */
+body.modo-campo .btn-back  { color: var(--color-accent); background: transparent; }
+body.modo-campo .def-back-btn { color: var(--color-text); background: transparent; }
+
+/* ── Overflow menu: texto escuro sobre fundo claro ── */
+body.modo-campo .mc-overflow-menu { background: var(--color-white); border-color: var(--color-border); }
+body.modo-campo .mc-overflow-menu button { color: var(--color-text); background: transparent; }
+body.modo-campo .mc-overflow-menu button:hover { background: var(--color-accent-muted); }
+body.modo-campo .mc-overflow-danger { color: #991b1b !important; }
+
+/* ── Garantir que TODOS os textos são legíveis ── */
+body.modo-campo p,
+body.modo-campo span,
+body.modo-campo div,
+body.modo-campo li {
+  color: inherit;
 }

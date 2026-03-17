@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { APP_FOOTER_TEXT } from '../config/version'
@@ -14,7 +14,7 @@ import { STORAGE } from '../config/storageKeys'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
 import PesquisaGlobal from './PesquisaGlobal'
-import QrReaderModal from './QrReaderModal'
+const QrReaderModal = lazy(() => import('./QrReaderModal'))
 import './Layout.css'
 
 export default function Layout({ children }) {
@@ -183,10 +183,10 @@ export default function Layout({ children }) {
               <Breadcrumbs />
               <div className="main-content">
                 {children}
+                <footer className="app-footer">
+                  {APP_FOOTER_TEXT}
+                </footer>
               </div>
-              <footer className="app-footer">
-                {APP_FOOTER_TEXT}
-              </footer>
               <InstallPrompt />
             </>
           )
@@ -219,7 +219,11 @@ export default function Layout({ children }) {
 
       {/* Modais globais — fora do <main> para z-index correcto */}
       {pesquisaOpen && <PesquisaGlobal onClose={() => setPesquisaOpen(false)} />}
-      <QrReaderModal isOpen={qrReaderOpen} onClose={() => setQrReaderOpen(false)} />
+      {qrReaderOpen && (
+        <Suspense fallback={null}>
+          <QrReaderModal isOpen={qrReaderOpen} onClose={() => setQrReaderOpen(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -45,7 +45,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
 }
 .filtro-tab:hover {
   border-color: var(--primary, #3b82f6);
@@ -66,8 +66,8 @@
   text-align: center;
 }
 .filtro-tab:not(.active) .filtro-tab-count {
-  background: var(--surface-2, #f1f5f9);
-  color: var(--text-secondary, #64748b);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
 }
 
 /* Tabela */
@@ -101,7 +101,7 @@
 }
 .reparacoes-table .data-table td.actions .actions-inner {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
@@ -113,7 +113,7 @@
   flex-shrink: 0;
 }
 .row-concluida td {
-  opacity: 0.75;
+  opacity: 0.82;
 }
 
 /* Célula máquina */
@@ -124,7 +124,7 @@
 }
 .maq-nome  { font-weight: 600; }
 .maq-sub   { font-size: 0.72rem; }
-.td-aviso  { font-size: 0.78rem; color: var(--text-secondary, #64748b); }
+.td-aviso  { font-size: 0.78rem; color: var(--color-text-muted); }
 .td-data   { white-space: nowrap; }
 
 /* Botão executar */
@@ -155,10 +155,10 @@
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
 }
 .empty-icon {
-  opacity: 0.35;
+  opacity: 0.65;
 }
 
 /* ── Modal Nova Reparação ─────────────────────────────────────────────────── */
@@ -184,7 +184,7 @@
 .email-info {
   font-size: 0.9rem;
   margin-bottom: 1rem;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
 }
 
 /* ── Confirm modal ───────────────────────────────────────────────────────── */
@@ -194,7 +194,7 @@
   width: 95vw;
 }
 .confirm-details {
-  background: var(--surface-2, #f1f5f9);
+  background: var(--color-bg-elevated);
   border-radius: 0.5rem;
   padding: 0.6rem 1rem;
   font-size: 0.88rem;
@@ -213,7 +213,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   margin: 0 0 0.5rem;
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   padding-bottom: 0.25rem;
@@ -226,8 +226,11 @@
 }
 .rel-label {
   font-weight: 600;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .pecas-table {
   font-size: 0.8rem;
@@ -236,7 +239,7 @@
   padding: 0.2rem 0.4rem;
 }
 .rel-section-equipamento {
-  background: var(--bg-secondary, #f8fafc);
+  background: var(--color-bg-secondary);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
 }
@@ -289,8 +292,8 @@
   margin-left: 0.5rem;
   font-size: 0.72rem;
   font-weight: 500;
-  color: var(--istobal-accent, #f59e0b);
-  background: rgba(245, 158, 11, 0.1);
+  color: var(--istobal-accent, #fbbf24);
+  background: rgba(251, 191, 36, 0.16);
   border-radius: var(--radius-xs);
   padding: 1px 5px;
   vertical-align: middle;
@@ -328,14 +331,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 .mensal-titulo {
   font-size: 1rem;
   font-weight: 700;
-  min-width: 160px;
+  min-width: 0;
+  flex: 1 1 auto;
   text-align: center;
+}
+@media (max-width: 768px) {
+  .mensal-titulo { min-width: auto; font-size: 0.95rem; }
 }
 
 .mensal-resumo {
@@ -347,7 +356,7 @@
 .mensal-stat {
   flex: 1;
   min-width: 90px;
-  background: var(--surface-2, #f1f5f9);
+  background: var(--color-bg-elevated);
   border-radius: 0.6rem;
   padding: 0.6rem 0.75rem;
   text-align: center;
@@ -356,7 +365,7 @@
   gap: 0.2rem;
 }
 .mensal-stat-total {
-  background: var(--surface-3, #e2e8f0);
+  background: var(--color-bg-secondary);
 }
 .mensal-stat-val {
   font-size: 1.4rem;
@@ -365,12 +374,14 @@
 }
 .mensal-stat-lbl {
   font-size: 0.7rem;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
 .mensal-secao {
   margin-top: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .mensal-secao-titulo {
   display: flex;
@@ -380,7 +391,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   margin: 0 0 0.5rem;
   border-bottom: 1px solid var(--border-color, #e2e8f0);
   padding-bottom: 0.25rem;
@@ -401,7 +412,7 @@
   font-variant-numeric: tabular-nums;
 }
 .row-em-curso td {
-  opacity: 0.7;
+  opacity: 0.85;
   font-style: italic;
 }
 .mensal-total-row {
@@ -411,7 +422,7 @@
 .mensal-total-lbl {
   text-align: right;
   font-size: 0.82rem;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   padding-right: 0.5rem !important;
 }
 .mensal-total-val {
@@ -419,11 +430,11 @@
   font-size: 0.92rem;
 }
 .mensal-stat-destaque {
-  background: #eff6ff !important;
-  border: 1.5px solid #bfdbfe;
+  background: rgba(26, 184, 240, 0.16) !important;
+  border: 1.5px solid rgba(26, 184, 240, 0.4);
 }
 .mensal-stat-destaque .mensal-stat-val {
-  color: #1d4ed8;
+  color: #7dd3fc;
 }
 
 /* Linha expansível (clicável para ver materiais) */
@@ -431,7 +442,7 @@
   cursor: pointer;
 }
 .row-expansivel:hover td {
-  background: #f0f9ff !important;
+  background: rgba(26, 184, 240, 0.08) !important;
 }
 .td-horas-toggle {
   display: flex;
@@ -440,7 +451,7 @@
   justify-content: flex-end;
 }
 .chevron-expand {
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-muted);
   flex-shrink: 0;
   transition: transform 0.2s ease;
 }
@@ -461,14 +472,15 @@
   font-weight: 600;
   padding: 0.1rem 0.35rem;
   border-radius: 999px;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: rgba(14, 165, 233, 0.18);
+  color: #7dd3fc;
+  border: 1px solid rgba(14, 165, 233, 0.35);
   white-space: nowrap;
 }
 
 /* Sub-linha com materiais expandidos */
 .row-materiais-detail td {
-  background: #f8fafc !important;
+  background: var(--color-bg-elevated) !important;
   padding: 0 !important;
   border-top: none !important;
 }
@@ -477,6 +489,8 @@
   border-left: 3px solid #3b82f6;
   margin: 0 0.5rem 0.3rem 0.5rem;
   border-radius: 0 0.25rem 0.25rem 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .materiais-detail-titulo {
   display: flex;
@@ -484,7 +498,7 @@
   gap: 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #0369a1;
+  color: #7dd3fc;
   margin-bottom: 0.45rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -495,16 +509,16 @@
   font-size: 0.78rem;
 }
 .materiais-mini-table thead th {
-  background: #e0f2fe;
-  color: #075985;
+  background: rgba(26, 184, 240, 0.15);
+  color: #7dd3fc;
   font-weight: 600;
   padding: 0.25rem 0.5rem;
   text-align: left;
-  border-bottom: 1px solid #bae6fd;
+  border-bottom: 1px solid rgba(26, 184, 240, 0.35);
 }
 .materiais-mini-table tbody td {
   padding: 0.2rem 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border);
   background: transparent !important;
 }
 .materiais-mini-table tbody tr:last-child td {
@@ -513,7 +527,7 @@
 .td-codigo {
   font-family: monospace;
   font-size: 0.75rem;
-  color: #475569;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 .th-qtd, .td-qtd {
@@ -536,7 +550,7 @@
 }
 .mensal-vazio {
   text-align: center;
-  color: var(--text-secondary, #64748b);
+  color: var(--color-text-muted);
   padding: 1rem 0;
   font-size: 0.88rem;
 }
@@ -552,7 +566,7 @@
   flex-direction: column;
   gap: var(--space-sm);
 }
-.rc-card.rc-concluida { opacity: 0.7; }
+.rc-card.rc-concluida { opacity: 0.82; }
 .rc-top {
   display: flex;
   align-items: center;

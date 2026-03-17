@@ -5,10 +5,18 @@
  */
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
-import { APP_FOOTER_TEXT } from '../config/version'
-import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
 import { getDeclaracaoCliente } from '../constants/relatorio'
+import {
+  cssBase,
+  htmlHeader,
+  htmlTituloBar,
+  htmlPaginaCliente,
+  htmlFooter,
+  htmlFotos,
+  PALETA,
+  TIPO,
+} from './relatorioBaseStyles'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
@@ -54,16 +62,13 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
   const dataRealizacao = dataRealizacaoBruta
     ? formatDataAzores(dataRealizacaoBruta, true)
     : 'Pendente de preenchimento'
+  const dataCriacao = relatorio.dataCriacao
+    ? formatDataHoraAzores(relatorio.dataCriacao) : '—'
 
   // ── Equipamento ──
   const equipCompleto = maquina && subcategoriaNome
     ? esc(`${subcategoriaNome} — ${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}`)
     : maquina ? esc(`${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}`) : '—'
-
-  const safeAssinatura = relatorio.assinaturaDigital
-    ? safeDataImageUrl(relatorio.assinaturaDigital) : ''
-  const tecSigSafe = tecnicoObj?.assinaturaDigital ? safeDataImageUrl(tecnicoObj.assinaturaDigital) : ''
-  const tecTelefone = tecnicoObj?.telefone ? esc(tecnicoObj.telefone) : ''
 
   // ── Peças ──
   let pecas = []
@@ -98,12 +103,53 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
   checklistItems.forEach(it => { checklistMap[it.id] = it.texto ?? it.descricao ?? it.nome ?? it.id })
 
   const buildCheckRow = ([id, resp], i) => {
-    const texto = checklistMap[id] ?? id   // fallback ao ID se não encontrar
+    const texto = checklistMap[id] ?? id
     const badge = resp === 'OK'
-      ? '<span class="badge-sim">OK</span>'
-      : resp === 'NOK' ? '<span class="badge-nao">NOK</span>' : '<span class="badge-nd">N/A</span>'
-    return `<tr><td class="cl-num">${i + 1}.</td><td class="cl-texto">${esc(texto)}</td><td class="cl-badge">${badge}</td></tr>`
+      ? `<span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">OK</span>`
+      : resp === 'NOK' ? `<span class="badge-nao" style="background:#fee2e2;color:#7f1d1d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #fca5a5">NOK</span>` : `<span class="badge-nd" style="color:${PALETA.muted}">N/A</span>`
+    const rowBg = i % 2 === 1 ? `;background:${PALETA.cinza}` : ''
+    return `<tr style="border-bottom:1px solid ${PALETA.bordaLeve}${rowBg}"><td class="cl-num" style="width:1.6em;color:${PALETA.muted};font-size:${TIPO.label};padding:3px 4px;white-space:nowrap;vertical-align:top;text-align:right;padding-right:6px">${i + 1}.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:${TIPO.pequeno};color:${PALETA.texto}">${esc(texto)}</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top">${badge}</td></tr>`
   }
+
+  const istobalBadge = reparacao?.origem === 'istobal_email'
+    ? ' <span class="rpt-istobal-badge">⚡ ISTOBAL</span>' : ''
+  const tituloBar = htmlTituloBar(
+    'Relatório de Reparação',
+    'Nº Relatório',
+    relatorio.numeroRelatorio ?? '—',
+    istobalBadge
+  )
+
+  const cssReparacao = `
+/* ── Reparação: variáveis de marca ── */
+:root { --rep: ${brandPrimary}; --rep-bg: ${brandSoft}; --rep-borda: ${brandBorder} }
+
+/* Bloco de texto longo */
+.rpt-text-block {
+  background: var(--cinza); border-radius: 3px; padding: 5px 7px;
+  font-size: 9.5px; line-height: 1.5; color: var(--texto);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* Peças (reparação: código, descrição, qtd) */
+.pecas-table .td-qtd { text-align: center; font-weight: 700; width: 3rem }
+
+/* Checklist reparação (OK/NOK/N/A) */
+.cl-table { width: 100%; border-collapse: collapse; font-size: 9.5px }
+.cl-table td { padding: 2px 4px; border-bottom: 1px solid var(--borda-leve); vertical-align: middle }
+.cl-table tr:last-child td { border-bottom: none }
+.cl-num { width: 1.5rem; color: var(--muted); text-align: right; padding-right: 6px }
+.cl-texto { flex: 1 }
+.cl-badge { text-align: right; width: 2.5rem }
+
+/* Aviso ISTOBAL */
+.rpt-istobal-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fff7ed; color: var(--rep);
+  border: 1px solid var(--rep-borda); border-radius: 3px;
+  padding: 1.5px 6px; font-size: 8.5px; font-weight: 700; margin-left: 6px;
+}
+`
 
   const html = `<!DOCTYPE html>
 <html lang="pt">
@@ -111,121 +157,15 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
 <meta charset="utf-8">
 <title>Relatório de Reparação ${esc(relatorio.numeroRelatorio ?? '')} — Navel</title>
 <style>
-@page{size:A4 portrait;margin:8mm 11mm}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;font-size:10.5px;line-height:1.42;color:#1a1a2e;background:#fff;padding:0}
-
-:root{
-  --azul:#1a4880;--azul-med:#2d6eb5;--azul-claro:#e8f2fa;
-  --cinza:#f4f6f8;--borda:#c6d8ec;--texto:#1a1a2e;--muted:#5a6a7e;
-  --verde:#16a34a;--vermelho:#dc2626;--acento:#f0a500;
-  --rep:${brandPrimary};--rep-bg:${brandSoft};--rep-borda:${brandBorder};--acento:${brandPrimary};
-}
-
-section{margin-bottom:10px;page-break-inside:avoid}
-.section-can-break{page-break-inside:auto}
-.page-break-before{page-break-before:always}
-.no-break{page-break-inside:avoid}
-
-/* Cabeçalho */
-.rpt-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:2.5px solid var(--azul)}
-.rpt-logos{display:flex;align-items:center;gap:10px}
-.rpt-logo img{max-height:42px;max-width:170px;object-fit:contain;display:block}
-.rpt-logo-istobal img{max-height:42px;max-width:170px;object-fit:contain;display:block}
-.rpt-logo-fallback{font-size:1.2em;font-weight:700;color:var(--azul)}
-.rpt-empresa{text-align:right;font-size:9px;line-height:1.5;color:var(--muted)}
-.rpt-empresa strong{display:block;font-size:10px;color:var(--azul);margin-bottom:1px}
-.rpt-empresa a{color:var(--azul-med);text-decoration:none}
-
-/* Título — barra de reparação (laranja) */
-.rpt-titulo-bar{display:flex;align-items:center;justify-content:space-between;background:var(--rep);color:#fff;padding:5px 10px;margin:7px 0 0;border-radius:3px}
-.rpt-titulo-bar h1{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.rpt-num-wrap{text-align:right}
-.rpt-num-label{font-size:8px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;display:block}
-.rpt-num{font-size:14px;font-weight:800;letter-spacing:.04em;font-family:'Courier New',monospace}
-.rpt-acento{height:2px;background:linear-gradient(90deg,var(--acento),var(--rep));margin-bottom:8px;border-radius:0 0 2px 2px}
-
-/* Secções */
-.rpt-section-title{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--rep);border-bottom:1px solid var(--rep-borda);padding-bottom:2px;margin-bottom:5px}
-
-/* Grid de dados */
-.rpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px}
-.rpt-field{padding:2.5px 0;border-bottom:1px solid #edf2f7}
-.rpt-field:last-child{border-bottom:none}
-.rpt-label{font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);display:block;margin-bottom:0}
-.rpt-value{font-size:10px;color:var(--texto);font-weight:500}
-
-/* Bloco de texto longo */
-.rpt-text-block{background:var(--cinza);border-radius:3px;padding:5px 7px;font-size:9.5px;line-height:1.5;color:var(--texto);white-space:pre-wrap;word-break:break-word}
-
-/* Peças */
-.pecas-table{width:100%;border-collapse:collapse;font-size:9px}
-.pecas-table th{background:var(--rep);color:#fff;padding:3px 6px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.05em}
-.pecas-table td{padding:3px 6px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-.pecas-table tr:last-child td{border-bottom:none}
-.pecas-table tr:nth-child(even) td{background:#fafafa}
-.pecas-table .td-qtd{text-align:center;font-weight:700;width:3rem}
-
-/* Checklist */
-.cl-table{width:100%;border-collapse:collapse;font-size:9px}
-.cl-table td{padding:2px 4px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-.cl-table tr:last-child td{border-bottom:none}
-.cl-num{width:1.5rem;color:var(--muted);text-align:right;padding-right:6px}
-.cl-texto{flex:1}
-.cl-badge{text-align:right;width:2.5rem}
-.badge-sim{background:#dcfce7;color:#166534;padding:1px 5px;border-radius:3px;font-size:7.5px;font-weight:700}
-.badge-nao{background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:3px;font-size:7.5px;font-weight:700}
-.badge-nd{background:#f1f5f9;color:#64748b;padding:1px 5px;border-radius:3px;font-size:7.5px;font-weight:700}
-
-/* Fotos */
-.fotos-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.foto-item img{max-width:140px;max-height:100px;object-fit:cover;border-radius:3px;border:1px solid var(--borda)}
-
-/* Assinatura */
-.rpt-assinatura-bloco{display:flex;gap:20px;align-items:flex-start}
-.rpt-assinatura-left{flex:1}
-.rpt-assinatura-right{flex:1;text-align:center}
-.rpt-assinatura-canvas{display:block;max-width:200px;max-height:70px;object-fit:contain;margin:0 auto 2px}
-.rpt-assinatura-label{font-size:7.5px;color:var(--muted);text-align:center;margin-top:2px;padding-top:3px;border-top:1px solid var(--borda)}
-.rpt-assinatura-nome{font-size:9px;font-weight:700;color:var(--texto);text-align:center;margin-bottom:1px}
-.rpt-assinatura-legenda{margin-top:4px;font-size:8px;color:var(--muted);text-align:center;line-height:1.35}
-
-/* Aviso ISTOBAL */
-.rpt-istobal-badge{display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:var(--rep);border:1px solid var(--rep-borda);border-radius:3px;padding:1px 6px;font-size:8px;font-weight:700;margin-left:6px}
-
-/* Rodapé */
-.rpt-footer{border-top:1px solid var(--borda);padding-top:5px;text-align:center;font-size:8px;color:var(--muted);margin-top:10px}
+${cssBase(brandPrimary, brandSoft)}
+${cssReparacao}
 </style>
 </head>
 <body>
 
-<!-- Cabeçalho -->
 <section>
-  <div class="rpt-header">
-    <div class="rpt-logos">
-      <div class="rpt-logo">
-        <img src="${logoSrc}" alt="Navel" onerror="this.parentNode.innerHTML='<span class=\\'rpt-logo-fallback\\'>NAVEL</span>'" />
-      </div>
-      ${logoMarcaSrc ? `
-      <div class="rpt-logo-istobal">
-        <img src="${logoMarcaSrc}" alt="${esc(logoMarcaAlt)}" onerror="this.parentNode.style.display='none'" />
-      </div>` : ''}
-    </div>
-    <div class="rpt-empresa">
-      <strong>${esc(EMPRESA.nome)}</strong>
-      ${esc(EMPRESA.divisaoComercial)}<br>
-      ${esc(EMPRESA.sede)}<br>
-      ${esc(EMPRESA.telefones)} · <a href="https://${esc(EMPRESA.web)}">${esc(EMPRESA.web)}</a>
-    </div>
-  </div>
-  <div class="rpt-titulo-bar">
-    <h1>Relatório de Reparação${reparacao?.origem === 'istobal_email' ? ' <span class="rpt-istobal-badge">⚡ ISTOBAL</span>' : ''}</h1>
-    <div class="rpt-num-wrap">
-      <span class="rpt-num-label">Nº Relatório</span>
-      <span class="rpt-num">${esc(relatorio.numeroRelatorio ?? '—')}</span>
-    </div>
-  </div>
-  <div class="rpt-acento"></div>
+${htmlHeader(logoSrc, logoMarcaSrc, logoMarcaAlt)}
+${tituloBar}
 </section>
 
 <!-- Dados gerais -->
@@ -263,15 +203,20 @@ ${relatorio.trabalhoRealizado ? `
 <!-- Peças / Consumíveis -->
 ${temPecas ? `
 <section>
-  <div class="rpt-section-title">Peças / Consumíveis Utilizados</div>
-  <table class="pecas-table">
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Peças / Consumíveis Utilizados</div>
+  <table class="pecas-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:${TIPO.pequeno};margin-bottom:4px">
     <thead>
-      <tr><th>Código</th><th>Descrição</th><th class="td-qtd">Qtd</th></tr>
+      <tr>
+        <th style="background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:left;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em">Código</th>
+        <th style="background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:left;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em">Descrição</th>
+        <th style="background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:center;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em;width:3rem">Qtd</th>
+      </tr>
     </thead>
     <tbody>
-      ${pecas.filter(p => p.descricao?.trim() || p.codigo?.trim()).map(p =>
-        `<tr><td>${esc(p.codigo ?? '—')}</td><td>${esc(p.descricao ?? '—')}</td><td class="td-qtd">${esc(String(p.quantidade ?? 1))}</td></tr>`
-      ).join('')}
+      ${pecas.filter(p => p.descricao?.trim() || p.codigo?.trim()).map((p, i) => {
+        const bg = i % 2 === 1 ? `;background:${PALETA.cinza}` : ''
+        return `<tr style="border-bottom:1px solid ${PALETA.bordaLeve}${bg}"><td style="padding:3px 6px;vertical-align:middle;font-size:${TIPO.pequeno};color:${PALETA.texto};font-family:'Courier New',monospace">${esc(p.codigo ?? '—')}</td><td style="padding:3px 6px;vertical-align:middle;font-size:${TIPO.pequeno};color:${PALETA.texto}">${esc(p.descricao ?? '—')}</td><td class="td-qtd" style="padding:3px 6px;vertical-align:middle;text-align:center;font-weight:700;font-size:${TIPO.pequeno};color:${PALETA.texto}">${esc(String(p.quantidade ?? 1))}</td></tr>`
+      }).join('')}
     </tbody>
   </table>
 </section>
@@ -280,8 +225,8 @@ ${temPecas ? `
 <!-- Checklist -->
 ${temChecklist ? `
 <section>
-  <div class="rpt-section-title">Checklist de Verificação</div>
-  <table class="cl-table">
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Checklist de Verificação</div>
+  <table class="cl-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:${TIPO.pequeno}">
     <tbody>
       ${checklistEntries.map(buildCheckRow).join('')}
     </tbody>
@@ -292,54 +237,27 @@ ${temChecklist ? `
 <!-- Notas -->
 ${relatorio.notas ? `
 <section>
-  <div class="rpt-section-title">Notas / Observações</div>
-  <div class="rpt-text-block">${esc(relatorio.notas)}</div>
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Notas / Observações</div>
+  <div class="rpt-text-block" style="background:rgba(26,72,128,0.10);border-left:3px solid ${PALETA.azulNavel};padding:7px 10px;border-radius:0 4px 4px 0;font-size:${TIPO.corpo};color:${PALETA.texto};line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(relatorio.notas)}</div>
 </section>
 ` : ''}
 
-<!-- Fotos -->
-${fotosSafe.length > 0 ? `
-<section class="section-can-break">
-  <div class="rpt-section-title">Documentação Fotográfica</div>
-  <div class="fotos-grid">
-    ${fotosSafe.map((f, i) => `<div class="foto-item"><img src="${f}" alt="Foto ${i + 1}" /></div>`).join('')}
-  </div>
-</section>
-` : ''}
+${htmlFotos(fotosSafe)}
 
-<!-- Assinatura -->
-<section class="no-break">
-  <div class="rpt-section-title">Assinatura e Declaração</div>
-  <div class="rpt-field" style="margin-bottom:4px"><span class="rpt-label">Data</span><span class="rpt-value">${esc(dataAssinatura)}</span></div>
-  <div class="rpt-assinatura-bloco">
-    <div class="rpt-assinatura-left">
-      <div class="rpt-assinatura-label" style="margin-bottom:2px">Técnico responsável</div>
-      <div class="rpt-assinatura-nome">${esc(relatorio.tecnico ?? '—')}</div>
-      ${tecTelefone ? `<div style="font-size:8px;color:#64748b">Tel: ${tecTelefone}</div>` : ''}
-      ${tecSigSafe
-        ? `<img class="rpt-assinatura-canvas" src="${tecSigSafe}" alt="Assinatura do técnico" style="max-height:55px" />`
-        : ''
-      }
-    </div>
-    <div class="rpt-assinatura-right">
-      <div class="rpt-assinatura-label" style="margin-bottom:2px">Assinatura do Cliente</div>
-      <div class="rpt-assinatura-nome">${esc(relatorio.nomeAssinante ?? '—')}</div>
-      ${cliente?.nome ? `<div style="font-size:8px;color:#64748b">${esc(cliente.nome)}</div>` : ''}
-      ${safeAssinatura
-        ? `<img class="rpt-assinatura-canvas" src="${safeAssinatura}" alt="Assinatura digital" style="max-height:55px" />`
-        : '<div style="height:55px;border-bottom:1px solid #cbd5e1;margin-bottom:4px;"></div>'
-      }
-    </div>
-  </div>
-  <p style="font-size:8px;color:#64748b;margin-top:6px;line-height:1.5;">
-    ${esc(getDeclaracaoCliente('reparacao'))}
-  </p>
-</section>
+<!-- Assinatura e declaração (página do cliente) + rodapé -->
+${htmlPaginaCliente({
+  tecnicoNome: relatorio.tecnico ?? '—',
+  tecnicoTelefone: tecnicoObj?.telefone ?? '',
+  tecnicoAssinatura: tecnicoObj?.assinaturaDigital ?? '',
+  clienteNome: relatorio.nomeAssinante ?? '—',
+  clienteAssinatura: relatorio.assinaturaDigital ?? '',
+  dataCriacao,
+  dataAssinatura,
+  declaracaoTexto: getDeclaracaoCliente('reparacao'),
+  proximasManutencoes: [],
+})}
 
-<!-- Rodapé -->
-<div class="rpt-footer">
-  ${esc(APP_FOOTER_TEXT)} · Relatório de Reparação ${esc(relatorio.numeroRelatorio ?? '')}
-</div>
+${htmlFooter('', `Relatório de Reparação ${relatorio.numeroRelatorio ?? ''}`)}
 
 </body>
 </html>`

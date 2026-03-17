@@ -105,8 +105,8 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
             <button type="submit" className="btn-add-doc"><Plus size={16} /> Adicionar documento</button>
           </form>
         )}
-        <div className="form-actions" style={{ marginTop: '1rem' }}>
-          <button type="button" className="secondary" onClick={onClose}>Fechar</button>
+        <div className="form-actions">
+          <button type="button" className="btn secondary" onClick={onClose}>Fechar</button>
         </div>
       </div>
     </div>

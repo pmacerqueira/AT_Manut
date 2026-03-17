@@ -7,7 +7,6 @@
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
-import { APP_FOOTER_TEXT } from '../config/version'
 import {
   INTERVALOS_KAESER,
   SEQUENCIA_KAESER,
@@ -16,8 +15,8 @@ import {
   descricaoCicloKaeser,
   isKaeserMarca,
 } from '../context/DataContext'
-import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
+import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
@@ -39,7 +38,7 @@ function hexToRgba(hex, alpha) {
 export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItemsLive = [], options = {}) {
   if (!relatorio) return ''
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
-  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj } = options
+  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes } = options
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -76,11 +75,6 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
     ? formatDataAzores(relatorio.dataAssinatura, true)
     : (relatorio.dataCriacao ? formatDataAzores(relatorio.dataCriacao, true) : 'Pendente de preenchimento')
 
-  // ── Texto do equipamento ──
-  const equipCompleto = maquina && subcategoriaNome
-    ? esc(`${subcategoriaNome} — ${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}`)
-    : maquina ? esc(`${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}`) : '—'
-
   const ultimoEnvioLinha = ultimoEnvio?.data && ultimoEnvio?.destinatario
     ? `Último envio por email: ${formatDataHoraAzores(ultimoEnvio.data)} para ${esc(ultimoEnvio.destinatario)}`
     : null
@@ -97,9 +91,10 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
   const buildCheckRow = (item, i, offset = 0) => {
     const r = relatorio.checklistRespostas?.[item.id]
     const badge = r === 'sim'
-      ? '<span class="badge-sim">SIM</span>'
-      : r === 'nao' ? '<span class="badge-nao">NÃO</span>' : '<span class="badge-nd">—</span>'
-    return `<tr><td class="cl-num">${i + offset + 1}.</td><td class="cl-texto">${esc(item.texto)}</td><td class="cl-badge">${badge}</td></tr>`
+      ? `<span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span>`
+      : r === 'nao' ? `<span class="badge-nao" style="background:#fee2e2;color:#7f1d1d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #fca5a5">NÃO</span>` : '<span class="badge-nd" style="color:#374151">—</span>'
+    const rowBg = (i + offset) % 2 === 1 ? `;background:${PALETA.cinza}` : ''
+    return `<tr style="border-bottom:1px solid ${PALETA.bordaLeve}${rowBg}"><td class="cl-num" style="width:1.6em;color:${PALETA.muted};font-size:${TIPO.label};padding:3px 4px;white-space:nowrap;vertical-align:top">${i + offset + 1}.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:${TIPO.pequeno};color:${PALETA.texto}">${esc(item.texto)}</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top">${badge}</td></tr>`
   }
 
   let html = `<!DOCTYPE html>
@@ -108,160 +103,36 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
 <meta charset="utf-8">
 <title>Relatório de Manutenção — Navel</title>
 <style>
-/* ── Página A4, margens de impressão ── */
-@page{size:A4 portrait;margin:8mm 11mm}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;font-size:10.5px;line-height:1.42;color:#1a1a2e;background:#fff;padding:0}
-
-/* ── Paleta ── */
-:root{
-  --azul:${brandPrimary};--azul-med:${brandPrimary};--azul-claro:${brandSoft};
-  --cinza:#f4f6f8;--borda:#c6d8ec;--texto:#1a1a2e;--muted:#5a6a7e;
-  --verde:#16a34a;--vermelho:#dc2626;--acento:${brandPrimary};
-  --kaeser:#b45309;--kaeser-bg:#fffbeb;--kaeser-borda:#fde68a;
-}
-
-/* ── Quebras de página ── */
-section{margin-bottom:10px;page-break-inside:avoid}
-.section-can-break{page-break-inside:auto}
-.page-break-before{page-break-before:always}
-.no-break{page-break-inside:avoid}
-
-/* ── Cabeçalho ── */
-.rpt-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:2.5px solid var(--azul)}
-.rpt-logos{display:flex;align-items:center;gap:10px}
-.rpt-logo img{max-height:42px;max-width:170px;object-fit:contain;display:block}
-.rpt-logo-istobal img{max-height:42px;max-width:170px;object-fit:contain;display:block}
-.rpt-logo-fallback{font-size:1.2em;font-weight:700;color:var(--azul)}
-.rpt-empresa{text-align:right;font-size:9px;line-height:1.5;color:var(--muted)}
-.rpt-empresa strong{display:block;font-size:10px;color:var(--azul);margin-bottom:1px}
-.rpt-empresa a{color:var(--azul-med);text-decoration:none}
-
-/* ── Título ── */
-.rpt-titulo-bar{display:flex;align-items:center;justify-content:space-between;background:var(--azul);color:#fff;padding:5px 10px;margin:7px 0 0;border-radius:3px}
-.rpt-titulo-bar h1{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.rpt-num-wrap{text-align:right}
-.rpt-num-label{font-size:8px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;display:block}
-.rpt-num{font-size:14px;font-weight:800;letter-spacing:.04em;font-family:'Courier New',monospace}
-.rpt-acento{height:2px;background:linear-gradient(90deg,var(--acento),var(--azul-med));margin-bottom:8px;border-radius:0 0 2px 2px}
-
-/* ── Secções ── */
-.rpt-section-title{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--azul-med);border-bottom:1px solid var(--borda);padding-bottom:2px;margin-bottom:5px}
-
-/* ── Grid de dados (2 colunas) ── */
-.rpt-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px}
-.rpt-field{padding:2.5px 0;border-bottom:1px solid #edf2f7}
-.rpt-field:last-child{border-bottom:none}
-.rpt-label{font-size:8.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);display:block;margin-bottom:0}
-.rpt-value{font-size:10.5px;color:var(--texto)}
-.rpt-field--full{grid-column:1/-1}
-
-/* ── Bloco KAESER ── */
+${cssBase(brandPrimary, brandSoft)}
+/* ── KAESER (específico deste relatório) ── */
+:root{--kaeser:#92400e;--kaeser-bg:#fffbeb;--kaeser-borda:#fde68a}
 .kaeser-band{background:var(--kaeser-bg);border:1.5px solid var(--kaeser-borda);border-radius:5px;margin-bottom:9px;overflow:hidden;page-break-inside:avoid}
 .kaeser-band-header{background:var(--kaeser);color:#fff;padding:4px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .kaeser-band-titulo{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-.kaeser-band-subtitulo{font-size:9px;opacity:.85}
+.kaeser-band-subtitulo{font-size:9.5px;color:var(--muted)}
 .kaeser-band-body{padding:7px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px}
-.kaeser-item{}
-.kaeser-item-label{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;display:block;margin-bottom:1px}
+.kaeser-item-label{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;display:block;margin-bottom:1px}
 .kaeser-item-valor{font-size:11px;font-weight:600;color:var(--texto)}
 .kaeser-item-valor.destaque{font-size:13px;font-weight:800;color:var(--kaeser)}
-.kaeser-item-val-sub{font-size:8.5px;color:var(--muted);display:block}
+.kaeser-item-val-sub{font-size:9px;color:var(--muted);display:block}
 .kaeser-seq{grid-column:1/-1;margin-top:4px;border-top:1px solid var(--kaeser-borda);padding-top:5px}
-.kaeser-seq-label{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;margin-bottom:3px}
+.kaeser-seq-label{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;margin-bottom:3px}
 .kaeser-seq-dots{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
 .kaeser-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1.5px solid transparent;flex-shrink:0}
-.kaeser-dot.passado{background:#e5e7eb;color:#6b7280;border-color:#d1d5db}
+.kaeser-dot.passado{background:#e5e7eb;color:#4b5563;border-color:#d1d5db}
 .kaeser-dot.atual{background:var(--kaeser);color:#fff;border-color:var(--kaeser)}
 .kaeser-dot.proximo{background:#fff;color:var(--kaeser);border-color:var(--kaeser)}
-.kaeser-dot.futuro{background:#f9fafb;color:#9ca3af;border-color:#e5e7eb}
-.kaeser-dot-sep{color:#9ca3af;font-size:10px;padding:0 1px}
-
-/* ── Checklist coluna única ── */
-.checklist-1col{width:100%}
-.checklist-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.checklist-table{width:100%;border-collapse:collapse;font-size:9.5px}
-.checklist-table tr:nth-child(even){background:var(--cinza)}
-.checklist-table td{padding:2.8px 4px;border-bottom:1px solid #edf2f7;vertical-align:top}
-.checklist-table td.cl-num{width:1.6em;color:var(--muted);font-size:8.5px;padding-left:2px;white-space:nowrap}
-.checklist-table td.cl-texto{padding-right:6px}
-.checklist-table td.cl-badge{width:32px;text-align:center;padding-right:2px;white-space:nowrap}
-.badge-sim{background:rgba(22,163,74,.15);color:var(--verde);padding:1px 5px;border-radius:8px;font-size:8.5px;font-weight:700}
-.badge-nao{background:rgba(220,38,38,.12);color:var(--vermelho);padding:1px 5px;border-radius:8px;font-size:8.5px;font-weight:700}
-.badge-nd{color:var(--muted);font-size:9px}
-
-/* ── Notas ── */
-.rpt-notas{background:var(--azul-claro);border-left:2.5px solid var(--azul-med);padding:5px 9px;border-radius:0 3px 3px 0;font-size:10px;color:var(--texto)}
-
-/* ── Fotos ── */
-.rpt-fotos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
-.rpt-fotos-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:3px;border:1px solid var(--borda);display:block}
-
-/* ── Peças e consumíveis ── */
-.pecas-table{width:100%;border-collapse:collapse;font-size:9.5px}
-.pecas-table thead{display:table-header-group}
-.pecas-table th{background:var(--azul);color:#fff;padding:4px 6px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.04em}
-.pecas-table td{padding:3px 6px;border-bottom:1px solid #edf2f7;vertical-align:middle}
-.pecas-table tr.row-usado td{background:#f0fdf4}
-.pecas-table tr.row-nao-usado td{background:#fafafa;color:#9ca3af}
-.pecas-table tr.row-nao-usado .cell-desc{text-decoration:line-through}
-.pecas-table .cell-status{width:20px;text-align:center;font-size:11px;font-weight:700}
-.pecas-table .cell-pos{width:46px;color:var(--muted);font-family:'Courier New',monospace;font-size:8.5px}
-.pecas-table .cell-code{width:118px;font-family:'Courier New',monospace;font-size:9px}
-.pecas-table .cell-qty{width:36px;text-align:right;font-weight:600}
-.pecas-table .cell-un{width:34px;color:var(--muted);font-size:8.5px}
-.pecas-group-row td{background:var(--cinza)!important;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:3px 6px;page-break-after:avoid}
-.pecas-group-usado td{border-left:3px solid var(--verde);color:var(--verde)}
-.pecas-group-nao-usado td{border-left:3px solid #9ca3af}
-.pecas-resumo{display:flex;gap:16px;padding:4px 6px;background:var(--cinza);border-top:1.5px solid var(--borda);font-size:9px}
-.pecas-resumo-item{display:flex;align-items:center;gap:4px}
-.pecas-resumo-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.pecas-resumo-dot.verde{background:var(--verde)}
-.pecas-resumo-dot.cinza{background:#9ca3af}
-
-/* ── Assinatura + declaração lado a lado ── */
-.rpt-bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
-.rpt-assinatura-box{background:var(--cinza);border:1px solid var(--borda);border-radius:4px;padding:7px 10px}
-.rpt-assinatura-img img{max-width:180px;max-height:70px;border:1px solid var(--borda);border-radius:3px;margin-top:4px;background:#fff;display:block}
-.rpt-assinatura-legenda{margin-top:5px;font-size:8px;color:var(--muted);line-height:1.35}
-.rpt-declaracao{background:var(--cinza);border:1px solid var(--borda);border-radius:4px;padding:7px 10px;font-size:8.5px;color:var(--muted);line-height:1.55}
-.rpt-assinaturas-dual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.rpt-assinatura-col{background:var(--cinza);border:1px solid var(--borda);border-radius:4px;padding:7px 10px}
-
-/* ── Rodapé ── */
-.rpt-footer{margin-top:8px;padding-top:6px;border-top:1px solid var(--borda);display:flex;justify-content:space-between;font-size:8.5px;color:var(--muted)}
+.kaeser-dot.futuro{background:#f9fafb;color:#6b7280;border-color:#e5e7eb}
+.kaeser-dot-sep{color:#6b7280;font-size:10px;padding:0 1px}
+.kaeser-legend{font-size:8.5px;color:#6b7280;margin-left:6px}
+.pecas-resumo-total{margin-left:auto;color:var(--muted)}
 </style>
 </head>
 <body>
 
-<header class="rpt-header">
-  <div class="rpt-logos">
-    <div class="rpt-logo">
-      <img src="${logoSrc}" alt="Navel"
-        onerror="this.parentNode.innerHTML='<span class=rpt-logo-fallback>Navel</span>'">
-    </div>
-    ${logoMarcaSrc ? `
-    <div class="rpt-logo-istobal">
-      <img src="${logoMarcaSrc}" alt="${esc(logoMarcaAlt)}" onerror="this.parentNode.style.display='none'">
-    </div>` : ''}
-  </div>
-  <div class="rpt-empresa">
-    <strong>${esc(EMPRESA.nome)}</strong>
-    ${esc(EMPRESA.divisaoComercial)}<br>
-    ${esc(EMPRESA.sede)}<br>
-    ${esc(EMPRESA.telefones)} &nbsp;|&nbsp; <a href="https://${EMPRESA.web}">${EMPRESA.web}</a><br>
-    ${esc(EMPRESA.pais)}
-  </div>
-</header>
+${htmlHeader(logoSrc, logoMarcaSrc, logoMarcaAlt)}
 
-<div class="rpt-titulo-bar">
-  <h1>Relatório de Manutenção${isKaeser ? ' — Compressor' : ''}</h1>
-  <div class="rpt-num-wrap">
-    <span class="rpt-num-label">Nº de Serviço</span>
-    <span class="rpt-num">${esc(relatorio?.numeroRelatorio ?? manutencao?.id ?? '—')}</span>
-  </div>
-</div>
-<div class="rpt-acento"></div>`
+${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : ''), 'Nº de Serviço', relatorio?.numeroRelatorio ?? manutencao?.id ?? '—')}`
 
   // ── Bloco KAESER ── mostrado antes dos dados gerais
   if (isKaeser) {
@@ -326,8 +197,8 @@ section{margin-bottom:10px;page-break-inside:avoid}
       <div class="kaeser-seq-label">Sequência do ciclo de manutenção (12 anos)</div>
       <div class="kaeser-seq-dots">
         ${seqDots}
-        ${posicaoAtual != null ? `<span style="font-size:8px;color:#9ca3af;margin-left:6px">
-          ● Efectuado &nbsp; ○ Próximo &nbsp; · Futuro
+        ${posicaoAtual != null ? `<span class="kaeser-legend">
+          ● Efetuado &nbsp; ○ Próximo &nbsp; · Futuro
         </span>` : ''}
       </div>
     </div>
@@ -335,7 +206,74 @@ section{margin-bottom:10px;page-break-inside:avoid}
 </div>`
   }
 
-  // ── Dados gerais da manutenção ──
+  // ── Periodicidade legível ──
+  const periodicidadeLabel = manutencao?.periodicidade
+    ? ({ trimestral: 'Trimestral (90 dias)', semestral: 'Semestral (180 dias)', anual: 'Anual (365 dias)' }[manutencao.periodicidade] ?? manutencao.periodicidade)
+    : (maquina?.periodicidadeManut
+      ? ({ trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' }[maquina.periodicidadeManut] ?? maquina.periodicidadeManut)
+      : null)
+
+  // ── Bloco: Identificação do cliente ──
+  html += `
+<section>
+  <div class="rpt-section-title">Identificação do cliente</div>
+  <div class="rpt-grid">
+    <div class="rpt-field">
+      <span class="rpt-label">Nome / Empresa</span>
+      <span class="rpt-value rpt-value--bold">${esc(cliente?.nome ?? '—')}</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">NIF</span>
+      <span class="rpt-value rpt-value--mono">${esc(cliente?.nif ?? '—')}</span>
+    </div>
+    ${cliente?.localidade ? `<div class="rpt-field">
+      <span class="rpt-label">Localidade</span>
+      <span class="rpt-value">${esc(cliente.localidade)}</span>
+    </div>` : ''}
+    ${cliente?.telefone ? `<div class="rpt-field">
+      <span class="rpt-label">Telefone</span>
+      <span class="rpt-value">${esc(cliente.telefone)}</span>
+    </div>` : ''}
+  </div>
+</section>`
+
+  // ── Bloco: Equipamento (não-KAESER — KAESER tem o seu próprio bloco acima) ──
+  if (!isKaeser && maquina) {
+    html += `
+<section>
+  <div class="rpt-section-title">Equipamento</div>
+  <div class="rpt-equip-band">
+    <div class="rpt-equip-grid">
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Marca / Modelo</span>
+        <span class="rpt-value">${esc(maquina.marca ?? '')} ${esc(maquina.modelo ?? '')}</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Número de série</span>
+        <span class="rpt-value rpt-value--mono rpt-value--accent">${esc(maquina.numeroSerie ?? '—')}</span>
+      </div>
+      ${subcategoriaNome ? `<div class="rpt-equip-item">
+        <span class="rpt-label">Tipo / Subcategoria</span>
+        <span class="rpt-value">${esc(subcategoriaNome)}</span>
+      </div>` : ''}
+      ${periodicidadeLabel ? `<div class="rpt-equip-item">
+        <span class="rpt-label">Periodicidade</span>
+        <span class="rpt-value">${esc(periodicidadeLabel)}</span>
+      </div>` : ''}
+      ${maquina.anoFabrico ? `<div class="rpt-equip-item">
+        <span class="rpt-label">Ano de fabrico</span>
+        <span class="rpt-value">${esc(String(maquina.anoFabrico))}</span>
+      </div>` : ''}
+      ${maquina.numeroDocumentoVenda ? `<div class="rpt-equip-item">
+        <span class="rpt-label">Doc. venda</span>
+        <span class="rpt-value">${esc(maquina.numeroDocumentoVenda)}</span>
+      </div>` : ''}
+    </div>
+  </div>
+</section>`
+  }
+
+  // ── Bloco: Dados da manutenção ──
   html += `
 <section>
   <div class="rpt-section-title">Dados da manutenção</div>
@@ -348,19 +286,14 @@ section{margin-bottom:10px;page-break-inside:avoid}
       <span class="rpt-label">Data de realização</span>
       <span class="rpt-value">${dataRealizacao}</span>
     </div>
-    ${!isKaeser ? `
-    <div class="rpt-field rpt-field--full">
-      <span class="rpt-label">Equipamento</span>
-      <span class="rpt-value">${equipCompleto}</span>
-    </div>` : ''}
-    <div class="rpt-field">
-      <span class="rpt-label">Cliente</span>
-      <span class="rpt-value">${esc(cliente?.nome ?? '—')}</span>
-    </div>
     <div class="rpt-field">
       <span class="rpt-label">Técnico responsável</span>
       <span class="rpt-value">${tecnicoNome}</span>
     </div>
+    ${periodicidadeLabel && isKaeser ? `<div class="rpt-field">
+      <span class="rpt-label">Periodicidade</span>
+      <span class="rpt-value">${esc(periodicidadeLabel)}</span>
+    </div>` : ''}
     ${(manutencao?.horasTotais != null || manutencao?.horasServico != null) && !isKaeser ? `
     <div class="rpt-field rpt-field--full">
       <span class="rpt-label">Contadores de horas</span>
@@ -371,13 +304,14 @@ section{margin-bottom:10px;page-break-inside:avoid}
 
   // ── Checklist ──
   if (checklistItems?.length > 0) {
+    const secTitleS = `font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px`
+
     if (isKaeser) {
-      // Coluna única para KAESER — mais legível, sem limite de espaço
       html += `
 <section class="section-can-break">
-  <div class="rpt-section-title">Checklist de verificação — ${checklistItems.length} pontos</div>
+  <div class="rpt-section-title" style="${secTitleS}">Checklist de verificação — ${checklistItems.length} pontos</div>
   <div class="checklist-1col">
-    <table class="checklist-table"><tbody>
+    <table class="checklist-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>
       ${(checklistItems ?? []).map((item, i) => buildCheckRow(item, i, 0)).join('')}
     </tbody></table>
   </div>
@@ -385,35 +319,36 @@ section{margin-bottom:10px;page-break-inside:avoid}
     } else {
       html += `
 <section>
-  <div class="rpt-section-title">Checklist de verificação</div>
-  <div class="checklist-2col">
-    <table class="checklist-table"><tbody>
-      ${col1.map((item, i) => buildCheckRow(item, i, 0)).join('')}
-    </tbody></table>
-    <table class="checklist-table"><tbody>
-      ${col2.map((item, i) => buildCheckRow(item, i, half)).join('')}
-    </tbody></table>
-  </div>
+  <div class="rpt-section-title" style="${secTitleS}">Checklist de verificação</div>
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="49%" style="vertical-align:top">
+      <table class="checklist-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>
+        ${col1.map((item, i) => buildCheckRow(item, i, 0)).join('')}
+      </tbody></table>
+    </td>
+    <td width="2%"></td>
+    <td width="49%" style="vertical-align:top">
+      <table class="checklist-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>
+        ${col2.map((item, i) => buildCheckRow(item, i, half)).join('')}
+      </tbody></table>
+    </td>
+  </tr></table>
 </section>`
     }
   }
 
-  // ── Notas e fotografias ──
-  if (relatorio.notas || relatorio.fotos?.length > 0) {
-    html += `<section><div class="rpt-section-title">Notas e fotografias</div>`
-    if (relatorio.notas) {
-      html += `<div class="rpt-notas">${esc(relatorio.notas).replace(/\n/g, '<br>')}</div>`
-    }
-    if (relatorio.fotos?.length > 0) {
-      html += `<div class="rpt-fotos-grid">`
-      relatorio.fotos.forEach((src, i) => {
-        const safe = safeDataImageUrl(src)
-        if (safe) html += `<img src="${safe}" alt="Fotografia ${i + 1}">`
-      })
-      html += `</div>`
-    }
-    html += `</section>`
+  // ── Notas ──
+  if (relatorio.notas) {
+    html += `
+<section>
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Notas do técnico</div>
+  <div class="rpt-notas" style="background:rgba(26,72,128,0.12);border-left:3px solid ${PALETA.azulNavel};padding:7px 10px;border-radius:0 4px 4px 0;font-size:${TIPO.corpo};color:${PALETA.texto};line-height:1.5">${esc(relatorio.notas).replace(/\n/g, '<br>')}</div>
+</section>`
   }
+
+  // ── Fotografias (secção separada, layout adaptativo, sem cortes) ──
+  const fotosSafe = (relatorio.fotos ?? []).map(f => safeDataImageUrl(f)).filter(Boolean)
+  html += htmlFotos(fotosSafe)
 
   // ── Consumíveis e peças ──
   if (relatorio.pecasUsadas?.length > 0) {
@@ -429,74 +364,74 @@ section{margin-bottom:10px;page-break-inside:avoid}
       ? `Consumíveis e peças — Manutenção Tipo ${tipoKaeser}${infoTipoKaeser ? ` · ${infoTipoKaeser.label}` : ''}`
       : 'Consumíveis e peças'
 
-    const linhaHtml = (p, rowClass) => `
-      <tr class="${rowClass} no-break">
-        <td class="cell-status">${rowClass === 'row-usado' ? '✓' : '✗'}</td>
-        <td class="cell-pos">${esc(p.posicao ?? '')}</td>
-        <td class="cell-code">${esc(p.codigoArtigo ?? '')}</td>
-        <td>${esc(p.descricao ?? '')}</td>
-        <td class="cell-qty">${p.quantidade ?? ''}</td>
-        <td class="cell-un">${esc(p.unidade ?? '')}</td>
+    const thS = `background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:left;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em`
+    const tdS = `padding:3px 6px;border-bottom:1px solid ${PALETA.bordaLeve};vertical-align:middle;font-size:${TIPO.pequeno};color:${PALETA.texto}`
+
+    let pecaIdx = 0
+    const linhaHtml = (p, rowClass) => {
+      const isUsado = rowClass === 'row-usado'
+      const bg = pecaIdx++ % 2 === 1 ? `;background:${PALETA.cinza}` : ''
+      const txtDeco = isUsado ? '' : ';text-decoration:line-through;color:#6b7280'
+      const statusIcon = isUsado ? '✓' : '✗'
+      const statusColor = isUsado ? PALETA.verde : '#6b7280'
+      return `
+      <tr class="${rowClass} no-break" style="page-break-inside:avoid${bg}">
+        <td class="cell-status" style="${tdS};width:20px;text-align:center;font-size:${TIPO.titulo};font-weight:700;color:${statusColor}">${statusIcon}</td>
+        <td class="cell-pos" style="${tdS};width:46px;color:${PALETA.muted};font-family:'Courier New',monospace;font-size:${TIPO.label}">${esc(p.posicao ?? '')}</td>
+        <td class="cell-code" style="${tdS};width:118px;font-family:'Courier New',monospace">${esc(p.codigoArtigo ?? '')}</td>
+        <td style="${tdS}${txtDeco}">${esc(p.descricao ?? '')}</td>
+        <td class="cell-qty" style="${tdS};width:36px;text-align:right;font-weight:600">${p.quantidade ?? ''}</td>
+        <td class="cell-un" style="${tdS};width:34px;color:${PALETA.muted};font-size:${TIPO.label}">${esc(p.unidade ?? '')}</td>
       </tr>`
+    }
+
+    const grpS = `${tdS};background:${PALETA.cinza} !important;font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${PALETA.muted};padding:4px 6px`
 
     html += `
 <section class="section-can-break${isKaeser ? ' page-break-before' : ''}">
-  <div class="rpt-section-title">${tipoHeaderLabel}</div>
-  <table class="pecas-table">
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">${tipoHeaderLabel}</div>
+  <table class="pecas-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:${TIPO.pequeno};margin-bottom:4px">
     <thead>
       <tr>
-        <th style="width:20px"></th>
-        <th style="width:46px">Pos.</th>
-        <th style="width:118px">Código artigo</th>
-        <th>Descrição</th>
-        <th style="width:36px;text-align:right">Qtd.</th>
-        <th style="width:34px">Un.</th>
+        <th style="${thS};width:20px"></th>
+        <th style="${thS};width:46px">Pos.</th>
+        <th style="${thS};width:118px">Código artigo</th>
+        <th style="${thS}">Descrição</th>
+        <th style="${thS};width:36px;text-align:right">Qtd.</th>
+        <th style="${thS};width:34px">Un.</th>
       </tr>
     </thead>
     <tbody>
-      ${usadas.length > 0 ? `<tr class="pecas-group-row pecas-group-usado"><td colspan="6">✓ Utilizados — ${usadas.length} artigo${usadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
+      ${usadas.length > 0 ? `<tr class="pecas-group-row pecas-group-usado"><td colspan="6" style="${grpS};border-left:3px solid ${PALETA.verde};color:${PALETA.verde}">✓ Utilizados — ${usadas.length} artigo${usadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
       ${usadas.map(p => linhaHtml(p, 'row-usado')).join('')}
-      ${naoUsadas.length > 0 ? `<tr class="pecas-group-row pecas-group-nao-usado"><td colspan="6">✗ Não utilizados — ${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
+      ${(() => { pecaIdx = 0; return '' })()}
+      ${naoUsadas.length > 0 ? `<tr class="pecas-group-row pecas-group-nao-usado"><td colspan="6" style="${grpS};border-left:3px solid #6b7280">✗ Não utilizados — ${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
       ${naoUsadas.map(p => linhaHtml(p, 'row-nao-usado')).join('')}
     </tbody>
   </table>
-  <div class="pecas-resumo">
-    <span class="pecas-resumo-item"><span class="pecas-resumo-dot verde"></span>${usadas.length} artigo${usadas.length !== 1 ? 's' : ''} utilizado${usadas.length !== 1 ? 's' : ''}</span>
-    ${naoUsadas.length > 0 ? `<span class="pecas-resumo-item"><span class="pecas-resumo-dot cinza"></span>${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''} não substituído${naoUsadas.length !== 1 ? 's' : ''}</span>` : ''}
-    <span style="margin-left:auto;color:var(--muted)">${pecas.length} artigo${pecas.length !== 1 ? 's' : ''} no plano</span>
+  <div class="pecas-resumo" style="display:flex;gap:16px;padding:4px 6px;background:${PALETA.cinza};border-top:1.5px solid ${PALETA.cinzaBorda};font-size:${TIPO.pequeno}">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${PALETA.verde};display:inline-block"></span>${usadas.length} artigo${usadas.length !== 1 ? 's' : ''} utilizado${usadas.length !== 1 ? 's' : ''}</span>
+    ${naoUsadas.length > 0 ? `<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block"></span>${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''} não substituído${naoUsadas.length !== 1 ? 's' : ''}</span>` : ''}
+    <span style="margin-left:auto;color:${PALETA.muted}">${pecas.length} artigo${pecas.length !== 1 ? 's' : ''} no plano</span>
   </div>
 </section>`
   }
 
-  // ── Assinatura + Declaração ──
+  // ── Página do cliente (assinatura, declaração, próximas manutenções) + rodapé ──
   html += `
-<section class="no-break">
-  <div class="rpt-section-title">Registo e assinatura</div>
-  <div class="rpt-grid" style="margin-bottom:6px">
-    <div class="rpt-field"><span class="rpt-label">Data de criação</span><span class="rpt-value">${dataCriacao}</span></div>
-    <div class="rpt-field"><span class="rpt-label">Data de assinatura</span><span class="rpt-value">${dataAssinatura}</span></div>
-  </div>
-  <div class="rpt-assinaturas-dual">
-    <div class="rpt-assinatura-col">
-      <div class="rpt-label" style="margin-bottom:2px">Técnico responsável</div>
-      <div class="rpt-value" style="font-weight:600">${tecnicoNome}</div>
-      ${tecTelefone ? `<div class="rpt-value" style="font-size:8.5px;color:#666">Tel: ${tecTelefone}</div>` : ''}
-      ${tecSigSafe ? `<div class="rpt-assinatura-img"><img src="${tecSigSafe}" alt="Assinatura do técnico" style="max-height:55px;max-width:200px"></div>` : ''}
-    </div>
-    <div class="rpt-assinatura-col">
-      <div class="rpt-label" style="margin-bottom:2px">Assinado pelo cliente</div>
-      <div class="rpt-value" style="font-weight:600">${esc(relatorio.nomeAssinante ?? '—')}</div>
-      ${safeAssinatura ? `<div class="rpt-assinatura-img"><img src="${safeAssinatura}" alt="Assinatura do cliente" style="max-height:55px;max-width:200px"></div>` : ''}
-    </div>
-  </div>
-  <div class="rpt-declaracao" style="margin-top:6px;font-size:8px">${esc(getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'))}</div>
-</section>
+${htmlPaginaCliente({
+  tecnicoNome,
+  tecnicoTelefone: tecTelefone,
+  tecnicoAssinatura: tecnicoObj?.assinaturaDigital,
+  clienteNome: relatorio.nomeAssinante ?? '—',
+  clienteAssinatura: relatorio.assinaturaDigital,
+  dataCriacao,
+  dataAssinatura,
+  declaracaoTexto: getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'),
+  proximasManutencoes,
+})}
 
-${ultimoEnvioLinha ? `<p style="font-size:8.5px;color:#888;margin-bottom:5px">${ultimoEnvioLinha}</p>` : ''}
-<footer class="rpt-footer">
-  <span>${esc(APP_FOOTER_TEXT)}</span>
-  <span>${esc(EMPRESA.web)} &nbsp;|&nbsp; ${esc(EMPRESA.telefones)}</span>
-</footer>
+${htmlFooter(ultimoEnvioLinha)}
 
 </body></html>`
 

@@ -39,7 +39,14 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
           </p>
         )}
         <p><strong>Cliente:</strong> {cliente?.nome ?? '—'}</p>
-        <p><strong>Data:</strong> {manutencao?.data ? formatDataAzores(manutencao.data) : '—'}</p>
+        <p><strong>Data agendada:</strong> {manutencao?.data ? formatDataAzores(manutencao.data) : '—'}</p>
+        <p><strong>Data de execução:</strong> {
+          manutencao?.dataExecucao
+            ? formatDataAzores(manutencao.dataExecucao)
+            : relatorio?.dataAssinatura
+              ? formatDataAzores(relatorio.dataAssinatura.slice(0, 10))
+              : '—'
+        }</p>
         <p><strong>Técnico:</strong> {relatorio?.tecnico ?? manutencao?.tecnico ?? '—'}</p>
         {(manutencao?.horasTotais != null || manutencao?.horasServico != null) && (
           <p><strong>Contadores:</strong> {manutencao.horasTotais != null && `Total: ${manutencao.horasTotais}h`}{manutencao.horasTotais != null && manutencao.horasServico != null && ' · '}{manutencao.horasServico != null && `Serviço: ${manutencao.horasServico}h`}</p>

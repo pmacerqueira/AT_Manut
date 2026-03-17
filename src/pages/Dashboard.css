@@ -15,6 +15,9 @@
   flex-shrink: 0;
   width: 0;
 }
+.manut-placeholder-p { margin-bottom: 1rem; }
+.relatorio-section-spaced { margin-bottom: 1rem; }
+.dashboard-calendar-link { margin-top: 0.75rem; display: inline-block; }
 @media (max-width: 1024px) {
   .dashboard-header-spacer {
     width: 58px;
@@ -89,6 +92,15 @@ button.stat-card-link:hover {
 .stat-label {
   font-size: 0.85em;
   color: var(--color-text-muted);
+}
+
+.stat-sublabel {
+  display: block;
+  font-size: 0.72em;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  margin-top: 0.1rem;
+  font-style: italic;
 }
 
 .stat-link {
@@ -309,18 +321,21 @@ button.stat-card-link:hover {
 }
 
 .badge-warning {
-  background: rgba(245, 158, 11, 0.25);
-  color: var(--color-warning);
+  background: rgba(251, 191, 36, 0.20);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.40);
 }
 
 .badge-success {
-  background: rgba(34, 197, 94, 0.25);
-  color: var(--color-success);
+  background: rgba(52, 211, 153, 0.20);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.40);
 }
 
 .badge-danger {
-  background: rgba(239, 68, 68, 0.25);
-  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.20);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.40);
 }
 
 .btn-link {
@@ -348,15 +363,22 @@ button.stat-card-link:hover {
 .calendar-nav-mini {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 .calendar-title-mini {
   font-size: 0.95rem;
   font-weight: 600;
   text-transform: capitalize;
-  min-width: 120px;
+  min-width: 0;
   text-align: center;
+}
+@media (max-width: 1024px) {
+  .calendar-nav-mini { flex-wrap: wrap; justify-content: center; }
+  .calendar-title-mini { min-width: auto; }
 }
 .dashboard-calendar-grid {
   display: grid;
@@ -387,7 +409,7 @@ button.stat-card-link:hover {
 .dashboard-cal-day.other-month {
   background: var(--color-bg-elevated);
 }
-.dashboard-cal-day.other-month .day-num { opacity: 0.4; }
+.dashboard-cal-day.other-month .day-num { opacity: 0.55; }
 .dashboard-cal-day.today {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
@@ -699,15 +721,15 @@ button.stat-card-link:hover {
 }
 .cards-row-mobile .stat-card-red {
   border-left: 3px solid var(--color-danger);
-  background: rgba(239, 68, 68, 0.18);
+  background: rgba(239, 68, 68, 0.14);
 }
 .cards-row-mobile .stat-card-yellow {
   border-left: 3px solid var(--color-warning);
-  background: rgba(245, 158, 11, 0.18);
+  background: rgba(251, 191, 36, 0.14);
 }
 .cards-row-mobile .stat-card-green {
   border-left: 3px solid var(--color-success);
-  background: rgba(34, 197, 94, 0.18);
+  background: rgba(52, 211, 153, 0.14);
 }
 .cards-row-mobile .stat-card-orange {
   border-left: 3px solid var(--color-warning);
@@ -741,15 +763,15 @@ button.stat-card-link:hover {
 }
 .stat-card-clientes {
   border-left-color: var(--color-accent);
-  background: rgba(0, 163, 224, 0.12);
+  background: rgba(0, 163, 224, 0.14);
 }
 .stat-card-equipamentos {
-  border-left-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.12);
+  border-left-color: #a78bfa;
+  background: rgba(139, 92, 246, 0.14);
 }
 .stat-card-novo {
   border-left-color: var(--color-success);
-  background: rgba(34, 197, 94, 0.15);
+  background: rgba(52, 211, 153, 0.14);
 }
 .stat-card-nav:hover {
   background: rgba(255, 255, 255, 0.06);

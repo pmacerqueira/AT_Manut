@@ -39,6 +39,25 @@
   touch-action: auto;
 }
 
+/* Hint que aparece enquanto o canvas está desbloqueado e já tem traço */
+.signature-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #8a95a8);
+  background: linear-gradient(transparent, rgba(255,255,255,0.85));
+  padding: 0.6rem 0.5rem 0.3rem;
+  pointer-events: none;
+  animation: sig-hint-in 0.4s ease-out;
+}
+@keyframes sig-hint-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .signature-actions {
   display: flex;
   border-top: 1px solid var(--color-border);
@@ -67,7 +86,18 @@
   color: var(--color-success, #22c55e);
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s, color 0.2s;
 }
 .signature-lock-btn:hover {
   background: var(--color-bg);
+}
+
+/* Pulse suave para chamar a atenção quando há traço por confirmar */
+.signature-lock-pulse {
+  animation: sig-pulse 2s ease-in-out infinite;
+  background: rgba(34, 197, 94, 0.08);
+}
+@keyframes sig-pulse {
+  0%, 100% { background: rgba(34, 197, 94, 0.08); }
+  50%      { background: rgba(34, 197, 94, 0.2); }
 }

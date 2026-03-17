@@ -77,9 +77,14 @@
 }
 
 .cliente-mobile-chevron {
-  opacity: 0.4;
+  opacity: 0.6;
   flex-shrink: 0;
 }
+
+.badge-inline { margin-left: 0.4rem; }
+.clientes-empty-msg { padding: 1rem 0; text-align: center; }
+.categoria-card-chevron { margin-top: 0.5rem; opacity: 0.6; }
+.maquina-ficha-chevron { flex-shrink: 0; opacity: 0.6; }
 
 /* ── Paginação ───────────────────────────────────────────────────────────── */
 .clientes-pagination {
@@ -122,39 +127,37 @@
 /* ── Tabela de clientes (apenas desktop ≥ 1025px) ── */
 .clientes-table {
   width: 100%;
-  overflow-x: auto;           /* segurança: nunca quebra o layout da página */
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 .clientes-table .data-table {
-  font-size: 0.82em;
   width: 100%;
-  min-width: 640px;           /* largura mínima absoluta antes de activar scroll */
-  table-layout: fixed;        /* distribuição previsível das colunas */
+  table-layout: auto;
   border-collapse: collapse;
 }
 .clientes-table .data-table th,
 .clientes-table .data-table td {
-  padding: 0.35rem 0.5rem;
-  line-height: 1.3;
+  padding: 0.45rem 0.6rem;
+  line-height: 1.35;
   vertical-align: middle;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .clientes-table .data-table th {
-  font-size: 0.75em;
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-/* col 1 — NIF: largura fixa */
-.clientes-table .data-table th:nth-child(1),
-.clientes-table .data-table td:nth-child(1) { width: 7rem; }
+/* col NIF — compacta, monospace */
+.clientes-table .col-nif { white-space: nowrap; }
+.clientes-table .col-nif code { font-size: 0.88em; }
 
-/* col 2 — Nome: absorve todo o espaço disponível */
-.clientes-table .data-table th:nth-child(2),
-.clientes-table .data-table td:nth-child(2) { width: auto; text-align: left; }
-.clientes-table .data-table td:nth-child(2) .btn-link-inline {
+/* col Nome — absorve todo o espaço disponível */
+.clientes-table .col-nome { width: 99%; max-width: 0; }
+.clientes-table .col-nome .btn-link-inline {
   display: block;
-  width: 100%;
+  max-width: 100%;
   text-align: left;
   padding: 0;
   overflow: hidden;
@@ -162,34 +165,37 @@
   white-space: nowrap;
 }
 
-/* col 3 — Localidade */
-.clientes-table .data-table th:nth-child(3),
-.clientes-table .data-table td:nth-child(3) { width: 11rem; text-align: left; }
-
-/* col 4 — Telefone */
-.clientes-table .data-table th:nth-child(4),
-.clientes-table .data-table td:nth-child(4) { width: 8rem; }
-
-/* col 5 — Máquinas */
-.clientes-table .data-table th:nth-child(5),
-.clientes-table .data-table td:nth-child(5) { width: 4rem; text-align: center; }
-
-/* col 6 — Acções */
-.clientes-table .data-table th:nth-child(6),
-.clientes-table .data-table td:nth-child(6) { width: auto; white-space: nowrap; }
-.clientes-table .data-table .actions {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.25rem;
-  justify-content: flex-end;
-  align-items: center;
+/* col Localidade — encolhe ao conteúdo, trunca se necessário */
+.clientes-table .col-local {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(180px, 18vw);
 }
-.clientes-table .data-table .actions .icon-btn {
-  min-width: 1.75rem !important;
-  min-height: 1.75rem !important;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0.2rem !important;
+
+/* col Máquinas — centrada, estreita */
+.clientes-table .col-maq { white-space: nowrap; text-align: center; }
+
+/* col Acções — justa ao conteúdo, nunca quebra */
+.clientes-table .col-actions {
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 0.4rem !important;
+}
+.clientes-table .col-actions .actions-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+.clientes-table .col-actions .icon-btn {
+  min-width: var(--space-2xl) !important;
+  min-height: var(--space-2xl) !important;
+  width: var(--space-2xl);
+  height: var(--space-2xl);
+  padding: 0.1rem !important;
+  border-radius: var(--radius-xs);
 }
 
 /* ── Ficha do cliente — header e acções ── */
@@ -221,89 +227,21 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
+}
+
+/* ── Dados do cliente (NIF, morada, contactos) ── */
+.ficha-cliente-dados {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
   margin-bottom: 0.75rem;
 }
-
-/* ── Modal de importação SAF-T ──────────────────────────────────────────── */
-.modal-import {
-  max-width: var(--modal-width-md);
+.ficha-cliente-dados p {
+  margin: 0 0 0.2rem;
+  word-break: break-word;
 }
-
-.import-file-label {
-  display: block;
-  margin-top: 0.25rem;
-}
-
-.import-preview {
-  margin-top: 1.25rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-sm);
-  padding: 1rem;
-  background: var(--bg-alt, #f9fafb);
-}
-
-.import-preview-stats {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.import-stat {
-  flex: 1;
-  text-align: center;
-  background: var(--color-white);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-sm);
-  padding: 0.65rem 0.5rem;
-}
-
-.import-stat-new  { border-color: #6ee7b7; background: #f0fdf4; }
-.import-stat-exist { border-color: #fcd34d; background: #fffbeb; }
-
-.import-stat-num {
-  display: block;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--color-primary, #2563eb);
-}
-
-.import-stat-new  .import-stat-num  { color: #059669; }
-.import-stat-exist .import-stat-num { color: #d97706; }
-
-.import-stat-label {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--text-muted, #6b7280);
-  margin-top: 0.2rem;
-}
-
-.import-modo-fieldset {
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-sm);
-  padding: 0.75rem 1rem;
-  margin: 0;
-}
-
-.import-modo-fieldset legend {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-muted, #6b7280);
-  padding: 0 0.35rem;
-}
-
-.import-radio {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-
-.import-radio input[type="radio"] {
-  margin-top: 2px;
-  flex-shrink: 0;
+.ficha-cliente-dados strong {
+  color: var(--color-text);
 }
 
 /* ── KPI bar na ficha do cliente ── */
@@ -347,21 +285,34 @@
 .ficha-top-actions {
   display: flex;
   gap: 0.5rem;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
 }
-.ficha-btn-flat {
+.ficha-top-actions .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
+  white-space: nowrap;
+  min-height: var(--touch-min, 44px);
+  padding: 0.4rem 0.75rem;
+}
+@media (max-width: 480px) {
+  .ficha-top-actions {
+    flex-direction: column;
+  }
+  .ficha-top-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* ── Badges de manutenção (próxima manut) ── */
 .badge-atraso {
-  background: rgba(220, 38, 38, 0.12);
-  color: var(--color-danger, #dc2626);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.40);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.12rem 0.45rem;
@@ -369,8 +320,9 @@
   white-space: nowrap;
 }
 .badge-conforme {
-  background: rgba(22, 163, 74, 0.12);
-  color: var(--color-success, #16a34a);
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.12rem 0.45rem;
@@ -378,8 +330,9 @@
   white-space: nowrap;
 }
 .badge-sem-data {
-  background: rgba(100, 116, 139, 0.10);
-  color: var(--color-text-muted);
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.40);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.12rem 0.45rem;
@@ -438,4 +391,115 @@
   padding: 0.15rem 0.45rem;
   white-space: nowrap;
   cursor: help;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Modal selecção de período — relatório de frota
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.modal-frota-filtro {
+  max-width: 480px;
+  width: 96vw;
+}
+.frota-filtro-desc {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+.frota-filtro-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 480px) {
+  .frota-filtro-row { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Modal relatório de frota — acções (abrir / PDF / email)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.modal-frota-report {
+  max-width: 440px;
+  width: 96vw;
+}
+.modal-frota-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-frota-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+.modal-frota-subtitle {
+  margin: 0.2rem 0 0.5rem;
+  font-size: 0.88rem;
+}
+.frota-periodo-badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(13, 110, 253, 0.08);
+  border: 1px solid rgba(13, 110, 253, 0.2);
+  border-radius: 20px;
+  padding: 0.15rem 0.75rem;
+  margin-bottom: 1.1rem;
+}
+
+/* 3 action buttons */
+.frota-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.frota-acao-btn {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-hover, rgba(255,255,255,0.04));
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+.frota-acao-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: rgba(13, 110, 253, 0.06);
+}
+.frota-acao-btn.active {
+  border-color: var(--color-primary);
+  background: rgba(13, 110, 253, 0.1);
+}
+.frota-acao-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.frota-acao-btn svg { grid-row: 1 / 3; color: var(--color-primary); }
+.frota-acao-btn span { grid-column: 2; }
+.frota-acao-btn small { grid-column: 2; font-size: 0.77rem; font-weight: 400; color: var(--color-text-muted); }
+.frota-acao-spinner {
+  grid-column: 3; grid-row: 1 / 3;
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--color-border, rgba(255,255,255,0.2));
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: frota-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes frota-spin { to { transform: rotate(360deg); } }
+
+/* Email panel styles are now global — see index.css (.frota-email-*) */
+
+@media (max-width: 480px) {
+  .modal-frota-report { width: 100vw; max-width: 100vw; border-radius: 0; }
 }

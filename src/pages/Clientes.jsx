@@ -8,9 +8,8 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Upload, Play, Calendar, QrCode, FileDown, Send } from 'lucide-react'
-import { gerarRelatorioFrotaHtml } from '../utils/gerarRelatorioFrota'
-import { imprimirOuGuardarPdf, abrirPdfRelatorio } from '../utils/gerarPdfRelatorio'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X } from 'lucide-react'
+import { gerarRelatorioFrotaPdf } from '../utils/gerarRelatorioFrota'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useDebounce } from '../hooks/useDebounce'
@@ -21,6 +20,8 @@ import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
 import { enviarRelatorioHtmlEmail } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
@@ -38,13 +39,14 @@ export default function Clientes() {
     addCliente,
     updateCliente,
     removeCliente,
-    importClientes,
     clearAllClientesAndRelated,
     getSubcategoria,
     getCategoria,
     getChecklistBySubcategoria,
     getRelatorioByManutencao,
+    getTecnicoByNome,
   } = useData()
+  const contentReady = useDeferredReady(clientes.length >= 0)
   const { canDelete, canEditCliente, canAddCliente, isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -63,8 +65,15 @@ export default function Clientes() {
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalEmail, setModalEmail] = useState(null)
   const [modalDocumentoEmail, setModalDocumentoEmail] = useState(null)
-  const [modalFrotaEmail, setModalFrotaEmail] = useState(null) // { cliente }
-  const [frotaEmailDest, setFrotaEmailDest] = useState('')
+  const [modalFrota, setModalFrota] = useState(null) // { cliente, manusFiltradas, repsFiltradas, options }
+  const [modalFrotaFiltro, setModalFrotaFiltro] = useState(null) // { cliente }
+  const [frotaDataInicio, setFrotaDataInicio] = useState('')
+  const [frotaDataFim, setFrotaDataFim] = useState('')
+  const [frotaEmailPane, setFrotaEmailPane] = useState(false)
+  const [frotaEmailCliente, setFrotaEmailCliente] = useState(false)
+  const [frotaEmailAdmin, setFrotaEmailAdmin] = useState(true)
+  const [frotaEmailOutro, setFrotaEmailOutro] = useState('')
+  const [frotaAcaoLoading, setFrotaAcaoLoading] = useState(null) // 'html' | 'pdf' | 'email' | null
   const [form, setForm] = useState({ nif: '', nome: '', morada: '', codigoPostal: '', localidade: '', telefone: '', email: '' })
   const [erro, setErro] = useState('')
   const [searchCliente, setSearchCliente] = useState('')
@@ -77,12 +86,6 @@ export default function Clientes() {
   // ── Modal eliminar todos ────────────────────────────────────────────────────
   const [modalEliminarTodos, setModalEliminarTodos] = useState(false)
 
-  // ── Modal de importação SAF-T ─────────────────────────────────────────────
-  const [modalImport, setModalImport] = useState(false)
-  const [importPreview, setImportPreview] = useState(null) // { lista, novos, existentes }
-  const [importModo, setImportModo] = useState('novos')    // 'novos' | 'atualizar'
-  const [importErro, setImportErro] = useState('')
-
   const handleEliminarTodosConfirm = async () => {
     setModalEliminarTodos(false)
     showGlobalLoading()
@@ -92,98 +95,6 @@ export default function Clientes() {
     } catch (err) {
       logger.error('Clientes', 'handleEliminarTodosConfirm', err?.message || 'Erro ao eliminar', { stack: err?.stack?.slice(0, 400) })
       showToast('Erro ao eliminar. Verifique a ligação e tente novamente.', 'error', 4000)
-    } finally {
-      hideGlobalLoading()
-    }
-  }
-
-  const handleImportFile = (e) => {
-    setImportErro('')
-    setImportPreview(null)
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.name.endsWith('.json')) {
-      setImportErro('Selecione um ficheiro .json (clientes-filosoft.json ou clientes-fttercei.json)')
-      return
-    }
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        let raw = ev.target.result
-        if (typeof raw === 'string' && raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1)
-        const parsed = JSON.parse(raw)
-        const temNif = (c) => {
-          if (!c || typeof c !== 'object') return false
-          const v = c.nif ?? c.Nif ?? c.NIF ?? c.CustomerTaxID ?? c.TaxID
-          return v != null && String(v).trim() !== ''
-        }
-        const encontrarLista = (obj, profundidade = 0) => {
-          if (profundidade > 5) return null
-          if (Array.isArray(obj) && obj.length > 0 && obj.some(temNif)) return obj
-          if (obj && typeof obj === 'object') {
-            for (const k of ['clientes', 'data', 'dados', 'customers', 'lista', 'records', 'items']) {
-              const v = obj[k]
-              if (Array.isArray(v) && v.length > 0 && v.some(temNif)) return v
-            }
-            for (const v of Object.values(obj)) {
-              const r = encontrarLista(v, profundidade + 1)
-              if (r) return r
-            }
-          }
-          return null
-        }
-        const lista = Array.isArray(parsed) && parsed.some(temNif) ? parsed
-          : parsed?.clientes ?? parsed?.data ?? parsed?.dados ?? parsed?.customers ?? encontrarLista(parsed)
-        if (!Array.isArray(lista) || lista.length === 0) {
-          setImportErro('Ficheiro inválido — não foi encontrado um array de clientes. Verifique a estrutura do JSON.')
-          return
-        }
-        if (!lista.some(temNif)) {
-          setImportErro('Ficheiro inválido — nenhum registo tem NIF (nif, NIF ou CustomerTaxID).')
-          return
-        }
-        const get = (obj, ...keys) => {
-          const k = keys.find(key => obj[key] != null && String(obj[key]).trim() !== '')
-          return k != null ? String(obj[k]).trim() : ''
-        }
-        const nifSet = new Set(clientes.map(c => String(c.nif)))
-        const passam = lista.filter(c => {
-          const nif = get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID')
-          const nome = get(c, 'nome', 'Nome', 'CompanyName')
-          const morada = get(c, 'morada', 'Morada')
-          const telefone = get(c, 'telefone', 'telemovel', 'Telefone', 'Telemovel')
-          const email = get(c, 'email', 'Email')
-          return nif && nome && morada && telefone && email
-        })
-        const novos = passam.filter(c => !nifSet.has(String(get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID'))))
-        const existentes = passam.filter(c => nifSet.has(String(get(c, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID'))))
-        setImportPreview({ lista, novos: novos.length, existentes: existentes.length, totalFicheiro: lista.length, ignorados: lista.length - passam.length })
-      } catch (err) {
-        setImportErro(err?.message || 'Erro ao ler o ficheiro JSON — verifique se está correctamente formatado.')
-      }
-    }
-    reader.readAsText(file, 'utf-8')
-    // limpar input para permitir re-seleccionar o mesmo ficheiro
-    e.target.value = ''
-  }
-
-  const handleImportConfirm = async () => {
-    if (!importPreview) return
-    const listaParaImportar = importPreview.lista
-    const modoImport = importModo
-    setModalImport(false)
-    setImportPreview(null)
-    showGlobalLoading()
-    try {
-      const resultado = await importClientes(listaParaImportar, modoImport)
-      const partes = []
-      if (resultado.adicionados)  partes.push(`${resultado.adicionados} novos`)
-      if (resultado.atualizados)  partes.push(`${resultado.atualizados} actualizados`)
-      if (resultado.ignorados)    partes.push(`${resultado.ignorados} ignorados`)
-      showToast(`Importação concluída: ${partes.join(', ')}.`, 'success', 5000)
-    } catch (err) {
-      logger.error('Clientes', 'handleImportConfirm', err?.message || 'Importação falhou', { stack: err?.stack?.slice(0, 400) })
-      showToast('Erro na importação. Tente novamente.', 'error')
     } finally {
       hideGlobalLoading()
     }
@@ -243,83 +154,169 @@ export default function Clientes() {
   const getMaquinasCount = (nif) => maquinas.filter(m => m.clienteNif === nif).length
   const getMaquinasDoCliente = (nif) => maquinas.filter(m => m.clienteNif === nif)
 
-  const handleRelatorioFrota = async (cliente) => {
+  const handleAbrirFiltroFrota = (cliente) => {
     const maqsCliente = getMaquinasDoCliente(cliente.nif)
     if (maqsCliente.length === 0) {
       showToast('Este cliente não tem equipamentos registados.', 'warning')
       return
     }
+    setFrotaDataInicio('')
+    setFrotaDataFim('')
+    setModalFrotaFiltro({ cliente })
+  }
+
+  const handleGerarFrotaComFiltro = async (e) => {
+    e.preventDefault()
+    const { cliente } = modalFrotaFiltro
+    const maqsCliente = getMaquinasDoCliente(cliente.nif)
+    const inicio = frotaDataInicio || null
+    const fim = frotaDataFim || new Date().toISOString().slice(0, 10)
+
+    const filtraPorData = (arr) => (arr ?? []).filter(item => {
+      const d = item.data
+      if (!d) return true
+      if (inicio && d < inicio) return false
+      if (d > fim) return false
+      return true
+    })
+    const manusFiltradas = filtraPorData(manutencoes)
+    const repsFiltradas = filtraPorData(reparacoes)
+
+    const fmtD = (s) => s ? s.slice(8, 10) + '-' + s.slice(5, 7) + '-' + s.slice(0, 4) : null
+    const periodoLabel = inicio
+      ? `${fmtD(inicio)} a ${fmtD(fim)}`
+      : `Até ${fmtD(fim)}`
+    const options = { periodoLabel, periodoCustom: true }
+
+    setModalFrotaFiltro(null)
+    setFrotaEmailPane(false)
+    setFrotaEmailCliente(!!cliente.email)
+    setFrotaEmailAdmin(true)
+    setFrotaEmailOutro('')
+    setFrotaAcaoLoading(null)
+    setModalFrota({ cliente, manusFiltradas, repsFiltradas, options })
+  }
+
+  const closeFrotaModal = () => {
+    setModalFrota(null)
+    setFrotaEmailPane(false)
+  }
+
+  const handleDownloadPdfManutencao = async (manut, rel, maquina, cliente) => {
     showGlobalLoading()
     try {
-      const html = gerarRelatorioFrotaHtml(
+      const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
+      const checklistItems = getChecklistBySubcategoria(maquina.subcategoriaId, manut.tipo || 'periodica')
+      const sub = getSubcategoria(maquina.subcategoriaId)
+      const blob = await gerarPdfCompacto({
+        relatorio: rel,
+        manutencao: manut,
+        maquina,
         cliente,
-        maqsCliente,
-        manutencoes,
-        relatorios ?? [],
-        reparacoes ?? [],
-        getSubcategoria,
-        getCategoria,
-        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png` }
-      )
-      const nomeArquivo = `frota_${cliente.nif}_${new Date().toISOString().slice(0, 10)}.pdf`
-      await imprimirOuGuardarPdf(html, nomeArquivo)
+        checklistItems,
+        subcategoriaNome: sub?.nome ?? '',
+        tecnicoObj: getTecnicoByNome(manut.tecnico || rel?.tecnico),
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio_${rel.numeroRelatorio ?? manut.id}_${manut.data}.pdf`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 15000)
+      showToast('PDF transferido.', 'success')
     } catch (err) {
-      showToast('Erro ao gerar relatório de frota.', 'error', 4000)
+      showToast('Erro ao gerar PDF.', 'error', 4000)
+      logger.error('Clientes', 'downloadPdfManutencao', err.message, { manutId: manut.id })
     } finally {
       hideGlobalLoading()
     }
   }
 
-  const openFrotaEmail = (cliente) => {
-    const maqsCliente = getMaquinasDoCliente(cliente.nif)
-    if (maqsCliente.length === 0) {
-      showToast('Este cliente não tem equipamentos registados.', 'warning')
-      return
+  const handleAbrirFrotaHtml = async () => {
+    const cli = modalFrota.cliente
+    setFrotaAcaoLoading('html')
+    try {
+      const maqsCliente = getMaquinasDoCliente(cli.nif)
+      const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')
+      const html = gerarRelatorioFrotaHtml(
+        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
+        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        getSubcategoria, getCategoria,
+        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
+      )
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (err) {
+      showToast('Erro ao gerar relatório HTML.', 'error', 4000)
+      logger.error('Clientes', 'abrirFrotaHtml', err.message, { nif: cli.nif })
+    } finally {
+      setFrotaAcaoLoading(null)
     }
-    setFrotaEmailDest(cliente.email ?? '')
-    setModalFrotaEmail({ cliente })
+  }
+
+  const handleGravarFrotaPdf = async () => {
+    const cli = modalFrota.cliente
+    setFrotaAcaoLoading('pdf')
+    try {
+      const maqsCliente = getMaquinasDoCliente(cli.nif)
+      const blob = await gerarRelatorioFrotaPdf(
+        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
+        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        getSubcategoria, getCategoria, modalFrota.options ?? {}
+      )
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `frota_${cli.nif}_${new Date().toISOString().slice(0, 10)}.pdf`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 15000)
+      showToast('PDF transferido.', 'success')
+    } catch (err) {
+      showToast('Erro ao gerar PDF.', 'error', 4000)
+      logger.error('Clientes', 'gravarFrotaPdf', err.message, { nif: cli.nif })
+    } finally {
+      setFrotaAcaoLoading(null)
+    }
   }
 
   const handleEnviarFrotaEmail = async (e) => {
     e.preventDefault()
-    const email = frotaEmailDest.trim()
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showToast('Indique um email válido.', 'warning')
-      return
-    }
-    const cli = modalFrotaEmail.cliente
-    const maqsCliente = getMaquinasDoCliente(cli.nif)
-    showGlobalLoading()
+    const cli = modalFrota.cliente
+    const dests = new Set()
+    if (frotaEmailCliente && cli.email) dests.add(cli.email.trim())
+    if (frotaEmailAdmin) dests.add('comercial@navel.pt')
+    frotaEmailOutro.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean).forEach(s => dests.add(s))
+    if (dests.size === 0) { showToast('Seleccione pelo menos um destinatário.', 'warning'); return }
+
+    setFrotaAcaoLoading('email')
     try {
+      const maqsCliente = getMaquinasDoCliente(cli.nif)
+      const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')
       const html = gerarRelatorioFrotaHtml(
-        cli,
-        maqsCliente,
-        manutencoes,
-        relatorios ?? [],
-        reparacoes ?? [],
-        getSubcategoria,
-        getCategoria,
-        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png` }
+        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
+        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        getSubcategoria, getCategoria,
+        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
       )
-      const ano = new Date().getFullYear()
-      const assunto = `Relatório Executivo de Frota ${ano} — ${cli.nome} — Navel`
-      const result = await enviarRelatorioHtmlEmail({
-        destinatario: email,
-        assunto,
-        html,
-        nomeCliente: cli.nome,
-      })
-      if (result.ok) {
-        showToast(result.message, 'success')
-        setModalFrotaEmail(null)
+      const periodo = modalFrota.options?.periodoLabel || new Date().getFullYear()
+      const assunto = `Relatório Executivo de Frota — ${periodo} — ${cli.nome} — Navel`
+      let erros = 0
+      for (const dest of dests) {
+        const result = await enviarRelatorioHtmlEmail({ destinatario: dest, assunto, html, nomeCliente: cli.nome })
+        if (!result.ok) { erros++; logger.error('Clientes', 'enviarFrotaEmail', result.message, { dest }) }
+      }
+      if (erros === 0) {
+        showToast(`Relatório enviado para ${dests.size} destinatário(s).`, 'success')
+        closeFrotaModal()
       } else {
-        showToast(result.message, 'error', 4000)
+        showToast(`${erros} envio(s) falharam. Verifique os logs.`, 'error', 4000)
       }
     } catch (err) {
       showToast('Erro ao enviar relatório de frota por email.', 'error', 4000)
       logger.error('Clientes', 'enviarFrotaEmail', err.message, { nif: cli.nif })
     } finally {
-      hideGlobalLoading()
+      setFrotaAcaoLoading(null)
     }
   }
 
@@ -413,21 +410,14 @@ export default function Clientes() {
           <h1>Clientes</h1>
           <p className="page-sub">Empresas e proprietários de equipamentos Navel</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {isAdmin && (
-            <>
-              <button type="button" className="secondary" onClick={() => { setModalImport(true); setImportPreview(null); setImportErro('') }}>
-                <Upload size={18} /> Importar SAF-T
-              </button>
-              {clientes.length > 0 && (
-                <button type="button" className="danger" onClick={() => setModalEliminarTodos(true)} title="Eliminar todos os clientes e dados relacionados">
-                  <Trash2 size={18} /> Eliminar todos
-                </button>
-              )}
-            </>
+        <div className="page-header-actions">
+          {isAdmin && clientes.length > 0 && (
+            <button type="button" className="btn danger" onClick={() => setModalEliminarTodos(true)} title="Eliminar todos os clientes e dados relacionados">
+              <Trash2 size={18} /> Eliminar todos
+            </button>
           )}
           {canAddCliente && (
-            <button type="button" onClick={openAdd}><Plus size={18} /> Novo cliente</button>
+            <button type="button" className="btn" onClick={openAdd}><Plus size={18} /> Novo cliente</button>
           )}
         </div>
       </div>
@@ -446,6 +436,7 @@ export default function Clientes() {
           </button>
         )}
       </div>
+      <ContentLoader loading={!contentReady} message="A carregar clientes…" hint="Por favor aguarde.">
       {/* Lista compacta — mobile */}
       <div className="clientes-mobile-lista">
         {clientesPaginated.map(c => {
@@ -468,7 +459,7 @@ export default function Clientes() {
                     </a>
                   )}
                   <span className="cliente-mobile-maq">{nMaq} máq.</span>
-                  {!c.email && <span className="badge badge-warning" title="Cliente sem email registado">⚠ sem email</span>}
+                  {!c.email && <span className="badge badge-warning badge-inline" title="Cliente sem email registado">⚠ sem email</span>}
                 </div>
               </div>
               <ChevronRight size={16} className="cliente-mobile-chevron" />
@@ -476,7 +467,7 @@ export default function Clientes() {
           )
         })}
         {clientesFiltrados.length === 0 && (
-          <p className="text-muted" style={{ padding: '1rem 0', textAlign: 'center' }}>Nenhum cliente encontrado.</p>
+          <p className="text-muted clientes-empty-msg">Nenhum cliente encontrado.</p>
         )}
         {clientesFiltrados.length > PAGE_SIZE && (
           <div className="clientes-pagination clientes-pagination-mobile">
@@ -501,43 +492,42 @@ export default function Clientes() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>NIF</th>
-              <th>Nome do Cliente</th>
-              <th>Localidade</th>
-              <th>Telefone</th>
-              <th>Máq.</th>
-              <th></th>
+              <th className="col-nif">NIF</th>
+              <th className="col-nome">Nome do Cliente</th>
+              <th className="col-local">Localidade</th>
+              <th className="col-maq">Máq.</th>
+              <th className="col-actions"></th>
             </tr>
           </thead>
           <tbody>
-            {clientesPaginated.map(c => (
-              <tr key={c.nif}>
-                <td data-label="NIF"><code>{c.nif}</code></td>
-                <td data-label="Nome">
-                  <button type="button" className="btn-link-inline" onClick={() => openFicha(c)} title="Abrir ficha">
-                    <strong>{c.nome}</strong>
-                  </button>
-                </td>
-                <td data-label="Localidade">{c.localidade || '—'}</td>
-                <td data-label="Telefone">
-                  {c.telefone || '—'}
-                  {!c.email && <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }} title="Cliente sem email registado">⚠ sem email</span>}
-                </td>
-                <td data-label="Máq.">{getMaquinasCount(c.nif)}</td>
-                <td className="actions" data-label="">
-                  {getMaquinasCount(c.nif) > 0 && (<>
-                    <button className="icon-btn secondary" onClick={() => handleRelatorioFrota(c)} title="Relatório executivo de frota (PDF)"><FileBarChart size={16} /></button>
-                    <button className="icon-btn secondary" onClick={() => openFrotaEmail(c)} title="Enviar relatório de frota por email"><Send size={16} /></button>
-                  </>)}
-                  {canEditCliente && (
-                    <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
-                  )}
-                  {canDelete && (
-                    <button className="icon-btn danger" onClick={() => setModalConfirmDeleteCliente(c)} disabled={getMaquinasCount(c.nif) > 0} title={getMaquinasCount(c.nif) > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /></button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {clientesPaginated.map(c => {
+              const nMaq = getMaquinasCount(c.nif)
+              return (
+                <tr key={c.nif}>
+                  <td className="col-nif"><code>{c.nif}</code></td>
+                  <td className="col-nome">
+                    <button type="button" className="btn-link-inline" onClick={() => openFicha(c)} title="Abrir ficha">
+                      <strong>{c.nome}</strong>
+                    </button>
+                  </td>
+                  <td className="col-local">{c.localidade || '—'}</td>
+                  <td className="col-maq">{nMaq}</td>
+                  <td className="col-actions">
+                    <span className="actions-row">
+                      {nMaq > 0 && (
+                        <button className="icon-btn secondary" onClick={() => handleAbrirFiltroFrota(c)} title="Relatório de frota"><FileBarChart size={16} /></button>
+                      )}
+                      {canEditCliente && (
+                        <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
+                      )}
+                      {canDelete && (
+                        <button className="icon-btn danger" onClick={() => setModalConfirmDeleteCliente(c)} disabled={nMaq > 0} title={nMaq > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /></button>
+                      )}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         {clientesFiltrados.length > PAGE_SIZE && (
@@ -557,6 +547,7 @@ export default function Clientes() {
           </div>
         )}
       </div>
+      </ContentLoader>
 
       {modal === 'ficha' && fichaCliente && (
         <div className="modal-overlay modal-ficha-overlay" onClick={closeFicha}>
@@ -603,17 +594,10 @@ export default function Clientes() {
               <div className="ficha-top-actions">
                 <button
                   className="btn secondary ficha-btn-frota"
-                  onClick={() => handleRelatorioFrota(fichaCliente)}
-                  title="Relatório executivo de frota (PDF)"
+                  onClick={() => handleAbrirFiltroFrota(fichaCliente)}
+                  title="Relatório executivo de frota"
                 >
                   <FileBarChart size={15} /> Relatório de frota
-                </button>
-                <button
-                  className="btn secondary ficha-btn-frota"
-                  onClick={() => openFrotaEmail(fichaCliente)}
-                  title="Enviar relatório de frota por email ao cliente"
-                >
-                  <Send size={15} /> Enviar frota
                 </button>
                 {fichaView !== 'flat' && fichaView !== 'maquina-detalhe' && (
                   <button className="btn secondary ficha-btn-flat" onClick={() => setFichaView('flat')}>
@@ -644,7 +628,7 @@ export default function Clientes() {
                           <button key={cat.id} type="button" className="categoria-card" onClick={() => { setFichaCategoria(cat); setFichaView('subcategorias'); }}>
                             <h4>{cat.nome}</h4>
                             <p>{count} equipamento(s)</p>
-                            <ChevronRight size={20} style={{ marginTop: '0.5rem', opacity: 0.6 }} />
+                            <ChevronRight size={18} className="categoria-card-chevron" />
                           </button>
                         )
                       })}
@@ -668,7 +652,7 @@ export default function Clientes() {
                           <button key={sub.id} type="button" className="categoria-card" onClick={() => { setFichaSubcategoria(sub); setFichaView('maquinas'); }}>
                             <h4>{sub.nome}</h4>
                             <p>{count} equipamento(s)</p>
-                            <ChevronRight size={20} style={{ marginTop: '0.5rem', opacity: 0.6 }} />
+                            <ChevronRight size={18} className="categoria-card-chevron" />
                           </button>
                         )
                       })}
@@ -693,7 +677,7 @@ export default function Clientes() {
                           <div className="maquina-ficha-card-badge">
                             {renderProximaManut(m)}
                           </div>
-                          <ChevronRight size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
+                          <ChevronRight size={18} className="maquina-ficha-chevron" />
                         </button>
                       ))}
                     </div>
@@ -721,7 +705,7 @@ export default function Clientes() {
                             <div className="maquina-ficha-card-badge">
                               {renderProximaManut(m)}
                             </div>
-                            <ChevronRight size={18} style={{ flexShrink: 0, opacity: 0.6 }} />
+                            <ChevronRight size={18} className="maquina-ficha-chevron" />
                           </button>
                         ))}
                     </div>
@@ -766,8 +750,11 @@ export default function Clientes() {
                           reparacoes: reparacoes.filter(r => r.maquinaId === fichaMaquina.id),
                           tecnicos,
                         })
-                        imprimirOuGuardarPdf(html)
-                      }}><FileDown size={14} /> Histórico PDF</button>
+                        const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+                        const url = URL.createObjectURL(blob)
+                        window.open(url, '_blank')
+                        setTimeout(() => URL.revokeObjectURL(url), 30000)
+                      }}><FileDown size={14} /> Histórico</button>
                     </div>
                     <h4>Documentação obrigatória</h4>
                     <div className="doc-table-wrapper">
@@ -804,44 +791,70 @@ export default function Clientes() {
                       </table>
                     </div>
                     <h4>Histórico de manutenções</h4>
-                    <div className="manutencoes-histórico">
-                      {getManutencoesDaMaquina(fichaMaquina.id).length === 0 ? (
-                        <p className="text-muted">Nenhuma manutenção registada.</p>
-                      ) : (
-                        getManutencoesDaMaquina(fichaMaquina.id).map(manut => {
-                          const rel = getRelatorioByManutencao(manut.id)
-                          return (
-                            <div key={manut.id} className="manutencao-item">
-                              <button
-                                type="button"
-                                className="manutencao-item-btn"
-                                onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
-                              >
-                                <div>
-                                  <strong>{format(parseDateLocal(manut.data), 'd MMM yyyy', { locale: pt })}</strong>
-                                  <span className="text-muted"> — {manut.tecnico || (rel?.tecnico) || 'Não atribuído'}</span>
-                                </div>
-                                <span className={`badge badge-${manut.status}`}>{statusLabel[manut.status]}</span>
-                              </button>
-                              {rel?.assinadoPeloCliente && (
-                                <button type="button" className="btn-enviar-email" onClick={e => { e.stopPropagation(); setModalEmail({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente }); }}>
-                                  Enviar relatório por email
-                                </button>
-                              )}
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
+                    {getManutencoesDaMaquina(fichaMaquina.id).length === 0 ? (
+                      <p className="text-muted">Nenhuma manutenção registada.</p>
+                    ) : (
+                      <div className="hist-manut-wrap">
+                        <table className="hist-manut-table">
+                          <thead>
+                            <tr>
+                              <th>Data</th>
+                              <th>Técnico</th>
+                              <th>Estado</th>
+                              <th>N.º Rel.</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {getManutencoesDaMaquina(fichaMaquina.id).map(manut => {
+                              const rel = getRelatorioByManutencao(manut.id)
+                              return (
+                                <tr key={manut.id}>
+                                  <td><strong>{format(parseDateLocal(manut.data), 'd MMM yyyy', { locale: pt })}</strong></td>
+                                  <td className="text-muted">{manut.tecnico || rel?.tecnico || 'Não atribuído'}</td>
+                                  <td><span className={`badge badge-${manut.status}`}>{statusLabel[manut.status]}</span></td>
+                                  <td className="hist-numrel">{rel?.numeroRelatorio || '—'}</td>
+                                  <td className="hist-manut-actions">
+                                    <button
+                                      type="button"
+                                      className="icon-btn secondary"
+                                      title="Ver ficha de manutenção"
+                                      onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
+                                    >
+                                      <Eye size={14} />
+                                    </button>
+                                    {rel && (
+                                      <button
+                                        type="button"
+                                        className="icon-btn secondary"
+                                        title="Obter PDF (sem pré-visualizador)"
+                                        onClick={() => handleDownloadPdfManutencao(manut, rel, fichaMaquina, fichaCliente)}
+                                      >
+                                        <FileDown size={14} />
+                                      </button>
+                                    )}
+                                    {rel?.assinadoPeloCliente && (
+                                      <button
+                                        type="button"
+                                        className="icon-btn secondary"
+                                        title="Enviar relatório por email"
+                                        onClick={() => setModalEmail({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
+                                      >
+                                        <Mail size={14} />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                     )
                   })()}
 
-                {canAddCliente && (
-                  <button type="button" className="btn-add-maquina" onClick={() => setModalMaquina({ mode: 'add', clienteNif: fichaCliente.nif })} style={{ marginTop: '1rem' }}>
-                    <Plus size={18} /> Adicionar máquina
-                  </button>
-                )}
               </>
             )}
             <div className="form-actions" style={{ marginTop: '1rem' }}>
@@ -921,31 +934,155 @@ export default function Clientes() {
         />
       )}
 
-      {/* ── Modal enviar frota por email ──────────────────────────────────────── */}
-      {modalFrotaEmail && (
-        <div className="modal-overlay" onClick={() => setModalFrotaEmail(null)}>
-          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
-            <h2><Send size={18} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Enviar relatório de frota</h2>
-            <p className="text-muted" style={{ margin: '0.5rem 0', fontSize: '0.88rem' }}>
-              Relatório executivo de frota de <strong>{modalFrotaEmail.cliente.nome}</strong> será enviado por email.
-            </p>
-            <form onSubmit={handleEnviarFrotaEmail}>
-              <div className="form-group">
-                <label>Destinatário</label>
-                <input
-                  type="email"
-                  value={frotaEmailDest}
-                  onChange={e => setFrotaEmailDest(e.target.value)}
-                  placeholder="email@cliente.pt"
-                  required
-                  autoFocus
-                />
+      {/* ── Modal selecção de período para relatório de frota ───────────── */}
+      {modalFrotaFiltro && (
+        <div className="modal-overlay" onClick={() => setModalFrotaFiltro(null)}>
+          <div className="modal modal-frota-filtro" onClick={e => e.stopPropagation()}>
+            <div className="modal-frota-header">
+              <h2><FileBarChart size={20} /> Relatório de frota</h2>
+              <button type="button" className="icon-btn secondary" onClick={() => setModalFrotaFiltro(null)} aria-label="Fechar"><X size={18} /></button>
+            </div>
+            <p className="text-muted modal-frota-subtitle">{modalFrotaFiltro.cliente.nome}</p>
+            <form onSubmit={handleGerarFrotaComFiltro}>
+              <p className="frota-filtro-desc">
+                Seleccione o período de dados a incluir no relatório. Campos em branco incluem dados desde sempre ou até hoje.
+              </p>
+              <div className="frota-filtro-row">
+                <div className="form-group">
+                  <label>Data de início</label>
+                  <input
+                    type="date"
+                    value={frotaDataInicio}
+                    onChange={e => setFrotaDataInicio(e.target.value)}
+                    max={frotaDataFim || new Date().toISOString().slice(0, 10)}
+                  />
+                  <span className="form-hint">Em branco = desde sempre</span>
+                </div>
+                <div className="form-group">
+                  <label>Data de fim</label>
+                  <input
+                    type="date"
+                    value={frotaDataFim}
+                    onChange={e => setFrotaDataFim(e.target.value)}
+                    min={frotaDataInicio || undefined}
+                  />
+                  <span className="form-hint">Em branco = até hoje</span>
+                </div>
               </div>
               <div className="form-actions">
-                <button type="button" className="secondary" onClick={() => setModalFrotaEmail(null)}>Cancelar</button>
-                <button type="submit"><Send size={15} /> Enviar</button>
+                <button type="button" className="secondary" onClick={() => setModalFrotaFiltro(null)}>Cancelar</button>
+                <button type="submit"><FileBarChart size={15} /> Gerar relatório</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal relatório de frota — acções ────────────────────────────── */}
+      {modalFrota && (
+        <div className="modal-overlay" onClick={frotaAcaoLoading ? undefined : closeFrotaModal}>
+          <div className="modal modal-frota-report" onClick={e => e.stopPropagation()}>
+            <div className="modal-frota-header">
+              <h2><FileBarChart size={20} /> Relatório de frota</h2>
+              {!frotaAcaoLoading && (
+                <button type="button" className="icon-btn secondary" onClick={closeFrotaModal} aria-label="Fechar"><X size={18} /></button>
+              )}
+            </div>
+            <p className="text-muted modal-frota-subtitle">{modalFrota.cliente.nome}</p>
+            {modalFrota.options?.periodoLabel && (
+              <p className="frota-periodo-badge">Período: {modalFrota.options.periodoLabel}</p>
+            )}
+
+            <div className="frota-acoes">
+              <button
+                type="button"
+                className="frota-acao-btn"
+                onClick={handleAbrirFrotaHtml}
+                disabled={!!frotaAcaoLoading}
+              >
+                <ExternalLink size={18} />
+                <span>Abrir numa janela</span>
+                <small>Relatório HTML no browser</small>
+                {frotaAcaoLoading === 'html' && <span className="frota-acao-spinner" />}
+              </button>
+
+              <button
+                type="button"
+                className="frota-acao-btn"
+                onClick={handleGravarFrotaPdf}
+                disabled={!!frotaAcaoLoading}
+              >
+                <FileDown size={18} />
+                <span>Gravar PDF</span>
+                <small>Descarregar ficheiro .pdf</small>
+                {frotaAcaoLoading === 'pdf' && <span className="frota-acao-spinner" />}
+              </button>
+
+              <button
+                type="button"
+                className={`frota-acao-btn${frotaEmailPane ? ' active' : ''}`}
+                onClick={() => setFrotaEmailPane(v => !v)}
+                disabled={!!frotaAcaoLoading}
+              >
+                <Mail size={18} />
+                <span>Enviar por email</span>
+                <small>Escolher destinatários</small>
+              </button>
+            </div>
+
+            {frotaEmailPane && (
+              <form className="frota-email-panel" onSubmit={handleEnviarFrotaEmail}>
+                <p className="frota-email-panel-title">Destinatários</p>
+                {modalFrota.cliente.email && (
+                  <label className="frota-email-check">
+                    <input
+                      type="checkbox"
+                      checked={frotaEmailCliente}
+                      onChange={e => setFrotaEmailCliente(e.target.checked)}
+                    />
+                    <span>
+                      <strong>{modalFrota.cliente.email}</strong>
+                      <small> — cliente</small>
+                    </span>
+                  </label>
+                )}
+                <label className="frota-email-check">
+                  <input
+                    type="checkbox"
+                    checked={frotaEmailAdmin}
+                    onChange={e => setFrotaEmailAdmin(e.target.checked)}
+                  />
+                  <span>
+                    <strong>comercial@navel.pt</strong>
+                    <small> — Navel (admin)</small>
+                  </span>
+                </label>
+                <label className="frota-email-check frota-email-outro">
+                  <input
+                    type="checkbox"
+                    checked={frotaEmailOutro.trim().length > 0}
+                    readOnly
+                    tabIndex={-1}
+                  />
+                  <span className="frota-email-outro-wrap">
+                    <small>Outro(s):</small>
+                    <input
+                      type="text"
+                      className="frota-email-outro-input"
+                      placeholder="email@exemplo.pt, outro@exemplo.pt"
+                      value={frotaEmailOutro}
+                      onChange={e => setFrotaEmailOutro(e.target.value)}
+                    />
+                  </span>
+                </label>
+                <div className="form-actions frota-email-actions">
+                  <button type="button" className="secondary" onClick={() => setFrotaEmailPane(false)}>Cancelar</button>
+                  <button type="submit" disabled={frotaAcaoLoading === 'email'}>
+                    {frotaAcaoLoading === 'email' ? <><span className="frota-acao-spinner" /> A enviar...</> : <><Send size={14} /> Enviar email</>}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -969,92 +1106,6 @@ export default function Clientes() {
         </div>
       )}
 
-      {/* ── Modal de importação SAF-T ─────────────────────────────────── */}
-      {modalImport && (
-        <div className="modal-overlay" onClick={() => setModalImport(false)}>
-          <div className="modal modal-import" onClick={e => e.stopPropagation()}>
-            <h2><Upload size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />Importar clientes — SAF-T</h2>
-            <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Selecione o ficheiro <strong>clientes-filosoft.json</strong> ou <strong>clientes-fttercei.json</strong> gerado pelos scripts de extracção (<code>npm run extract-clientes-saft</code> ou <code>extract-clientes-fttercei</code>). Os ficheiros são criados na pasta do projecto.
-            </p>
-
-            <label className="import-file-label">
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportFile}
-                style={{ display: 'none' }}
-                id="import-json-input"
-              />
-              <span className="btn secondary" style={{ cursor: 'pointer' }} onClick={() => document.getElementById('import-json-input').click()}>
-                <Upload size={16} /> Escolher ficheiro JSON…
-              </span>
-            </label>
-
-            {importErro && <p className="form-erro" style={{ marginTop: '0.75rem' }}>{importErro}</p>}
-
-            {importPreview && (
-              <div className="import-preview">
-                <div className="import-preview-stats">
-                  <div className="import-stat import-stat-new">
-                    <span className="import-stat-num">{importPreview.novos}</span>
-                    <span className="import-stat-label">novos a importar</span>
-                  </div>
-                  <div className="import-stat import-stat-exist">
-                    <span className="import-stat-num">{importPreview.existentes}</span>
-                    <span className="import-stat-label">já existem</span>
-                  </div>
-                  {importPreview.ignorados > 0 && (
-                    <div className="import-stat">
-                      <span className="import-stat-num">{importPreview.ignorados}</span>
-                      <span className="import-stat-label">sem critérios</span>
-                    </div>
-                  )}
-                  <div className="import-stat">
-                    <span className="import-stat-num">{importPreview.lista.length}</span>
-                    <span className="import-stat-label">total no ficheiro</span>
-                  </div>
-                </div>
-
-                <fieldset className="import-modo-fieldset">
-                  <legend>O que fazer com os clientes já existentes?</legend>
-                  <label className="import-radio">
-                    <input
-                      type="radio"
-                      name="importModo"
-                      value="novos"
-                      checked={importModo === 'novos'}
-                      onChange={() => setImportModo('novos')}
-                    />
-                    <strong>Ignorar</strong> — só adiciona os {importPreview.novos} novos (recomendado)
-                  </label>
-                  <label className="import-radio">
-                    <input
-                      type="radio"
-                      name="importModo"
-                      value="atualizar"
-                      checked={importModo === 'atualizar'}
-                      onChange={() => setImportModo('atualizar')}
-                    />
-                    <strong>Actualizar</strong> — substitui morada/contactos dos {importPreview.existentes} existentes com dados do SAF-T
-                  </label>
-                </fieldset>
-              </div>
-            )}
-
-            <div className="form-actions" style={{ marginTop: '1.25rem' }}>
-              <button type="button" className="secondary" onClick={() => setModalImport(false)}>Cancelar</button>
-              <button
-                type="button"
-                onClick={handleImportConfirm}
-                disabled={!importPreview}
-              >
-                <Upload size={16} /> Importar {importPreview ? importPreview.lista.length : ''} clientes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {modal && modal !== 'ficha' && (
         <div className="modal-overlay" onClick={() => setModal(null)}>

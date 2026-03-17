@@ -13,16 +13,19 @@ import { usePermissions } from '../hooks/usePermissions'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, Clock, Archive, MoreHorizontal } from 'lucide-react'
+import BulkExecutarModal from '../components/BulkExecutarModal'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, Clock, Archive, MoreHorizontal, CheckSquare } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
 import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 import { pt } from 'date-fns/locale'
 import { relatorioParaHtml } from '../utils/relatorioHtml'
-import { abrirPdfRelatorio, imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
+import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { logger } from '../utils/logger'
 import { STORAGE } from '../config/storageKeys'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Manutencoes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', em_progresso: 'Em progresso', emAtraso: 'Em atraso', proxima: 'Próxima' }
@@ -66,6 +69,7 @@ export default function Manutencoes() {
     tecnicos,
   } = useData()
   const { canDelete, canEditManutencao, canDeleteManutencao, isAdmin } = usePermissions()
+  const contentReady = useDeferredReady(manutencoes.length >= 0)
   const [modalConfirmDelete, setModalConfirmDelete] = useState(null)
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -77,9 +81,11 @@ export default function Manutencoes() {
   const [modalFotos, setModalFotos] = useState(null) // { fotos: string[] }
   const [modalEmail, setModalEmail] = useState(null) // { manutencao, maquina, rel, sub, cliente }
   const [modalRecolherAssinatura, setModalRecolherAssinatura] = useState(null) // { manutencao, maquina }
-  const [emailDestino, setEmailDestino] = useState('')
-  const [emailEnviando, setEmailEnviando] = useState(false)
-  const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasTotais: '', horasServico: '' })
+  const [emailCheckCliente, setEmailCheckCliente] = useState(false)
+  const [emailCheckAdmin, setEmailCheckAdmin]     = useState(true)
+  const [emailOutro, setEmailOutro]               = useState('')
+  const [emailEnviando, setEmailEnviando]         = useState(false)
+  const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasTotais: '', horasServico: '', dataExecucao: '' })
   const [addClienteNif, setAddClienteNif] = useState('')
   const [addCategoriaId, setAddCategoriaId] = useState('')
   const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
@@ -106,6 +112,9 @@ export default function Manutencoes() {
     return true
   }, [feriadosSetManut])
   const [overflowOpen, setOverflowOpen] = useState(null)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [modalBulk, setModalBulk] = useState(null)
 
   useEffect(() => {
     if (!overflowOpen) return
@@ -115,6 +124,20 @@ export default function Manutencoes() {
     document.addEventListener('click', close, true)
     return () => document.removeEventListener('click', close, true)
   }, [overflowOpen])
+
+  const toggleBulkMode = useCallback(() => {
+    setBulkMode(v => !v)
+    setSelectedIds(new Set())
+  }, [])
+
+  const toggleSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const STORAGE_KEY = STORAGE.MANUTENCOES_FILTER
 
@@ -197,6 +220,8 @@ export default function Manutencoes() {
   }
 
   const openEdit = (m) => {
+    const rel = m.status === 'concluida' ? getRelatorioByManutencao(m.id) : null
+    const dataExec = rel ? (rel.dataAssinatura || rel.dataCriacao || '').slice(0, 10) : ''
     setForm({
       id: m.id,
       maquinaId: m.maquinaId,
@@ -207,6 +232,7 @@ export default function Manutencoes() {
       observacoes: m.observacoes || '',
       horasTotais: m.horasTotais ?? '',
       horasServico: m.horasServico ?? '',
+      dataExecucao: dataExec,
     })
     setModal('edit')
   }
@@ -240,6 +266,17 @@ export default function Manutencoes() {
     } else {
       updateManutencao(form.id, payload)
       if (maq && Object.keys(updateMaqData).length > 0) updateMaquina(mId, updateMaqData)
+      if (isAdmin && form.status === 'concluida' && form.dataExecucao) {
+        const rel = getRelatorioByManutencao(form.id)
+        if (rel) {
+          const novaDataISO = `${form.dataExecucao}T12:00:00.000Z`
+          updateRelatorio(rel.id, {
+            dataCriacao: novaDataISO,
+            dataAssinatura: rel.assinadoPeloCliente ? novaDataISO : rel.dataAssinatura,
+          })
+          showToast('Data de execução actualizada com sucesso.', 'success')
+        }
+      }
     }
     setModal(null)
   }
@@ -279,32 +316,53 @@ export default function Manutencoes() {
     [...manutencoesPendentes].sort((a, b) => calcDiasAtraso(b.data) - calcDiasAtraso(a.data)),
   [manutencoesPendentes, hojeStr])
 
+  const EMAIL_ADMIN_MANUT = 'comercial@navel.pt'
+
   const handleEnviarEmail = async (e) => {
     e.preventDefault()
     if (!modalEmail) return
+    const { manutencao: m, maquina: maq, rel, sub, cliente } = modalEmail
+    const emailClienteVal = cliente?.email?.trim() ?? ''
+
+    const dests = new Set()
+    if (emailCheckCliente && emailClienteVal) dests.add(emailClienteVal.toLowerCase())
+    if (emailCheckAdmin) dests.add(EMAIL_ADMIN_MANUT)
+    emailOutro.split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => s).forEach(em => dests.add(em))
+
+    if (dests.size === 0) { showToast('Selecione pelo menos um destinatário.', 'warning'); return }
+
     setEmailEnviando(true)
     showGlobalLoading()
     try {
-      const { manutencao: m, maquina: maq, rel, sub, cliente } = modalEmail
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
       const tecObj = getTecnicoByNome(rel?.tecnico || m?.tecnico)
-      const resultado = await enviarRelatorioEmail({
-        emailDestinatario: emailDestino,
-        relatorio: rel,
-        manutencao: m,
-        maquina: maq,
-        cliente,
-        checklistItems,
-        subcategoriaNome: sub?.nome || '',
-        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
-        tecnicoObj: tecObj,
-      })
-      if (resultado?.ok) {
-        showToast(`Email enviado para ${emailDestino}.`, 'success')
+      let sucesso = 0
+      for (const dest of dests) {
+        const resultado = await enviarRelatorioEmail({
+          emailDestinatario: dest,
+          relatorio: rel,
+          manutencao: m,
+          maquina: maq,
+          cliente,
+          checklistItems,
+          subcategoriaNome: sub?.nome || '',
+          logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+          tecnicoObj: tecObj,
+        })
+        if (resultado?.ok) sucesso++
+        else logger.error('Manutencoes', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
+      }
+      if (sucesso > 0) {
+        showToast(
+          sucesso === dests.size
+            ? `Email enviado para ${sucesso} destinatário${sucesso > 1 ? 's' : ''}.`
+            : `Enviado para ${sucesso} de ${dests.size} destinatários.`,
+          sucesso === dests.size ? 'success' : 'warning'
+        )
         setModalEmail(null)
-        setEmailDestino('')
+        setEmailOutro('')
       } else {
-        showToast(resultado?.message || 'Erro ao enviar email.', 'error', 4000)
+        showToast('Não foi possível enviar o email. Tente novamente.', 'error', 4000)
       }
     } catch (err) {
       showToast(err?.message || 'Erro ao enviar email.', 'error', 4000)
@@ -319,22 +377,25 @@ export default function Manutencoes() {
     try {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
       const tecObj = getTecnicoByNome(m.tecnico || rel?.tecnico)
-      const html = relatorioParaHtml(rel, m, maq, cliente, checklistItems, {
-        subcategoriaNome: sub?.nome,
-        ultimoEnvio: rel.ultimoEnvio,
-        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
-        tecnicoObj: tecObj,
-      })
-      await abrirPdfRelatorio({
+      const blob = await gerarPdfCompacto({
         relatorio: rel,
         manutencao: m,
         maquina: maq,
         cliente,
         checklistItems,
         subcategoriaNome: sub?.nome ?? '',
-        html,
         tecnicoObj: tecObj,
       })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio_${rel.numeroRelatorio ?? m.id}_${m.data}.pdf`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 15000)
+      showToast('PDF transferido.', 'success')
+    } catch (err) {
+      showToast('Erro ao gerar PDF.', 'error', 4000)
+      logger.error('Manutencoes', 'handleAbrirPdf', err.message)
     } finally {
       hideGlobalLoading()
     }
@@ -345,7 +406,9 @@ export default function Manutencoes() {
     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
     const rel = getRelatorioByManutencao(m.id)
     const cliente = getCliente(maq?.clienteNif)
-    setEmailDestino(cliente?.email || '')
+    setEmailCheckCliente(!!cliente?.email?.trim())
+    setEmailCheckAdmin(true)
+    setEmailOutro('')
     setModalEmail({ manutencao: m, maquina: maq, rel, sub, cliente })
   }
 
@@ -374,6 +437,8 @@ export default function Manutencoes() {
     subtituloPagina = 'Ordenado por dias de atraso (mais urgente primeiro)'
   }
 
+  const manutencoesList_selectable = listaParaMostrar.filter(m => m.status === 'pendente' || m.status === 'agendada')
+
   return (
     <div className="page">
       <div className="page-header">
@@ -385,7 +450,7 @@ export default function Manutencoes() {
           <h1>{tituloPagina}</h1>
           <p className="page-sub">{subtituloPagina}</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="page-header-actions">
           {!filter && (
             <button
               type="button"
@@ -395,6 +460,9 @@ export default function Manutencoes() {
               {mostrarTodas ? 'Ocultar executadas' : `Ver todas (${manutencoesExecutadas.length})`}
             </button>
           )}
+          <button type="button" className={bulkMode ? 'secondary' : 'btn-outline-muted'} onClick={toggleBulkMode}>
+            <CheckSquare size={16} /> {bulkMode ? 'Cancelar selecção' : 'Selecionar'}
+          </button>
           {isAdmin && (
             <button type="button" onClick={openAdd}>
               <Plus size={18} /> Nova manutenção
@@ -402,6 +470,8 @@ export default function Manutencoes() {
           )}
         </div>
       </div>
+
+      <ContentLoader loading={!contentReady} message="A carregar manutenções…" hint="Por favor aguarde.">
 
       {/* ── Lista mobile (≤768px) — padrão field-service ───────────────────── */}
       <div className="manutencoes-cards">
@@ -424,9 +494,15 @@ export default function Manutencoes() {
               const equipSub    = sub?.nome || ''
 
               return (
-                <div key={m.id} className={`mc mc-${st}`}>
+                <div key={m.id} className={`mc mc-${st}${bulkMode && selectedIds.has(m.id) ? ' mc-selected' : ''}`}>
                   {/* Faixa de status lateral */}
                   <div className="mc-strip" />
+
+                  {bulkMode && isPrimary && (
+                    <label className="bulk-check-mobile" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
+                    </label>
+                  )}
 
                   <div className="mc-body">
                     {/* Linha 1: tipo + badge + número + badge KAESER */}
@@ -529,7 +605,7 @@ export default function Manutencoes() {
                                 <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
                               )}
                               {canDeleteManutencao(m.id) && (
-                                <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m.id)}><Trash2 size={14} /> Eliminar</button>
+                                <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m)}><Trash2 size={14} /> Eliminar</button>
                               )}
                             </div>
                           )}
@@ -548,6 +624,26 @@ export default function Manutencoes() {
           <table className="data-table">
             <thead>
               <tr>
+                {bulkMode && (
+                  <th className="col-bulk-check">
+                    <input type="checkbox"
+                      checked={(() => {
+                        const selectable = listaParaMostrar.filter(m => m.status === 'pendente' || m.status === 'agendada')
+                        return selectable.length > 0 && selectable.every(m => selectedIds.has(m.id))
+                      })()}
+                      onChange={e => {
+                        const selectable = listaParaMostrar.filter(m => m.status === 'pendente' || m.status === 'agendada')
+                        if (e.target.checked) {
+                          setSelectedIds(new Set([...selectedIds, ...selectable.map(m => m.id)]))
+                        } else {
+                          const next = new Set(selectedIds)
+                          selectable.forEach(m => next.delete(m.id))
+                          setSelectedIds(next)
+                        }
+                      }}
+                    />
+                  </th>
+                )}
                 <th className="col-dias">Dias</th>
                 <th>Equipamento</th>
                 <th>Cliente</th>
@@ -568,7 +664,14 @@ export default function Manutencoes() {
                   const isConcluida = m.status === 'concluida'
                   const dias = isConcluida ? null : calcDiasAtraso(m.data)
                   return (
-                    <tr key={m.id}>
+                    <tr key={m.id} className={bulkMode && selectedIds.has(m.id) ? 'bulk-row-selected' : ''}>
+                      {bulkMode && (
+                        <td className="col-bulk-check">
+                          {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') ? (
+                            <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
+                          ) : <span />}
+                        </td>
+                      )}
                       <td data-label="Dias" className={`col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
                         {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
                       </td>
@@ -644,7 +747,7 @@ export default function Manutencoes() {
                             <span className="icon-btn readonly" title="Manutenção assinada"><Lock size={16} /></span>
                           )}
                           {canDeleteManutencao(m.id) && (
-                            <button className="icon-btn danger" onClick={() => setModalConfirmDelete(m.id)} title="Eliminar"><Trash2 size={16} /></button>
+                            <button className="icon-btn danger" onClick={() => setModalConfirmDelete(m)} title="Eliminar"><Trash2 size={16} /></button>
                           )}
                         </div>
                       </td>
@@ -659,6 +762,8 @@ export default function Manutencoes() {
             </p>
           )}
         </div>
+
+      </ContentLoader>
 
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
@@ -722,7 +827,7 @@ export default function Manutencoes() {
                 </label>
               )}
               <label>
-                Data
+                Data agendada
                 <input
                   type="date"
                   required
@@ -742,6 +847,21 @@ export default function Manutencoes() {
                   {nomesTecnicos.map(nome => <option key={nome} value={nome}>{nome}</option>)}
                 </select>
               </label>
+              {modal === 'edit' && isAdmin && form.status === 'concluida' && (
+                <div className="form-section-historica">
+                  <label className="historica-label">
+                    <Clock size={14} />
+                    Data de execução
+                    <span className="historica-hint">(alterar a data em que a manutenção foi realizada)</span>
+                    <input
+                      type="date"
+                      max={getHojeAzores()}
+                      value={form.dataExecucao}
+                      onChange={e => setForm(f => ({ ...f, dataExecucao: e.target.value }))}
+                    />
+                  </label>
+                </div>
+              )}
               {modal === 'edit' && (
                 <>
                   <label>
@@ -868,51 +988,131 @@ export default function Manutencoes() {
         />
       )}
 
-      {modalEmail && (
-        <div className="modal-overlay" onClick={() => { setModalEmail(null); setEmailDestino('') }}>
-          <div className="modal modal-email-envio" onClick={e => e.stopPropagation()}>
-            <h2><Mail size={20} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />Enviar relatório por email</h2>
-            {modalEmail.rel?.numeroRelatorio && (
-              <p className="modal-hint">Relatório <strong>{modalEmail.rel.numeroRelatorio}</strong> — {modalEmail.manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'}</p>
-            )}
-            <form onSubmit={handleEnviarEmail}>
-              <label>
-                Endereço de email do destinatário <span className="required">*</span>
-                <input
-                  type="email"
-                  required
-                  autoFocus
-                  value={emailDestino}
-                  onChange={e => setEmailDestino(e.target.value)}
-                  placeholder="cliente@empresa.pt"
-                  disabled={emailEnviando}
-                />
-              </label>
-              <div className="form-actions">
-                <button type="button" className="secondary" onClick={() => { setModalEmail(null); setEmailDestino('') }} disabled={emailEnviando}>
-                  Cancelar
-                </button>
-                <button type="submit" disabled={emailEnviando || !emailDestino.trim()}>
-                  {emailEnviando ? 'A enviar…' : <><Mail size={16} /> Enviar email</>}
-                </button>
-              </div>
-            </form>
+      {modalEmail && (() => {
+        const emailCli = modalEmail.cliente?.email?.trim() ?? ''
+        return (
+          <div className="modal-overlay" onClick={() => { setModalEmail(null); setEmailOutro('') }}>
+            <div className="modal modal-email-envio" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <h2><Mail size={20} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />Enviar relatório por email</h2>
+              {modalEmail.rel?.numeroRelatorio && (
+                <p className="modal-hint">Relatório <strong>{modalEmail.rel.numeroRelatorio}</strong> — {modalEmail.manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'}</p>
+              )}
+              <form onSubmit={handleEnviarEmail}>
+                <div className="frota-email-panel">
+                  {emailCli ? (
+                    <label className="frota-email-check">
+                      <input type="checkbox" checked={emailCheckCliente} onChange={e => setEmailCheckCliente(e.target.checked)} disabled={emailEnviando} />
+                      <span><strong>Cliente</strong><br /><small>{emailCli}</small></span>
+                    </label>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}><em>Sem email de cliente na ficha.</em></p>
+                  )}
+                  <label className="frota-email-check">
+                    <input type="checkbox" checked={emailCheckAdmin} onChange={e => setEmailCheckAdmin(e.target.checked)} disabled={emailEnviando} />
+                    <span><strong>Administração</strong><br /><small>{EMAIL_ADMIN_MANUT}</small></span>
+                  </label>
+                  <div className="frota-email-outro-wrap" style={{ marginTop: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Outro(s) endereço(s)</label>
+                    <input
+                      type="text"
+                      className="frota-email-outro-input"
+                      placeholder="ex: outro@empresa.pt, backup@navel.pt"
+                      value={emailOutro}
+                      onChange={e => setEmailOutro(e.target.value)}
+                      disabled={emailEnviando}
+                    />
+                    <small style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Separe múltiplos emails com vírgula.</small>
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button type="button" className="secondary" onClick={() => { setModalEmail(null); setEmailOutro('') }} disabled={emailEnviando}>
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={emailEnviando}>
+                    {emailEnviando ? 'A enviar…' : <><Mail size={16} /> Enviar email</>}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
+        )
+      })()}
+
+      {/* ── Barra flutuante de selecção em massa ── */}
+      {bulkMode && selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-action-count">{selectedIds.size} selecionada{selectedIds.size !== 1 ? 's' : ''}</span>
+          <button type="button" className="btn primary" onClick={() => {
+            const selected = manutencoesList_selectable.filter(m => selectedIds.has(m.id))
+            const maqMap = {}
+            selected.forEach(m => { maqMap[m.maquinaId] = getMaquina(m.maquinaId) })
+            setModalBulk({ manutencoes: selected, maquinaMap: maqMap })
+          }}>
+            <Play size={15} /> Executar {selectedIds.size}
+          </button>
+          <button type="button" className="btn secondary" onClick={toggleBulkMode}>
+            <X size={15} /> Cancelar
+          </button>
         </div>
       )}
 
-      {modalConfirmDelete && (
-        <div className="modal-overlay" onClick={() => setModalConfirmDelete(null)}>
-          <div className="modal modal-compact" onClick={e => e.stopPropagation()}>
-            <h2>Confirmar eliminação</h2>
-            <p>Tem a certeza que pretende eliminar esta manutenção? Esta acção é irreversível e eliminará também o relatório associado e manutenções periódicas futuras (se aplicável).</p>
-            <div className="form-actions">
-              <button type="button" className="secondary" onClick={() => setModalConfirmDelete(null)}>Cancelar</button>
-              <button type="button" className="danger" onClick={() => { removeManutencao(modalConfirmDelete); setModalConfirmDelete(null); showToast('Manutenção eliminada.', 'success') }}>Eliminar</button>
+      {modalBulk && (
+        <BulkExecutarModal
+          isOpen
+          onClose={() => { setModalBulk(null); setBulkMode(false); setSelectedIds(new Set()) }}
+          manutencoesList={modalBulk.manutencoes}
+          maquinaMap={modalBulk.maquinaMap}
+        />
+      )}
+
+      {modalConfirmDelete && (() => {
+        const mDel = modalConfirmDelete
+        const maqDel = getMaquina(mDel.maquinaId)
+        const relDel = getRelatorioByManutencao(mDel.id)
+        const cliDel = getCliente(maqDel?.clienteNif)
+        const isConcluida = mDel.status === 'concluida'
+        const futurasCount = isConcluida && mDel.maquinaId
+          ? manutencoes.filter(fm =>
+              fm.id !== mDel.id &&
+              fm.maquinaId === mDel.maquinaId &&
+              (fm.status === 'pendente' || fm.status === 'agendada') &&
+              fm.data > mDel.data
+            ).length
+          : 0
+
+        return (
+          <div className="modal-overlay" onClick={() => setModalConfirmDelete(null)}>
+            <div className="modal modal-compact modal-delete-confirm" onClick={e => e.stopPropagation()}>
+              <h2 className="modal-delete-title"><Trash2 size={20} /> Eliminar manutenção</h2>
+              <div className="modal-delete-details">
+                <p><strong>{maqDel ? `${maqDel.marca} ${maqDel.modelo}` : 'N/A'}</strong></p>
+                {maqDel?.numeroSerie && <p className="text-muted">Nº Série: {maqDel.numeroSerie}</p>}
+                {cliDel && <p className="text-muted">{cliDel.nome}</p>}
+                <p className="text-muted">{mDel.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'} — {formatDataAzores(mDel.data)}</p>
+                {relDel?.numeroRelatorio && <p className="text-muted">Relatório: {relDel.numeroRelatorio}</p>}
+              </div>
+              <div className="modal-delete-warning">
+                <p>Tem a certeza que pretende eliminar esta manutenção?</p>
+                <p>Esta acção é <strong>irreversível</strong> e eliminará:</p>
+                <ul>
+                  <li>A manutenção e todos os seus dados</li>
+                  {relDel && <li>O relatório associado{relDel.assinadoPeloCliente ? ' (assinado pelo cliente)' : ''}</li>}
+                  {futurasCount > 0 && <li><strong>{futurasCount}</strong> manutenção(ões) periódica(s) futura(s) agendada(s) automaticamente</li>}
+                </ul>
+              </div>
+              <div className="form-actions">
+                <button type="button" className="secondary" onClick={() => setModalConfirmDelete(null)}>Não, cancelar</button>
+                <button type="button" className="danger" onClick={() => {
+                  removeManutencao(mDel.id)
+                  setModalConfirmDelete(null)
+                  showToast(`Manutenção eliminada${futurasCount > 0 ? ` (+ ${futurasCount} agendamento(s) futuro(s))` : ''}.`, 'success')
+                  logger.action('Manutencoes', 'deleteManutencao', `Admin eliminou manutenção ${mDel.id}${relDel ? ` com relatório ${relDel.numeroRelatorio}` : ''}`, { id: mDel.id, futuras: futurasCount })
+                }}>Sim, eliminar</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
     </div>
   )

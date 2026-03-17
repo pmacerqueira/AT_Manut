@@ -582,8 +582,8 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
             </div>
           )}
           <div className="form-actions">
-            <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit">{mode === 'add' ? 'Adicionar' : 'Guardar'}</button>
+            <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn">{mode === 'add' ? 'Adicionar' : 'Guardar'}</button>
           </div>
         </form>
       </div>

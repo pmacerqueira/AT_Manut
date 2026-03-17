@@ -221,9 +221,9 @@ export default function Definicoes() {
     <div className="def-page">
       {/* Cabeçalho */}
       <div className="def-header">
-        <button type="button" className="def-back-btn" onClick={() => navigate(-1)} title="Voltar">
+        <button type="button" className="btn-back def-back-btn" onClick={() => navigate(-1)} title="Voltar atrás">
           <ArrowLeft size={20} />
-          <span>Voltar</span>
+          <span>Voltar atrás</span>
         </button>
         <div className="def-title-wrap">
           <Shield size={22} className="def-title-icon" />

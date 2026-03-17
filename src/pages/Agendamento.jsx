@@ -8,6 +8,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { INTERVALOS } from '../context/DataContext'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import { useAuth } from '../context/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from '../components/Toast'
@@ -91,6 +93,7 @@ function gerarDatasRecorrentes(dataInicioISO, periodicidade, horizonteAnos) {
 
 export default function Agendamento() {
   const { clientes, maquinas, manutencoes, addManutencao, addManutencoesBatch, getSubcategoria } = useData()
+  const contentReady = useDeferredReady(maquinas.length >= 0)
   const { user } = useAuth()
   const { isAdmin } = usePermissions()
   const { showToast } = useToast()
@@ -328,6 +331,7 @@ export default function Agendamento() {
         </div>
       </div>
 
+      <ContentLoader loading={!contentReady} message="A carregar agendamento…" hint="Por favor aguarde.">
       <form onSubmit={handleSubmit} className="card agendamento-form">
         <label>
           <span>Cliente</span>
@@ -608,6 +612,7 @@ export default function Agendamento() {
           )}
         </div>
       )}
+      </ContentLoader>
 
       {sugestaoData && (
         <div className="modal-overlay" onClick={() => setSugestaoData(null)}>

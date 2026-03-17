@@ -19,6 +19,7 @@
   justify-content: space-between;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
 }
 
 .qr-modal-body { padding: 1.25rem; }
@@ -35,6 +36,7 @@
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.25rem;
+  flex-wrap: wrap;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -56,8 +58,8 @@
   border: 2px solid #0d2340;
   border-radius: var(--radius);
   overflow: hidden;
-  width: 450px;
-  height: 250px;
+  width: min(450px, 95vw);
+  height: min(250px, 32dvh);
   margin: 0 auto;
   font-family: 'Segoe UI', Arial, sans-serif;
   color: #0d2340;

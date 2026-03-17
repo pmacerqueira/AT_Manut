@@ -2,14 +2,13 @@
  * gerarHtmlHistoricoMaquina — Gera o HTML completo do histórico de manutenção
  * de uma máquina para impressão / PDF via window.print().
  *
- * Reutiliza o estilo visual de relatorioHtml.js (paleta Navel, layout A4).
+ * Reutiliza relatorioBaseStyles (paleta Navel, layout A4).
  * Formato: capa com dados da máquina + estatísticas + tabela cronológica
  * de todas as manutenções + última assinatura.
  */
 import { formatDataAzores, formatDataHoraAzores, parseDateLocal } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
-import { APP_FOOTER_TEXT } from '../config/version'
-import { EMPRESA } from '../constants/empresa'
+import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA, TIPO } from './relatorioBaseStyles'
 
 /**
  * @param {object} params
@@ -130,6 +129,64 @@ export function gerarHtmlHistoricoMaquina({
     </tr>`
   }
 
+  // ── CSS específico do histórico (timeline, badges, stats, ficha) ──────────────
+  const cssHistorico = `
+/* Margens de impressão (histórico usa 10mm 13mm) */
+@page { margin: 10mm 13mm; }
+
+/* Override título bar para "Gerado em" (data em vez de nº serviço) */
+.rpt-titulo-bar .rpt-num { font-size: 9.5px; font-family: inherit; }
+.rpt-titulo-bar .rpt-num-label { font-size: 8.5px; color: rgba(255,255,255,.85); }
+
+/* Ficha do equipamento */
+.ficha-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--borda); border-radius:4px; overflow:hidden; margin-bottom:10px; }
+.ficha-col { padding:8px 10px; }
+.ficha-col + .ficha-col { border-left:1px solid var(--borda); background:var(--cinza); }
+.ficha-field { margin-bottom:5px; }
+.ficha-field:last-child { margin-bottom:0; }
+.ficha-label { display:block; font-size:${TIPO.micro}; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:1px; }
+.ficha-value { font-size:${TIPO.corpo}; color:var(--texto); font-weight:500; }
+.ficha-value-lg { font-size:13px; font-weight:700; color:var(--azul); }
+
+/* Estatísticas */
+.stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:12px; }
+.stat-box { border:1px solid var(--borda); border-radius:4px; padding:6px 8px; text-align:center; background:var(--cinza); }
+.stat-num { display:block; font-size:18px; font-weight:800; line-height:1.1; color:var(--azul); }
+.stat-num.red { color:var(--vermelho); }
+.stat-num.green { color:var(--verde); }
+.stat-num.orange { color:var(--laranja); }
+.stat-lbl { display:block; font-size:${TIPO.micro}; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+.stat-num.ultima-exec { font-size:${ultimaExecStr.length > 8 ? '9' : '13'}px; padding-top:${ultimaExecStr.length > 8 ? '5' : '2'}px; }
+
+/* Tabela histórico */
+.hist-table { width:100%; border-collapse:collapse; font-size:${TIPO.pequeno}; margin-bottom:14px; page-break-inside:auto; }
+.hist-table th { background:var(--azul); color:var(--branco); padding:4px 6px; text-align:left; font-size:${TIPO.micro}; font-weight:600; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; }
+.hist-table th.th-n { width:22px; }
+.hist-table th.th-data { width:62px; }
+.hist-table th.th-tipo { width:58px; }
+.hist-table th.th-estado { width:68px; }
+.hist-table th.th-tecnico { width:80px; }
+.hist-table th.th-assin { width:90px; }
+.hist-table td { padding:4px 6px; border-bottom:1px solid var(--borda-leve); vertical-align:top; }
+.hist-table tr.row-alt td { background:var(--cinza); }
+.td-c { text-align:center; }
+.td-notes { font-size:${TIPO.label}; color:var(--muted); max-width:140px; }
+
+/* Badges estado */
+.badge-ok   { background:#dcfce7; color:#14532d; padding:1.5px 6px; border-radius:8px; font-size:${TIPO.micro}; font-weight:700; white-space:nowrap; border:1px solid #86efac; }
+.badge-err  { background:#fee2e2; color:#7f1d1d; padding:1.5px 6px; border-radius:8px; font-size:${TIPO.micro}; font-weight:700; white-space:nowrap; border:1px solid #fca5a5; }
+.badge-pend { background:#fef3c7; color:#78350f; padding:1.5px 6px; border-radius:8px; font-size:${TIPO.micro}; font-weight:700; white-space:nowrap; border:1px solid #fcd34d; }
+
+.hist-empty { color:var(--muted); font-size:10px; margin-bottom:12px; font-style:italic; }
+.hist-reps-title { margin-top:14px; }
+.hist-table.reps-table th.th-tecnico { width:70px; }
+
+@media print {
+  .hist-table tr { page-break-inside:avoid; }
+  .hist-table thead { display:table-header-group; }
+}
+`
+
   // ── HTML completo ────────────────────────────────────────────────────────────
   return `<!DOCTYPE html>
 <html lang="pt">
@@ -137,97 +194,17 @@ export function gerarHtmlHistoricoMaquina({
 <meta charset="utf-8">
 <title>Histórico de Manutenção — ${esc(maquina.marca)} ${esc(maquina.modelo)}</title>
 <style>
-@page { size: A4 portrait; margin: 10mm 13mm; }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; line-height: 1.4; color: #1a1a2e; background: #fff; }
-
-:root {
-  --azul:#1a4880; --azul-med:#2d6eb5; --azul-claro:#e8f2fa;
-  --cinza:#f4f6f8; --borda:#c6d8ec; --texto:#1a1a2e; --muted:#5a6a7e;
-  --verde:#16a34a; --vermelho:#dc2626; --laranja:#d97706; --acento:#f0a500;
-}
-
-/* ── Cabeçalho ── */
-.rpt-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding-bottom:8px; border-bottom:2.5px solid var(--azul); }
-.rpt-logo img { max-height:38px; max-width:140px; object-fit:contain; display:block; }
-.rpt-empresa { text-align:right; font-size:8.5px; line-height:1.55; color:var(--muted); }
-.rpt-empresa strong { display:block; font-size:9.5px; color:var(--azul); margin-bottom:1px; }
-
-/* ── Barra de título ── */
-.rpt-titulo-bar { display:flex; align-items:center; justify-content:space-between; background:var(--azul); color:#fff; padding:5px 10px; margin:7px 0 0; border-radius:3px; }
-.rpt-titulo-bar h1 { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
-.rpt-gerado { font-size:7.5px; opacity:.75; }
-.rpt-acento { height:2px; background:linear-gradient(90deg,var(--acento),var(--azul-med)); margin-bottom:11px; border-radius:0 0 2px 2px; }
-
-/* ── Ficha do equipamento ── */
-.section-title { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--azul-med); border-bottom:1px solid var(--borda); padding-bottom:3px; margin:0 0 6px; }
-.ficha-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--borda); border-radius:4px; overflow:hidden; margin-bottom:10px; }
-.ficha-col { padding:8px 10px; }
-.ficha-col + .ficha-col { border-left:1px solid var(--borda); background:var(--cinza); }
-.ficha-field { margin-bottom:5px; }
-.ficha-field:last-child { margin-bottom:0; }
-.ficha-label { display:block; font-size:7.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:1px; }
-.ficha-value { font-size:10.5px; color:var(--texto); font-weight:500; }
-.ficha-value-lg { font-size:13px; font-weight:700; color:var(--azul); }
-
-/* ── Estatísticas ── */
-.stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:12px; }
-.stat-box { border:1px solid var(--borda); border-radius:4px; padding:6px 8px; text-align:center; background:var(--cinza); }
-.stat-num { display:block; font-size:18px; font-weight:800; line-height:1.1; color:var(--azul); }
-.stat-num.red { color:var(--vermelho); }
-.stat-num.green { color:var(--verde); }
-.stat-num.orange { color:var(--laranja); }
-.stat-lbl { display:block; font-size:7.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
-
-/* ── Tabela histórico ── */
-.hist-table { width:100%; border-collapse:collapse; font-size:9px; margin-bottom:14px; page-break-inside:auto; }
-.hist-table th { background:var(--azul); color:#fff; padding:4px 6px; text-align:left; font-size:8px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; }
-.hist-table td { padding:4px 6px; border-bottom:1px solid #edf2f7; vertical-align:top; }
-.hist-table tr.row-alt td { background:var(--cinza); }
-.td-c { text-align:center; }
-.td-notes { font-size:8.5px; color:var(--muted); max-width:140px; }
-
-/* ── Badges ── */
-.badge-ok   { background:rgba(22,163,74,.14);  color:var(--verde);    padding:1px 5px; border-radius:8px; font-size:8px; font-weight:700; white-space:nowrap; }
-.badge-err  { background:rgba(220,38,38,.12);  color:var(--vermelho); padding:1px 5px; border-radius:8px; font-size:8px; font-weight:700; white-space:nowrap; }
-.badge-pend { background:rgba(217,119,6,.12);  color:var(--laranja);  padding:1px 5px; border-radius:8px; font-size:8px; font-weight:700; white-space:nowrap; }
-
-/* ── Assinatura ── */
-.assin-box { border:1px solid var(--borda); border-radius:4px; padding:8px 10px; background:var(--cinza); display:inline-block; margin-bottom:12px; }
-.assin-box img { display:block; max-width:200px; max-height:80px; margin-top:5px; border:1px solid var(--borda); background:#fff; border-radius:3px; }
-.assin-meta { font-size:8.5px; color:var(--muted); margin-top:3px; }
-
-/* ── Rodapé ── */
-.rpt-footer { margin-top:10px; padding-top:6px; border-top:1px solid var(--borda); display:flex; justify-content:space-between; font-size:8.5px; color:var(--muted); }
-
-@media print {
-  .hist-table tr { page-break-inside:avoid; }
-  .hist-table thead { display:table-header-group; }
-}
+${cssBase(PALETA.azulNavel, 'rgba(26,72,128,0.12)')}
+${cssHistorico}
 </style>
 </head>
 <body>
 
-<header class="rpt-header">
-  <div class="rpt-logo">
-    <img src="${logoSrc}" alt="Navel"
-      onerror="this.parentNode.innerHTML='<strong style=color:#1a4880;font-size:14px>NAVEL</strong>'">
-  </div>
-  <div class="rpt-empresa">
-    <strong>${esc(EMPRESA.nome)}</strong>
-    ${esc(EMPRESA.divisaoComercial)}<br>
-    ${esc(EMPRESA.sede)}<br>
-    ${esc(EMPRESA.telefones)} &nbsp;|&nbsp; ${esc(EMPRESA.web)}
-  </div>
-</header>
+${htmlHeader(logoSrc)}
 
-<div class="rpt-titulo-bar">
-  <h1>Histórico Completo de Manutenção</h1>
-  <span class="rpt-gerado">Gerado em ${geradoEm}</span>
-</div>
-<div class="rpt-acento"></div>
+${htmlTituloBar('Histórico Completo de Manutenção', 'Gerado em', geradoEm)}
 
-<div class="section-title">Ficha do equipamento</div>
+<div class="rpt-section-title">Ficha do equipamento</div>
 <div class="ficha-grid">
   <div class="ficha-col">
     <div class="ficha-field">
@@ -267,7 +244,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; line-heigh
   </div>
 </div>
 
-<div class="section-title">Estatísticas globais</div>
+<div class="rpt-section-title">Estatísticas globais</div>
 <div class="stats-row">
   <div class="stat-box">
     <span class="stat-num">${total}</span>
@@ -286,25 +263,25 @@ body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10.5px; line-heigh
     <span class="stat-lbl">Em atraso</span>
   </div>
   <div class="stat-box">
-    <span class="stat-num" style="font-size:${ultimaExecStr.length > 8 ? '9' : '13'}px;padding-top:${ultimaExecStr.length > 8 ? '5' : '2'}px">${ultimaExecStr}</span>
+    <span class="stat-num ultima-exec">${ultimaExecStr}</span>
     <span class="stat-lbl">Última execução</span>
   </div>
 </div>
 
-<div class="section-title">
+<div class="rpt-section-title">
   Registo histórico — ${total} intervenç${total === 1 ? 'ão' : 'ões'} (mais recente primeiro)
 </div>
 ${total === 0
-  ? '<p style="color:#5a6a7e;font-size:10px;margin-bottom:12px;font-style:italic">Nenhuma manutenção registada para este equipamento.</p>'
+  ? '<p class="hist-empty">Nenhuma manutenção registada para este equipamento.</p>'
   : `<table class="hist-table">
   <thead>
     <tr>
-      <th class="td-c" style="width:22px">#</th>
-      <th style="width:62px">Data</th>
-      <th class="td-c" style="width:58px">Tipo</th>
-      <th class="td-c" style="width:68px">Estado</th>
-      <th style="width:80px">Técnico</th>
-      <th style="width:90px">Assinado por</th>
+      <th class="td-c th-n">#</th>
+      <th class="th-data">Data</th>
+      <th class="td-c th-tipo">Tipo</th>
+      <th class="td-c th-estado">Estado</th>
+      <th class="th-tecnico">Técnico</th>
+      <th class="th-assin">Assinado por</th>
       <th>Observações</th>
     </tr>
   </thead>
@@ -315,16 +292,16 @@ ${total === 0
 }
 
 ${repsOrdenadas.length > 0 ? `
-<div class="section-title" style="margin-top:14px">
+<div class="rpt-section-title hist-reps-title">
   Reparações — ${repsOrdenadas.length} registo${repsOrdenadas.length === 1 ? '' : 's'}
 </div>
-<table class="hist-table">
+<table class="hist-table reps-table">
   <thead>
     <tr>
-      <th class="td-c" style="width:22px">#</th>
-      <th style="width:62px">Data</th>
-      <th style="width:70px">Técnico</th>
-      <th class="td-c" style="width:68px">Estado</th>
+      <th class="td-c th-n">#</th>
+      <th class="th-data">Data</th>
+      <th class="th-tecnico">Técnico</th>
+      <th class="td-c th-estado">Estado</th>
       <th>Descrição da avaria</th>
       <th>Observações</th>
     </tr>
@@ -334,27 +311,25 @@ ${repsOrdenadas.length > 0 ? `
   </tbody>
 </table>` : ''}
 
-${(safeAssin || safeTecAssin) ? `<div class="section-title">Última assinatura registada</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-  ${safeTecAssin ? `<div class="assin-box">
-    <span class="ficha-label">Técnico responsável</span>
-    <div style="font-weight:600;font-size:10px;margin:3px 0">${esc(tecObj?.nome || '')}</div>
-    ${tecObj?.telefone ? `<div style="font-size:8px;color:#666">Tel: ${esc(tecObj.telefone)}</div>` : ''}
-    <img src="${safeTecAssin}" alt="Assinatura do técnico" style="max-height:50px">
+${(safeAssin || safeTecAssin) ? `
+<div class="rpt-section-title">Última assinatura registada</div>
+<div class="rpt-assinaturas-dual">
+  ${safeTecAssin ? `<div class="rpt-assinatura-col">
+    <div class="rpt-label">Técnico responsável</div>
+    <div class="rpt-assinatura-nome">${esc(tecObj?.nome || '')}</div>
+    ${tecObj?.telefone ? `<div class="rpt-assinatura-detalhe">Tel: ${esc(tecObj.telefone)}</div>` : ''}
+    <div class="rpt-assinatura-img"><img src="${safeTecAssin}" alt="Assinatura do técnico"></div>
   </div>` : '<div></div>'}
-  ${safeAssin ? `<div class="assin-box">
-    <span class="ficha-label">Assinatura do cliente</span>
-    <img src="${safeAssin}" alt="Assinatura do cliente" style="max-height:50px">
+  ${safeAssin ? `<div class="rpt-assinatura-col">
+    <div class="rpt-label">Assinatura do cliente</div>
+    <div class="rpt-assinatura-img"><img src="${safeAssin}" alt="Assinatura do cliente"></div>
     ${ultimoRelAssin?.nomeAssinante
-      ? `<div class="assin-meta">Assinado por: <strong>${esc(ultimoRelAssin.nomeAssinante)}</strong>${ultimoRelAssin.dataAssinatura ? ` &nbsp;&mdash;&nbsp; ${formatDataHoraAzores(ultimoRelAssin.dataAssinatura)}` : ''}</div>`
+      ? `<div class="rpt-assinatura-detalhe">Assinado por: <strong>${esc(ultimoRelAssin.nomeAssinante)}</strong>${ultimoRelAssin.dataAssinatura ? ` &nbsp;&mdash;&nbsp; ${formatDataHoraAzores(ultimoRelAssin.dataAssinatura)}` : ''}</div>`
       : ''}
   </div>` : '<div></div>'}
 </div>` : ''}
 
-<footer class="rpt-footer">
-  <span>${esc(APP_FOOTER_TEXT)}</span>
-  <span>${esc(equipDesc)} &nbsp;&middot;&nbsp; S/N: ${esc(maquina.numeroSerie || '—')}</span>
-</footer>
+${htmlFooter('', '', `${esc(equipDesc)} &nbsp;&middot;&nbsp; S/N: ${esc(maquina.numeroSerie || '—')}`)}
 
 </body>
 </html>`

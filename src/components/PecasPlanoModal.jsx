@@ -320,22 +320,22 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
         </form>
 
         {/* Rodapé com acção de limpar */}
-        <div className="modal-pecas-footer">
+        <div className="modal-pecas-footer form-actions">
           {confirmarLimpar ? (
             <div className="confirmar-limpar">
-              <span>Eliminar:</span>
-              <button className="btn btn-sm danger" onClick={handleLimparTipo}>Só Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo} ({pecasTipo.length})</button>
-              <button className="btn btn-sm danger" onClick={handleLimparTudo}>Toda a máquina ({totalMaquina})</button>
-              <button className="btn btn-sm" onClick={() => setConfirmarLimpar(false)}>Cancelar</button>
+              <button type="button" className="btn btn-sm secondary" onClick={() => setConfirmarLimpar(false)}>Cancelar</button>
+              <span className="confirmar-limpar-label">Eliminar:</span>
+              <button type="button" className="btn btn-sm danger" onClick={handleLimparTipo}>Só Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo} ({pecasTipo.length})</button>
+              <button type="button" className="btn btn-sm danger" onClick={handleLimparTudo}>Toda a máquina ({totalMaquina})</button>
             </div>
           ) : (
             <>
               {totalMaquina > 0 && (
-                <button className="btn btn-sm btn-outline-muted" onClick={() => setConfirmarLimpar(true)}>
+                <button type="button" className="btn btn-sm btn-outline-muted" onClick={() => setConfirmarLimpar(true)}>
                   <Trash2 size={13} /> Limpar plano…
                 </button>
               )}
-              <button className="btn secondary" onClick={onClose} style={{ marginLeft: 'auto' }}>Fechar</button>
+              <button type="button" className="btn secondary modal-pecas-fechar" onClick={onClose}>Fechar</button>
             </>
           )}
         </div>

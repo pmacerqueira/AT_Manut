@@ -26,11 +26,14 @@ import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import RelatorioView from '../components/RelatorioView'
 import AlertaProactivoModal from '../components/AlertaProactivoModal'
 import { getManutencoesPendentesAlertas, getDiasAviso, isAlertsModalDismissedToday, dismissAlertsModalToday } from '../config/alertasConfig'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Dashboard.css'
 import { pt } from 'date-fns/locale'
 
 export default function Dashboard() {
   const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria } = useData()
+  const contentReady = useDeferredReady(manutencoes.length >= 0)
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const getMaquina = (id) => maquinas.find(m => m.id === id)
@@ -74,6 +77,11 @@ export default function Dashboard() {
   const proximas = useMemo(() =>
     pendentes.filter(m => !isBefore(parseDateLocal(m.data), new Date())),
   [pendentes])
+
+  const proximasSeisMeses = useMemo(() => {
+    const limite = addMonths(new Date(), 6)
+    return proximas.filter(m => !isBefore(parseDateLocal(m.data), new Date()) && isBefore(parseDateLocal(m.data), limite))
+  }, [proximas])
 
   // Reparações pendentes (não concluídas)
   const reparacoesPendentes = useMemo(() =>
@@ -174,6 +182,8 @@ export default function Dashboard() {
         }}
       />
 
+      <ContentLoader loading={!contentReady} message="A preparar dashboard…" hint="Por favor aguarde.">
+
       <div className="cards-row cards-row-mobile">
         <Link
           to="/manutencoes?filter=atraso"
@@ -191,8 +201,9 @@ export default function Dashboard() {
         <Link to="/manutencoes?filter=proximas" className="card stat-card stat-card-link stat-card-mobile stat-card-yellow">
           <Wrench size={24} className="stat-icon" />
           <div>
-            <span className="stat-value">{proximas.length}</span>
+            <span className="stat-value">{proximasSeisMeses.length}</span>
             <span className="stat-label">Próximas</span>
+            <span className="stat-sublabel">próximos 6 meses</span>
           </div>
         </Link>
         <Link to="/manutencoes?filter=executadas" className="card stat-card stat-card-link stat-card-mobile stat-card-green">
@@ -272,7 +283,7 @@ export default function Dashboard() {
                     <span className="meu-dia-item-cliente">{cli?.nome ?? '—'}</span>
                   </div>
                   <div className="meu-dia-item-right">
-                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>Reparação</span>
+                    <span className="badge badge-warning badge-sm">Reparação</span>
                     <button type="button" className="btn primary btn-sm" onClick={() => navigate('/reparacoes')}>
                       <Play size={13} /> Ver
                     </button>
@@ -355,7 +366,7 @@ export default function Dashboard() {
                   </div>
                   <div className="meu-dia-item-right">
                     {rep.origem === 'istobal_email' && (
-                      <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>ISTOBAL</span>
+                      <span className="badge badge-warning badge-sm">ISTOBAL</span>
                     )}
                     <button
                       type="button"
@@ -429,7 +440,7 @@ export default function Dashboard() {
             <span><span className="dot dot-orange" /> Próximas</span>
             <span><span className="dot dot-red" /> Em atraso</span>
           </div>
-          <Link to="/calendario" className="btn-link" style={{ marginTop: '0.75rem' }}>
+          <Link to="/calendario" className="btn-link dashboard-calendar-link">
             Ver calendário completo
           </Link>
         </div>
@@ -607,8 +618,8 @@ export default function Dashboard() {
                     />
                   ) : (
                     <div className="manutencao-detalhe-placeholder manutencao-ficha-agendada">
-                      <p className="text-muted" style={{ marginBottom: '1rem' }}>Esta manutenção ainda não tem relatório associado.</p>
-                      <section className="relatorio-section" style={{ marginBottom: '1rem' }}>
+                      <p className="text-muted manut-placeholder-p">Esta manutenção ainda não tem relatório associado.</p>
+                      <section className="relatorio-section relatorio-section-spaced">
                         <h3>Ficha da manutenção agendada</h3>
                         <p><strong>Equipamento:</strong> {maq ? `${maq.marca || ''} ${maq.modelo || ''} — Nº Série: ${maq.numeroSerie || '—'}` : '—'}</p>
                         <p><strong>Cliente:</strong> {cliente?.nome ?? '—'}</p>
@@ -626,6 +637,7 @@ export default function Dashboard() {
         })()}
       </div>
 
+      </ContentLoader>
     </div>
   )
 }

@@ -1,12 +1,19 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import './SignaturePad.css'
 
-export default function SignaturePad({ onChange, disabled }) {
+/**
+ * SignaturePad — Captura de assinatura digital com canvas.
+ *
+ * O utilizador pode levantar o dedo/caneta quantas vezes quiser
+ * (para acentos, pontos, espaços entre nome e apelido).
+ * Só fica bloqueado ao tocar explicitamente em "Confirmar".
+ */
+export default function SignaturePad({ onChange, disabled, initialImage }) {
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [locked, setLocked] = useState(false)
   const [hasSigned, setHasSigned] = useState(false)
-  const lockTimerRef = useRef(null)
+  const [strokeCount, setStrokeCount] = useState(0)
 
   const getPoint = useCallback((e) => {
     const canvas = canvasRef.current
@@ -23,7 +30,6 @@ export default function SignaturePad({ onChange, disabled }) {
   const startDraw = useCallback((e) => {
     e.preventDefault()
     if (disabled || locked) return
-    clearTimeout(lockTimerRef.current)
     const pt = getPoint(e)
     if (!pt) return
     const ctx = canvasRef.current?.getContext('2d')
@@ -48,29 +54,33 @@ export default function SignaturePad({ onChange, disabled }) {
     e.preventDefault()
     if (isDrawing) {
       setHasSigned(true)
+      setStrokeCount(prev => prev + 1)
       const dataUrl = canvasRef.current?.toDataURL('image/png')
       if (dataUrl) onChange?.(dataUrl)
-      lockTimerRef.current = setTimeout(() => setLocked(true), 1200)
     }
     setIsDrawing(false)
   }, [isDrawing, onChange])
+
+  const confirmSignature = useCallback(() => {
+    setLocked(true)
+    const dataUrl = canvasRef.current?.toDataURL('image/png')
+    if (dataUrl) onChange?.(dataUrl)
+  }, [onChange])
 
   const unlock = useCallback(() => {
     setLocked(false)
   }, [])
 
   const clear = useCallback(() => {
-    clearTimeout(lockTimerRef.current)
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setLocked(false)
     setHasSigned(false)
+    setStrokeCount(0)
     onChange?.(null)
   }, [onChange])
-
-  useEffect(() => () => clearTimeout(lockTimerRef.current), [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -88,12 +98,22 @@ export default function SignaturePad({ onChange, disabled }) {
       ctx.lineWidth   = 2
       ctx.lineCap     = 'round'
       ctx.lineJoin    = 'round'
+      if (initialImage) {
+        const img = new Image()
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, w, h)
+          setHasSigned(true)
+          setLocked(true)
+          onChange?.(initialImage)
+        }
+        img.src = initialImage
+      }
     }
     setupCanvas()
     const ro = new ResizeObserver(setupCanvas)
     ro.observe(canvas)
     return () => ro.disconnect()
-  }, [])
+  }, [initialImage])
 
   return (
     <div className="signature-pad">
@@ -115,15 +135,24 @@ export default function SignaturePad({ onChange, disabled }) {
             Tocar para editar
           </button>
         )}
+        {!locked && !disabled && hasSigned && !isDrawing && (
+          <div className="signature-hint">
+            Pode continuar a escrever — toque em Confirmar quando terminar
+          </div>
+        )}
       </div>
       {!disabled && (
         <div className="signature-actions">
           <button type="button" className="signature-clear" onClick={clear}>
-            Limpar assinatura
+            Limpar
           </button>
           {hasSigned && !locked && (
-            <button type="button" className="signature-lock-btn" onClick={() => setLocked(true)}>
-              ✓ Confirmar
+            <button
+              type="button"
+              className={`signature-lock-btn${strokeCount > 0 && !isDrawing ? ' signature-lock-pulse' : ''}`}
+              onClick={confirmSignature}
+            >
+              ✓ Confirmar assinatura
             </button>
           )}
         </div>

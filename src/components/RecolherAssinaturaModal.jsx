@@ -3,12 +3,12 @@ import { useToast } from './Toast'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
 import SignaturePad from './SignaturePad'
-import { PenLine, X } from 'lucide-react'
+import { PenLine, X, Bookmark } from 'lucide-react'
 import { formatDataAzores } from '../utils/datasAzores'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 
 export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, maquina }) {
-  const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes } = useData()
+  const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes, updateCliente } = useData()
   const { showToast } = useToast()
 
   const [nomeAssinante, setNomeAssinante] = useState('')
@@ -16,17 +16,32 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
   const [erro, setErro] = useState('')
   const [key, setKey] = useState(0)
 
+  const rel = manutencao ? getRelatorioByManutencao(manutencao.id) : null
+  const cliente = clientes.find(c => c.nif === maquina?.clienteNif) ?? null
+
   useEffect(() => {
     if (isOpen) {
-      setNomeAssinante('')
-      setAssinaturaDigital(null)
+      setNomeAssinante(cliente?.nomeContacto ?? '')
+      setAssinaturaDigital(cliente?.assinaturaContacto ?? null)
       setErro('')
       setKey(k => k + 1)
     }
-  }, [isOpen, manutencao?.id])
+  }, [isOpen, manutencao?.id, cliente?.nomeContacto, cliente?.assinaturaContacto])
 
-  const rel = manutencao ? getRelatorioByManutencao(manutencao.id) : null
-  const cliente = clientes.find(c => c.nif === maquina?.clienteNif) ?? null
+  const guardarNomeContacto = useCallback(() => {
+    const nome = nomeAssinante.trim()
+    if (!nome || !maquina?.clienteNif) return
+    updateCliente(maquina.clienteNif, { nomeContacto: nome })
+    showToast('Nome do contacto guardado para futuras intervenções', 'success')
+    logger.action('RecolherAssinaturaModal', 'guardarNomeContacto', `Nome "${nome}" guardado para cliente ${maquina.clienteNif}`)
+  }, [nomeAssinante, maquina?.clienteNif, updateCliente, showToast])
+
+  const guardarAssinaturaContacto = useCallback(() => {
+    if (!assinaturaDigital || !maquina?.clienteNif) return
+    updateCliente(maquina.clienteNif, { assinaturaContacto: assinaturaDigital })
+    showToast('Assinatura guardada para futuras intervenções', 'success')
+    logger.action('RecolherAssinaturaModal', 'guardarAssinaturaContacto', `Assinatura guardada para cliente ${maquina.clienteNif}`)
+  }, [assinaturaDigital, maquina?.clienteNif, updateCliente, showToast])
 
   const handleConfirmar = useCallback(() => {
     setErro('')
@@ -116,25 +131,41 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
 
         <label className="label-required">
           <span>Nome do assinante <span className="req-star">*</span></span>
-          <input
-            type="text"
-            value={nomeAssinante}
-            onChange={e => setNomeAssinante(e.target.value)}
-            placeholder="Nome completo do responsável"
-            maxLength={80}
-          />
+          <div className="campo-com-guardar">
+            <input
+              type="text"
+              value={nomeAssinante}
+              onChange={e => setNomeAssinante(e.target.value)}
+              placeholder="Nome completo do responsável"
+              maxLength={80}
+            />
+            {nomeAssinante.trim() && (
+              <button type="button" className="btn-guardar-contacto" onClick={guardarNomeContacto}
+                title="Guardar este nome para futuras intervenções deste cliente">
+                <Bookmark size={14} />
+                {cliente?.nomeContacto === nomeAssinante.trim() ? 'Guardado' : 'Guardar'}
+              </button>
+            )}
+          </div>
         </label>
 
         <div className="recolher-assinatura-pad">
           <div className="assinatura-canvas-label">
             Assinatura digital <span className="req-star">*</span>
           </div>
-          <SignaturePad key={key} onChange={setAssinaturaDigital} />
+          <SignaturePad key={key} onChange={setAssinaturaDigital} initialImage={cliente?.assinaturaContacto} />
+          {assinaturaDigital && (
+            <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
+              title="Guardar esta assinatura para futuras intervenções deste cliente"
+              style={{ marginTop: 'var(--space-sm)' }}>
+              <Bookmark size={14} /> Guardar assinatura
+            </button>
+          )}
         </div>
 
         <div className="form-actions">
-          <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
-          <button type="button" className="primary" onClick={handleConfirmar}>
+          <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn" onClick={handleConfirmar}>
             <PenLine size={15} /> Confirmar assinatura
           </button>
         </div>

@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Relatório de Manutenção — Navel</title>
+<style>
+
+/* ── Página A4, margens de impressão ── */
+@page { size: A4 portrait; margin: 8mm 11mm }
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 10.5px;
+  line-height: 1.42;
+  color: var(--texto);
+  background: var(--branco);
+  padding: 0;
+}
+
+/* ── Paleta via custom properties ── */
+:root {
+  --azul: #1a4880;
+  --azul-med: #1a4880;
+  --azul-claro: rgba(26, 72, 128, 0.12);
+  --cinza: #f3f4f6;
+  --borda: #b0c4de;
+  --borda-leve: #e5e7eb;
+  --texto: #111827;
+  --muted: #374151;
+  --verde: #15803d;
+  --vermelho: #b91c1c;
+  --amarelo: #a16207;
+  --acento: #1a4880;
+  --branco: #ffffff;
+  --bg-alt: #f9fafb;
+}
+
+/* ── Quebras de página ── */
+section { margin-bottom: 10px; page-break-inside: avoid }
+.section-can-break { page-break-inside: auto }
+.page-break-before { page-break-before: always }
+.no-break { page-break-inside: avoid }
+
+/* ── Cabeçalho ── */
+.rpt-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; padding-bottom: 10px;
+  border-bottom: 3px solid var(--azul);
+}
+.rpt-logos { display: flex; align-items: center; gap: 12px }
+.rpt-logo img, .rpt-logo-marca img {
+  max-height: 44px; max-width: 180px; object-fit: contain; display: block;
+}
+.rpt-logo-fallback { font-size: 1.2em; font-weight: 800; color: var(--azul) }
+.rpt-empresa {
+  text-align: left; font-size: 9.5px; line-height: 1.55; color: var(--texto);
+}
+.rpt-empresa strong { font-size: 10.5px; color: var(--azul) }
+.rpt-empresa a { color: var(--azul); text-decoration: none; font-weight: 600 }
+
+/* ── Barra de título ── */
+.rpt-titulo-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--azul); color: var(--branco);
+  padding: 7px 12px; margin: 8px 0 0; border-radius: 3px;
+}
+.rpt-titulo-bar h1 {
+  font-size: 11.5px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.rpt-num-wrap { text-align: right }
+.rpt-num-label {
+  font-size: 8.5px; color: rgba(255,255,255,.85); text-transform: uppercase;
+  letter-spacing: .08em; display: block;
+}
+.rpt-num {
+  font-size: 14px; font-weight: 800;
+  letter-spacing: .04em; font-family: 'Courier New', monospace;
+}
+.rpt-acento {
+  height: 2px; background: linear-gradient(90deg, var(--acento), var(--azul-med));
+  margin-bottom: 8px; border-radius: 0 0 2px 2px;
+}
+
+/* ── Secções genéricas ── */
+.rpt-section-title {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--azul);
+  border-bottom: 1.5px solid var(--azul); padding-bottom: 3px; margin-bottom: 6px;
+}
+
+/* ── Grid de dados (2 colunas) ── */
+.rpt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px }
+.rpt-field { padding: 2.5px 0; border-bottom: 1px solid var(--borda-leve) }
+.rpt-field:last-child { border-bottom: none }
+.rpt-label {
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); display: block; margin-bottom: 1px;
+}
+.rpt-value { font-size: 10.5px; color: var(--texto) }
+.rpt-value--bold { font-weight: 700 }
+.rpt-value--mono { font-family: 'Courier New', monospace; letter-spacing: .03em }
+.rpt-value--accent { color: var(--azul); font-weight: 600 }
+.rpt-value--muted { color: var(--muted) }
+.rpt-field--full { grid-column: 1 / -1 }
+
+/* ── Bloco equipamento destacado ── */
+.rpt-equip-band {
+  background: var(--azul-claro); border: 1.5px solid var(--borda);
+  border-top: 3px solid var(--azul);
+  border-radius: 4px; padding: 8px 10px; margin-bottom: 8px;
+}
+.rpt-equip-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px 12px;
+}
+.rpt-equip-item .rpt-label { font-size: 9px }
+.rpt-equip-item .rpt-value { font-size: 10.5px; font-weight: 700; color: var(--texto) }
+
+/* ── Notas ── */
+.rpt-notas {
+  background: var(--azul-claro); border-left: 3px solid var(--azul);
+  padding: 7px 10px; border-radius: 0 4px 4px 0;
+  font-size: 10.5px; color: var(--texto); line-height: 1.5;
+}
+
+/* ── Fotos — layout adaptativo por quantidade ── */
+.rpt-fotos-section { margin-top: 8px }
+.rpt-fotos-row {
+  display: flex; gap: 10px; margin-bottom: 10px;
+  page-break-inside: avoid;
+}
+.rpt-foto-item {
+  flex: 1; min-width: 0; text-align: center;
+}
+.rpt-foto-item img {
+  width: 100%; max-height: 180px; object-fit: contain;
+  border-radius: 4px; border: 1.5px solid var(--borda);
+  background: var(--cinza); display: block;
+}
+.rpt-foto-caption {
+  font-size: 9px; color: var(--texto);
+  margin-top: 3px; text-align: center; font-weight: 500;
+}
+/* 1 foto: centrada, max 60% largura */
+.rpt-fotos-row--single .rpt-foto-item { flex: 0 1 60%; margin: 0 auto }
+.rpt-fotos-row--single .rpt-foto-item img { max-height: 220px }
+/* 2 fotos: 50% cada */
+.rpt-fotos-row--pair .rpt-foto-item { flex: 0 1 50% }
+.rpt-fotos-row--pair .rpt-foto-item img { max-height: 200px }
+
+/* ── Checklist ── */
+.checklist-1col { width: 100% }
+.checklist-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px }
+.checklist-table { width: 100%; border-collapse: collapse; font-size: 9.5px }
+.checklist-table tr:nth-child(even) { background: var(--cinza) }
+.checklist-table td {
+  padding: 2.8px 4px; border-bottom: 1px solid var(--borda-leve); vertical-align: top;
+}
+.checklist-table td.cl-num {
+  width: 1.6em; color: var(--muted); font-size: 9px;
+  padding-left: 2px; white-space: nowrap;
+}
+.checklist-table td.cl-texto { padding-right: 6px }
+.checklist-table td.cl-badge { width: 32px; text-align: center; padding-right: 2px; white-space: nowrap }
+.badge-sim {
+  background: #dcfce7; color: #14532d;
+  padding: 1.5px 6px; border-radius: 8px; font-size: 9px; font-weight: 700;
+  border: 1px solid #86efac;
+}
+.badge-nao {
+  background: #fee2e2; color: #7f1d1d;
+  padding: 1.5px 6px; border-radius: 8px; font-size: 9px; font-weight: 700;
+  border: 1px solid #fca5a5;
+}
+.badge-nd { color: var(--muted); font-size: 9.5px }
+
+/* ── Peças e consumíveis ── */
+.pecas-table { width: 100%; border-collapse: collapse; font-size: 9.5px }
+.pecas-table thead { display: table-header-group }
+.pecas-table th {
+  background: var(--azul); color: var(--branco);
+  padding: 4px 6px; text-align: left;
+  font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+}
+.pecas-table td {
+  padding: 3px 6px; border-bottom: 1px solid var(--borda-leve); vertical-align: middle;
+}
+.pecas-table tr.row-usado td { background: #f0fdf4 }
+.pecas-table tr.row-nao-usado td { background: var(--bg-alt); color: #6b7280 }
+.pecas-table tr.row-nao-usado .cell-desc { text-decoration: line-through }
+.pecas-table .cell-status { width: 20px; text-align: center; font-size: 11.5px; font-weight: 700 }
+.pecas-table .cell-pos { width: 46px; color: var(--muted); font-family: 'Courier New', monospace; font-size: 9px }
+.pecas-table .cell-code { width: 118px; font-family: 'Courier New', monospace; font-size: 9.5px }
+.pecas-table .cell-qty { width: 36px; text-align: right; font-weight: 600 }
+.pecas-table .cell-un { width: 34px; color: var(--muted); font-size: 9px }
+.pecas-group-row td {
+  background: var(--cinza) !important;
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); padding: 3px 6px;
+  page-break-after: avoid;
+}
+.pecas-group-usado td { border-left: 3px solid var(--verde); color: var(--verde) }
+.pecas-group-nao-usado td { border-left: 3px solid #6b7280 }
+.pecas-resumo {
+  display: flex; gap: 16px; padding: 4px 6px;
+  background: var(--cinza); border-top: 1.5px solid var(--borda); font-size: 9.5px;
+}
+.pecas-resumo-item { display: flex; align-items: center; gap: 4px }
+.pecas-resumo-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0 }
+.pecas-resumo-dot.verde { background: var(--verde) }
+.pecas-resumo-dot.cinza { background: #6b7280 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PÁGINA DO CLIENTE — assinaturas, declaração e próximas manutenções
+ * Forçar sempre nova página; nunca cortar blocos internos.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.rpt-pagina-cliente {
+  page-break-before: always;
+}
+.rpt-pagina-cliente-titulo {
+  font-size: 12px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--branco);
+  background: var(--azul); padding: 6px 10px; border-radius: 3px;
+  margin-bottom: 12px;
+}
+
+/* ── Assinatura lado a lado ── */
+.rpt-assinaturas-dual {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 8px;
+}
+.rpt-assinatura-col {
+  background: var(--branco); border: 1.5px solid var(--borda);
+  border-top: 3px solid var(--azul);
+  border-radius: 4px; padding: 10px 12px;
+}
+.rpt-assinatura-nome {
+  font-size: 10.5px; font-weight: 700; color: var(--texto);
+  margin-bottom: 3px;
+}
+.rpt-assinatura-detalhe { font-size: 9px; color: var(--muted) }
+.rpt-assinatura-img img {
+  max-width: 220px; max-height: 60px;
+  border: 1px solid var(--borda); border-radius: 3px;
+  margin-top: 6px; background: var(--branco); display: block;
+}
+.rpt-assinatura-placeholder {
+  height: 60px; border-bottom: 1.5px dashed var(--borda);
+  margin-top: 6px; margin-bottom: 4px;
+}
+
+/* ── Declaração do cliente ── */
+.rpt-declaracao-box {
+  background: var(--cinza); border: 1.5px solid var(--borda);
+  border-left: 3px solid var(--azul);
+  border-radius: 4px; padding: 10px 12px; margin-top: 12px;
+}
+.rpt-declaracao-titulo {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--azul); margin-bottom: 5px;
+}
+.rpt-declaracao-texto {
+  font-size: 9.5px; color: var(--texto); line-height: 1.6;
+}
+
+/* ── Tabela próximas manutenções ── */
+.rpt-proximas-box { margin-top: 14px }
+.proximas-table { width: 100%; border-collapse: collapse; margin-bottom: 6px }
+.proximas-table th {
+  background: var(--azul); color: var(--branco);
+  padding: 5px 8px; font-size: 9px; text-transform: uppercase;
+  letter-spacing: .04em; text-align: left; border: 1px solid var(--azul);
+}
+.proximas-table th:first-child { text-align: center; width: 30px }
+.proximas-table td {
+  padding: 4px 8px; font-size: 10.5px; color: var(--texto);
+  border: 1px solid var(--borda-leve);
+}
+.proximas-table tr:nth-child(even) { background: var(--cinza) }
+.proximas-nota {
+  font-size: 9.5px; color: var(--texto);
+  margin: 4px 0 8px; line-height: 1.55;
+  font-style: italic;
+}
+
+/* ── Último envio ── */
+.rpt-ultimo-envio { font-size: 9px; color: var(--muted); margin-bottom: 6px; font-style: italic }
+
+/* ── Rodapé ── */
+.rpt-footer {
+  margin-top: 10px; padding-top: 7px;
+  border-top: 2px solid var(--azul);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9px; color: var(--texto);
+}
+
+/* ── KAESER (específico deste relatório) ── */
+:root{--kaeser:#92400e;--kaeser-bg:#fffbeb;--kaeser-borda:#fde68a}
+.kaeser-band{background:var(--kaeser-bg);border:1.5px solid var(--kaeser-borda);border-radius:5px;margin-bottom:9px;overflow:hidden;page-break-inside:avoid}
+.kaeser-band-header{background:var(--kaeser);color:#fff;padding:4px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.kaeser-band-titulo{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.kaeser-band-subtitulo{font-size:9.5px;color:var(--muted)}
+.kaeser-band-body{padding:7px 10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px}
+.kaeser-item-label{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;display:block;margin-bottom:1px}
+.kaeser-item-valor{font-size:11px;font-weight:600;color:var(--texto)}
+.kaeser-item-valor.destaque{font-size:13px;font-weight:800;color:var(--kaeser)}
+.kaeser-item-val-sub{font-size:9px;color:var(--muted);display:block}
+.kaeser-seq{grid-column:1/-1;margin-top:4px;border-top:1px solid var(--kaeser-borda);padding-top:5px}
+.kaeser-seq-label{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--kaeser);font-weight:700;margin-bottom:3px}
+.kaeser-seq-dots{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.kaeser-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1.5px solid transparent;flex-shrink:0}
+.kaeser-dot.passado{background:#e5e7eb;color:#4b5563;border-color:#d1d5db}
+.kaeser-dot.atual{background:var(--kaeser);color:#fff;border-color:var(--kaeser)}
+.kaeser-dot.proximo{background:#fff;color:var(--kaeser);border-color:var(--kaeser)}
+.kaeser-dot.futuro{background:#f9fafb;color:#6b7280;border-color:#e5e7eb}
+.kaeser-dot-sep{color:#6b7280;font-size:10px;padding:0 1px}
+.kaeser-legend{font-size:8.5px;color:#6b7280;margin-left:6px}
+.pecas-resumo-total{margin-left:auto;color:var(--muted)}
+</style>
+</head>
+<body>
+
+
+<header class="rpt-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:10px;border-bottom:3px solid #1a4880">
+  <div class="rpt-logos" style="display:flex;align-items:center;gap:12px">
+    <div class="rpt-logo">
+      <img src="https://www.navel.pt/manut/logo-navel.png" alt="Navel" width="160" height="44"
+        style="max-height:44px;max-width:160px;width:auto;height:auto;display:block;object-fit:contain"
+        onerror="this.parentNode.innerHTML='<span class=rpt-logo-fallback style=font-size:1.2em;font-weight:800;color:#1a4880>Navel</span>'">
+    </div>
+    
+  </div>
+  <div class="rpt-empresa" style="text-align:left;font-size:9.5px;line-height:1.55;color:#111827">
+    <strong style="font-size:10.5px;color:#1a4880">JOSÉ GONÇALVES CERQUEIRA (NAVEL-AÇORES), Lda.</strong><br>
+    Div. Comercial: Pico d&#39;Água Park, Rua 5, n.º13-15 · 9600-049 Pico da Pedra<br>
+    Sede / Divisão Oficinas: Rua Engº Abel Ferin Coutinho · Apt. 1481 · 9501-802 Ponta Delgada<br>
+    Tel: 296 205 290 / 296 630 120 &nbsp;|&nbsp; <a href="https://www.navel.pt" style="color:#1a4880;text-decoration:none;font-weight:600">www.navel.pt</a><br>
+    Açores — Portugal
+  </div>
+</header>
+
+
+<div class="rpt-titulo-bar" style="display:flex;align-items:center;justify-content:space-between;background:#1a4880;color:#fff;padding:7px 12px;margin:8px 0 0;border-radius:3px">
+  <h1 style="font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0;color:#fff">Relatório de Manutenção</h1>
+  <div class="rpt-num-wrap" style="text-align:right">
+    <span class="rpt-num-label" style="font-size:8.5px;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.08em;display:block">Nº de Serviço</span>
+    <span class="rpt-num" style="font-size:14px;font-weight:800;letter-spacing:.04em;font-family:'Courier New',monospace;color:#fff">MNT-2026-TEST-001</span>
+  </div>
+</div>
+<div class="rpt-acento" style="height:2px;background:linear-gradient(90deg,#1a4880,#2d6eb5);margin-bottom:8px;border-radius:0 0 2px 2px"></div>
+<section>
+  <div class="rpt-section-title">Identificação do cliente</div>
+  <div class="rpt-grid">
+    <div class="rpt-field">
+      <span class="rpt-label">Nome / Empresa</span>
+      <span class="rpt-value rpt-value--bold">Auto Açoreana - Comércio de Automóveis, Lda.</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">NIF</span>
+      <span class="rpt-value rpt-value--mono">512345678</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">Localidade</span>
+      <span class="rpt-value">Ponta Delgada</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">Telefone</span>
+      <span class="rpt-value">296 123 456</span>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="rpt-section-title">Equipamento</div>
+  <div class="rpt-equip-band">
+    <div class="rpt-equip-grid">
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Marca / Modelo</span>
+        <span class="rpt-value">RAVAGLIOLI KPX 337.55 A</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Número de série</span>
+        <span class="rpt-value rpt-value--mono rpt-value--accent">RAV-2024-00542</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Tipo / Subcategoria</span>
+        <span class="rpt-value">Elevadores de 2 colunas</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Periodicidade</span>
+        <span class="rpt-value">Trimestral (90 dias)</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Ano de fabrico</span>
+        <span class="rpt-value">2024</span>
+      </div>
+      <div class="rpt-equip-item">
+        <span class="rpt-label">Doc. venda</span>
+        <span class="rpt-value">FT 2024/00892</span>
+      </div>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="rpt-section-title">Dados da manutenção</div>
+  <div class="rpt-grid">
+    <div class="rpt-field">
+      <span class="rpt-label">Data agendada</span>
+      <span class="rpt-value">12 de março de 2026</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">Data de realização</span>
+      <span class="rpt-value">12 de março de 2026</span>
+    </div>
+    <div class="rpt-field">
+      <span class="rpt-label">Técnico responsável</span>
+      <span class="rpt-value">Aldevino Costa</span>
+    </div>
+    
+    
+    <div class="rpt-field rpt-field--full">
+      <span class="rpt-label">Contadores de horas</span>
+      <span class="rpt-value">Total: 1250 h · Serviço: 3.5 h</span>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="rpt-section-title" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a4880;border-bottom:1.5px solid #1a4880;padding-bottom:3px;margin-bottom:6px">Checklist de verificação</div>
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td width="49%" style="vertical-align:top">
+      <table class="checklist-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>
+        <tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">1.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Inspeção visual da estrutura e apoios de fixação ao solo</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">2.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Verificação das ligações elétricas e cablagem</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">3.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Teste do sistema hidráulico (pressão e estanquicidade)</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">4.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Verificação do nível e estado do óleo hidráulico</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-nao" style="background:#fee2e2;color:#7f1d1d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #fca5a5">NÃO</span></td></tr><tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">5.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Teste do sistema de segurança mecânico (travas)</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">6.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Verificação e medição dos cabos de aço (desgaste)</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr>
+      </tbody></table>
+    </td>
+    <td width="2%"></td>
+    <td width="49%" style="vertical-align:top">
+      <table class="checklist-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>
+        <tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">7.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Lubrificação de todos os pontos de articulação</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">8.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Teste funcional completo com carga nominal</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">9.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Verificação dos batentes de segurança e fins de curso</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">10.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Inspeção dos cilindros hidráulicos (fugas, desgaste)</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">11.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Verificação do estado dos braços de elevação</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr><tr style="border-bottom:1px solid #e5e7eb;background:#f3f4f6"><td class="cl-num" style="width:1.6em;color:#374151;font-size:9px;padding:3px 4px;white-space:nowrap;vertical-align:top">12.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:9.5px;color:#111827">Teste do dispositivo de paragem de emergência</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top"><span class="badge-sim" style="background:#dcfce7;color:#14532d;padding:1.5px 6px;border-radius:8px;font-size:9px;font-weight:700;border:1px solid #86efac">SIM</span></td></tr>
+      </tbody></table>
+    </td>
+  </tr></table>
+</section>
+<section>
+  <div class="rpt-section-title" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a4880;border-bottom:1.5px solid #1a4880;padding-bottom:3px;margin-bottom:6px">Notas do técnico</div>
+  <div class="rpt-notas" style="background:rgba(26,72,128,0.12);border-left:3px solid #1a4880;padding:7px 10px;border-radius:0 4px 4px 0;font-size:10.5px;color:#111827;line-height:1.5">Manutenção preventiva trimestral efetuada sem anomalias significativas. Detetado ligeiro desgaste na junta tórica do cilindro esquerdo — agendada substituição para a próxima intervenção. Óleo hidráulico substituído conforme plano de manutenção. Todos os pontos de articulação lubrificados.</div>
+</section>
+<section class="section-can-break">
+  <div class="rpt-section-title">Documentação fotográfica</div>
+  <div class="rpt-fotos-section"><div class="rpt-fotos-row rpt-fotos-row--pair"><div class="rpt-foto-item">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAHElEQVQY02P4/58BFTAyMIwqHFU4qnBUIaUKAQAHbgIKhRNb3wAAAABJRU5ErkJggg==" alt="Fotografia 1">
+      <div class="rpt-foto-caption">Foto 1</div>
+    </div><div class="rpt-foto-item">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAAHElEQVQY02P4/58BFTAyMIwqHFU4qnBUIaUKAQAHbgIKhRNb3wAAAABJRU5ErkJggg==" alt="Fotografia 2">
+      <div class="rpt-foto-caption">Foto 2</div>
+    </div></div></div>
+</section>
+<section class="section-can-break">
+  <div class="rpt-section-title" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a4880;border-bottom:1.5px solid #1a4880;padding-bottom:3px;margin-bottom:6px">Consumíveis e peças</div>
+  <table class="pecas-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:9.5px;margin-bottom:4px">
+    <thead>
+      <tr>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;width:20px"></th>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;width:46px">Pos.</th>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;width:118px">Código artigo</th>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em">Descrição</th>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;width:36px;text-align:right">Qtd.</th>
+        <th style="background:#1a4880;color:#fff;padding:4px 6px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.04em;width:34px">Un.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="pecas-group-row pecas-group-usado"><td colspan="6" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;background:#f3f4f6 !important;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151;padding:4px 6px;border-left:3px solid #15803d;color:#15803d">✓ Utilizados — 3 artigos</td></tr>
+      
+      <tr class="row-usado no-break" style="page-break-inside:avoid">
+        <td class="cell-status" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:20px;text-align:center;font-size:11.5px;font-weight:700;color:#15803d">✓</td>
+        <td class="cell-pos" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:46px;color:#374151;font-family:'Courier New',monospace;font-size:9px">1</td>
+        <td class="cell-code" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:118px;font-family:'Courier New',monospace">HYD-OIL-10L</td>
+        <td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827">Óleo hidráulico HLP 32 (10L)</td>
+        <td class="cell-qty" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:36px;text-align:right;font-weight:600">1</td>
+        <td class="cell-un" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:34px;color:#374151;font-size:9px">un</td>
+      </tr>
+      <tr class="row-usado no-break" style="page-break-inside:avoid;background:#f3f4f6">
+        <td class="cell-status" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:20px;text-align:center;font-size:11.5px;font-weight:700;color:#15803d">✓</td>
+        <td class="cell-pos" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:46px;color:#374151;font-family:'Courier New',monospace;font-size:9px">2</td>
+        <td class="cell-code" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:118px;font-family:'Courier New',monospace">FLT-HYD-001</td>
+        <td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827">Filtro hidráulico</td>
+        <td class="cell-qty" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:36px;text-align:right;font-weight:600">1</td>
+        <td class="cell-un" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:34px;color:#374151;font-size:9px">un</td>
+      </tr>
+      <tr class="row-usado no-break" style="page-break-inside:avoid">
+        <td class="cell-status" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:20px;text-align:center;font-size:11.5px;font-weight:700;color:#15803d">✓</td>
+        <td class="cell-pos" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:46px;color:#374151;font-family:'Courier New',monospace;font-size:9px">4</td>
+        <td class="cell-code" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:118px;font-family:'Courier New',monospace">LUB-GRS-500</td>
+        <td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827">Massa lubrificante EP2 (500g)</td>
+        <td class="cell-qty" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:36px;text-align:right;font-weight:600">1</td>
+        <td class="cell-un" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:34px;color:#374151;font-size:9px">un</td>
+      </tr>
+      
+      <tr class="pecas-group-row pecas-group-nao-usado"><td colspan="6" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;background:#f3f4f6 !important;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151;padding:4px 6px;border-left:3px solid #6b7280">✗ Não utilizados — 1 artigo</td></tr>
+      
+      <tr class="row-nao-usado no-break" style="page-break-inside:avoid">
+        <td class="cell-status" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:20px;text-align:center;font-size:11.5px;font-weight:700;color:#6b7280">✗</td>
+        <td class="cell-pos" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:46px;color:#374151;font-family:'Courier New',monospace;font-size:9px">3</td>
+        <td class="cell-code" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:118px;font-family:'Courier New',monospace">JNT-TOR-042</td>
+        <td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;text-decoration:line-through;color:#6b7280">Junta tórica ø42mm</td>
+        <td class="cell-qty" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:36px;text-align:right;font-weight:600">2</td>
+        <td class="cell-un" style="padding:3px 6px;border-bottom:1px solid #e5e7eb;vertical-align:middle;font-size:9.5px;color:#111827;width:34px;color:#374151;font-size:9px">un</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="pecas-resumo" style="display:flex;gap:16px;padding:4px 6px;background:#f3f4f6;border-top:1.5px solid #b0c4de;font-size:9.5px">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#15803d;display:inline-block"></span>3 artigos utilizados</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block"></span>1 artigo não substituído</span>
+    <span style="margin-left:auto;color:#374151">4 artigos no plano</span>
+  </div>
+</section>
+
+<div class="rpt-pagina-cliente" style="page-break-before:always">
+  <div class="rpt-pagina-cliente-titulo" style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#fff;background:#1a4880;padding:6px 10px;border-radius:3px;margin-bottom:12px">Registo, assinatura e conformidade</div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px"><tr>
+    <td width="50%" style="padding-right:5px">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#374151;display:block;margin-bottom:1px">Data de criação do relatório</div>
+      <div style="font-size:10.5px;color:#111827">12 de março de 2026 às 09:00</div>
+    </td>
+    <td width="50%" style="padding-left:5px">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#374151;display:block;margin-bottom:1px">Data de assinatura</div>
+      <div style="font-size:10.5px;color:#111827">12 de março de 2026 às 13:30</div>
+    </td>
+  </tr></table>
+
+  
+  <div class="rpt-declaracao-box no-break" style="background:#f3f4f6;border:1.5px solid #b0c4de;border-left:3px solid #1a4880;border-radius:4px;padding:10px 12px;margin-top:12px">
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1a4880;margin-bottom:5px">Declaração de aceitação e compromisso do cliente</div>
+    <div style="font-size:9.5px;color:#111827;line-height:1.6">Declaro que li e concordo com o que foi relatado pelo técnico na manutenção do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.</div>
+  </div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>
+    <td width="48%" style="background:#fff;border:1.5px solid #b0c4de;border-top:3px solid #1a4880;border-radius:4px;padding:10px 12px;width:48%;display:inline-block;vertical-align:top">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#374151;display:block;margin-bottom:1px">Técnico responsável</div>
+      <div style="font-size:10.5px;font-weight:700;color:#111827;margin-bottom:3px">Aldevino Costa</div>
+      <div style="font-size:9px;color:#374151">Tel: 912 345 678</div>
+      
+    </td>
+    <td width="4%"></td>
+    <td width="48%" style="background:#fff;border:1.5px solid #b0c4de;border-top:3px solid #1a4880;border-radius:4px;padding:10px 12px;width:48%;display:inline-block;vertical-align:top">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#374151;display:block;margin-bottom:1px">Assinado pelo cliente</div>
+      <div style="font-size:10.5px;font-weight:700;color:#111827;margin-bottom:3px">Manuel Santos</div>
+      <div style="height:55px;border-bottom:1.5px dashed #b0c4de;margin-top:6px"></div>
+    </td>
+  </tr></table>
+  <div class="rpt-proximas-box no-break" style="margin-top:14px">
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1a4880;border-bottom:1.5px solid #1a4880;padding-bottom:3px;margin-bottom:6px">Próximas manutenções agendadas</div>
+    <p style="font-size:9.5px;color:#111827;margin:4px 0 8px;line-height:1.55;font-style:italic">Informamos que foram nesta data agendadas as datas das manutenções futuras para este equipamento (datas estimativas, podem sofrer alterações):</p>
+    <table class="proximas-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:6px">
+      <thead><tr>
+        <th style="background:#1a4880;color:#fff;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:left;border:1px solid #1a4880;text-align:center;width:30px">N.º</th>
+        <th style="background:#1a4880;color:#fff;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:left;border:1px solid #1a4880">Data prevista</th>
+        <th style="background:#1a4880;color:#fff;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:left;border:1px solid #1a4880">Periodicidade</th>
+        <th style="background:#1a4880;color:#fff;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;text-align:left;border:1px solid #1a4880">Técnico</th>
+      </tr></thead>
+      <tbody><tr>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;text-align:center;width:30px">1</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">15/06/2026</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">Trimestral</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;color:#374151">Aldevino Costa</td>
+      </tr><tr style="background:#f3f4f6">
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;text-align:center;width:30px">2</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">15/09/2026</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">Trimestral</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;color:#374151">A designar</td>
+      </tr><tr>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;text-align:center;width:30px">3</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">15/12/2026</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">Trimestral</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;color:#374151">A designar</td>
+      </tr><tr style="background:#f3f4f6">
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;text-align:center;width:30px">4</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">15/03/2027</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb">Trimestral</td>
+        <td style="padding:4px 8px;font-size:10.5px;color:#111827;border:1px solid #e5e7eb;color:#374151">A designar</td>
+      </tr></tbody>
+    </table>
+  </div>
+</div>
+
+
+
+<div class="rpt-footer" style="margin-top:10px;padding-top:5px;border-top:1.5px solid #1a4880;display:flex;justify-content:space-between;align-items:center;font-size:8px;color:#374151">
+  <span style="font-size:8px;color:#374151">Navel-Açores, Lda — Todos os direitos reservados · v1.13.0</span>
+  <span style="font-size:8px;color:#374151">www.navel.pt &nbsp;|&nbsp; Tel: 296 205 290 / 296 630 120</span>
+</div>
+
+</body></html>

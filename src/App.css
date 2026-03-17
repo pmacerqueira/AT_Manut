@@ -10,7 +10,7 @@
   font-family: sans-serif;
 }
 .error-boundary h2 { color: var(--color-danger); }
-.error-boundary p { color: var(--color-gray-500); max-width: 400px; text-align: center; }
+.error-boundary p { color: var(--color-text-muted); max-width: 400px; text-align: center; }
 .error-boundary button {
   padding: 0.6rem 1.4rem;
   background: var(--color-primary);
@@ -22,7 +22,7 @@
 }
 .error-boundary pre {
   font-size: var(--text-sm);
-  color: var(--color-gray-400);
+  color: var(--color-text-muted);
   max-width: 600px;
   white-space: pre-wrap;
   margin-top: var(--space-lg);

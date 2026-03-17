@@ -384,8 +384,8 @@ const initialClientes = [
   { id: '510123456', nif: '510123456', nome: 'Auto São Jorge Lda', morada: 'Rua do Comércio, 33', codigoPostal: '9800-521', localidade: 'Calheta', telefone: '295410789', email: 'auto@saojorge.pt' },
 ]
 
-// Subcategorias com contador de horas (elétricos, diesel/gasolina)
-export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub1', 'sub2', 'sub4', 'sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub12', 'sub13', 'sub14', 'sub15', 'sub16']
+// Subcategorias com contador de horas (compressores e geradores — elevadores não usam)
+export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub14', 'sub15', 'sub16']
 
 // Subcategorias de compressores de parafuso (suportam ciclo A/B/C/D e plano de consumíveis)
 export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub14', 'sub15']
@@ -947,116 +947,6 @@ export function DataProvider({ children }) {
   }, [clientes, maquinas, manutencoes, reparacoes, persist])
 
   /**
-   * Importação em massa de clientes a partir de uma lista JSON (formato AT_Manut).
-   * Aguarda a persistência na API antes de retornar — evita que fetchTodos sobrescreva com dados parciais.
-   * @param {Array}  lista  Array de { nif, nome, morada, localidade, codigoPostal, telefone, email }
-   * @param {'novos'|'atualizar'} modo  'novos' → só adiciona novos; 'atualizar' → também actualiza existentes
-   * @returns {Promise<{ adicionados: number, atualizados: number, ignorados: number }>}
-   */
-  const importClientes = useCallback(async (lista, modo = 'novos') => {
-    const agora = Date.now()
-    const listaClientes = clientes ?? []
-    const mapaExistentes = new Map(listaClientes.map(c => [String(c.nif), c]))
-    const novosClientes   = []
-    const clientesUpdate  = []
-    let ignorados = 0
-    const nifsVistos = new Set()
-    let nifsDuplicados = 0
-
-    // Normalizar nomes de campos (suporta camelCase, PascalCase e variantes)
-    const get = (obj, ...keys) => {
-      const k = keys.find(key => obj[key] != null && String(obj[key]).trim() !== '')
-      return k != null ? String(obj[k]).trim() : ''
-    }
-    lista.forEach((raw, i) => {
-      const nif = get(raw, 'nif', 'Nif', 'NIF', 'CustomerTaxID', 'TaxID')
-      const nome = get(raw, 'nome', 'Nome', 'CompanyName')
-      const morada = get(raw, 'morada', 'Morada')
-      const codigoPostal = get(raw, 'codigoPostal', 'codigo_postal', 'CodigoPostal')
-      const telefone = get(raw, 'telefone', 'telemovel', 'Telefone', 'Telemovel')
-      const email = get(raw, 'email', 'Email')
-      if (!nif || !nome || !morada || !telefone || !email) { ignorados++; return }
-      if (nifsVistos.has(nif)) { nifsDuplicados++; return }
-      nifsVistos.add(nif)
-
-      if (mapaExistentes.has(nif)) {
-        if (modo === 'atualizar') {
-          const existente = mapaExistentes.get(nif)
-          const localidade = get(raw, 'localidade', 'Localidade')
-          const merged = {
-            ...existente,
-            nome:         nome             || existente.nome,
-            morada:       morada           || existente.morada,
-            localidade:   localidade       || existente.localidade,
-            codigoPostal: codigoPostal     || existente.codigoPostal,
-            telefone:     telefone         || existente.telefone,
-            email:        email            || existente.email,
-          }
-          clientesUpdate.push(merged)
-        } else {
-          ignorados++
-        }
-      } else {
-        const localidade = get(raw, 'localidade', 'Localidade')
-        const novo = {
-          id: 'cli' + (agora + i),
-          nif,
-          nome,
-          morada,
-          localidade,
-          codigoPostal,
-          telefone,
-          email,
-        }
-        novosClientes.push(novo)
-        mapaExistentes.set(nif, novo)
-      }
-    })
-
-    // Actualizar estado local
-    setClientes(prev => {
-      let next = [...prev]
-      // Adicionar novos
-      novosClientes.forEach(c => next.push(c))
-      // Actualizar existentes
-      clientesUpdate.forEach(merged => {
-        const idx = next.findIndex(c => String(c.nif) === String(merged.nif))
-        if (idx !== -1) next[idx] = merged
-      })
-      return next
-    })
-
-    // Persistir na API — bulk_create e aguardar conclusão (evita fetchTodos sobrescrever com dados parciais)
-    const { apiClientes } = await import('../services/apiService')
-    if (novosClientes.length > 0) {
-      try {
-        await apiClientes.bulkCreate(novosClientes)
-      } catch (err) {
-        logger.error('DataContext', 'importClientes', `bulk_create falhou: ${err.message}`, { count: novosClientes.length })
-        // Fallback: tentar um a um (para modo offline, enfileira)
-        for (const novo of novosClientes) {
-          await persist(() => apiClientes.create(novo),
-                  { resource: 'clientes', action: 'create', data: novo })
-        }
-      }
-    }
-    for (const merged of clientesUpdate) {
-      const recId = merged.id ?? merged.nif
-      await persist(() => apiClientes.update(recId, merged),
-              { resource: 'clientes', action: 'update', id: recId, data: merged })
-    }
-
-    const adicionados = novosClientes.length
-    const atualizados = clientesUpdate.length
-
-    logger.action('DataContext', 'importClientes',
-      `Importação: +${adicionados} novos, ~${atualizados} actualizados, ${ignorados} ignorados`,
-      { modo, total: lista.length })
-
-    return { adicionados, atualizados, ignorados, nifsDuplicados }
-  }, [clientes, persist])
-
-  /**
    * Elimina todos os clientes e dados relacionados (máquinas, manutenções, relatórios, reparações).
    * Usa bulk_restore com arrays vazios. Apenas Admin.
    */
@@ -1461,15 +1351,20 @@ export function DataProvider({ children }) {
 
       return prev.filter(m => !idsRemover.has(m.id))
     })
+    const relAlvo = relatorios.find(r => r.manutencaoId === id)
     setRelatorios(prev => prev.filter(r => r.manutencaoId !== id))
-    logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id })
-    import('../services/apiService').then(({ apiManutencoes }) =>
+    logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id, relatorioId: relAlvo?.id })
+    import('../services/apiService').then(({ apiManutencoes, apiRelatorios }) => {
+      if (relAlvo?.id) {
+        persist(() => apiRelatorios.remove(relAlvo.id),
+                { resource: 'relatorios', action: 'delete', id: relAlvo.id })
+      }
       persist(() => apiManutencoes.remove(id),
               { resource: 'manutencoes', action: 'delete', id })
-    ).catch(err => {
+    }).catch(err => {
       logger.error('DataContext', 'removeManutencao', 'Falha ao persistir eliminação', { msg: err?.message, id })
     })
-  }, [persist])
+  }, [relatorios, persist])
 
   // ── Relatórios ────────────────────────────────────────────────────────────
   const addRelatorio = useCallback((r) => {
@@ -1940,7 +1835,6 @@ export function DataProvider({ children }) {
     addCliente,
     updateCliente,
     removeCliente,
-    importClientes,
     clearAllClientesAndRelated,
     addMaquina,
     updateMaquina,
@@ -1982,7 +1876,7 @@ export function DataProvider({ children }) {
     addChecklistItem, updateChecklistItem, removeChecklistItem,
     addCategoria, updateCategoria, removeCategoria, addMarca, updateMarca,
     getTecnicoByNome, addTecnico, updateTecnico, removeTecnico,
-    addCliente, updateCliente, removeCliente, importClientes, clearAllClientesAndRelated,
+    addCliente, updateCliente, removeCliente, clearAllClientesAndRelated,
     addMaquina, updateMaquina, removeMaquina, addDocumentoMaquina, removeDocumentoMaquina,
     addManutencao, addManutencoesBatch, updateManutencao, removeManutencao, iniciarManutencao,
     addRelatorio, updateRelatorio, getRelatorioByManutencao,

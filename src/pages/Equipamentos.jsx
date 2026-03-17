@@ -11,12 +11,13 @@ import { ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageO
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
-import { imprimirOuGuardarPdf } from '../utils/gerarPdfRelatorio'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
 
 export default function Equipamentos() {
@@ -32,6 +33,7 @@ export default function Equipamentos() {
     tecnicos,
     removeMaquina,
   } = useData()
+  const contentReady = useDeferredReady(maquinas.length >= 0)
   const { canDelete, isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -108,9 +110,12 @@ export default function Equipamentos() {
         reparacoes:   repsMaq,
         tecnicos,
       })
-      imprimirOuGuardarPdf(html)
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
     } catch (err) {
-      showToast('Erro ao gerar histórico PDF.', 'error')
+      showToast('Erro ao gerar histórico.', 'error')
     } finally {
       hideGlobalLoading()
       setLoadingHistorico(null)
@@ -173,6 +178,7 @@ export default function Equipamentos() {
         )}
       </div>
 
+      <ContentLoader loading={!contentReady} message="A carregar equipamentos…" hint="Por favor aguarde.">
       {filterAtraso ? (
         <div className="table-card card">
           {maquinasEmAtraso.length === 0 ? (
@@ -192,13 +198,13 @@ export default function Equipamentos() {
                   {list.map(m => {
                     const sub = getSubcategoria(m.subcategoriaId)
                     return (
-                      <div key={m.id} className="maquina-row" style={{ borderLeft: '3px solid var(--color-danger)' }}>
+                      <div key={m.id} className="maquina-row maquina-row--atraso">
                         <div className="maquina-row-info">
                           <div className="equip-desc-block">
                             <strong>{sub?.nome || ''} — {m.marca} {m.modelo}</strong>
                             <span className="text-muted equip-num-serie">Nº Série: {m.numeroSerie}</span>
                           </div>
-                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div className="equip-badges-row">
                             {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
                               <span
                                 className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
@@ -285,7 +291,9 @@ export default function Equipamentos() {
       {view === 'maquinas' && selectedSubcategoria && selectedCategoria && (
         <>
           <div className="equipamentos-nav">
-            <button type="button" className="breadcrumb-btn" onClick={handleBackCategorias}>Equipamentos</button>
+            <button type="button" className="breadcrumb-btn" onClick={handleBackCategorias}>
+              <ArrowLeft size={16} /> Equipamentos
+            </button>
             <span className="breadcrumb">/</span>
             <button type="button" className="breadcrumb-btn" onClick={handleBackSubcategorias}>{selectedCategoria.nome}</button>
             <span className="breadcrumb">/ {selectedSubcategoria.nome}</span>
@@ -364,6 +372,7 @@ export default function Equipamentos() {
       )}
         </>
       )}
+      </ContentLoader>
 
       {modalEdit && (
         <MaquinaFormModal

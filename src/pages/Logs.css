@@ -174,11 +174,11 @@
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
-.log-badge--fatal  { background: rgba(244,63,94,0.15);   color: #f43f5e; }
-.log-badge--error  { background: rgba(239,68,68,0.15);   color: var(--color-danger); }
-.log-badge--warn   { background: rgba(245,158,11,0.15);  color: var(--color-warning); }
-.log-badge--action { background: rgba(0,163,224,0.15);   color: var(--color-accent); }
-.log-badge--info   { background: rgba(139,156,173,0.1);  color: var(--color-text-muted); }
+.log-badge--fatal  { background: rgba(244,63,94,0.18);   color: #fda4af; border: 1px solid rgba(244,63,94,0.40); }
+.log-badge--error  { background: rgba(239,68,68,0.18);   color: #fca5a5; border: 1px solid rgba(239,68,68,0.40); }
+.log-badge--warn   { background: rgba(251,191,36,0.18);  color: #fcd34d; border: 1px solid rgba(251,191,36,0.40); }
+.log-badge--action { background: rgba(0,163,224,0.18);   color: #67e8f9; border: 1px solid rgba(0,163,224,0.40); }
+.log-badge--info   { background: rgba(148,163,184,0.15); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.35); }
 
 /* Campos da linha */
 .log-ts        { color: var(--color-text-muted); font-size: 0.76rem; flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -217,7 +217,7 @@
   color: var(--color-text-muted);
   white-space: pre-wrap;
   word-break: break-all;
-  max-height: 220px;
+  max-height: min(220px, 35dvh);
   overflow-y: auto;
   border: 1px solid var(--color-border);
   user-select: text;

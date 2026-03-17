@@ -193,7 +193,7 @@ $RESOURCE_MAP = [
     'clientes' => [
         'table'      => 'clientes',
         'json_cols'  => [],
-        'allowed'    => ['id','nif','nome','morada','codigo_postal','localidade','telefone','email','notas','criado_em'],
+        'allowed'    => ['id','nif','nome','morada','codigo_postal','localidade','telefone','email','notas','criado_em','nome_contacto','assinatura_contacto'],
         'order'      => 'nome ASC',
     ],
     'categorias' => [

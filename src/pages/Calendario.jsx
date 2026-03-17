@@ -18,6 +18,8 @@ import {
 } from 'date-fns'
 import { getHojeAzores } from '../utils/datasAzores'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import { pt } from 'date-fns/locale'
 import './Calendario.css'
 
@@ -27,6 +29,7 @@ export default function Calendario() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const navigate = useNavigate()
   const { maquinas, manutencoes, reparacoes, getSubcategoria } = useData()
+  const contentReady = useDeferredReady(manutencoes.length >= 0)
 
   const getManutencoesForDay = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
@@ -124,6 +127,7 @@ export default function Calendario() {
         </div>
       </div>
 
+      <ContentLoader loading={!contentReady} message="A carregar calendário…" hint="Por favor aguarde.">
       <div className={`calendar-card card ${isMobile ? 'calendar-week-view' : ''}`}>
         <div className="calendar-header">
           {weekDays.map(d => (
@@ -177,6 +181,7 @@ export default function Calendario() {
         <span><span className="dot dot-purple"></span> Reparação</span>
         <span><span className="dot dot-gray"></span> Prevista</span>
       </div>
+      </ContentLoader>
     </div>
   )
 }

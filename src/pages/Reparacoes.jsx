@@ -4,6 +4,7 @@
  * Inclui reparações geradas automaticamente via email ISTOBAL.
  */
 import { useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
@@ -14,6 +15,8 @@ import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { MESES_PT } from '../constants/locale'
+import ContentLoader from '../components/ContentLoader'
+import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Reparacoes.css'
 
 const STATUS_LABELS = {
@@ -43,6 +46,8 @@ export default function Reparacoes() {
     tecnicos,
     getTecnicoByNome,
   } = useData()
+  const contentReady = useDeferredReady(reparacoes.length >= 0)
+  const navigate = useNavigate()
   const { canDelete, canDeleteReparacao, isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -53,9 +58,11 @@ export default function Reparacoes() {
   const [modalNova, setModalNova] = useState(false)
   const [formNova, setFormNova] = useState({ maquinaId: '', tecnico: '', data: getHojeAzores(), numeroAviso: '', descricaoAvaria: '' })
   const [errorsNova, setErrorsNova] = useState({})
-  const [modalEmail, setModalEmail] = useState(null)
-  const [emailDestino, setEmailDestino] = useState('')
-  const [emailEnviando, setEmailEnviando] = useState(false)
+  const [modalEmail, setModalEmail]         = useState(null)
+  const [emailCheckCliente, setEmailCheckCliente] = useState(false)
+  const [emailCheckAdmin, setEmailCheckAdmin]     = useState(true)
+  const [emailOutro, setEmailOutro]               = useState('')
+  const [emailEnviando, setEmailEnviando]         = useState(false)
   const [modalEliminar, setModalEliminar] = useState(null)
   const [filtroClienteNova, setFiltroClienteNova] = useState('')
   const [modalMensal, setModalMensal] = useState(false)
@@ -198,18 +205,30 @@ export default function Reparacoes() {
 
   // ── Envio de email ────────────────────────────────────────────────────────
 
+  const EMAIL_ADMIN_REP = 'comercial@navel.pt'
+
   const handleAbrirEmail = (rep) => {
     const rel = getRelatorioByReparacao(rep.id)
     if (!rel) { showToast('Sem relatório gerado para enviar', 'warning'); return }
     const maq = getMaquina(rep.maquinaId)
     const cli = maq ? getCliente(maq.clienteNif) : null
-    setEmailDestino(cli?.email ?? '')
+    setEmailCheckCliente(!!(cli?.email?.trim()))
+    setEmailCheckAdmin(true)
+    setEmailOutro('')
     setModalEmail({ rep, rel, maq, cli })
   }
 
   const handleEnviarEmail = async () => {
-    if (!emailDestino?.trim()) { showToast('Indique o email de destino', 'warning'); return }
     const { rep, rel, maq, cli } = modalEmail
+    const emailCli = cli?.email?.trim() ?? ''
+
+    const dests = new Set()
+    if (emailCheckCliente && emailCli) dests.add(emailCli.toLowerCase())
+    if (emailCheckAdmin) dests.add(EMAIL_ADMIN_REP)
+    emailOutro.split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => s).forEach(em => dests.add(em))
+
+    if (dests.size === 0) { showToast('Selecione pelo menos um destinatário.', 'warning'); return }
+
     showGlobalLoading()
     setEmailEnviando(true)
     try {
@@ -218,18 +237,30 @@ export default function Reparacoes() {
       const itensChecklist = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
       const tecObj = getTecnicoByNome(rep.tecnico || rel?.tecnico)
       const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist, { tecnicoObj: tecObj })
-      const resultado = await enviarRelatorioHtmlEmail({
-        destinatario: emailDestino.trim(),
-        assunto: `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
-        html,
-        nomeCliente: cli?.nome ?? '',
-      })
-      if (resultado.ok) {
-        showToast('Relatório enviado com sucesso', 'success')
-        logger.action('Reparacoes', 'enviarEmail', `Email enviado para ${emailDestino}`, { relId: rel.id })
+      const assunto = `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
+      let sucesso = 0
+      for (const dest of dests) {
+        const resultado = await enviarRelatorioHtmlEmail({
+          destinatario: dest,
+          assunto,
+          html,
+          nomeCliente: cli?.nome ?? '',
+        })
+        if (resultado.ok) sucesso++
+        else logger.error('Reparacoes', 'enviarEmail', resultado.message ?? 'Erro', { dest })
+      }
+      if (sucesso > 0) {
+        showToast(
+          sucesso === dests.size
+            ? `Relatório enviado para ${sucesso} destinatário${sucesso > 1 ? 's' : ''}.`
+            : `Enviado para ${sucesso} de ${dests.size} destinatários.`,
+          sucesso === dests.size ? 'success' : 'warning'
+        )
+        logger.action('Reparacoes', 'enviarEmail', `Email enviado (${sucesso} dests)`, { relId: rel.id })
         setModalEmail(null)
+        setEmailOutro('')
       } else {
-        showToast(resultado.message || 'Erro ao enviar email.', 'error', 4000)
+        showToast('Não foi possível enviar o email. Tente novamente.', 'error', 4000)
       }
     } catch (err) {
       showToast('Erro ao enviar email: ' + err.message, 'error')
@@ -259,21 +290,27 @@ export default function Reparacoes() {
   return (
     <div className="reparacoes-page">
       <div className="page-header">
-        <div className="page-header-left">
-          <Hammer size={24} />
-          <h1>Reparações</h1>
-          {counts.pendente > 0 && (
-            <span className="badge badge-danger">{counts.pendente} pendente{counts.pendente !== 1 ? 's' : ''}</span>
-          )}
+        <div>
+          <button type="button" className="btn-back" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+            Voltar atrás
+          </button>
+          <h1>
+            Reparações
+            {counts.pendente > 0 && (
+              <span className="badge badge-danger page-header-badge">{counts.pendente} pendente{counts.pendente !== 1 ? 's' : ''}</span>
+            )}
+          </h1>
+          <p className="page-sub">Gestão de reparações e avisos ISTOBAL</p>
         </div>
         <div className="page-header-actions">
           {isAdmin && (
             <button type="button" className="btn secondary" onClick={() => setModalMensal(true)} title="Relatório mensal ISTOBAL">
-              <BarChart2 size={16} /> Mensal ISTOBAL
+              <BarChart2 size={18} /> Mensal ISTOBAL
             </button>
           )}
-          <button type="button" className="btn primary" onClick={() => setModalNova(true)}>
-            <Plus size={16} /> Nova Reparação
+          <button type="button" className="btn" onClick={() => setModalNova(true)}>
+            <Plus size={18} /> Nova Reparação
           </button>
         </div>
       </div>
@@ -293,6 +330,7 @@ export default function Reparacoes() {
         ))}
       </div>
 
+      <ContentLoader loading={!contentReady} message="A carregar reparações…" hint="Por favor aguarde.">
       {/* Tabela */}
       {listaFiltrada.length === 0 ? (
         <div className="empty-state card">
@@ -444,6 +482,8 @@ export default function Reparacoes() {
         </>
       )}
 
+      </ContentLoader>
+
       {/* ── Modal: Nova Reparação ─────────────────────────────────────────── */}
       {modalNova && (() => {
         const maqSel = maquinas.find(m => m.id === formNova.maquinaId)
@@ -588,36 +628,56 @@ export default function Reparacoes() {
       )}
 
       {/* ── Modal: Enviar Email ───────────────────────────────────────────── */}
-      {modalEmail && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Enviar relatório por email">
-          <div className="modal modal-email-rep">
-            <div className="modal-header">
-              <h2><Mail size={18} /> Enviar Relatório</h2>
-              <button type="button" className="icon-btn" onClick={() => setModalEmail(null)}><X size={20} /></button>
-            </div>
-            <div className="modal-body">
-              <p className="email-info">
-                Relatório <strong>{modalEmail.rel?.numeroRelatorio}</strong> — {modalEmail.maq?.marca} {modalEmail.maq?.modelo}
-              </p>
-              <div className="form-group">
-                <label>Email de destino</label>
-                <input
-                  type="email"
-                  value={emailDestino}
-                  onChange={e => setEmailDestino(e.target.value)}
-                  placeholder="cliente@empresa.pt"
-                />
+      {modalEmail && (() => {
+        const emailCli = modalEmail.cli?.email?.trim() ?? ''
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Enviar relatório por email" onClick={() => { setModalEmail(null); setEmailOutro('') }}>
+            <div className="modal modal-email-rep" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2><Mail size={18} /> Enviar Relatório</h2>
+                <button type="button" className="icon-btn" onClick={() => { setModalEmail(null); setEmailOutro('') }}><X size={20} /></button>
+              </div>
+              <div className="modal-body">
+                <p className="email-info">
+                  Relatório <strong>{modalEmail.rel?.numeroRelatorio}</strong> — {modalEmail.maq?.marca} {modalEmail.maq?.modelo}
+                </p>
+                <div className="frota-email-panel">
+                  {emailCli ? (
+                    <label className="frota-email-check">
+                      <input type="checkbox" checked={emailCheckCliente} onChange={e => setEmailCheckCliente(e.target.checked)} disabled={emailEnviando} />
+                      <span><strong>Cliente</strong><br /><small>{emailCli}</small></span>
+                    </label>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}><em>Sem email de cliente na ficha.</em></p>
+                  )}
+                  <label className="frota-email-check">
+                    <input type="checkbox" checked={emailCheckAdmin} onChange={e => setEmailCheckAdmin(e.target.checked)} disabled={emailEnviando} />
+                    <span><strong>Administração</strong><br /><small>{EMAIL_ADMIN_REP}</small></span>
+                  </label>
+                  <div className="frota-email-outro-wrap" style={{ marginTop: '0.5rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Outro(s) endereço(s)</label>
+                    <input
+                      type="text"
+                      className="frota-email-outro-input"
+                      placeholder="ex: outro@empresa.pt, backup@navel.pt"
+                      value={emailOutro}
+                      onChange={e => setEmailOutro(e.target.value)}
+                      disabled={emailEnviando}
+                    />
+                    <small style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Separe múltiplos emails com vírgula.</small>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn secondary" onClick={() => { setModalEmail(null); setEmailOutro('') }} disabled={emailEnviando}>Cancelar</button>
+                <button type="button" className="btn primary" onClick={handleEnviarEmail} disabled={emailEnviando}>
+                  {emailEnviando ? <><Clock size={14} className="spin" /> A enviar...</> : <><Mail size={14} /> Enviar</>}
+                </button>
               </div>
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn secondary" onClick={() => setModalEmail(null)} disabled={emailEnviando}>Cancelar</button>
-              <button type="button" className="btn primary" onClick={handleEnviarEmail} disabled={emailEnviando}>
-                {emailEnviando ? <><Clock size={14} className="spin" /> A enviar...</> : <><Mail size={14} /> Enviar</>}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Modal: Relatório Mensal ISTOBAL ──────────────────────────────── */}
       {modalMensal && (

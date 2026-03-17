@@ -11,7 +11,6 @@
     "build:fast": "vite build && npm run zip",
     "prebuild": "node scripts/optimize-images.js",
     "optimize-images": "node scripts/optimize-images.js",
-    "extract-clientes-saft": "node scripts/extract-clientes-saft.js",
     "extract-clientes-fttercei": "node scripts/extract-clientes-fttercei.js",
     "extract-artigos-armazem": "node scripts/extract-artigos-armazem.js",
     "lint": "eslint .",

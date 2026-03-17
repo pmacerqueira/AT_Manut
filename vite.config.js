@@ -25,18 +25,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core React — sempre carregado
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          // Gráficos KPIs — apenas em /metricas (lazy)
           'vendor-charts': ['recharts'],
-          // QR Code — geração de etiquetas
           'vendor-qr': ['qrcode'],
-          // Sanitização HTML
           'vendor-purify': ['dompurify'],
-          // Geração de PDF — apenas quando solicitado
           'vendor-pdf': ['jspdf'],
-          // Captura de ecrã para PDF
           'vendor-canvas': ['html2canvas'],
+          'vendor-zxing': ['@zxing/browser'],
+          'vendor-datefns': ['date-fns'],
+          'vendor-icons': ['lucide-react'],
         },
       },
     },

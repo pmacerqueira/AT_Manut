@@ -239,9 +239,9 @@ export default function Marcas() {
   return (
     <div className="marcas-page">
       <div className="marcas-header">
-        <button type="button" className="marcas-back" onClick={() => navigate(-1)}>
+        <button type="button" className="btn-back marcas-back" onClick={() => navigate(-1)}>
           <ArrowLeft size={20} />
-          <span>Voltar</span>
+          <span>Voltar atrás</span>
         </button>
         <div className="marcas-title-wrap">
           <Palette size={22} />

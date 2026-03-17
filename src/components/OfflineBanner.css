@@ -69,7 +69,7 @@
   border-radius: var(--radius-xs);
   cursor: pointer;
   transition: background 0.15s;
-  min-height: 28px;
+  min-height: var(--touch-min, 44px);
 }
 
 .offline-banner__btn:hover:not(:disabled) {
