@@ -37,11 +37,11 @@
 }
 
 .horas-acumuladas-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
-.horas-acumuladas-section h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--color-text-muted); }
+.horas-acumuladas-section h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--color-text); font-weight: 600; }
 .horas-info { margin: 0; font-size: 0.9em; color: var(--color-text); }
 .horas-cell { font-size: 0.9em; }
 .consumiveis-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
-.consumiveis-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text-muted); }
+.consumiveis-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text); font-weight: 600; }
 
 /* ── Maquina row — atraso highlight ── */
 .maquina-row--atraso {

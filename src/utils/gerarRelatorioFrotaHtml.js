@@ -7,6 +7,10 @@ import { escapeHtml } from './sanitize'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
 
+const TENDENCIA_HISTORICO_MAX = 5
+const TENDENCIA_EXCELENTE_MIN = 3
+const TENDENCIA_ATENCAO_MAX = 2
+
 const fmtD = (dateStr) => {
   if (!dateStr) return '—'
   const s = String(dateStr).slice(0, 10).split('-')
@@ -62,7 +66,33 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     else if (emAtraso) { estadoBadge = 'badge-atraso'; estadoLabel = 'Em atraso' }
     else { estadoBadge = 'badge-ok'; estadoLabel = 'Conforme' }
 
-    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estadoBadge, estadoLabel }
+    // R2: Indicador de tendência
+    const manutsConclM = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))
+    let tendencia = { nivel: 'neutro', texto: '—', cor: PALETA.muted }
+    if (manutsConclM.length >= 2) {
+      const relsConcl = manutsConclM.slice(0, TENDENCIA_HISTORICO_MAX).map(mt => relMap.get(mt.id)).filter(Boolean)
+      const anomaliasTotal = relsConcl.reduce((n, r) => {
+        const snap = r.checklistSnapshot ?? []
+        return n + snap.filter(item => r.checklistRespostas?.[item.id] === 'nao').length
+      }, 0)
+      if (emAtraso) {
+        tendencia = { nivel: 'critico', texto: '⚠ Atraso', cor: PALETA.vermelho }
+      } else if (anomaliasTotal === 0 && manutsConclM.length >= TENDENCIA_EXCELENTE_MIN) {
+        tendencia = { nivel: 'excelente', texto: '★ Excelente', cor: PALETA.verde }
+      } else if (anomaliasTotal === 0) {
+        tendencia = { nivel: 'bom', texto: '● Conforme', cor: PALETA.verde }
+      } else if (anomaliasTotal <= TENDENCIA_ATENCAO_MAX) {
+        tendencia = { nivel: 'atencao', texto: '◐ Atenção', cor: PALETA.amarelo }
+      } else {
+        tendencia = { nivel: 'critico', texto: '⚠ Crítico', cor: PALETA.vermelho }
+      }
+    } else if (manutsConclM.length === 0 && !m.proximaManut) {
+      tendencia = { nivel: 'novo', texto: '○ Novo', cor: PALETA.muted }
+    } else if (emAtraso) {
+      tendencia = { nivel: 'critico', texto: '⚠ Atraso', cor: PALETA.vermelho }
+    }
+
+    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estadoBadge, estadoLabel, tendencia }
   })
 
   const totalEquip = maquinas.length
@@ -172,16 +202,17 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
     const grupoAtraso = grupo.linhas.filter(l => l.emAtraso).length
     html += `<div class="cat-header">${esc(grupo.nome)} (${grupo.linhas.length} equip.${grupoAtraso > 0 ? ` · <span class="atraso-count">${grupoAtraso} em atraso</span>` : ''})</div>
 <table class="tabela-frota"><thead><tr>
-  <th class="cell-eq" style="width:30%">Equipamento / N.º Série</th>
-  <th class="cell-center" style="width:10%">Última</th>
-  <th class="cell-center" style="width:10%">Próxima</th>
-  <th class="cell-center" style="width:7%">Dias</th>
-  <th class="cell-center" style="width:6%">Man.</th>
-  <th class="cell-center" style="width:6%">Rep.</th>
-  <th class="cell-center" style="width:13%">Estado</th>
+  <th class="cell-eq" style="width:26%">Equipamento / N.º Série</th>
+  <th class="cell-center" style="width:9%">Última</th>
+  <th class="cell-center" style="width:9%">Próxima</th>
+  <th class="cell-center" style="width:6%">Dias</th>
+  <th class="cell-center" style="width:5%">Man.</th>
+  <th class="cell-center" style="width:5%">Rep.</th>
+  <th class="cell-center" style="width:11%">Estado</th>
+  <th class="cell-center" style="width:11%">Tendência</th>
   <th class="cell-center" style="width:18%">Últ. rel.</th>
 </tr></thead><tbody>`
-    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel }, idx) => {
+    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia }, idx) => {
       const diasStr = diasAtraso != null ? (diasAtraso > 0 ? `<span class="data-atraso">+${diasAtraso}</span>` : diasAtraso === 0 ? 'Hoje' : `<span class="data-ok">${diasAtraso}</span>`) : '—'
       const parClass = idx % 2 === 0 ? 'par' : ''
       html += `<tr class="eq-row ${parClass}">
@@ -192,10 +223,11 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
         <td class="cell-center cell-muted">${totalManuts || '—'}</td>
         <td class="cell-center cell-muted">${totalReps || '—'}</td>
         <td class="cell-center"><span class="badge ${estadoBadge}">${esc(estadoLabel)}</span></td>
+        <td class="cell-center" style="font-size:7.5pt;font-weight:700;color:${tendencia.cor}">${tendencia.texto}</td>
         <td class="cell-center cell-rel">${relUltima?.numeroRelatorio ?? '—'}</td>
       </tr><tr class="sub-row ${parClass}">
         <td colspan="1" class="cell-eq">${sub ? `<span class="eq-sub">${esc(sub.nome)}</span>` : ''} ${m.numeroSerie ? `<span class="eq-serie">S/N: ${esc(m.numeroSerie)}</span>` : ''}</td>
-        <td colspan="7"></td>
+        <td colspan="8"></td>
       </tr>`
     })
     html += `</tbody></table>`
@@ -239,6 +271,16 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
     })
     html += `</tbody></table>`
   }
+
+  html += `
+<div style="margin-top:10px;padding:6px 10px;background:${PALETA.cinza};border:1px solid ${PALETA.bordaLeve};border-radius:4px;font-size:7.5pt;color:${PALETA.muted};display:flex;gap:14px;flex-wrap:wrap;align-items:center;page-break-inside:avoid">
+  <strong style="color:${PALETA.azulNavel};text-transform:uppercase;letter-spacing:.04em;font-size:7pt">Legenda Tendência:</strong>
+  <span style="color:${PALETA.verde}">★ Excelente — ≥${TENDENCIA_EXCELENTE_MIN} sem anomalias</span>
+  <span style="color:${PALETA.verde}">● Conforme — sem anomalias</span>
+  <span style="color:${PALETA.amarelo}">◐ Atenção — anomalias pontuais (≤${TENDENCIA_ATENCAO_MAX})</span>
+  <span style="color:${PALETA.vermelho}">⚠ Crítico — múltiplas anomalias ou atraso</span>
+  <span style="color:${PALETA.muted}">○ Novo — sem histórico</span>
+</div>`
 
   html += `${htmlFooter('Documento gerado em ' + hojeFormatado)}</body></html>`
   return html

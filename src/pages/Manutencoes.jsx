@@ -166,14 +166,24 @@ export default function Manutencoes() {
   const getMaquina = (id) => maquinas.find(m => m.id === id)
 
   useEffect(() => {
-    const execId = location.state?.openExecucaoId
-    if (execId) {
-      const m = manutencoes.find(x => x.id === execId)
-      const maq = m ? maquinas.find(x => x.id === m.maquinaId) : null
-      if (m && maq) setModalExecucao({ manutencao: m, maquina: maq })
+    const execId = location.state?.openExecucaoId || searchParams.get('executar')
+    if (!execId) return
+    if (!manutencoes.length || !maquinas.length) return
+    const m = manutencoes.find(x => x.id === execId)
+    const maq = m ? maquinas.find(x => x.id === m.maquinaId) : null
+    if (m && maq) {
+      if (m.status === 'pendente' || m.status === 'agendada') iniciarManutencao(m.id)
+      setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: maq })
+    }
+    if (location.state?.openExecucaoId) {
       navigate(location.pathname + location.search, { replace: true, state: {} })
     }
-  }, [location.state?.openExecucaoId, manutencoes, maquinas, navigate, location.pathname, location.search])
+    if (searchParams.get('executar')) {
+      const params = new URLSearchParams(searchParams)
+      params.delete('executar')
+      navigate(location.pathname + (params.toString() ? `?${params}` : ''), { replace: true, state: {} })
+    }
+  }, [location.state?.openExecucaoId, searchParams, manutencoes, maquinas, navigate, location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
 

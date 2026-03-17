@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> ~450 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
-> Última revisão: 2026-03-12 — v1.11.0
+> 441 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
+> Última revisão: 2026-03-17 — v1.14.0
 
 ---
 
@@ -27,7 +27,7 @@
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
 | `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T: modal, validação ficheiro, preview, importação completa, 2ª importação (ignorar) |
-| **Total** | **~450** | **100% dos fluxos da aplicação + escalabilidade** |
+| **Total** | **441** | **100% dos fluxos da aplicação + escalabilidade** |
 
 > **Specs 01–09** (127 testes): cobertura base do núcleo da aplicação.
 > **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
@@ -403,4 +403,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-03-12 — v1.11.0*
+*Última actualização: 2026-03-17 — v1.14.0*

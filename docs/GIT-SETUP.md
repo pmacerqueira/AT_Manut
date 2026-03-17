@@ -1,35 +1,19 @@
 # Configuração do Git — AT_Manut
 
-Instruções para configurar o Git no projeto e manter o repositório sincronizado com o GitHub.
+Referência para manter o repositório sincronizado com o GitHub após cada build.
 
 **Repositório:** https://github.com/pmacerqueira/AT_Manut
 
 ---
 
-## Git vs GitHub
+## Verificar se o Git está instalado
 
-| | Git | GitHub |
-|---|-----|--------|
-| **O que é** | Ferramenta de controlo de versões (instalada no teu PC) | Serviço online que guarda repositórios Git |
-| **Onde corre** | No teu computador | Na nuvem (github.com) |
-| **Obrigatório?** | Sim, para usar tags e histórico de versões | Não — podes usar Git só localmente |
+```powershell
+git --version
+```
 
-**Resumo:** Git é o programa; GitHub é um sítio onde podes guardar o teu repositório (e partilhar com outros).
-
----
-
-## 1. Instalar o Git (Windows)
-
-1. Ir a https://git-scm.com/download/win
-2. Descarregar e instalar o Git para Windows
-3. Durante a instalação, podes deixar as opções por defeito
-4. **Reiniciar o Cursor** (ou o terminal) após a instalação
-
----
-
-## 2. Configurar nome e email (uma vez só)
-
-Abrir o PowerShell ou o terminal do Cursor e executar:
+Se não estiver instalado: https://git-scm.com/download/win  
+Após instalar, configurar (uma vez só):
 
 ```powershell
 git config --global user.name "Pedro Cerqueira"
@@ -38,35 +22,7 @@ git config --global user.email "pmcerqueira@navel.pt"
 
 ---
 
-## 3. Inicializar o repositório no projeto
-
-Se a pasta `c:\Cursor_Projetos\NAVEL\AT_Manut` ainda não for um repositório Git:
-
-```powershell
-cd c:\Cursor_Projetos\NAVEL\AT_Manut
-git init
-```
-
----
-
-## 4. Criar a tag v1.0.0 (primeira versão estável)
-
-Depois de teres o Git a funcionar:
-
-```powershell
-cd c:\Cursor_Projetos\NAVEL\AT_Manut
-git add .
-git commit -m "v1.0.0 — Primeira versão estável"
-git tag -a v1.0.0 -m "Primeira versão estável"
-```
-
----
-
-## 5. GitHub (configurado)
-
-O repositório está em **https://github.com/pmacerqueira/AT_Manut**.
-
-### Push após cada build fechado
+## Push após cada build fechado
 
 ```powershell
 cd c:\Cursor_Projetos\NAVEL\AT_Manut
@@ -83,10 +39,9 @@ Ver `.cursor/rules/at-manut-workflow.mdc` para o fluxo completo de build e deplo
 
 ---
 
-## Verificar se o Git está instalado
+## Git vs GitHub
 
-```powershell
-git --version
-```
-
-Se aparecer algo como `git version 2.x.x`, está instalado correctamente.
+| | Git | GitHub |
+|---|-----|--------|
+| **O que é** | Ferramenta de controlo de versões (instalada no PC) | Serviço online que guarda repositórios Git |
+| **Onde corre** | No computador local | Na nuvem (github.com) |

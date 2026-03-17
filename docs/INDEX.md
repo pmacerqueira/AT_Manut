@@ -23,9 +23,6 @@ Este índice define a documentação oficial e evita dispersão por ficheiros re
 - `docs/ROADMAP.md`
 - `docs/ROADMAP-EVOLUCAO-2026.md` (histórico de planeamento 2026)
 
-## Histórico de sessões
-- `docs/SESSAO-FILOSOFT-2026-02-22.md` (histórico; não canónico para regras atuais)
-
 ## Política de obsolescência
 1. Informação repetida deve ser removida do ficheiro mais fraco e mantida na fonte canónica.
 2. Documentos de sessão são memória histórica, não substituem documentação canónica.

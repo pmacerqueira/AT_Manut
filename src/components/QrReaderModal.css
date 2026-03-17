@@ -194,6 +194,42 @@
   text-decoration: none;
 }
 
+/* M2: Scan & Go */
+.qrr-scan-go {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+}
+.qrr-scan-go-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid #3b82f6;
+  border-radius: var(--radius-xs);
+  font-size: 0.85rem;
+  color: #1e3a5f;
+}
+.qrr-scan-go-info strong { display: block; }
+.qrr-scan-go-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+.qrr-scan-go-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.6rem 1rem;
+}
+
 /* Actions */
 .qrr-actions {
   display: flex;

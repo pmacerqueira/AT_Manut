@@ -9,6 +9,98 @@ Política de continuidade:
 
 ---
 
+## [1.14.1] — 2026-03-17 — Contraste e legibilidade; melhorias arquitecturais (M1/M2/M4/M5/R1/R2/R3)
+
+### Contraste e legibilidade — auditoria completa
+- `--color-text-muted` +12% luminosidade (`#c8d6e3` → `#d8e2ec`) — ratio WCAG ~9.6:1
+- `--color-border` reforçado (`#2d3a4d` → `#3a4a60`) — bordas mais visíveis
+- `--color-accent-muted` mais opaco (0.15 → 0.22) — botões secundários distintos
+- Nova variável `--color-text-subtle` para hierarquia tipográfica sem opacity
+- **Sidebar**: nav-links font-weight 600, active 700, user-name em --color-text
+- **Dashboard**: stat-label weight 600, sublabel sem opacity, weekday headers em --color-text, ícones opacity 0.85
+- **Tabelas**: th font-weight 700, form labels em --color-text
+- **Eliminação de opacity** em textos/ícones: ~20 ocorrências em 12 ficheiros CSS (chevrons, separadores, empty-icons, breadcrumbs, log-version, hints, readonly)
+- **Modo campo**: --color-text-muted escurecido para `#1e2a38`, empty-icon opacity 0.85
+
+### Melhorias arquitecturais (workflow e relatórios)
+- **M1**: Pré-preenchimento inteligente da checklist (última execução do mesmo tipo/máquina)
+- **M2**: Scan & Go — QR Code detecta manutenção pendente (7 dias) e abre wizard
+- **M4**: Quick Notes — chips de texto configuráveis abaixo das observações
+- **M5**: Prontidão semanal — OfflineBanner mostra manutenções pré-carregadas (5 dias)
+- **R1**: Historial compacto de anomalias (últimas 5 manutenções) no relatório individual
+- **R2**: Indicadores de tendência (★ ● ◐ ⚠ ○) no relatório de frota
+- **R3**: Próxima manutenção prevista com periodicidade no relatório individual
+- Auditoria de dependências: constantes extraídas, hardcoding eliminado, race conditions corrigidas
+
+### Documentação
+- `docs/ROADMAP.md` actualizado com estado v1.14.1, 3 melhorias propostas (P1/P2/P3), backlog reorganizado
+
+### Ficheiros alterados
+- `src/index.css` (variáveis + contraste global)
+- `src/components/Layout.css`, `Breadcrumbs.css`, `PesquisaGlobal.css`, `OfflineBanner.css`
+- `src/pages/Dashboard.css`, `Clientes.css`, `Manutencoes.css`, `Reparacoes.css`, `Calendario.css`, `Equipamentos.css`, `Logs.css`
+- `src/components/ExecutarManutencaoModal.jsx`, `QrReaderModal.jsx`, `EnviarEmailModal.jsx`, `OfflineBanner.jsx`
+- `src/utils/relatorioHtml.js`, `gerarRelatorioFrotaHtml.js`
+- `src/config/version.js` → `1.14.1`
+- `src/config/storageKeys.js`
+- `docs/ROADMAP.md`, `CHANGELOG.md`
+
+---
+
+## [1.14.0] — 2026-03-17 — Wizard manutenção layout fixo; PDFs sem diálogo de impressão; email com opções de destinatários
+
+### Wizard ExecutarManutencaoModal — redesign de layout
+- **Estrutura fixa de 3 secções** — cabeçalho fixo (título + hint + barra de progresso), corpo com scroll independente (`wizard-body`), rodapé fixo com botões de navegação (`wizard-footer`)
+- Elimina o problema de janelas ora grandes ora pequenas e botões em posições inconsistentes entre passos
+- **Rodapé unificado** — botões Anterior / Próximo / Cancelar / Guardar sem assinatura / Gravar / Enviar relatório renderizados condicionalmente por passo
+- Modal de altura fixa: `95dvh` em mobile, `80dvh` em desktop (`max-width: 700px`)
+- Scrollbar de corpo com estilos personalizados para boa visibilidade em dark e light theme
+
+### Checklist — destaque visual (passo 1)
+- Secção da checklist com cor de fundo distinta (`.checklist-section-wizard`) e badge "✱ Preenchimento obrigatório"
+- Scroll interno da checklist removido — o scroll é gerido pelo `wizard-body` (scroll único e intuitivo)
+- Alternância de cor nas linhas (`:nth-child(even)`) para facilitar leitura
+
+### PDFs e email — auditoria geral
+- **Nenhum botão abre diálogo de impressão** — todos os fluxos de "obter PDF" fazem download directo via Blob
+- **Botão "enviar por email"** abre sempre painel de destinatários: email do cliente, email admin (`comercial@navel.pt`), campo de endereço livre
+- Corrigido em: `Manutencoes.jsx`, `Reparacoes.jsx`, `EnviarEmailModal.jsx`, `Equipamentos.jsx`, `ExecutarReparacaoModal.jsx`
+
+### Relatório de frota (painel do cliente)
+- **Filtro por período** antes de gerar o relatório (data início / data fim; ambos opcionais)
+- **3 acções directas**: Abrir HTML em nova aba, Gravar PDF (download), Enviar por email (com painel de destinatários)
+- Histórico de manutenções reconvertido em tabela compacta com ícones de acção por linha
+- Botão "Adicionar máquina" removido do painel de frota do cliente
+
+### Dashboard
+- Cartão "Próximas" mostra agora o nº de manutenções nos **próximos 6 meses** (em vez de todas as futuras)
+- Sublabel "próximos 6 meses" adicionado sob o valor
+
+### Relatório de manutenção — campos de data
+- Label "Data" renomeado para "Data agendada" no formulário de agendamento
+- `RelatorioView` apresenta "Data agendada" e "Data de execução" em linhas separadas
+
+### Assinaturas nos relatórios
+- Corrigido problema de molduras a cortar o texto e a assinatura — caixas de assinatura agora abraçam todo o conteúdo
+- Imagens de assinatura com `max-width: 100%` e layout de inner `<div>` para escala responsiva
+
+### Scroll nos modais
+- `.modal-overlay` é agora o único contentor de scroll (removido `overflow-y: auto` do genérico `.modal`)
+- `overscroll-behavior: contain` + `touch-action: pan-y` no overlay para scroll correcto em desktop e touch
+
+### Ficheiros alterados
+- `src/components/ExecutarManutencaoModal.jsx`, `src/pages/Manutencoes.css`
+- `src/components/EnviarEmailModal.jsx`
+- `src/pages/Manutencoes.jsx`, `src/pages/Reparacoes.jsx`, `src/pages/Clientes.jsx`, `src/pages/Equipamentos.jsx`
+- `src/components/ExecutarReparacaoModal.jsx`
+- `src/utils/relatorioBaseStyles.js`
+- `src/index.css`, `src/pages/Clientes.css`
+- `src/pages/Dashboard.jsx`, `src/pages/Dashboard.css`
+- `src/components/RelatorioView.jsx`
+- `src/config/version.js` → `1.14.0`
+
+---
+
 ## [1.13.0] — 2026-03-13 — Relatório executivo de frota N3, declaração de aceitação do cliente
 
 ### Relatório Executivo de Frota (N3) — Enriquecido
@@ -985,4 +1077,4 @@ Política de continuidade:
 
 ---
 
-*Última actualização: 2026-03-12 — v1.11.0*
+*Última actualização: 2026-03-17 — v1.14.0*

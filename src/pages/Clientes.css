@@ -57,7 +57,7 @@
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
-.cliente-mobile-loc::before { content: '·'; margin-right: 0.3rem; opacity: 0.5; }
+.cliente-mobile-loc::before { content: '·'; margin-right: 0.3rem; opacity: 0.8; }
 
 .cliente-mobile-tel {
   font-size: 0.75rem;
@@ -65,7 +65,7 @@
   text-decoration: none;
 }
 .cliente-mobile-tel:hover { text-decoration: underline; }
-.cliente-mobile-tel::before { content: '·'; margin-right: 0.3rem; opacity: 0.5; color: var(--color-text-muted); }
+.cliente-mobile-tel::before { content: '·'; margin-right: 0.3rem; opacity: 0.8; color: var(--color-text-muted); }
 
 .cliente-mobile-maq {
   font-size: 0.72rem;
@@ -77,14 +77,14 @@
 }
 
 .cliente-mobile-chevron {
-  opacity: 0.6;
+  opacity: 0.85;
   flex-shrink: 0;
 }
 
 .badge-inline { margin-left: 0.4rem; }
 .clientes-empty-msg { padding: 1rem 0; text-align: center; }
-.categoria-card-chevron { margin-top: 0.5rem; opacity: 0.6; }
-.maquina-ficha-chevron { flex-shrink: 0; opacity: 0.6; }
+.categoria-card-chevron { margin-top: 0.5rem; opacity: 0.85; }
+.maquina-ficha-chevron { flex-shrink: 0; opacity: 0.85; }
 
 /* ── Paginação ───────────────────────────────────────────────────────────── */
 .clientes-pagination {

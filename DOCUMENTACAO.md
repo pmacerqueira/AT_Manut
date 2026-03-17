@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.11.0 · **Última actualização:** 2026-03-12
+**Versão:** 1.14.0 · **Última actualização:** 2026-03-17
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -37,7 +37,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ~450 testes (18 specs) |
+| Testes | Playwright E2E — 441 testes (17 specs) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---
@@ -66,7 +66,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── hooks/
 │   │   ├── usePermissions.js           # canDelete, canEditManutencao, isAdmin
 │   │   ├── useMediaQuery.js            # Detecção mobile
-│   │   └── useDebounce.js             # Debounce para pesquisa
+│   │   ├── useDebounce.js             # Debounce para pesquisa
+│   │   └── useDeferredReady.js         # Atraso de render para modais pesados
 │   │
 │   ├── components/
 │   │   ├── Layout.jsx / .css           # Sidebar, menu, logout, Ctrl+K, Ler QR, modo campo
@@ -82,22 +83,24 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
 │   │   ├── DocumentacaoModal.jsx       # Documentação de equipamento
-│   │   ├── EnviarEmailModal.jsx        # Envio de email
+│   │   ├── EnviarEmailModal.jsx        # Envio de email (com painel de destinatários)
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
 │   │   ├── PecasPlanoModal.jsx / .css   # Plano de peças e consumíveis
 │   │   ├── QrEtiquetaModal.jsx / .css  # QR Code + etiqueta 90×50mm
 │   │   ├── QrReaderModal.jsx / .css    # Leitura QR por câmara (@zxing/browser)
 │   │   ├── PesquisaGlobal.jsx / .css   # Pesquisa global Ctrl+K (clientes+maquinas+manut.)
-│   │   └── AlertaProactivoModal.jsx / .css  # Modal proactivo de alertas (Admin)
+│   │   ├── AlertaProactivoModal.jsx / .css  # Modal proactivo de alertas (Admin)
+│   │   ├── BulkExecutarModal.jsx       # Execução em lote de manutenções históricas
+│   │   └── ContentLoader.jsx / .css    # Skeleton loader para listas
 │   │
 │   ├── pages/
 │   │   ├── Login.jsx / .css
-│   │   ├── Dashboard.jsx / .css        # KPIs, "O meu dia", alertas, card reparações
+│   │   ├── Dashboard.jsx / .css        # KPIs, "O meu dia", alertas, card Próximas (6 meses), card reparações
 │   │   ├── Clientes.jsx / .css         # CRUD + badge "Sem email"
 │   │   ├── Equipamentos.jsx / .css     # Hierarquia Cat→Sub→Máq, QR, Histórico PDF; recebe ?maquina=ID
-│   │   ├── Manutencoes.jsx / .css      # Lista, filtros, execução
+│   │   ├── Manutencoes.jsx / .css      # Lista, filtros, execução (wizard 7 passos)
 │   │   ├── Reparacoes.jsx / .css       # Lista, filtros, execução multi-dia, relatório, mensal ISTOBAL
-│   │   ├── Agendamento.jsx / .css      # Nova manutenção
+│   │   ├── Agendamento.jsx / .css      # Nova manutenção (pipeline cascata)
 │   │   ├── Calendario.jsx / .css       # Vista mensal
 │   │   ├── Categorias.jsx / .css       # CRUD categorias/subcategorias/checklist
 │   │   ├── Definicoes.jsx / .css       # Backup, restauro, config alertas, modo campo, uso LS
@@ -112,8 +115,12 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │
 │   ├── utils/
 │   │   ├── relatorioHtml.js            # HTML do relatório individual (manutenções)
-│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF)
+│   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios (assinaturas, tabelas)
+│   │   ├── relatorioReparacaoHtml.js   # HTML do relatório de reparação
+│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — download directo sem impressão
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
+│   │   ├── gerarRelatorioFrota.js      # PDF do relatório executivo de frota (jsPDF)
+│   │   ├── gerarRelatorioFrotaHtml.js  # HTML do relatório executivo de frota
 │   │   ├── kpis.js                     # calcResumoCounts, calcTaxaCumprimento, calcEvolucaoMensal…
 │   │   ├── datasAzores.js              # Feriados dos Açores, dias úteis
 │   │   ├── diasUteis.js               # Cálculo de dias úteis
@@ -127,7 +134,10 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │       └── relatorio.js                # Constantes de relatório
 │
 ├── servidor-cpanel/
+│   ├── api/
+│   │   └── data.php                    # Endpoint central: CRUD MySQL (todas as entidades)
 │   ├── send-email.php                  # Backend: envio de email + PDF
+│   ├── send-report.php                 # Backend: envio de relatório de frota por email
 │   ├── cron-alertas.php                # Cron diário: lembretes automáticos + log alertas_log
 │   ├── INSTRUCOES_CPANEL.md
 │   └── MIGRACAO_MYSQL.md
@@ -379,7 +389,7 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ```js
 // src/config/version.js
-export const APP_VERSION = '1.11.0'
+export const APP_VERSION = '1.14.0'
 export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
 ```
 

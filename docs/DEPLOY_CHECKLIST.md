@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-03-12 — v1.11.0
+> Última revisão: 2026-03-17 — v1.14.0
 
 ## Resumo da verificação da base de dados
 

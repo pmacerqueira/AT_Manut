@@ -2,7 +2,7 @@
 
 Directrizes de interface e experiência do utilizador. **Todas as novas funcionalidades devem seguir estas regras.**
 
-Última revisão: 2026-03-12 — v1.11.0
+Última revisão: 2026-03-17 — v1.14.0
 
 ---
 
@@ -192,7 +192,7 @@ const handleSubmit = (e) => {
 
 ```js
 import { APP_FOOTER_TEXT } from '../config/version'
-// APP_FOOTER_TEXT = "Navel-Açores, Lda — Todos os direitos reservados · v1.11.0"
+// APP_FOOTER_TEXT = "Navel-Açores, Lda — Todos os direitos reservados · v{APP_VERSION}"
 ```
 
 Aplicar em: `relatorioHtml.js`, `gerarPdfRelatorio.js`, `gerarHtmlHistoricoMaquina.js`, `send-email.php`, `EnviarDocumentoModal`, e qualquer novo relatório.

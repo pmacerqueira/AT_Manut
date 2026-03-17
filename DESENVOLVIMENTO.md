@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.11.0 · **Última actualização:** 2026-03-12
+**Versão:** 1.14.0 · **Última actualização:** 2026-03-17
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -78,11 +78,15 @@ Próximo passo:
 | Dashboard de métricas / KPIs | `Metricas.jsx`, `Metricas.css`, `kpis.js`, `App.jsx`, `Layout.jsx` |
 | Modo campo | `Definicoes.jsx`, `index.css` (`.modo-campo`), `App.jsx`, `Layout.jsx` |
 | Indicador de armazenamento | `Definicoes.jsx`, `Definicoes.css` |
-| Histórico PDF máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx` |
-| Relatório individual PDF | `relatorioHtml.js`, `gerarPdfRelatorio.js` |
-| Envio de email | `emailService.js`, `servidor-cpanel/send-email.php` |
+| Histórico HTML máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx`, `Clientes.jsx` |
+| Relatório individual PDF | `relatorioHtml.js`, `relatorioBaseStyles.js`, `gerarPdfRelatorio.js` |
+| Relatório de frota | `gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `Clientes.jsx` |
+| Relatório de reparação | `relatorioReparacaoHtml.js`, `relatorioBaseStyles.js` |
+| Envio de email (destinatários) | `emailService.js`, `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` |
+| Envio de relatório de frota | `emailService.js`, `servidor-cpanel/send-report.php` |
 | Alertas automáticos (cron) | `servidor-cpanel/cron-alertas.php`, `docs/CRON-ALERTAS.md` |
-| Agendamento novo | `Agendamento.jsx` |
+| Agendamento novo (pipeline) | `Agendamento.jsx` |
+| Execução de manutenção (wizard) | `ExecutarManutencaoModal.jsx`, `Manutencoes.css` |
 | Lista de manutenções | `Manutencoes.jsx` |
 | Calendário | `Calendario.jsx` |
 | Clientes / Equipamentos | `Clientes.jsx`, `Equipamentos.jsx` |
@@ -95,6 +99,8 @@ Próximo passo:
 | **Reparações — relatório mensal ISTOBAL** | `Reparacoes.jsx` → `RelatorioMensalISTOBAL`, `RelatorioReparacaoView` |
 | **Gestão de técnicos** | `Definicoes.jsx`, `DataContext.jsx` → `addTecnico`, `updateTecnico`, `removeTecnico` |
 | **Assinatura em 2 passos** | `RecolherAssinaturaModal.jsx`, `Manutencoes.jsx` |
+| **Declaração de aceitação** | `RecolherAssinaturaModal.jsx`, `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx` |
+| **Dashboard — card Próximas** | `Dashboard.jsx` (próximos 6 meses via `useMemo`) |
 
 ---
 

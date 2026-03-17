@@ -1,11 +1,11 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e histórico de implementação.
-> Última revisão: 2026-03-13 — v1.12.0
+> Última revisão: 2026-03-17 — v1.14.0
 
 ---
 
-## Estado actual (v1.12.0) — O que está implementado
+## Estado actual (v1.14.0) — O que está implementado
 
 | Área | Detalhe | Versão |
 |------|---------|--------|
@@ -60,11 +60,60 @@
 | **Validação feriados/fins-de-semana** | No agendamento | **v1.12.0** |
 | **Gestão completa de checklists** | CRUD + snapshot imutável | **v1.12.0** |
 | **Email CC garantido** | comercial@navel.pt em todos os envios | **v1.12.0** |
-| **Relatório executivo PDF** | Visão da frota para apresentar ao cliente, baseado nos KPIs | **v1.12.0** |
+| **Relatório executivo de frota** | Visão da frota por categoria, com KPIs, reparações e resumo anual | **v1.12.0–v1.13.0** |
+| **Declaração de aceitação do cliente** | Texto dinâmico por tipo de serviço, legislação em vigor (EN 1493:2022, DL 50/2005) | **v1.13.0** |
+| **Relatório de frota — filtro por período** | Data início / fim opcionais antes de gerar o relatório | **v1.14.0** |
+| **Relatório de frota — 3 acções directas** | Abrir HTML, Gravar PDF, Enviar por email com painel de destinatários | **v1.14.0** |
+| **PDFs sem diálogo de impressão** | Download directo em todo o sistema (auditoria geral) | **v1.14.0** |
+| **Painel de destinatários em todos os emails** | Cliente / admin / endereço livre em qualquer envio | **v1.14.0** |
+| **Wizard de manutenção com layout fixo** | Cabeçalho + corpo scrollável + rodapé fixo; altura consistente em todos os passos | **v1.14.0** |
+| **Dashboard — card Próximas (6 meses)** | Contagem de manutenções para os próximos 6 meses com sublabel | **v1.14.0** |
+| **Checklist — destaque visual** | Fundo distinto + badge "obrigatório" no passo 1 do wizard | **v1.14.0** |
+| **Assinaturas nos relatórios** | Molduras corrigidas para abraçar todo o conteúdo | **v1.14.0** |
+| **M1: Pré-preenchimento inteligente** | Checklist pré-preenchida com base na última execução do mesmo tipo/máquina | **v1.14.0** |
+| **M2: Scan & Go (QR → wizard)** | QR Code de máquina detecta manutenção pendente (7 dias) e abre wizard pré-preenchido | **v1.14.0** |
+| **M4: Quick Notes (notas rápidas)** | Chips de texto pré-definido abaixo das observações; configuráveis via localStorage | **v1.14.0** |
+| **M5: Prontidão semanal** | OfflineBanner mostra quantas manutenções estão pré-carregadas para os próximos 5 dias | **v1.14.0** |
+| **R1: Historial de anomalias** | Últimas 5 manutenções com anomalias no relatório individual (checklist "Não") | **v1.14.0** |
+| **R2: Tendência no relatório de frota** | Indicadores visuais (★ ● ◐ ⚠ ○) por equipamento no relatório de frota | **v1.14.0** |
+| **R3: Próxima manutenção prevista** | Linha informativa no relatório individual com data e periodicidade | **v1.14.0** |
+| **Contraste e legibilidade** | Audit geral: --color-text-muted mais brilhante, bordas reforçadas, opacity eliminado de textos/ícones, sidebar e labels com font-weight forte | **v1.14.0** |
 
 ---
 
 ## Histórico de versões principais
+
+### v1.14.0 — Wizard Manutenção; PDFs; Email; Dashboard; Melhorias Arquitecturais; Contraste
+**Implementado:** Março 2026
+
+- Wizard `ExecutarManutencaoModal` redesenhado com layout fixo (cabeçalho + body scroll + rodapé unificado)
+- Auditoria geral: nenhum botão abre diálogo de impressão; todos os PDFs são download directo
+- Painel de destinatários de email em todos os pontos de envio (cliente / admin / outro)
+- Relatório de frota: filtro por período + 3 acções directas + tabela compacta no histórico de manutenções
+- Dashboard: card "Próximas" mostra próximos 6 meses
+- Assinaturas nos relatórios: molduras corrigidas
+- Scroll nos modais: consolidado no `.modal-overlay`
+- **M1:** Pré-preenchimento inteligente da checklist (última execução do mesmo tipo/máquina)
+- **M2:** Scan & Go — QR Code detecta manutenção pendente e abre wizard directamente
+- **M4:** Quick Notes — chips de texto pré-definido para observações
+- **M5:** Prontidão semanal — OfflineBanner indica manutenções pré-carregadas (5 dias)
+- **R1:** Historial compacto de anomalias no relatório individual
+- **R2:** Indicadores de tendência (★ ● ◐ ⚠ ○) no relatório de frota
+- **R3:** Próxima manutenção prevista com periodicidade no relatório individual
+- **Contraste e legibilidade:** Audit completo — `--color-text-muted` +12% luminosidade, `--color-border` reforçado, `--color-text-subtle` para hierarquia, eliminação de opacity em textos/ícones, sidebar font-weight 600/700, form labels em --color-text, data-table headers font-weight 700
+
+---
+
+### v1.13.0 — Relatório executivo de frota N3, declaração de aceitação
+**Implementado:** Março 2026
+
+- Relatório executivo de frota enriquecido: agrupamento por categoria, coluna "Dias", secção de reparações, resumo anual, KPIs expandidos
+- Envio do relatório de frota por email via `send-report.php` com CC a `comercial@navel.pt`
+- Declaração de aceitação/compromisso do cliente com legislação actualizada (EN 1493:2022, Diretiva 2006/42/CE, Regulamento (UE) 2023/1230, DL 50/2005)
+- Texto dinâmico de declaração adaptado ao tipo de serviço (montagem / manutenção / reparação)
+- Declaração visível antes de assinar nos 3 modais de assinatura digital
+
+---
 
 ### v1.9.x — Módulo Reparações
 **Implementado:** Fevereiro 2026
@@ -152,13 +201,20 @@
 
 ## O que ainda está por fazer (Backlog)
 
-### Próximo sprint (v2.x)
+### Próximo sprint — 3 melhorias prioritárias (v1.15.0)
+
+| # | Funcionalidade | Impacto | Esforço | Justificação |
+|---|---|---|---|---|
+| **P1** | **Timestamps silenciosos (duração real da manutenção)** — Registar automaticamente hora de início (abertura do wizard) e hora de fim (gravação). Calcular duração sem intervenção do técnico. Visível no relatório e na ficha de manutenção. | **Alto** | **Baixo** | Dado objectivo para faturação, eficiência e historial. Nenhum esforço extra para o técnico — o sistema capta silenciosamente. Preparado na sessão anterior, aguarda "educação" da equipa. |
+| **P2** | **Painel de peças/consumíveis com preços (fase de faturação)** — Adicionar campos custo unitário e preço venda às peças usadas em manutenções e reparações. Calcular totais no relatório (internamente, invisível ao cliente). Exportar lista de materiais faturáveis. | **Alto** | **Médio** | Estrutura de peças já existe; falta a camada de preços. Permite gerar orçamentos e controlar margens. Fundamental para escalar o negócio. |
+| **P3** | **Entrada por voz nos campos de texto** — SpeechRecognition API (`pt-PT`) para observações, descrição de avaria, trabalho realizado. Botão de microfone discreto junto aos `textarea`. Transcrição em tempo real com possibilidade de editar. | **Médio** | **Médio** | Técnicos no terreno usam luvas e ambientes ruidosos. Ditar observações é 3× mais rápido que escrever num tablet. Melhora qualidade e detalhe das notas de campo. |
+
+### Médio prazo (v2.x)
 
 | # | Funcionalidade | Impacto | Esforço | Notas |
 |---|---|---|---|---|
 | N1 | **Notificações push** (Web Push API) — manutenções a vencer em 3 dias | Alto | Alto | Service Worker necessário; independente do cron |
-| N2 | **Entrada por voz** nos campos de texto (SpeechRecognition API, `pt-PT`) | Médio | Médio | Útil em ambiente de campo com luvas |
-| N4 | **Valores de custo/venda em reparações** — fase de faturação (invisível no relatório do cliente) | Alto | Médio | Já existe estrutura de peças usadas; falta a camada de preços |
+| N4 | **Actualização automática multi-tab** — BroadcastChannel API | Baixo | Baixo | Sincronização instantânea entre abas abertas |
 
 ### Fase 3 — Escalabilidade (horizonte 6-12 meses)
 
@@ -166,7 +222,6 @@
 |---|---|---|---|---|
 | F3.1 | **Multi-técnico em manutenção** — registar 2+ técnicos numa execução | Médio | Médio | Adequado para equipas maiores |
 | F3.2 | **App nativa** — Capacitor (iOS + Android, notificações push nativas) | Alto | Muito alto | Reavaliar quando tiver >5 técnicos de campo |
-| F3.3 | **Actualização automática multi-tab** — BroadcastChannel API | Baixo | Baixo | Sincronização instantânea entre abas abertas |
 
 > **Nota sobre sincronização:** A sincronização multi-dispositivo já funciona via PHP/MySQL (cPanel) — qualquer dispositivo autenticado lê os mesmos dados em tempo real ao refrescar. O que não existe é push automático sem refrescar. Para a equipa actual (1-2 técnicos), não é problema prático.
 
@@ -185,14 +240,21 @@
 - **Modo campo** — alto contraste para técnicos ao sol
 - **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
 - **Assinatura do técnico em PDFs** — identificação e assinatura pré-preenchida
-- **~450 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
+- **441 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 - **Cascatas CRUD completas** — frontend e backend alinhados para integridade de dados
 - **Protecção contra eliminação acidental** — modais de confirmação em operações críticas
 - **Pipeline intuitivo de agendamento** — Cliente→Categoria→Máquina para criação de manutenções
+- **Relatório executivo de frota** — visão completa da frota para apresentar ao cliente
+- **PDFs sem diálogo de impressão** — download directo em toda a aplicação
+- **Painel de destinatários em emails** — escolha sempre explícita do destino em todos os envios
+- **Pré-preenchimento inteligente** — checklist baseada na última execução; Quick Notes configuráveis
+- **Scan & Go** — QR Code detecta manutenção pendente e abre wizard directo
+- **Relatórios com intelligence layer** — tendências, anomalias, próxima manutenção prevista
+- **Contraste WCAG reforçado** — variáveis dedicadas, font-weight forte, sem opacity em texto
 
 ---
 
-*Última actualização: 2026-03-13 — v1.12.0*
+*Última actualização: 2026-03-17 — v1.14.0 (contraste + roadmap actualizado)*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

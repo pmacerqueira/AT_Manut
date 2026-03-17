@@ -70,8 +70,8 @@
 .manutencoes-list-title {
   margin: 0 0 0.5rem;
   font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .manutencoes-concluidas-card {
@@ -183,7 +183,7 @@
 
 .icon-btn.readonly {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 
@@ -613,7 +613,7 @@
 .peca-checklist-row.peca-nao-usada {
   background: var(--color-bg-secondary);
   border-color: var(--color-border);
-  opacity: 0.62;
+  opacity: 0.75;
 }
 
 .peca-checklist-row.peca-nao-usada .peca-checklist-info {
@@ -813,10 +813,11 @@
 }
 .wizard-progress-step {
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 .wizard-progress-label {
-  font-weight: 600;
-  color: var(--color-primary, #3b82f6);
+  font-weight: 700;
+  color: var(--color-accent);
 }
 
 /* O <form> dentro do wizard cresce para preencher o espaço restante */
@@ -1142,4 +1143,72 @@ body.modo-campo .bulk-item {
     text-align: center;
     font-size: 0.88rem;
   }
+}
+
+/* ── M1: Banner de pré-preenchimento inteligente ── */
+.prefill-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #1e40af;
+  margin-bottom: 0.75rem;
+}
+.prefill-banner svg { flex-shrink: 0; }
+.prefill-banner .btn-link-checklist {
+  margin-left: auto;
+  white-space: nowrap;
+  color: #1e40af;
+  text-decoration: underline;
+}
+body.modo-campo .prefill-banner {
+  background: #1e293b;
+  border-color: #334155;
+  border-left-color: #60a5fa;
+  color: #93c5fd;
+}
+
+/* ── M4: Quick Notes chips ── */
+.quick-notes-section { margin-top: 0.75rem; }
+.quick-notes-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+  margin-bottom: 0.35rem;
+  display: block;
+}
+.quick-notes-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.quick-note-chip {
+  background: var(--color-bg-alt, #f3f4f6);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 16px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--color-text, #374151);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.quick-note-chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+}
+body.modo-campo .quick-note-chip {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+body.modo-campo .quick-note-chip:hover {
+  background: #1e3a5f;
+  border-color: #60a5fa;
+  color: #93c5fd;
 }

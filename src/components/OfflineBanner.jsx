@@ -7,17 +7,46 @@
  *  • A sincronizar          → azul com spinner
  *  • Online (limpo)         → oculto
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useData } from '../context/DataContext'
 import { cacheTimestamp } from '../services/localCache'
-import { WifiOff, RefreshCw, CloudOff } from 'lucide-react'
+import { getHojeAzores } from '../utils/datasAzores'
+import { addDays } from 'date-fns'
+import { WifiOff, RefreshCw, CloudOff, CheckCircle2 } from 'lucide-react'
 import './OfflineBanner.css'
 
+const PREFETCH_DIAS = 5
+const READY_DISPLAY_MS = 4000
+
 export default function OfflineBanner() {
-  const { isOnline, syncPending, processSync } = useData()
+  const { isOnline, syncPending, processSync, manutencoes, maquinas, loading } = useData()
   const [syncing,   setSyncing]   = useState(false)
   const [cacheDate, setCacheDate] = useState(null)
   const [visible,   setVisible]   = useState(false)
+  const [readyShown, setReadyShown] = useState(false)
+  const [readyVisible, setReadyVisible] = useState(false)
+
+  // M5: Pré-carregamento preditivo — calcular manutenções da semana
+  const weekReadiness = useMemo(() => {
+    if (loading) return null
+    const hoje = getHojeAzores()
+    const limite = addDays(new Date(hoje + 'T12:00:00'), PREFETCH_DIAS).toISOString().slice(0, 10)
+    const pendentes = manutencoes.filter(
+      mt => (mt.status === 'pendente' || mt.status === 'agendada') && mt.data >= hoje && mt.data <= limite
+    )
+    const comMaquina = pendentes.filter(mt => maquinas.some(m => m.id === mt.maquinaId))
+    return { total: pendentes.length, prontas: comMaquina.length }
+  }, [loading, manutencoes, maquinas])
+
+  // Mostrar indicador de prontidão uma vez após carregar dados
+  useEffect(() => {
+    if (!loading && isOnline && weekReadiness && !readyShown && syncPending === 0) {
+      setReadyShown(true)
+      setReadyVisible(true)
+      const t = setTimeout(() => setReadyVisible(false), READY_DISPLAY_MS)
+      return () => clearTimeout(t)
+    }
+  }, [loading, isOnline, weekReadiness, readyShown, syncPending])
 
   // Actualizar data do cache e visibilidade
   useEffect(() => {
@@ -27,7 +56,6 @@ export default function OfflineBanner() {
     } else if (syncPending > 0) {
       setVisible(true)
     } else {
-      // Esconder com pequeno delay para dar feedback visual ao sincronizar
       const t = setTimeout(() => setVisible(false), 2000)
       return () => clearTimeout(t)
     }
@@ -39,6 +67,20 @@ export default function OfflineBanner() {
     setSyncing(true)
     await processSync()
     setSyncing(false)
+  }
+
+  // M5: Indicador de prontidão da semana (mostrado brevemente ao carregar)
+  if (readyVisible && isOnline && weekReadiness && syncPending === 0) {
+    return (
+      <div className="offline-banner offline-banner--ready" role="status" aria-live="polite">
+        <CheckCircle2 size={15} />
+        <span>
+          {weekReadiness.total > 0
+            ? `✓ ${weekReadiness.prontas} manutenção${weekReadiness.prontas !== 1 ? 'ões' : ''} pré-carregada${weekReadiness.prontas !== 1 ? 's' : ''} para os próximos ${PREFETCH_DIAS} dias`
+            : '✓ Dados sincronizados — sem manutenções agendadas esta semana'}
+        </span>
+      </div>
+    )
   }
 
   if (!visible) return null

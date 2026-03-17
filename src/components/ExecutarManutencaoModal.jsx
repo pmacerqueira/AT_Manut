@@ -30,6 +30,29 @@ const FOTO_QUALITY = 0.75
 const STEP_LABELS = ['Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
 const TOTAL_STEPS = 7
 
+const QUICK_NOTES_DEFAULT = [
+  'Equipamento em bom estado geral',
+  'Desgaste normal, dentro do esperado',
+  'Necessita acompanhamento na próxima visita',
+  'Cliente informado de anomalia',
+  'Peça substituída preventivamente',
+  'Ruído anormal detetado — monitorizar',
+  'Lubrificação efetuada em todos os pontos',
+  'Alinhamento verificado e corrigido',
+  'Filtros substituídos conforme plano',
+  'Sem observações adicionais',
+]
+
+function getQuickNotes() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('atm_quick_notes') || 'null')
+    if (Array.isArray(stored) && stored.length > 0) return stored
+  } catch { /* fallback */ }
+  return QUICK_NOTES_DEFAULT
+}
+
+const QUICK_NOTES = getQuickNotes()
+
 /** Copia o ficheiro para memória imediatamente (evita revogação em mobile ao usar câmara) */
 function fileToMemory(file) {
   return new Promise((resolve, reject) => {
@@ -87,6 +110,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     getPecasPlanoByMaquina,
     tecnicos,
     getTecnicoByNome,
+    relatorios: todosRelatorios,
   } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -118,6 +142,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [confirmacaoPendente, setConfirmacaoPendente] = useState(null)
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [preFilledFromLast, setPreFilledFromLast] = useState(false)
 
   const navigate = useNavigate()
   const canvasRef   = useRef(null)
@@ -171,8 +196,25 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const checklistRespostas = {}
     const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m?.tipo || 'periodica') : []
     const existingRel = m ? getRelatorioByManutencao(m.id) : null
+
+    // M1: Pré-preenchimento inteligente — usar última execução do mesmo tipo como base
+    const tipoAtual = m?.tipo || 'periodica'
+    let lastRel = null
+    if (!existingRel && maq) {
+      const manutsConclMaq = manutencoes
+        .filter(mt => mt.maquinaId === maq.id && mt.status === 'concluida' && mt.tipo === tipoAtual)
+        .sort((a, b) => b.data.localeCompare(a.data))
+      for (const mt of manutsConclMaq) {
+        const r = todosRelatorios.find(rr => rr.manutencaoId === mt.id)
+        if (r?.checklistRespostas) { lastRel = r; break }
+      }
+    }
+    const fontePreFill = existingRel || lastRel
+    const isPreFilled = !existingRel && !!lastRel
+    setPreFilledFromLast(isPreFilled)
+
     checklistItems.forEach(it => {
-      checklistRespostas[it.id] = existingRel?.checklistRespostas?.[it.id] ?? ''
+      checklistRespostas[it.id] = fontePreFill?.checklistRespostas?.[it.id] ?? ''
     })
     // Auto-sugerir tipo pelo ciclo da máquina (posicaoKaeser), com fallback ao relatório existente
     const isCompressorMaq = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
@@ -194,7 +236,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const nomePreenchido = existingRel?.nomeAssinante || cli?.nomeContacto || ''
     setForm({
       checklistRespostas,
-      notas: (existingRel?.notas ?? '').slice(0, 300),
+      notas: isPreFilled ? '' : (existingRel?.notas ?? '').slice(0, 300),
       horasTotais: '',
       horasServico: '',
       tecnico: existingRel?.tecnico ?? '',
@@ -842,6 +884,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           <div className="wizard-step-content" style={{ display: step === 1 ? 'block' : 'none' }}>
             <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>
 
+            {preFilledFromLast && (
+              <div className="prefill-banner">
+                <History size={15} />
+                <span>Checklist pré-preenchida com base na última execução. Reveja antes de avançar.</span>
+                <button type="button" className="btn-link-checklist" onClick={() => {
+                  const empty = {}
+                  items.forEach(it => { empty[it.id] = '' })
+                  setForm(f => ({ ...f, checklistRespostas: empty }))
+                  setPreFilledFromLast(false)
+                }}>Limpar tudo</button>
+              </div>
+            )}
+
             {(maq?.documentos ?? []).length > 0 && (
               <div className="doc-links-inline">
                 <FolderOpen size={14} />
@@ -1021,6 +1076,23 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 placeholder="Notas relevantes da manutenção..."
               />
             </label>
+
+            <div className="quick-notes-section">
+              <span className="quick-notes-label">Notas rápidas — toque para adicionar:</span>
+              <div className="quick-notes-chips">
+                {QUICK_NOTES.map((note, i) => (
+                  <button key={i} type="button" className="quick-note-chip"
+                    onClick={() => {
+                      setForm(f => {
+                        const current = f.notas.trim()
+                        const sep = current ? (current.endsWith('.') ? ' ' : '. ') : ''
+                        return { ...f, notas: (current + sep + note).slice(0, 300) }
+                      })
+                      if (confirmacaoPendente) setConfirmacaoPendente(null)
+                    }}>{note}</button>
+                ))}
+              </div>
+            </div>
             {confirmacaoPendente === 'notas' && (
               <div className="wizard-confirm">
                 <AlertTriangle size={16} />

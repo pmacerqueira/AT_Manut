@@ -18,6 +18,7 @@ export const STORAGE = {
   ALERTAS_DISMISS: 'atm_alertas_dismiss',
   ALERTAS_ENVIADOS: 'atm_alertas_enviados',
   MANUTENCOES_FILTER: 'atm_manutencoes_filter',
+  QUICK_NOTES: 'atm_quick_notes',
 }
 
 export const SESSION = {

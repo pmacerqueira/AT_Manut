@@ -11,17 +11,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
-import { X, Camera, QrCode, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
+import { X, Camera, QrCode, CheckCircle, AlertTriangle, Loader, Wrench } from 'lucide-react'
+import { useData } from '../context/DataContext'
+import { getHojeAzores } from '../utils/datasAzores'
+import { addDays } from 'date-fns'
 import './QrReaderModal.css'
+
+const SCAN_GO_DIAS_LIMITE = 7
 
 export default function QrReaderModal({ isOpen, onClose }) {
   const videoRef    = useRef(null)
   const controlsRef = useRef(null)  // IScannerControls
   const navigate    = useNavigate()
+  const { maquinas, manutencoes } = useData()
 
   const [estado, setEstado]       = useState('a-iniciar') // 'a-iniciar' | 'a-ler' | 'lido' | 'erro'
   const [mensagem, setMensagem]   = useState('')
   const [textoQr, setTextoQr]     = useState('')
+  const [manutPendente, setManutPendente] = useState(null)
+  const [maqDetectada, setMaqDetectada]   = useState(null)
 
   // Parar câmara ao fechar
   const pararCamera = () => {
@@ -103,14 +111,33 @@ export default function QrReaderModal({ isOpen, onClose }) {
 
   const processar = (texto) => {
     setTextoQr(texto)
+    setManutPendente(null)
+    setMaqDetectada(null)
 
     // Verificar se é um QR da app (URL com ?maquina=ID)
     try {
       const url   = new URL(texto)
       const maqId = url.searchParams.get('maquina')
       if (maqId) {
+        const maq = maquinas.find(m => m.id === maqId)
+        setMaqDetectada(maq ?? null)
+
+        // M2: Scan & Go — verificar se há manutenção pendente nos próximos 7 dias
+        const hoje = getHojeAzores()
+        const limite7d = addDays(new Date(hoje + 'T12:00:00'), SCAN_GO_DIAS_LIMITE).toISOString().slice(0, 10)
+        const manutProxima = manutencoes
+          .filter(mt => mt.maquinaId === maqId && (mt.status === 'pendente' || mt.status === 'agendada') && mt.data <= limite7d)
+          .sort((a, b) => a.data.localeCompare(b.data))[0]
+
+        if (manutProxima) {
+          setManutPendente(manutProxima)
+          setEstado('lido')
+          setMensagem(maq ? `${maq.marca} ${maq.modelo} — manutenção agendada!` : 'Máquina encontrada — manutenção agendada!')
+          return
+        }
+
         setEstado('lido')
-        setMensagem(`Máquina encontrada — a abrir ficha…`)
+        setMensagem(maq ? `${maq.marca} ${maq.modelo} — a abrir ficha…` : 'Máquina encontrada — a abrir ficha…')
         setTimeout(() => {
           onClose()
           navigate(`/equipamentos?maquina=${encodeURIComponent(maqId)}`)
@@ -200,8 +227,36 @@ export default function QrReaderModal({ isOpen, onClose }) {
             )}
           </div>
 
+          {/* M2: Scan & Go — ação direta para manutenção pendente */}
+          {estado === 'lido' && manutPendente && maqDetectada && (
+            <div className="qrr-scan-go">
+              <div className="qrr-scan-go-info">
+                <Wrench size={16} />
+                <div>
+                  <strong>{maqDetectada.marca ?? '—'} {maqDetectada.modelo ?? ''}</strong>
+                  <span className="qrr-scan-go-sub">
+                    {maqDetectada.numeroSerie ? `S/N: ${maqDetectada.numeroSerie} · ` : ''}
+                    Agendada: {manutPendente.data ? manutPendente.data.split('-').reverse().join('-') : '—'}
+                  </span>
+                </div>
+              </div>
+              <button type="button" className="btn primary qrr-scan-go-btn" onClick={() => {
+                onClose()
+                navigate(`/manutencoes?executar=${encodeURIComponent(manutPendente.id)}`)
+              }}>
+                <Wrench size={15} /> Executar manutenção agendada
+              </button>
+              <button type="button" className="btn secondary" onClick={() => {
+                onClose()
+                navigate(`/equipamentos?maquina=${encodeURIComponent(maqDetectada.id)}`)
+              }}>
+                Ver ficha do equipamento
+              </button>
+            </div>
+          )}
+
           {/* Texto QR externo (quando não é da app) */}
-          {estado === 'lido' && textoQr && !textoQr.includes('?maquina=') && (
+          {estado === 'lido' && textoQr && !textoQr.includes('?maquina=') && !manutPendente && (
             <div className="qrr-externo">
               <p className="qrr-externo-label">Conteúdo lido:</p>
               <code className="qrr-externo-texto">{textoQr}</code>
@@ -219,7 +274,7 @@ export default function QrReaderModal({ isOpen, onClose }) {
           )}
 
           {/* Retry em caso de erro */}
-          {(estado === 'erro' || estado === 'lido') && (
+          {(estado === 'erro' || (estado === 'lido' && !manutPendente)) && (
             <div className="qrr-actions">
               <button
                 type="button"
@@ -228,6 +283,8 @@ export default function QrReaderModal({ isOpen, onClose }) {
                   setEstado('a-iniciar')
                   setTextoQr('')
                   setMensagem('')
+                  setManutPendente(null)
+                  setMaqDetectada(null)
                 }}
               >
                 Tentar novamente

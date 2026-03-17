@@ -58,8 +58,7 @@
   background: rgba(0, 0, 0, 0.15);
 }
 .calendar-day.other-month .day-number {
-  color: var(--color-text-muted);
-  opacity: 0.65;
+  color: var(--color-text-subtle, var(--color-text-muted));
 }
 
 .calendar-day.today {

@@ -26,13 +26,18 @@ Estrutura final no servidor:
 ```
 public_html/
   api/
-    send-email.php       ← relatórios com PDF e lembretes de conformidade
-    send-report.php      ← envio de HTML (EnviarEmailModal, EnviarDocumentoModal)
-    data.php, db.php, config.php, atm_log.php
+    data.php             ← endpoint central: CRUD MySQL (todas as entidades)
+    db.php, config.php   ← ligação à base de dados
+    atm_log.php          ← registo de logs do servidor
+    send-email.php       ← envio de relatórios com PDF e lembretes de conformidade
+    send-report.php      ← envio do relatório de frota (HTML via email)
     fpdf.php             ← biblioteca FPDF (geração de PDF no servidor)
-    font/                ← fontes FPDF (Helvetica, Courier, etc.)
+    font/                ← fontes FPDF (Helvetica, Courier, Times, etc.)
     log-receiver.php     ← receptor de logs do frontend
-  send-contact.php       ← já existia
+    istobal-webhook.php  ← webhook para recepção de avisos ISTOBAL por email
+    parse-istobal-email.php ← parsing de emails ISTOBAL
+  cron-alertas.php       ← cron diário de lembretes de conformidade
+  send-contact.php       ← já existia (formulário de contacto do site)
   index.html
   ...
 ```

@@ -32,7 +32,7 @@
   border: none;
   color: var(--color-text-muted);
   font-size: var(--text-2xs);
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: color 0.15s;
@@ -186,6 +186,7 @@
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   color: var(--color-text-muted);
+  font-weight: 600;
   transition: all 0.2s ease;
 }
 
@@ -197,6 +198,7 @@
 .nav-link.active {
   color: var(--color-accent);
   background: var(--color-accent-muted);
+  font-weight: 700;
 }
 
 .sidebar-footer {
@@ -220,7 +222,8 @@
 }
 .user-name {
   font-size: 0.9em;
-  color: var(--color-text-muted);
+  color: var(--color-text);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -297,9 +300,8 @@
   margin-top: var(--space-2xl);
   padding-bottom: var(--space-md);
   font-size: var(--text-2xs);
-  color: var(--color-text-muted);
+  color: var(--color-text-subtle, var(--color-text-muted));
   text-align: center;
-  opacity: 0.7;
 }
 @media (max-width: 1024px) {
   .app-footer { display: none; }

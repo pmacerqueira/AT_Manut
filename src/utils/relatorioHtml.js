@@ -18,6 +18,9 @@ import {
 import { resolveChecklist } from './resolveChecklist'
 import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
 
+const HISTORIAL_MAX = 5
+const ANOMALIA_TEXTO_MAX = 80
+
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
   if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase()
@@ -38,7 +41,7 @@ function hexToRgba(hex, alpha) {
 export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItemsLive = [], options = {}) {
   if (!relatorio) return ''
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
-  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes } = options
+  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios } = options
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -414,6 +417,66 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
     ${naoUsadas.length > 0 ? `<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block"></span>${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''} não substituído${naoUsadas.length !== 1 ? 's' : ''}</span>` : ''}
     <span style="margin-left:auto;color:${PALETA.muted}">${pecas.length} artigo${pecas.length !== 1 ? 's' : ''} no plano</span>
   </div>
+</section>`
+  }
+
+  // ── R3: Próxima manutenção prevista ──
+  const proximaAgendada = (proximasManutencoes ?? [])
+    .filter(pm => pm.data)
+    .sort((a, b) => a.data.localeCompare(b.data))[0]
+  const periMaq = maquina?.periodicidadeManut
+  const periLabelsMap = { trimestral: 'trimestral', semestral: 'semestral', anual: 'anual', mensal: 'mensal' }
+  if (proximaAgendada || periMaq) {
+    const fmtDShort = (d) => { const s = String(d ?? '').slice(0,10).split('-'); return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : '—' }
+    const dataProxStr = proximaAgendada ? fmtDShort(proximaAgendada.data) : '(a confirmar)'
+    const periStr = periLabelsMap[periMaq] ?? ''
+    html += `
+<div style="background:${PALETA.cinza};border:1px solid ${PALETA.bordaLeve};border-left:3px solid ${PALETA.azulNavel};border-radius:4px;padding:8px 12px;margin-top:10px;page-break-inside:avoid">
+  <div style="font-size:${TIPO.corpo};color:${PALETA.texto}">
+    <strong style="color:${PALETA.azulNavel}">Próxima manutenção prevista:</strong> ${esc(dataProxStr)}${periStr ? ` <span style="color:${PALETA.muted}">(periodicidade ${esc(periStr)})</span>` : ''}
+  </div>
+  <div style="font-size:${TIPO.label};color:${PALETA.muted};margin-top:3px;font-style:italic">
+    Este equipamento é sujeito a manutenção periódica de conformidade, de acordo com a legislação em vigor.
+  </div>
+</div>`
+  }
+
+  // ── R1: Historial compacto de anomalias ──
+  const histRels = (historicoRelatorios ?? []).slice(0, HISTORIAL_MAX)
+  if (histRels.length > 0) {
+    const fmtDH = (d) => { const s = String(d ?? '').slice(0,10).split('-'); return s.length === 3 ? `${s[2]}-${s[1]}-${s[0]}` : '—' }
+    const tipoLabelFn = (t) => ({ montagem: 'Montagem', periodica: 'Periódica' }[t] ?? t ?? '—')
+    const totalAnomalias = histRels.reduce((n, hr) => n + (hr.anomalias?.length ?? 0), 0)
+    const thSH = `background:${PALETA.azulNavel};color:#fff;padding:4px 6px;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em;text-align:left`
+    const tdSH = `padding:3px 6px;border-bottom:1px solid ${PALETA.bordaLeve};vertical-align:top;font-size:${TIPO.pequeno};color:${PALETA.texto}`
+    html += `
+<section style="page-break-inside:avoid;margin-top:10px">
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Historial recente — ${esc(maquina?.marca ?? '')} ${esc(maquina?.modelo ?? '')} (últimas ${histRels.length})</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+    <thead><tr>
+      <th style="${thSH}">Data</th>
+      <th style="${thSH}">Tipo</th>
+      <th style="${thSH}">Técnico</th>
+      <th style="${thSH}">Anomalias (checklist)</th>
+    </tr></thead>
+    <tbody>
+      ${histRels.map((hr, i) => {
+        const truncate = (s) => s.length > ANOMALIA_TEXTO_MAX ? s.slice(0, ANOMALIA_TEXTO_MAX) + '…' : s
+        const anomTxt = hr.anomalias?.length > 0
+          ? hr.anomalias.map(a => esc(truncate(a))).join('; ')
+          : `<span style="color:${PALETA.verde}">Nenhuma</span>`
+        return `<tr style="${i % 2 === 1 ? `background:${PALETA.cinza}` : ''}">
+          <td style="${tdSH}">${fmtDH(hr.data)}</td>
+          <td style="${tdSH}">${esc(tipoLabelFn(hr.tipo))}</td>
+          <td style="${tdSH}">${esc(hr.tecnico ?? '—')}</td>
+          <td style="${tdSH};font-size:${TIPO.label}">${anomTxt}</td>
+        </tr>`
+      }).join('')}
+    </tbody>
+  </table>
+  ${totalAnomalias === 0
+    ? `<p style="font-size:${TIPO.pequeno};color:${PALETA.verde};font-style:italic;margin:4px 0 0">✓ Sem anomalias registadas nas últimas ${histRels.length} manutenções.</p>`
+    : `<p style="font-size:${TIPO.pequeno};color:${PALETA.muted};font-style:italic;margin:4px 0 0">${totalAnomalias} anomalia${totalAnomalias !== 1 ? 's' : ''} identificada${totalAnomalias !== 1 ? 's' : ''} no período — acompanhar na próxima intervenção.</p>`}
 </section>`
   }
 
