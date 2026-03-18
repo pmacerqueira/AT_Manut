@@ -70,30 +70,54 @@ export default function Definicoes() {
     { label: 'Relatórios',  value: relatorios.length },
   ]
 
-  // Estima tamanho total e percentagem de uso do localStorage
+  const fmtBytes = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  }
+
   const calcUsageLS = () => {
-    const ALL_KEYS = Object.keys(localStorage)
-    const bytes = ALL_KEYS.reduce((acc, k) => acc + ((localStorage.getItem(k)?.length ?? 0) * 2), 0) // UTF-16: 2 bytes/char
-    const QUOTA_BYTES = 5 * 1024 * 1024 // 5 MB (estimativa conservadora)
-    const pct  = Math.min(100, Math.round((bytes / QUOTA_BYTES) * 100))
-    const fmt  = bytes < 1024 ? `${bytes} B`
-               : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB`
-               : `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-    return { bytes, pct, fmt }
+    const QUOTA_BYTES = 5 * 1024 * 1024
+    const atmKeys = Object.values(STORAGE)
+    let atmBytes = 0
+    let otherBytes = 0
+    const breakdown = []
+
+    for (const key of Object.keys(localStorage)) {
+      const size = (localStorage.getItem(key)?.length ?? 0) * 2
+      if (atmKeys.includes(key)) {
+        atmBytes += size
+        if (size > 512) {
+          const label = key.replace('atm_', '').replace(/_/g, ' ')
+          breakdown.push({ key, label, size })
+        }
+      } else {
+        otherBytes += size
+      }
+    }
+    breakdown.sort((a, b) => b.size - a.size)
+
+    const totalBytes = atmBytes + otherBytes
+    const pct = Math.min(100, Math.round((totalBytes / QUOTA_BYTES) * 100))
+    return { totalBytes, atmBytes, otherBytes, pct, fmt: fmtBytes(totalBytes), fmtAtm: fmtBytes(atmBytes), breakdown }
   }
 
-  // Estima tamanho do backup em KB (só dados da app)
-  const estimarTamanho = () => {
-    const keys = ['atm_clientes','atm_categorias','atm_subcategorias','atm_checklist','atm_maquinas','atm_manutencoes','atm_relatorios']
-    const bytes = keys.reduce((acc, k) => acc + (localStorage.getItem(k)?.length ?? 0), 0)
-    return bytes < 1024
-      ? `${bytes} B`
-      : bytes < 1024 * 1024
-        ? `${(bytes / 1024).toFixed(1)} KB`
-        : `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-  }
+  const [lsUsage, setLsUsage] = useState(() => calcUsageLS())
+  const refreshUsage = useCallback(() => setLsUsage(calcUsageLS()), [])
 
-  const lsUsage = calcUsageLS()
+  const handleLimparCache = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE.CACHE)
+      localStorage.removeItem(STORAGE.LOG)
+      localStorage.removeItem(STORAGE.LOG_PENDING_FLUSH)
+      localStorage.removeItem(STORAGE.SYNC_QUEUE)
+      refreshUsage()
+      logger.action('Definicoes', 'limparCache', 'Cache offline limpo')
+      showToast('Cache offline limpo. Os dados continuam seguros no servidor.', 'success')
+    } catch (e) {
+      showToast('Erro ao limpar cache: ' + e.message, 'error')
+    }
+  }, [refreshUsage, showToast])
 
   // ── Exportar ────────────────────────────────────────────────────────────────
   const handleExportar = () => {
@@ -235,8 +259,8 @@ export default function Definicoes() {
       <div className="def-alert def-alert--info">
         <Info size={18} />
         <div>
-          <strong>Armazenamento local</strong> — Os dados da aplicação estão guardados no browser deste dispositivo.
-          Exporta regularmente um backup para proteger o teu trabalho. Em caso de limpeza de cache ou mudança de dispositivo, o backup permite restaurar tudo em segundos.
+          <strong>Armazenamento</strong> — Os dados da aplicação são guardados no servidor MySQL (fonte de verdade).
+          O browser mantém um cache local para acesso offline. Exporta regularmente um backup como segurança adicional.
         </div>
       </div>
 
@@ -253,17 +277,13 @@ export default function Definicoes() {
               <span className="def-stat-lbl">{s.label}</span>
             </div>
           ))}
-          <div className="def-stat-card def-stat-card--size">
-            <span className="def-stat-val">{estimarTamanho()}</span>
-            <span className="def-stat-lbl">Tamanho estimado</span>
-          </div>
         </div>
 
         {/* Indicador de uso do localStorage */}
         <div className="def-ls-usage">
           <div className="def-ls-usage-header">
             <HardDrive size={14} />
-            <span>Espaço em localStorage</span>
+            <span>Cache local (localStorage)</span>
             <span className="def-ls-usage-val">{lsUsage.fmt} <span className="def-ls-usage-pct">({lsUsage.pct}%)</span></span>
           </div>
           <div className="def-ls-bar">
@@ -272,12 +292,41 @@ export default function Definicoes() {
               style={{ width: `${lsUsage.pct}%` }}
             />
           </div>
+
+          {lsUsage.breakdown.length > 0 && (
+            <div className="def-ls-breakdown">
+              <span className="def-ls-breakdown-title">Distribuição por tipo:</span>
+              {lsUsage.breakdown.slice(0, 6).map(item => (
+                <div key={item.key} className="def-ls-breakdown-row">
+                  <span className="def-ls-breakdown-label">{item.label}</span>
+                  <span className="def-ls-breakdown-size">{fmtBytes(item.size)}</span>
+                </div>
+              ))}
+              {lsUsage.otherBytes > 0 && (
+                <div className="def-ls-breakdown-row def-ls-breakdown-row--other">
+                  <span className="def-ls-breakdown-label">outros (não AT_Manut)</span>
+                  <span className="def-ls-breakdown-size">{fmtBytes(lsUsage.otherBytes)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {lsUsage.pct >= 70 && (
             <p className="def-ls-aviso">
               <AlertTriangle size={13} />
-              Armazenamento a atingir o limite. Exporta um backup e considera limpar dados antigos.
+              Armazenamento a atingir o limite. Os dados no servidor não são afectados.
             </p>
           )}
+
+          <div className="def-ls-actions">
+            <button type="button" className="def-btn def-btn--secondary def-btn--sm" onClick={handleLimparCache}>
+              <Trash2 size={14} />
+              Limpar cache offline
+            </button>
+            <span className="def-ls-actions-hint">
+              Liberta espaço eliminando o cache e logs. Os dados continuam no servidor.
+            </span>
+          </div>
         </div>
       </section>
 

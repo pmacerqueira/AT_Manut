@@ -255,6 +255,8 @@
   flex: 1;
   min-width: 4.5rem;
   text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
   padding: 0.45rem 0.5rem;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--color-border);
@@ -280,6 +282,96 @@
 .ficha-kpi-ok .ficha-kpi-num { color: var(--color-success, #16a34a); }
 .ficha-kpi-ok { border-color: rgba(22, 163, 74, 0.25); background: rgba(22, 163, 74, 0.06); }
 .ficha-kpi-muted .ficha-kpi-num { color: var(--color-text-muted); }
+.ficha-kpi-item:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.ficha-kpi-item:disabled { cursor: default; opacity: 0.5; }
+.ficha-kpi-active { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.ficha-kpi-danger.ficha-kpi-active { outline-color: var(--color-danger); }
+.ficha-kpi-ok.ficha-kpi-active { outline-color: var(--color-success); }
+
+/* ── Vista KPI manutenções (atraso/conformes/sem data) ── */
+.ficha-kpi-manut-view { padding: 0.25rem 0; }
+
+.kpi-manut-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.kpi-manut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kpi-manut-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.kpi-manut-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.kpi-manut-card-info strong {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-manut-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.kpi-dias-atraso {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.kpi-manut-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.kpi-btn-executar {
+  background: var(--color-success) !important;
+  color: var(--color-white) !important;
+  border: none;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.kpi-btn-executar:hover {
+  background: var(--color-success-dark, #14532d) !important;
+}
+
+@media (max-width: 768px) {
+  .kpi-manut-card { flex-direction: column; align-items: stretch; }
+  .kpi-manut-card-actions { justify-content: flex-end; margin-top: 0.35rem; }
+}
 
 /* ── Top actions (frota + ver todos) ── */
 .ficha-top-actions {

@@ -112,7 +112,6 @@
   flex-direction: column;
   gap: 0.2rem;
 }
-.def-stat-card--size { grid-column: span 2; }
 .def-stat-val {
   font-size: 1.6rem;
   font-weight: 700;
@@ -267,6 +266,57 @@
   margin: 0;
 }
 
+.def-ls-breakdown {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+.def-ls-breakdown-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.def-ls-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.15rem 0;
+  font-size: 0.82rem;
+}
+.def-ls-breakdown-label {
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+.def-ls-breakdown-size {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.def-ls-breakdown-row--other .def-ls-breakdown-label {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.def-ls-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+.def-ls-actions-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  flex: 1;
+}
+
 /* ── Modo campo toggle ────────────────────────────────────────────────────── */
 .def-toggle-row {
   display: flex;
@@ -330,8 +380,8 @@
 @media (max-width: 480px) {
   .def-page { padding: 1rem 0.75rem 3rem; gap: 1rem; }
   .def-section { padding: 1rem; }
-  .def-stat-card--size { grid-column: span 1; }
   .def-btn { width: 100%; justify-content: center; min-height: 44px; }
+  .def-ls-actions { flex-direction: column; align-items: stretch; }
   .def-title { font-size: clamp(1.1rem, 5vw, 1.35rem); }
 }
 

@@ -1,10 +1,35 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft, ArrowUp, ArrowDown, Check, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft, ArrowUp, ArrowDown, Check, X, MessageSquareText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import './Categorias.css'
+
+const QUICK_NOTES_DEFAULT = [
+  'Equipamento em bom estado geral',
+  'Desgaste normal, dentro do esperado',
+  'Necessita acompanhamento na próxima visita',
+  'Cliente informado de anomalia',
+  'Peça substituída preventivamente',
+  'Ruído anormal detetado — monitorizar',
+  'Lubrificação efetuada em todos os pontos',
+  'Alinhamento verificado e corrigido',
+  'Filtros substituídos conforme plano',
+  'Sem observações adicionais',
+]
+
+function loadQuickNotes() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('atm_quick_notes') || 'null')
+    if (Array.isArray(stored) && stored.length > 0) return stored
+  } catch { /* fallback */ }
+  return [...QUICK_NOTES_DEFAULT]
+}
+
+function saveQuickNotes(notes) {
+  localStorage.setItem('atm_quick_notes', JSON.stringify(notes))
+}
 
 export default function Categorias() {
   const { isAdmin } = usePermissions()
@@ -41,6 +66,52 @@ export default function Categorias() {
   const [addingCheckSub, setAddingCheckSub] = useState(null)
   const [newCheckTexto, setNewCheckTexto] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
+
+  const [quickNotes, setQuickNotes] = useState(loadQuickNotes)
+  const [qnExpanded, setQnExpanded] = useState(false)
+  const [qnAdding, setQnAdding] = useState(false)
+  const [qnNewText, setQnNewText] = useState('')
+  const [qnEditing, setQnEditing] = useState(null)
+  const [qnEditText, setQnEditText] = useState('')
+
+  useEffect(() => { saveQuickNotes(quickNotes) }, [quickNotes])
+
+  const qnAdd = useCallback(() => {
+    const t = qnNewText.trim()
+    if (!t) return
+    setQuickNotes(prev => [...prev, t])
+    setQnNewText('')
+    setQnAdding(false)
+    showToast('Nota rápida adicionada.', 'success')
+  }, [qnNewText, showToast])
+
+  const qnSaveEdit = useCallback((idx) => {
+    const t = qnEditText.trim()
+    if (!t) return
+    setQuickNotes(prev => prev.map((n, i) => i === idx ? t : n))
+    setQnEditing(null)
+    showToast('Nota rápida actualizada.', 'success')
+  }, [qnEditText, showToast])
+
+  const qnRemove = useCallback((idx) => {
+    setQuickNotes(prev => prev.filter((_, i) => i !== idx))
+    showToast('Nota rápida eliminada.', 'success')
+  }, [showToast])
+
+  const qnMove = useCallback((idx, dir) => {
+    setQuickNotes(prev => {
+      const next = [...prev]
+      const target = idx + dir
+      if (target < 0 || target >= next.length) return prev
+      ;[next[idx], next[target]] = [next[target], next[idx]]
+      return next
+    })
+  }, [])
+
+  const qnReset = useCallback(() => {
+    setQuickNotes([...QUICK_NOTES_DEFAULT])
+    showToast('Notas rápidas repostas para os valores originais.', 'success')
+  }, [showToast])
 
   const handleAddCheckItem = useCallback((subcategoriaId, items) => {
     const texto = newCheckTexto.trim()
@@ -364,6 +435,83 @@ export default function Categorias() {
             </div>
           )
         })}
+      </div>
+
+      {/* ── Secção: Notas rápidas para observações ────────────────────────── */}
+      <div className="card qn-section">
+        <div className="qn-header" onClick={() => setQnExpanded(v => !v)}>
+          <button type="button" className="expand-btn">
+            {qnExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </button>
+          <MessageSquareText size={18} className="qn-header-icon" />
+          <h2 className="qn-title">Notas rápidas para observações</h2>
+          <span className="badge badge-count">{quickNotes.length} notas</span>
+        </div>
+        {qnExpanded && (
+          <div className="qn-body">
+            <p className="qn-desc">
+              Estes textos aparecem como chips no passo "Observações" ao executar uma manutenção.
+              O técnico toca para inserir rapidamente no campo de notas.
+            </p>
+            <div className="qn-list">
+              {quickNotes.map((note, i) => (
+                <div key={i} className={`qn-item${qnEditing === i ? ' edit' : ''}`}>
+                  {qnEditing === i ? (
+                    <>
+                      <span className="ordem">{i + 1}.</span>
+                      <div className="inline-edit">
+                        <input
+                          value={qnEditText}
+                          onChange={e => setQnEditText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') qnSaveEdit(i); if (e.key === 'Escape') setQnEditing(null) }}
+                          autoFocus
+                        />
+                        <button type="button" className="icon-btn success" onClick={() => qnSaveEdit(i)} title="Guardar"><Check size={14} /></button>
+                        <button type="button" className="icon-btn secondary" onClick={() => setQnEditing(null)} title="Cancelar"><X size={14} /></button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="ordem">{i + 1}.</span>
+                      <span className="texto">{note}</span>
+                      <div className="checklist-item-actions">
+                        <button type="button" className="icon-btn secondary" onClick={() => qnMove(i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /></button>
+                        <button type="button" className="icon-btn secondary" onClick={() => qnMove(i, 1)} disabled={i === quickNotes.length - 1} title="Mover para baixo"><ArrowDown size={13} /></button>
+                        <button type="button" className="icon-btn secondary" onClick={() => { setQnEditing(i); setQnEditText(note) }} title="Editar texto"><Pencil size={13} /></button>
+                        <button type="button" className="icon-btn danger" onClick={() => qnRemove(i)} title="Eliminar nota"><Trash2 size={13} /></button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            {qnAdding ? (
+              <div className="qn-item edit">
+                <span className="ordem">{quickNotes.length + 1}.</span>
+                <div className="inline-edit">
+                  <input
+                    value={qnNewText}
+                    onChange={e => setQnNewText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') qnAdd(); if (e.key === 'Escape') { setQnAdding(false); setQnNewText('') } }}
+                    placeholder="Texto da nova nota rápida"
+                    autoFocus
+                  />
+                  <button type="button" className="icon-btn success" onClick={qnAdd} title="Adicionar"><Check size={14} /></button>
+                  <button type="button" className="icon-btn secondary" onClick={() => { setQnAdding(false); setQnNewText('') }} title="Cancelar"><X size={14} /></button>
+                </div>
+              </div>
+            ) : (
+              <div className="qn-actions-row">
+                <button type="button" className="btn-add-check" onClick={() => { setQnAdding(true); setQnNewText('') }}>
+                  <Plus size={13} /> Adicionar nota
+                </button>
+                <button type="button" className="btn-qn-reset secondary" onClick={qnReset}>
+                  Repor originais
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {confirmDelete && (

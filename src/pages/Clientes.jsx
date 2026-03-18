@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
@@ -8,7 +8,9 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X, AlertTriangle } from 'lucide-react'
+
+const ExecutarManutencaoModal = lazy(() => import('../components/ExecutarManutencaoModal'))
 import { gerarRelatorioFrotaPdf } from '../utils/gerarRelatorioFrota'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -45,6 +47,7 @@ export default function Clientes() {
     getChecklistBySubcategoria,
     getRelatorioByManutencao,
     getTecnicoByNome,
+    updateManutencao,
   } = useData()
   const contentReady = useDeferredReady(clientes.length >= 0)
   const { canDelete, canEditCliente, canAddCliente, isAdmin } = usePermissions()
@@ -65,6 +68,8 @@ export default function Clientes() {
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalEmail, setModalEmail] = useState(null)
   const [modalDocumentoEmail, setModalDocumentoEmail] = useState(null)
+  const [modalExecucao, setModalExecucao] = useState(null)
+  const [fichaKpiFilter, setFichaKpiFilter] = useState(null)
   const [modalFrota, setModalFrota] = useState(null) // { cliente, manusFiltradas, repsFiltradas, options }
   const [modalFrotaFiltro, setModalFrotaFiltro] = useState(null) // { cliente }
   const [frotaDataInicio, setFrotaDataInicio] = useState('')
@@ -128,6 +133,7 @@ export default function Clientes() {
     setFichaView('categorias')
     setFichaCategoria(null)
     setFichaSubcategoria(null)
+    setFichaKpiFilter(null)
     setFichaMaquina(null)
   }
 
@@ -333,6 +339,39 @@ export default function Clientes() {
     }
     return { total: maquinasCliente.length, emAtraso, conformes, semData }
   }, [maquinasCliente])
+
+  const maquinasFiltradas = useMemo(() => {
+    if (!fichaCliente || !fichaKpiFilter) return []
+    const hoje = startOfDay(new Date(getHojeAzores()))
+    return maquinasCliente.filter(maq => {
+      if (fichaKpiFilter === 'atraso') {
+        return maq.proximaManut && isBefore(startOfDay(parseDateLocal(maq.proximaManut)), hoje)
+      }
+      if (fichaKpiFilter === 'conformes') {
+        return maq.proximaManut && !isBefore(startOfDay(parseDateLocal(maq.proximaManut)), hoje)
+      }
+      if (fichaKpiFilter === 'semData') {
+        return !maq.proximaManut
+      }
+      return false
+    })
+  }, [fichaCliente, fichaKpiFilter, maquinasCliente])
+
+  const maquinasComManutencao = useMemo(() => {
+    return maquinasFiltradas.map(maq => {
+      const pendentes = manutencoes
+        .filter(m => m.maquinaId === maq.id && m.status !== 'concluida')
+        .sort((a, b) => parseDateLocal(a.data) - parseDateLocal(b.data))
+      return { maq, manutPendente: pendentes[0] || null, totalPendentes: pendentes.length }
+    })
+  }, [maquinasFiltradas, manutencoes])
+
+  const iniciarManutencaoCliente = (manutId) => {
+    const m = manutencoes.find(x => x.id === manutId)
+    if (m && (m.status === 'pendente' || m.status === 'agendada')) {
+      updateManutencao(manutId, { status: 'em_progresso' })
+    }
+  }
 
   const categoriasComMaquinas = maquinasCliente.reduce((acc, m) => {
     const sub = getSubcategoria(m.subcategoriaId)
@@ -571,22 +610,22 @@ export default function Clientes() {
 
             {fichaKpis && (
               <div className="ficha-kpi-bar">
-                <div className="ficha-kpi-item">
+                <button type="button" className="ficha-kpi-item" onClick={() => setFichaView('flat')}>
                   <span className="ficha-kpi-num">{fichaKpis.total}</span>
                   <span className="ficha-kpi-label">Equipamentos</span>
-                </div>
-                <div className="ficha-kpi-item ficha-kpi-danger">
+                </button>
+                <button type="button" className={`ficha-kpi-item ficha-kpi-danger${fichaKpiFilter === 'atraso' ? ' ficha-kpi-active' : ''}`} onClick={() => { setFichaKpiFilter(fichaKpiFilter === 'atraso' ? null : 'atraso'); setFichaView('kpi-manut') }} disabled={fichaKpis.emAtraso === 0}>
                   <span className="ficha-kpi-num">{fichaKpis.emAtraso}</span>
                   <span className="ficha-kpi-label">Em atraso</span>
-                </div>
-                <div className="ficha-kpi-item ficha-kpi-ok">
+                </button>
+                <button type="button" className={`ficha-kpi-item ficha-kpi-ok${fichaKpiFilter === 'conformes' ? ' ficha-kpi-active' : ''}`} onClick={() => { setFichaKpiFilter(fichaKpiFilter === 'conformes' ? null : 'conformes'); setFichaView('kpi-manut') }} disabled={fichaKpis.conformes === 0}>
                   <span className="ficha-kpi-num">{fichaKpis.conformes}</span>
                   <span className="ficha-kpi-label">Conformes</span>
-                </div>
-                <div className="ficha-kpi-item ficha-kpi-muted">
+                </button>
+                <button type="button" className={`ficha-kpi-item ficha-kpi-muted${fichaKpiFilter === 'semData' ? ' ficha-kpi-active' : ''}`} onClick={() => { setFichaKpiFilter(fichaKpiFilter === 'semData' ? null : 'semData'); setFichaView('kpi-manut') }} disabled={fichaKpis.semData === 0}>
                   <span className="ficha-kpi-num">{fichaKpis.semData}</span>
                   <span className="ficha-kpi-label">Sem data</span>
-                </div>
+                </button>
               </div>
             )}
 
@@ -709,6 +748,77 @@ export default function Clientes() {
                           </button>
                         ))}
                     </div>
+                  </div>
+                )}
+
+                {fichaView === 'kpi-manut' && fichaKpiFilter && (
+                  <div className="ficha-kpi-manut-view">
+                    <div className="equipamentos-nav">
+                      <button type="button" className="breadcrumb-btn" onClick={() => { setFichaKpiFilter(null); setFichaView('categorias') }}>
+                        <ArrowLeft size={16} /> Voltar
+                      </button>
+                      <span className="breadcrumb">/ {fichaKpiFilter === 'atraso' ? 'Equipamentos em atraso' : fichaKpiFilter === 'conformes' ? 'Equipamentos conformes' : 'Equipamentos sem data'}</span>
+                    </div>
+
+                    {fichaKpiFilter === 'atraso' && maquinasComManutencao.length > 0 && (
+                      <div className="kpi-manut-alert">
+                        <AlertTriangle size={16} />
+                        <span>{maquinasComManutencao.length} equipamento(s) com manutenção em atraso</span>
+                      </div>
+                    )}
+
+                    {maquinasComManutencao.length === 0 ? (
+                      <p className="text-muted" style={{ padding: '1rem 0' }}>Nenhum equipamento encontrado nesta categoria.</p>
+                    ) : (
+                      <div className="kpi-manut-list">
+                        {maquinasComManutencao.map(({ maq, manutPendente, totalPendentes }) => {
+                          const sub = getSubcategoria(maq.subcategoriaId)
+                          const dias = maq.proximaManut ? Math.round((startOfDay(new Date(getHojeAzores())) - startOfDay(parseDateLocal(maq.proximaManut))) / 86400000) : null
+                          return (
+                            <div key={maq.id} className="kpi-manut-card">
+                              <div className="kpi-manut-card-info">
+                                <strong>{sub?.nome ? `${sub.nome} — ` : ''}{maq.marca} {maq.modelo}</strong>
+                                <span className="text-muted">Nº Série: {maq.numeroSerie}</span>
+                                <div className="kpi-manut-card-meta">
+                                  {maq.proximaManut && (
+                                    <span>Próxima: <strong>{format(parseDateLocal(maq.proximaManut), 'dd/MM/yyyy')}</strong></span>
+                                  )}
+                                  {dias != null && dias > 0 && <span className="kpi-dias-atraso">+{dias} dias</span>}
+                                  {manutPendente && (
+                                    <span className={`badge badge-${manutPendente.status}`}>{statusLabel[manutPendente.status] || manutPendente.status}</span>
+                                  )}
+                                  {totalPendentes > 1 && <span className="text-muted">({totalPendentes} pendentes)</span>}
+                                  {!manutPendente && <span className="badge badge-info">Sem registo</span>}
+                                </div>
+                              </div>
+                              <div className="kpi-manut-card-actions">
+                                {manutPendente && (manutPendente.status === 'pendente' || manutPendente.status === 'agendada') && (
+                                  <button type="button" className="btn kpi-btn-executar" onClick={() => {
+                                    iniciarManutencaoCliente(manutPendente.id)
+                                    setModalExecucao({ manutencao: { ...manutPendente, status: 'em_progresso' }, maquina: maq })
+                                  }}>
+                                    <Play size={15} /> Executar
+                                  </button>
+                                )}
+                                {manutPendente && manutPendente.status === 'em_progresso' && (
+                                  <button type="button" className="btn kpi-btn-executar" onClick={() => setModalExecucao({ manutencao: manutPendente, maquina: maq })}>
+                                    <Play size={15} /> Continuar
+                                  </button>
+                                )}
+                                {!manutPendente && (
+                                  <button type="button" className="btn secondary" onClick={() => navigate(`/agendamento?maquinaId=${maq.id}`)}>
+                                    <Calendar size={15} /> Agendar
+                                  </button>
+                                )}
+                                <button type="button" className="icon-btn secondary" onClick={() => { setFichaMaquina(maq); setFichaView('maquina-detalhe') }} title="Ver ficha do equipamento">
+                                  <Eye size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1144,6 +1254,16 @@ export default function Clientes() {
             </div>
           </div>
         </div>
+      )}
+      {modalExecucao && (
+        <Suspense fallback={null}>
+          <ExecutarManutencaoModal
+            isOpen
+            onClose={() => setModalExecucao(null)}
+            manutencao={modalExecucao.manutencao}
+            maquina={modalExecucao.maquina}
+          />
+        </Suspense>
       )}
     </div>
   )

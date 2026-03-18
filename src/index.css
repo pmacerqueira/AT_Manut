@@ -1156,8 +1156,23 @@ body.modo-campo .btn-link-checklist {
   font-weight: 600;
 }
 body.modo-campo .icon-btn {
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  color: #1e40af;
+  border: 1.5px solid #93c5fd;
+  background: #f0f7ff !important;
+  border-radius: 6px;
+}
+body.modo-campo .icon-btn:hover {
+  background: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+body.modo-campo .icon-btn.danger {
+  color: #991b1b !important;
+  border-color: #fca5a5 !important;
+  background: #fef2f2 !important;
+}
+body.modo-campo .icon-btn.danger:hover {
+  background: #fee2e2 !important;
+  color: #7f1d1d !important;
 }
 
 /* ── Botão voltar — texto escuro legível ── */
@@ -1304,17 +1319,20 @@ body.modo-campo .modal h2 {
 
 /* ── Tabelas ── */
 body.modo-campo table th {
-  background: #d0d8e4;
-  color: var(--color-text);
+  background: #e2e8f0;
+  color: #1e293b;
   font-weight: 700;
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 2px solid #94a3b8;
 }
 body.modo-campo table td {
   color: var(--color-text);
-  border-bottom: 1px solid #c0c8d4;
+  border-bottom: 1px solid #cbd5e1;
+}
+body.modo-campo table tbody tr:nth-child(even) {
+  background: #f8fafc;
 }
 body.modo-campo table tbody tr:hover {
-  background: #e8ecf2;
+  background: #e0e7f1;
 }
 
 /* ── Badges: alto contraste ── */
@@ -1470,6 +1488,70 @@ body.modo-campo .stat-card svg,
 body.modo-campo .stat-card-nav svg {
   opacity: 1;
 }
+
+/* ── Dashboard stat cards — cores de sinalização no modo campo ── */
+body.modo-campo .stat-card-red {
+  background: #fee2e2 !important;
+  border-color: #dc2626 !important;
+  border-left: 5px solid #dc2626 !important;
+}
+body.modo-campo .stat-card-red .stat-value { color: #991b1b; }
+body.modo-campo .stat-card-red .stat-label { color: #7f1d1d; }
+body.modo-campo .stat-card-red .stat-icon { color: #dc2626; }
+body.modo-campo .stat-card-red .stat-alerta-dias { color: #991b1b; }
+
+body.modo-campo .stat-card-yellow {
+  background: #fef3c7 !important;
+  border-color: #d97706 !important;
+  border-left: 5px solid #d97706 !important;
+}
+body.modo-campo .stat-card-yellow .stat-value { color: #92400e; }
+body.modo-campo .stat-card-yellow .stat-label { color: #78350f; }
+body.modo-campo .stat-card-yellow .stat-sublabel { color: #92400e; }
+body.modo-campo .stat-card-yellow .stat-icon { color: #d97706; }
+
+body.modo-campo .stat-card-green {
+  background: #dcfce7 !important;
+  border-color: #16a34a !important;
+  border-left: 5px solid #16a34a !important;
+}
+body.modo-campo .stat-card-green .stat-value { color: #14532d; }
+body.modo-campo .stat-card-green .stat-label { color: #166534; }
+body.modo-campo .stat-card-green .stat-icon { color: #16a34a; }
+
+body.modo-campo .stat-card-orange {
+  background: #fff7ed !important;
+  border-color: #ea580c !important;
+  border-left: 5px solid #ea580c !important;
+}
+body.modo-campo .stat-card-orange .stat-value { color: #9a3412; }
+body.modo-campo .stat-card-orange .stat-label { color: #7c2d12; }
+body.modo-campo .stat-card-orange .stat-icon { color: #ea580c; }
+
+/* Nav cards (Clientes, Equipamentos, Agendar) no modo campo */
+body.modo-campo .stat-card-clientes {
+  background: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  border-left: 5px solid #0284c7 !important;
+}
+body.modo-campo .stat-card-clientes .stat-value { color: #0c4a6e; }
+body.modo-campo .stat-card-clientes .stat-icon { color: #0284c7; }
+
+body.modo-campo .stat-card-equipamentos {
+  background: #ede9fe !important;
+  border-color: #7c3aed !important;
+  border-left: 5px solid #7c3aed !important;
+}
+body.modo-campo .stat-card-equipamentos .stat-value { color: #4c1d95; }
+body.modo-campo .stat-card-equipamentos .stat-icon { color: #7c3aed; }
+
+body.modo-campo .stat-card-novo {
+  background: #dcfce7 !important;
+  border-color: #16a34a !important;
+  border-left: 5px solid #16a34a !important;
+}
+body.modo-campo .stat-card-novo .stat-value { color: #14532d; }
+body.modo-campo .stat-card-novo .stat-icon { color: #16a34a; }
 
 /* ── Dashboard calendário: dias, header ── */
 body.modo-campo .dashboard-cal-weekday {

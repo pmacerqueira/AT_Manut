@@ -299,6 +299,73 @@
   background: var(--color-accent-muted);
 }
 
+/* ── Secção: Notas rápidas ─────────────────────────────────────────────────── */
+.qn-section {
+  margin-top: 1rem;
+}
+.qn-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.4rem 0;
+  user-select: none;
+}
+.qn-header-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+.qn-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  flex: 1;
+}
+.qn-desc {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  margin: 0.25rem 0 0.75rem 0;
+  line-height: 1.4;
+}
+.qn-body {
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+.qn-list {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.6rem;
+}
+.qn-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+  font-size: 0.88em;
+  line-height: 1.2;
+}
+.qn-item .ordem {
+  color: var(--color-text-muted);
+  min-width: 1.5rem;
+}
+.qn-item .texto {
+  flex: 1;
+}
+.qn-item.edit {
+  padding: 0.5rem 0;
+}
+.qn-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.btn-qn-reset {
+  font-size: 0.82em;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .add-form label { min-width: 0; }

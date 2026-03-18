@@ -15,18 +15,19 @@
 /* Coluna de ações */
 .manutencoes-table .data-table th:last-child {
   width: 1%;
-  min-width: 11rem;
+  min-width: 13rem;
   white-space: nowrap;
   text-align: right;
+  padding-right: 0.5rem;
 }
 .manutencoes-table .data-table td.actions {
-  /* Forçar display: table-cell para garantir vertical-align */
   display: table-cell !important;
   width: 1%;
-  min-width: 11rem;
+  min-width: 13rem;
   white-space: nowrap;
   text-align: right;
   vertical-align: middle !important;
+  padding-right: 0.5rem !important;
 }
 /* O flex fica no wrapper interno — nunca no td */
 .manutencoes-table .data-table td.actions .actions-inner {
@@ -934,6 +935,55 @@
   border-top: 1px solid var(--color-border, rgba(255,255,255,0.08));
 }
 
+/* ── Modo campo (light): tabela de manutenções ─────────────────────────── */
+body.modo-campo .manutencoes-table.table-card.card {
+  overflow-x: auto;
+  overflow-y: visible;
+  border: 2px solid #94a3b8;
+}
+body.modo-campo .manutencoes-table .data-table th {
+  background: #e2e8f0;
+  color: #1e293b;
+  border-bottom: 2px solid #94a3b8;
+}
+body.modo-campo .manutencoes-table .data-table td {
+  border-bottom: 1px solid #cbd5e1;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr:hover {
+  background: #e0e7f1;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn {
+  color: #1e40af !important;
+  border: 1.5px solid #93c5fd !important;
+  background: #eff6ff !important;
+  border-radius: 6px;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn:hover {
+  background: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn.btn-executar-manut {
+  color: #166534 !important;
+  border-color: #86efac !important;
+  background: #f0fdf4 !important;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn.btn-executar-manut:hover {
+  background: #dcfce7 !important;
+  color: #14532d !important;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn.danger,
+body.modo-campo .manutencoes-table .data-table .icon-btn.danger:hover {
+  color: #991b1b !important;
+  border-color: #fca5a5 !important;
+  background: #fef2f2 !important;
+}
+body.modo-campo .manutencoes-table .data-table td.actions .actions-inner {
+  gap: 0.35rem;
+}
+
 /* ── Modo campo (light) overrides ───────────────────────────────────────── */
 body.modo-campo .wizard-progress-bar {
   background: #e2e8f0;
@@ -1177,7 +1227,7 @@ body.modo-campo .prefill-banner {
 .quick-notes-section { margin-top: 0.75rem; }
 .quick-notes-label {
   font-size: 0.78rem;
-  color: var(--color-text-muted, #6b7280);
+  color: var(--color-text-muted);
   margin-bottom: 0.35rem;
   display: block;
 }
@@ -1187,28 +1237,28 @@ body.modo-campo .prefill-banner {
   gap: 0.35rem;
 }
 .quick-note-chip {
-  background: var(--color-bg-alt, #f3f4f6);
-  border: 1px solid var(--color-border, #d1d5db);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   border-radius: 16px;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.78rem;
-  color: var(--color-text, #374151);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
 }
 .quick-note-chip:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  color: #1e40af;
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 body.modo-campo .quick-note-chip {
-  background: #1e293b;
-  border-color: #334155;
-  color: #cbd5e1;
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
 }
 body.modo-campo .quick-note-chip:hover {
-  background: #1e3a5f;
-  border-color: #60a5fa;
-  color: #93c5fd;
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1e40af;
 }

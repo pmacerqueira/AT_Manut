@@ -51,8 +51,6 @@ function getQuickNotes() {
   return QUICK_NOTES_DEFAULT
 }
 
-const QUICK_NOTES = getQuickNotes()
-
 /** Copia o ficheiro para memória imediatamente (evita revogação em mobile ao usar câmara) */
 function fileToMemory(file) {
   return new Promise((resolve, reject) => {
@@ -115,6 +113,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
+  const quickNotes = useMemo(() => getQuickNotes(), [isOpen])
 
   const [form, setForm] = useState({
     checklistRespostas: {},
@@ -1080,7 +1079,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             <div className="quick-notes-section">
               <span className="quick-notes-label">Notas rápidas — toque para adicionar:</span>
               <div className="quick-notes-chips">
-                {QUICK_NOTES.map((note, i) => (
+                {quickNotes.map((note, i) => (
                   <button key={i} type="button" className="quick-note-chip"
                     onClick={() => {
                       setForm(f => {
