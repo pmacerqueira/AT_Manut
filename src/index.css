@@ -1087,6 +1087,11 @@ body.modo-campo select,
 body.modo-campo textarea {
   min-height: 46px;
 }
+body.modo-campo .data-table .icon-btn,
+body.modo-campo .data-table .icon-btn.readonly {
+  min-height: 2rem !important;
+  min-width: 2rem !important;
+}
 
 /* ── Botões: reforçar peso; cor herdada do estilo base ou do componente ── */
 body.modo-campo button,
@@ -1196,39 +1201,63 @@ body.modo-campo .mc-overflow-menu button:hover {
   background: var(--color-bg-elevated);
 }
 
-/* ── Sidebar ── */
+/* ── Sidebar — a sidebar mantém fundo escuro em modo-campo, forçar texto claro ── */
 body.modo-campo .sidebar {
-  background: #1a2332;
+  background: #1a2332 !important;
   border-right: 2px solid #3a4a60;
+  color: #f4f7fa !important;
 }
-body.modo-campo .sidebar .nav-link {
-  color: #f4f7fa;
+body.modo-campo .sidebar .nav-link,
+body.modo-campo .sidebar .nav-link span,
+body.modo-campo .sidebar .nav-link svg {
+  color: #e8edf3 !important;
   padding: 0.85rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
 }
-body.modo-campo .sidebar .nav-link:hover {
+body.modo-campo .sidebar .nav-link:hover,
+body.modo-campo .sidebar .nav-link:hover span,
+body.modo-campo .sidebar .nav-link:hover svg {
   background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  color: #ffffff !important;
 }
-body.modo-campo .sidebar .nav-link.active {
+body.modo-campo .sidebar .nav-link.active,
+body.modo-campo .sidebar .nav-link.active span,
+body.modo-campo .sidebar .nav-link.active svg {
   background: var(--color-accent);
-  color: #ffffff;
+  color: #ffffff !important;
   font-weight: 700;
 }
-body.modo-campo .sidebar .user-name {
-  color: #f4f7fa;
+body.modo-campo .sidebar .user-name,
+body.modo-campo .sidebar .user-role {
+  color: #e8edf3 !important;
 }
 body.modo-campo .sidebar .btn-logout {
-  color: #fca5a5;
-  background: rgba(220, 40, 40, 0.22);
+  color: #fca5a5 !important;
+  background: rgba(220, 40, 40, 0.22) !important;
   border: 2px solid rgba(220, 40, 40, 0.55);
   font-weight: 600;
 }
-body.modo-campo .sidebar .sidebar-search-btn {
-  color: #f4f7fa;
+body.modo-campo .sidebar .btn-logout svg {
+  color: #fca5a5 !important;
+}
+body.modo-campo .sidebar .sidebar-search-btn,
+body.modo-campo .sidebar .sidebar-search-btn svg {
+  color: #e8edf3 !important;
   border-color: #4a5a70;
   font-weight: 500;
+}
+body.modo-campo .sidebar .sidebar-search-btn kbd {
+  color: #c0c8d8 !important;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+body.modo-campo .sidebar .btn-modo-campo,
+body.modo-campo .sidebar .btn-modo-campo svg {
+  color: #e8edf3 !important;
+}
+body.modo-campo .sidebar .app-footer {
+  color: #8a95a8 !important;
 }
 
 /* Indicador visual de modo campo activo na sidebar */
@@ -1663,6 +1692,10 @@ body.modo-campo .badge-danger   { background: #fee2e2; color: #7f1d1d; border-co
 /* ── Manutenções: badges e tipos Kaeser ── */
 body.modo-campo .badge-concluida            { background: #dcfce7; color: #14532d; border-color: #166534; }
 body.modo-campo .badge-em_progresso         { background: #fef3c7; color: #78350f; border-color: #92400e; }
+body.modo-campo .badge-emAtraso             { background: #fee2e2; color: #7f1d1d; border-color: #991b1b; font-weight: 700; }
+body.modo-campo .badge-pendente             { background: #fef3c7; color: #78350f; border-color: #92400e; font-weight: 700; }
+body.modo-campo .badge-agendada             { background: #dbeafe; color: #1e3a8a; border-color: #3b82f6; font-weight: 700; }
+body.modo-campo .badge-proxima              { background: #fef3c7; color: #78350f; border-color: #92400e; font-weight: 700; }
 body.modo-campo .badge.kaeser-tipo-badge    { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
 body.modo-campo .badge.kaeser-tipo-badge--outro { background: #f1f5f9; color: #374151; border-color: #94a3b8; }
 body.modo-campo .badge-historico            { background: #f1f5f9; color: #374151; border-color: #94a3b8; }

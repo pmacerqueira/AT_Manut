@@ -10,7 +10,7 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package, Clock, ArrowLeft } from 'lucide-react'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package, Clock, ArrowLeft, Pencil } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
@@ -39,6 +39,7 @@ export default function Reparacoes() {
     maquinas,
     clientes,
     addReparacao,
+    updateReparacao,
     removeReparacao,
     getRelatorioByReparacao,
     getSubcategoria,
@@ -64,6 +65,10 @@ export default function Reparacoes() {
   const [emailOutro, setEmailOutro]               = useState('')
   const [emailEnviando, setEmailEnviando]         = useState(false)
   const [modalEliminar, setModalEliminar] = useState(null)
+  const [modalEditar, setModalEditar] = useState(null)
+  const [formEditar, setFormEditar] = useState({ maquinaId: '', tecnico: '', data: '', numeroAviso: '', descricaoAvaria: '' })
+  const [errorsEditar, setErrorsEditar] = useState({})
+  const [filtroClienteEditar, setFiltroClienteEditar] = useState('')
   const [filtroClienteNova, setFiltroClienteNova] = useState('')
   const [modalMensal, setModalMensal] = useState(false)
   const [avisoExpandido, setAvisoExpandido] = useState(null) // id da reparação com detalhe expandido
@@ -202,6 +207,49 @@ export default function Reparacoes() {
     logger.action('Reparacoes', 'eliminarReparacao', `Reparação ${modalEliminar.id} eliminada`)
     setModalEliminar(null)
   }
+
+  // ── Editar Reparação ────────────────────────────────────────────────────
+  const abrirEditar = (rep) => {
+    const maq = getMaquina(rep.maquinaId)
+    setFormEditar({
+      maquinaId: rep.maquinaId || '',
+      tecnico: rep.tecnico || '',
+      data: rep.data || getHojeAzores(),
+      numeroAviso: rep.numeroAviso || '',
+      descricaoAvaria: rep.descricaoAvaria || '',
+    })
+    setFiltroClienteEditar(maq?.clienteNif || '')
+    setErrorsEditar({})
+    setModalEditar(rep)
+  }
+
+  const validarEditar = () => {
+    const errs = {}
+    if (!formEditar.maquinaId)       errs.maquinaId = 'Seleccione uma máquina'
+    if (!formEditar.tecnico?.trim())  errs.tecnico   = 'Indique o técnico'
+    if (!formEditar.data)            errs.data      = 'Indique a data'
+    setErrorsEditar(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  const handleGravarEditar = () => {
+    if (!validarEditar() || !modalEditar) return
+    updateReparacao(modalEditar.id, {
+      maquinaId:       formEditar.maquinaId,
+      tecnico:         formEditar.tecnico.trim(),
+      data:            formEditar.data,
+      numeroAviso:     formEditar.numeroAviso.trim(),
+      descricaoAvaria: formEditar.descricaoAvaria.trim(),
+    })
+    showToast('Reparação actualizada', 'success')
+    logger.action('Reparacoes', 'editarReparacao', `Reparação ${modalEditar.id} actualizada`, { id: modalEditar.id })
+    setModalEditar(null)
+  }
+
+  const maquinasFiltradasEditar = useMemo(() => {
+    if (!filtroClienteEditar) return maquinasOrdenadas
+    return maquinasOrdenadas.filter(m => m.clienteNif === filtroClienteEditar)
+  }, [maquinasOrdenadas, filtroClienteEditar])
 
   // ── Envio de email ────────────────────────────────────────────────────────
 
@@ -383,6 +431,11 @@ export default function Reparacoes() {
                       </button>
                     </>
                   )}
+                  {!concluida && isAdmin && (
+                    <button type="button" className="icon-btn secondary" title="Editar" onClick={() => abrirEditar(rep)}>
+                      <Pencil size={18} />
+                    </button>
+                  )}
                   {canDeleteReparacao(rep.id) && (
                     <button type="button" className="icon-btn danger" title="Eliminar" onClick={() => handleEliminar(rep)}>
                       <Trash2 size={18} />
@@ -460,6 +513,16 @@ export default function Reparacoes() {
                               <Mail size={16} />
                             </button>
                           </>
+                        )}
+                        {!concluida && isAdmin && (
+                          <button
+                            type="button"
+                            className="icon-btn secondary"
+                            title="Editar reparação"
+                            onClick={() => abrirEditar(rep)}
+                          >
+                            <Pencil size={16} />
+                          </button>
                         )}
                         {canDeleteReparacao(rep.id) && (
                           <button
@@ -591,6 +654,115 @@ export default function Reparacoes() {
                 </button>
                 <button type="button" className="btn primary" onClick={handleCriarReparacao}>
                   <Plus size={15} /> Criar Reparação
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Modal: Editar Reparação ──────────────────────────────────────── */}
+      {modalEditar && (() => {
+        const maqSel = maquinas.find(m => m.id === formEditar.maquinaId)
+        const isIstobal = maqSel?.marca?.toUpperCase().includes('ISTOBAL')
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Editar Reparação">
+            <div className="modal modal-nova-rep">
+              <div className="modal-header">
+                <h2><Pencil size={18} /> Editar Reparação</h2>
+                <button type="button" className="icon-btn" onClick={() => setModalEditar(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body">
+
+                <div className="form-group">
+                  <label>Cliente <span className="text-muted" style={{ fontWeight: 'normal', fontSize: '0.8em' }}>filtro</span></label>
+                  <select value={filtroClienteEditar} onChange={e => { setFiltroClienteEditar(e.target.value); setFormEditar(p => ({ ...p, maquinaId: '' })) }}>
+                    <option value="">Todos os clientes</option>
+                    {clientesComMaquinas.map(c => <option key={c.nif} value={c.nif}>{c.nome}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Máquina <span className="required">*</span></label>
+                  <select
+                    className={errorsEditar.maquinaId ? 'input-error' : ''}
+                    value={formEditar.maquinaId}
+                    onChange={e => setFormEditar(p => ({ ...p, maquinaId: e.target.value }))}
+                  >
+                    <option value="">— Seleccione —</option>
+                    {maquinasFiltradasEditar.map(m => {
+                      const c = getCliente(m.clienteNif)
+                      return (
+                        <option key={m.id} value={m.id}>
+                          {m.marca} {m.modelo}{c ? ` — ${c.nome}` : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  {errorsEditar.maquinaId && <span className="field-error">{errorsEditar.maquinaId}</span>}
+                </div>
+
+                <div className="form-row-nova">
+                  <div className="form-group">
+                    <label>Técnico <span className="required">*</span></label>
+                    <select
+                      className={errorsEditar.tecnico ? 'input-error' : ''}
+                      value={formEditar.tecnico}
+                      onChange={e => setFormEditar(p => ({ ...p, tecnico: e.target.value }))}
+                    >
+                      <option value="">— Seleccione —</option>
+                      {nomesTecnicos.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {errorsEditar.tecnico && <span className="field-error">{errorsEditar.tecnico}</span>}
+                  </div>
+                  <div className="form-group">
+                    <label>Data <span className="required">*</span></label>
+                    <input
+                      type="date"
+                      className={errorsEditar.data ? 'input-error' : ''}
+                      value={formEditar.data}
+                      onChange={e => setFormEditar(p => ({ ...p, data: e.target.value }))}
+                    />
+                    {errorsEditar.data && <span className="field-error">{errorsEditar.data}</span>}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>
+                    Nº de Aviso / Pedido de Assistência
+                    {isIstobal && (
+                      <span className="field-hint-istobal">
+                        <Zap size={11} /> ISTOBAL — usar o nº do aviso recebido de isat@istobal.com
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={formEditar.numeroAviso}
+                    onChange={e => setFormEditar(p => ({ ...p, numeroAviso: e.target.value }))}
+                    placeholder={isIstobal ? 'Ex: ES00549609 (aviso ISTOBAL)' : 'Ex: 2026-RP-001'}
+                  />
+                </div>
+
+                <div className="form-group form-group-full">
+                  <label>Descrição da avaria / problema</label>
+                  <textarea
+                    rows={5}
+                    className="textarea-descricao"
+                    value={formEditar.descricaoAvaria}
+                    onChange={e => setFormEditar(p => ({ ...p, descricaoAvaria: e.target.value }))}
+                    placeholder="Descreva brevemente o problema reportado pelo cliente..."
+                  />
+                </div>
+
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn secondary" onClick={() => setModalEditar(null)}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn primary" onClick={handleGravarEditar}>
+                  <Pencil size={15} /> Guardar Alterações
                 </button>
               </div>
             </div>

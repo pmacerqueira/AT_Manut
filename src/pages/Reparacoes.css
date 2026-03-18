@@ -136,6 +136,24 @@
   background: var(--color-success-dark) !important;
 }
 
+/* Botão editar */
+.icon-btn.secondary {
+  color: var(--color-primary) !important;
+}
+.icon-btn.secondary:hover {
+  color: var(--color-white) !important;
+  background: var(--color-primary) !important;
+}
+body.modo-campo .icon-btn.secondary {
+  color: #1a6bb5 !important;
+  background: rgba(26, 107, 181, .08) !important;
+  border: 1px solid rgba(26, 107, 181, .3) !important;
+}
+body.modo-campo .icon-btn.secondary:hover {
+  color: #fff !important;
+  background: #1a6bb5 !important;
+}
+
 /* Badge origem ISTOBAL */
 .rep-origem-istobal {
   display: inline-flex;

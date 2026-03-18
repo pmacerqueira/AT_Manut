@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 /**
  * parse-istobal-email.php — Integração ISTOBAL: Email Piping → Reparação automática
@@ -86,40 +87,84 @@ if (empty(trim($rawEmail))) {
 
 ilog('Email recebido (' . strlen($rawEmail) . ' bytes)');
 
-// ── 2. Verificar remetente ────────────────────────────────────────────────────
+// ── 2. Extrair headers relevantes ─────────────────────────────────────────────
 $fromLine = '';
-foreach (explode("\n", $rawEmail) as $line) {
+$subjectRaw = '';
+$xForwardedFrom = '';
+$headerEnd = strpos($rawEmail, "\r\n\r\n");
+if ($headerEnd === false) $headerEnd = strpos($rawEmail, "\n\n");
+if ($headerEnd === false) $headerEnd = 8192;
+$headerBlock = substr($rawEmail, 0, $headerEnd);
+$headerLines = explode("\n", $headerBlock);
+$inSubject = false;
+
+foreach ($headerLines as $line) {
     $line = rtrim($line, "\r\n");
-    if (stripos($line, 'From:') === 0) {
+    if ($inSubject) {
+        if (preg_match('/^[\s\t]+(.*)/', $line, $cont)) {
+            $subjectRaw .= ' ' . trim($cont[1]);
+            continue;
+        } else {
+            $inSubject = false;
+        }
+    }
+    if (stripos($line, 'From:') === 0 && empty($fromLine)) {
         $fromLine = $line;
-        break;
+    }
+    if (stripos($line, 'Subject:') === 0 && empty($subjectRaw)) {
+        $subjectRaw = trim(substr($line, 8));
+        $inSubject = true;
+    }
+    if (stripos($line, 'X-Forwarded-For:') === 0 || stripos($line, 'X-Original-From:') === 0) {
+        $xForwardedFrom = $line;
     }
 }
-ilog('From: ' . $fromLine);
 
-// Aceitar apenas de isat@istobal.com
-if (stripos($fromLine, 'isat@istobal.com') === false) {
-    ilog('IGNORADO: Remetente não é isat@istobal.com.');
+$subjectLine = $subjectRaw;
+if (function_exists('iconv_mime_decode')) {
+    $decoded = @iconv_mime_decode($subjectRaw, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+    if ($decoded !== false && strlen($decoded) > 0) $subjectLine = $decoded;
+}
+if (preg_match('/=\?/', $subjectLine) && function_exists('mb_decode_mimeheader')) {
+    $dec = @mb_decode_mimeheader($subjectLine);
+    if ($dec && strlen($dec) > 0) $subjectLine = $dec;
+}
+
+ilog('From: ' . $fromLine);
+ilog('Assunto raw: ' . $subjectRaw);
+ilog('Assunto decoded: ' . $subjectLine);
+if ($xForwardedFrom) ilog('X-Forwarded: ' . $xForwardedFrom);
+
+// ── 3. Verificar se é email ISTOBAL ─────────────────────────────────────────
+$isIstobalDirect    = stripos($fromLine, 'isat@istobal.com') !== false;
+$isIstobalForward   = stripos($xForwardedFrom, 'istobal') !== false;
+$isIstobalInBody    = stripos($rawEmail, 'isat@istobal.com') !== false;
+$hasEsInSubject     = preg_match('/\bES\d{6,}\b/i', $subjectLine)
+                   || preg_match('/\bES\d{6,}\b/i', $subjectRaw);
+$hasIstobalKeyword  = stripos($subjectLine, 'istobal') !== false
+                   || stripos($subjectLine, 'IFS') !== false
+                   || stripos($subjectLine, 'Aviso') !== false
+                   || stripos($subjectRaw, 'IFS') !== false;
+
+if (!$isIstobalDirect && !$isIstobalForward && !$isIstobalInBody && !$hasEsInSubject && !$hasIstobalKeyword) {
+    ilog('IGNORADO: Remetente não é isat@istobal.com e email não contém dados ISTOBAL.');
     exit(0);
 }
+if (!$isIstobalDirect) {
+    ilog('Email reencaminhado detectado (não é From: directo). A processar na mesma.');
+}
 
-// ── 3. Extrair assunto ────────────────────────────────────────────────────────
-$subjectLine = '';
-foreach (explode("\n", $rawEmail) as $line) {
-    $line = rtrim($line, "\r\n");
-    if (stripos($line, 'Subject:') === 0) {
-        $subjectLine = trim(substr($line, 8));
-        break;
+// ── 3b. Ignorar emails de fecho técnico/serviço ─────────────────────────────
+$subjectNorm = mb_strtolower((string)$subjectLine, 'UTF-8');
+$closureKeywords = ['cierre', 'cerrado', 'finalizado', 'finalizacion', 'finalización', 'resuelto', 'resolvido', 'fecho', 'fechado'];
+foreach ($closureKeywords as $kw) {
+    if (mb_strpos($subjectNorm, $kw) !== false) {
+        ilog("IGNORADO: email de fecho detectado no assunto (keyword='$kw').");
+        exit(0);
     }
 }
-// Descodificar assunto codificado (quoted-printable ou base64)
-if (function_exists('iconv_mime_decode')) {
-    $subjectLine = iconv_mime_decode($subjectLine, 0, 'UTF-8');
-}
-ilog('Assunto: ' . $subjectLine);
 
-// Extrair número de aviso ES\d+ directamente do assunto (fonte mais fiável —
-// está na barra vermelha do email mas pode não estar numa célula <td> do HTML)
+// Extrair número de aviso ES\d+ directamente do assunto (fonte mais fiável)
 $numeroAvisoSubject = '';
 if (preg_match('/\b(ES\d+)\b/', $subjectLine, $esm)) {
     $numeroAvisoSubject = $esm[1];
@@ -329,18 +374,18 @@ if ($normSerieEmail !== '') {
 }
 
 if (!$maquinaId) {
-    ilog("ERROR: Máquina não encontrada (serie='$numeroSerie', modelo='$modeloMaquina').");
+    $msg = "Máquina não encontrada (serie='$numeroSerie', modelo='$modeloMaquina'). Reparação criada sem máquina associada.";
+    ilog("WARN: $msg");
     notify_ops(
-        "AT_Manut: Não foi possível abrir reparação ISTOBAL ($numeroAviso)",
-        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: máquina não encontrada por Nº de série/modelo.\nAviso: $numeroAviso\nSérie no email: $numeroSerie\nModelo no email: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+        "AT_Manut: Aviso ISTOBAL sem máquina associada ($numeroAviso)",
+        "Aviso ISTOBAL recebido sem correspondência de máquina. A reparação foi criada como pendente sem máquina.\n\nAviso: $numeroAviso\nSérie no email: $numeroSerie\nModelo no email: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
     );
-    exit(1);
+} else {
+    if ($normModeloEmail !== '' && norm_text($modeloBd) !== $normModeloEmail) {
+        ilog("AVISO: divergência de modelo para maquinaId=$maquinaId (email='$modeloMaquina' vs BD='$modeloBd').");
+    }
+    ilog("Máquina encontrada: id=$maquinaId (serieEmail='$numeroSerie' | serieBD='$serieBd')");
 }
-
-if ($normModeloEmail !== '' && norm_text($modeloBd) !== $normModeloEmail) {
-    ilog("AVISO: divergência de modelo para maquinaId=$maquinaId (email='$modeloMaquina' vs BD='$modeloBd').");
-}
-ilog("Máquina encontrada: id=$maquinaId (serieEmail='$numeroSerie' | serieBD='$serieBd')");
 
 // ── 8. Construir descrição completa da avaria ──────────────────────────────────
 $descFull = $descricaoAvaria;
@@ -357,7 +402,7 @@ foreach ($parsed as $k => $v) {
 
 // ── 9. Verificar duplicado (mesmo aviso já registado) ─────────────────────────
 if ($numeroAviso) {
-    $dup = $pdo->prepare('SELECT id, status FROM reparacoes WHERE numero_aviso = ? ORDER BY criado_em DESC LIMIT 1');
+    $dup = $pdo->prepare('SELECT id, status, maquina_id FROM reparacoes WHERE numero_aviso = ? ORDER BY criado_em DESC LIMIT 1');
     $dup->execute([$numeroAviso]);
     $exist = $dup->fetch(PDO::FETCH_ASSOC);
     if ($exist) {
@@ -370,12 +415,12 @@ if ($numeroAviso) {
             exit(0);
         }
 
-        // Último email vence para avisos ainda em aberto (pendente/em_progresso).
+        $resolvedMaquinaId = $maquinaId ?: ($exist['maquina_id'] ?? null);
         $upd = $pdo->prepare('UPDATE reparacoes
             SET maquina_id = ?, data = ?, numero_aviso = ?, descricao_avaria = ?, observacoes = ?, origem = ?
             WHERE id = ?');
         $upd->execute([
-            $maquinaId,
+            $resolvedMaquinaId,
             $dataFormatada,
             $numeroAviso ?: null,
             $descFull,
@@ -383,7 +428,7 @@ if ($numeroAviso) {
             'istobal_email',
             $exist['id'],
         ]);
-        ilog("ATUALIZADO: aviso=$numeroAviso (id={$exist['id']}) com dados mais recentes.");
+        ilog("ATUALIZADO: aviso=$numeroAviso (id={$exist['id']}) com dados mais recentes. maquinaId=" . ($resolvedMaquinaId ?: 'NULL'));
         exit(0);
     }
 }

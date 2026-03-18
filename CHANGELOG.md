@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.15.1] — 2026-03-18 — Edição de reparações; Email piping ISTOBAL via cPanel
+
+### Funcionalidades
+- **Editar Reparação:** Novo botão de edição (ícone lápis) em reparações pendentes/em progresso — permite alterar máquina, técnico, data, nº aviso e descrição (Admin only)
+- Modal de edição reutiliza layout do formulário "Nova Reparação" com pré-preenchimento dos dados actuais e filtro de cliente
+- Estilo `.icon-btn.secondary` com variante modo-campo (azul, contraste adequado)
+
+### Integração ISTOBAL — Migração de Make.com para cPanel Email Piping
+- Migração do processamento de emails ISTOBAL de Make.com (créditos esgotados) para cPanel Email Piping (gratuito)
+- Novo subdomínio `bot.navel.pt` com MX records locais para recepção directa de emails no cPanel
+- Script `parse-istobal-email.php` refactorizado: shebang para piping, detecção robusta de remetente/assunto (MIME decode, header folding), criação de reparação mesmo sem máquina associada
+- Regra de redirect automático no Outlook 365 → `istobal@bot.navel.pt`
+
+### Handoff
+- Próximo passo: verificar que os próximos emails automáticos da ISTOBAL (redirect O365) são correctamente parseados e associados à máquina via nº série
+
+---
+
 ## [1.14.1] — 2026-03-17 — Contraste e legibilidade; melhorias arquitecturais (M1/M2/M4/M5/R1/R2/R3)
 
 ### Contraste e legibilidade — auditoria completa

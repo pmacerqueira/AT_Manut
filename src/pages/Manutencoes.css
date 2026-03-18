@@ -940,6 +940,27 @@ body.modo-campo .manutencoes-table.table-card.card {
   overflow-x: auto;
   overflow-y: visible;
   border: 2px solid #94a3b8;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+  touch-action: pan-x pan-y;
+}
+body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar {
+  height: 10px;
+}
+body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 5px;
+}
+body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 5px;
+}
+body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+body.modo-campo .manutencoes-table .data-table {
+  min-width: 900px;
 }
 body.modo-campo .manutencoes-table .data-table th {
   background: #e2e8f0;
@@ -955,7 +976,21 @@ body.modo-campo .manutencoes-table .data-table tbody tr:nth-child(even) {
 body.modo-campo .manutencoes-table .data-table tbody tr:hover {
   background: #e0e7f1;
 }
-body.modo-campo .manutencoes-table .data-table .icon-btn {
+body.modo-campo .manutencoes-table .data-table th:last-child,
+body.modo-campo .manutencoes-table .data-table td.actions {
+  min-width: 10rem;
+  padding-right: 0.6rem !important;
+}
+body.modo-campo .manutencoes-table .data-table td.actions .actions-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+}
+body.modo-campo .manutencoes-table .data-table .icon-btn,
+body.modo-campo .manutencoes-table .data-table .icon-btn.readonly {
+  min-width: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0.3rem !important;
   color: #1e40af !important;
   border: 1.5px solid #93c5fd !important;
   background: #eff6ff !important;
@@ -980,8 +1015,110 @@ body.modo-campo .manutencoes-table .data-table .icon-btn.danger:hover {
   border-color: #fca5a5 !important;
   background: #fef2f2 !important;
 }
-body.modo-campo .manutencoes-table .data-table td.actions .actions-inner {
-  gap: 0.35rem;
+
+/* ── Modo campo (light): cards mobile (tablets portrait ≤1024px) ────────── */
+body.modo-campo .mc {
+  background: #ffffff;
+  border: 2px solid #94a3b8;
+  border-radius: 10px;
+}
+body.modo-campo .mc-body {
+  padding: 0.65rem 0.85rem 0;
+}
+body.modo-campo .mc-sub {
+  color: #475569;
+  font-weight: 600;
+}
+body.modo-campo .mc-title strong {
+  color: #0f172a;
+}
+body.modo-campo .mc-cliente-label {
+  color: #475569;
+  font-weight: 600;
+}
+body.modo-campo .mc-cliente-nome {
+  color: #0f172a;
+  font-weight: 600;
+}
+body.modo-campo .mc-info {
+  color: #334155;
+}
+body.modo-campo .mc-meta {
+  color: #334155;
+  border-top-color: #cbd5e1;
+}
+body.modo-campo .mc-date-agenda {
+  color: #0f172a;
+  font-weight: 700;
+}
+body.modo-campo .mc-footer {
+  border-top-color: #cbd5e1;
+  padding: 0.5rem 0 0.55rem;
+}
+body.modo-campo .mc-btn-primary {
+  min-height: 44px;
+  padding: 0.45rem 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: #166534;
+  color: #fff;
+}
+body.modo-campo .mc-btn-primary:active {
+  background: #14532d;
+}
+body.modo-campo .mc-icons .icon-btn {
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0.35rem !important;
+  color: #1e40af !important;
+  border: 1.5px solid #93c5fd !important;
+  background: #eff6ff !important;
+  border-radius: 8px;
+}
+body.modo-campo .mc-icons .icon-btn:hover,
+body.modo-campo .mc-icons .icon-btn:active {
+  background: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+body.modo-campo .mc-overflow-menu {
+  background: #ffffff;
+  border: 2px solid #94a3b8;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+body.modo-campo .mc-overflow-menu button {
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+}
+body.modo-campo .mc-overflow-menu button:hover {
+  background: #e2e8f0;
+}
+body.modo-campo .mc-overflow-danger {
+  color: #991b1b !important;
+}
+body.modo-campo .mc-overflow-danger:hover {
+  background: #fee2e2 !important;
+}
+body.modo-campo .mc-dias-badge.dias-atraso {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  font-weight: 700;
+}
+body.modo-campo .mc-dias-badge.dias-hoje {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-weight: 700;
+}
+body.modo-campo .mc-dias-badge.dias-futuro {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  font-weight: 700;
 }
 
 /* ── Modo campo (light) overrides ───────────────────────────────────────── */
