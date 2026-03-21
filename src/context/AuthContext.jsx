@@ -32,8 +32,27 @@ async function sessionFromToken() {
   }
 }
 
+/** JWT mínimo para bypass em localhost (DEV) — mesmo formato que `decodeTokenPayload` / E2E. */
+function buildDevBypassJwt(user) {
+  const payload = {
+    sub: user.id,
+    username: user.username,
+    nome: user.nome,
+    role: user.role,
+    exp: Math.floor(Date.now() / 1000) + 7200,
+  }
+  const json = JSON.stringify(payload)
+  const b64 = btoa(
+    encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+  )
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${b64}.dev`
+}
+
 // ── DEV BYPASS — remover antes de build de produção ──
-const DEV_BYPASS = import.meta.env.DEV && window.location.hostname === 'localhost'
+const DEV_BYPASS = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname)
 const DEV_USERS = {
   Admin:    { id: 'dev-admin', username: 'Admin', nome: 'Admin (Dev)', role: ROLES.ADMIN },
   ATecnica: { id: 'dev-tec',  username: 'ATecnica', nome: 'Técnico (Dev)', role: ROLES.TECNICO },
@@ -46,10 +65,6 @@ export function AuthProvider({ children }) {
 
   // Restaurar sessão a partir do JWT existente (sem chamada de rede)
   useEffect(() => {
-    if (DEV_BYPASS) {
-      setHydrated(true)
-      return
-    }
     sessionFromToken().then(sess => {
       setSession(sess)
       setHydrated(true)
@@ -65,6 +80,13 @@ export function AuthProvider({ children }) {
     if (DEV_BYPASS) {
       const devUser = DEV_USERS[username]
       if (devUser) {
+        const expectedPw = devUser.role === ROLES.ADMIN ? 'admin123' : 'tecnico123'
+        if (password !== expectedPw) {
+          setLoginError('Utilizador ou password incorretos.')
+          return false
+        }
+        const { setToken } = await getApi()
+        setToken(buildDevBypassJwt(devUser))
         setSession({ user: devUser })
         setHydrated(true)
         window.dispatchEvent(new Event('atm:login'))

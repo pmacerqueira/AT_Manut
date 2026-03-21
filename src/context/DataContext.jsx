@@ -6,12 +6,36 @@
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios } from '../utils/diasUteis'
+import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
 import { STORAGE } from '../config/storageKeys'
 
 const DataContext = createContext(null)
+
+/**
+ * Ao substituir relatórios vindos da API, preserva `enviadoParaCliente` / `ultimoEnvio`
+ * quando o servidor ainda não devolve esses campos (ex.: antes da migração SQL ou race na sync).
+ */
+function mergeRelatoriosMantendoEnvio(prev, incoming) {
+  if (!Array.isArray(incoming)) return prev
+  const map = new Map((prev ?? []).map(r => [r.id, r]))
+  return incoming.map(r => {
+    const old = map.get(r.id)
+    if (!old) return r
+    const merged = { ...r }
+    const newHasEmail = merged.enviadoParaCliente?.email
+    const oldHasEmail = old.enviadoParaCliente?.email
+    if (!newHasEmail && oldHasEmail) {
+      merged.enviadoParaCliente = old.enviadoParaCliente
+    }
+    if (old.ultimoEnvio && !merged.ultimoEnvio) {
+      merged.ultimoEnvio = old.ultimoEnvio
+    }
+    return merged
+  })
+}
 
 export const INTERVALOS = {
   trimestral: { dias: 90, label: 'Trimestral' },
@@ -594,6 +618,8 @@ export function DataProvider({ children }) {
   const [marcas,        setMarcas]        = useState(INITIAL_MARCAS)
   const [maquinas,      setMaquinas]      = useState([])
   const [manutencoes,   setManutencoes]   = useState([])
+  const manutencoesRef = useRef([])
+  manutencoesRef.current = manutencoes
   const [relatorios,          setRelatorios]          = useState([])
   const [reparacoes,          setReparacoes]          = useState([])
   const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
@@ -621,7 +647,7 @@ export function DataProvider({ children }) {
       setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
       setMaquinas(d.maquinas           ?? [])
       setManutencoes(d.manutencoes             ?? [])
-      setRelatorios(d.relatorios               ?? [])
+      setRelatorios(prev => mergeRelatoriosMantendoEnvio(prev, d.relatorios ?? []))
       setReparacoes(d.reparacoes               ?? [])
       setRelatoriosReparacao(d.relatoriosReparacao ?? [])
       setTecnicos(d.tecnicos                 ?? [])
@@ -646,7 +672,7 @@ export function DataProvider({ children }) {
           setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
           setMaquinas(d.maquinas           ?? [])
           setManutencoes(d.manutencoes             ?? [])
-          setRelatorios(d.relatorios               ?? [])
+          setRelatorios(prev => mergeRelatoriosMantendoEnvio(prev, d.relatorios ?? []))
           setReparacoes(d.reparacoes               ?? [])
           setRelatoriosReparacao(d.relatoriosReparacao ?? [])
           setTecnicos(d.tecnicos                 ?? [])
@@ -720,8 +746,16 @@ export function DataProvider({ children }) {
     }
   }, [processSync, fetchTodos])
 
-  const getSubcategoria = useCallback((id) => subcategorias.find(s => s.id === id), [subcategorias])
-  const getCategoria = useCallback((id) => categorias.find(c => c.id === id), [categorias])
+  const getSubcategoria = useCallback((id) => {
+    if (id == null || id === '') return undefined
+    const k = String(id)
+    return subcategorias.find(s => String(s.id) === k)
+  }, [subcategorias])
+  const getCategoria = useCallback((id) => {
+    if (id == null || id === '') return undefined
+    const k = String(id)
+    return categorias.find(c => String(c.id) === k)
+  }, [categorias])
   const getSubcategoriasByCategoria = useCallback((categoriaId) =>
     subcategorias.filter(s => s.categoriaId === categoriaId).sort((a, b) => a.nome.localeCompare(b.nome)),
   [subcategorias])
@@ -1252,6 +1286,33 @@ export function DataProvider({ children }) {
     }
   }, [persist])
 
+  /**
+   * Após `setManutencoes`, grava na BD `proximaManut` derivada da agenda (microtask → estado já consolidado).
+   */
+  const scheduleSyncProximaParaMaquinas = useCallback((maquinaIds) => {
+    const ids = [...new Set((maquinaIds || []).filter(Boolean))]
+    if (ids.length === 0) return
+    queueMicrotask(() => {
+      const lista = manutencoesRef.current
+      for (const mid of ids) {
+        const proxima = minDataManutencaoAberta(mid, lista)
+        updateMaquina(mid, { proximaManut: proxima })
+      }
+    })
+  }, [updateMaquina])
+
+  /**
+   * Actualiza `maquinas.proximaManut` a partir da agenda (com patch extra opcional, ex. ultimaManutencaoData).
+   */
+  const sincronizarProximaManutComAgenda = useCallback((maquinaId, extraPatch = {}) => {
+    if (!maquinaId) return
+    queueMicrotask(() => {
+      const lista = manutencoesRef.current
+      const proxima = minDataManutencaoAberta(maquinaId, lista)
+      updateMaquina(maquinaId, { proximaManut: proxima, ...extraPatch })
+    })
+  }, [updateMaquina])
+
   const removeMaquina = useCallback((id) => {
     const maqManutIds = manutencoes.filter(m => m.maquinaId === id).map(m => m.id)
     const maqRepIds = reparacoes.filter(r => r.maquinaId === id).map(r => r.id)
@@ -1273,6 +1334,7 @@ export function DataProvider({ children }) {
     const id = 'm' + Date.now()
     const novo = { ...m, id, criadoEm: m.criadoEm ?? new Date().toISOString() }
     setManutencoes(prev => [...prev, novo])
+    scheduleSyncProximaParaMaquinas([novo.maquinaId])
     logger.action('DataContext', 'addManutencao', `Manutenção agendada (maquinaId: ${m.maquinaId})`, { id, maquinaId: m.maquinaId, data: m.data })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.create(novo),
@@ -1281,7 +1343,7 @@ export function DataProvider({ children }) {
       logger.error('DataContext', 'addManutencao', 'Falha ao persistir manutenção', { msg: err?.message, id })
     })
     return id
-  }, [persist])
+  }, [persist, scheduleSyncProximaParaMaquinas])
 
   const addManutencoesBatch = useCallback((lista) => {
     if (!lista || lista.length === 0) return 0
@@ -1292,6 +1354,7 @@ export function DataProvider({ children }) {
       criadoEm: m.criadoEm ?? new Date().toISOString(),
     }))
     setManutencoes(prev => [...prev, ...novas])
+    scheduleSyncProximaParaMaquinas(novas.map(n => n.maquinaId))
     logger.action('DataContext', 'addManutencoesBatch', `${novas.length} manutenções criadas em lote`, { count: novas.length })
     import('../services/apiService').then(({ apiManutencoes }) =>
       persist(() => apiManutencoes.bulkCreate(novas),
@@ -1300,10 +1363,21 @@ export function DataProvider({ children }) {
       logger.error('DataContext', 'addManutencoesBatch', 'Falha ao persistir batch', { msg: err?.message, count: novas.length })
     })
     return novas.length
-  }, [persist])
+  }, [persist, scheduleSyncProximaParaMaquinas])
 
   const updateManutencao = useCallback((id, data) => {
-    setManutencoes(prev => prev.map(m => m.id === id ? { ...m, ...data } : m))
+    let syncIds = []
+    setManutencoes(prev => {
+      const anterior = prev.find(m => m.id === id)
+      const next = prev.map(m => m.id === id ? { ...m, ...data } : m)
+      const mids = new Set()
+      if (anterior?.maquinaId) mids.add(anterior.maquinaId)
+      const alvo = next.find(m => m.id === id)
+      if (alvo?.maquinaId) mids.add(alvo.maquinaId)
+      syncIds = [...mids]
+      return next
+    })
+    scheduleSyncProximaParaMaquinas(syncIds)
     logger.action('DataContext', 'updateManutencao',
       `Manutenção ${id} actualizada (${data.status ?? 'sem status'})`,
       { id, ...data })
@@ -1313,9 +1387,10 @@ export function DataProvider({ children }) {
     ).catch(err => {
       logger.error('DataContext', 'updateManutencao', 'Falha ao persistir actualização', { msg: err?.message, id })
     })
-  }, [persist])
+  }, [persist, scheduleSyncProximaParaMaquinas])
 
   const removeManutencao = useCallback((id) => {
+    let syncIds = []
     setManutencoes(prev => {
       const alvo = prev.find(m => m.id === id)
       if (!alvo) return prev.filter(m => m.id !== id)
@@ -1349,8 +1424,10 @@ export function DataProvider({ children }) {
         }
       }
 
+      if (alvo.maquinaId) syncIds = [alvo.maquinaId]
       return prev.filter(m => !idsRemover.has(m.id))
     })
+    scheduleSyncProximaParaMaquinas(syncIds)
     const relAlvo = relatorios.find(r => r.manutencaoId === id)
     setRelatorios(prev => prev.filter(r => r.manutencaoId !== id))
     logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id, relatorioId: relAlvo?.id })
@@ -1364,7 +1441,7 @@ export function DataProvider({ children }) {
     }).catch(err => {
       logger.error('DataContext', 'removeManutencao', 'Falha ao persistir eliminação', { msg: err?.message, id })
     })
-  }, [relatorios, persist])
+  }, [relatorios, persist, scheduleSyncProximaParaMaquinas])
 
   // ── Relatórios ────────────────────────────────────────────────────────────
   const addRelatorio = useCallback((r) => {
@@ -1493,6 +1570,7 @@ export function DataProvider({ children }) {
   const confirmarManutencoesPeriodicas = useCallback((novas) => {
     if (!novas?.length) return 0
     setManutencoes(prev => [...prev, ...novas])
+    scheduleSyncProximaParaMaquinas(novas.map(n => n.maquinaId))
     logger.action('DataContext', 'confirmarManutencoesPeriodicas',
       `${novas.length} manutenções periódicas confirmadas (pós-montagem)`,
       { count: novas.length, maquinaId: novas[0]?.maquinaId })
@@ -1503,7 +1581,7 @@ export function DataProvider({ children }) {
       logger.error('DataContext', 'confirmarManutencoesPeriodicas', 'Falha ao persistir periódicas', { msg: err?.message, count: novas.length })
     })
     return novas.length
-  }, [persist])
+  }, [persist, scheduleSyncProximaParaMaquinas])
 
   const getRelatorioByManutencao = useCallback((manutencaoId) => {
     return relatorios.find(r => r.manutencaoId === manutencaoId)
@@ -1595,7 +1673,7 @@ export function DataProvider({ children }) {
    *
    * @returns {number} número de novas manutenções criadas
    */
-  const recalcularPeriodicasAposExecucao = useCallback((maquinaId, periodicidade, dataExecucao, tecnico) => {
+  const recalcularPeriodicasAposExecucao = useCallback((maquinaId, periodicidade, dataExecucao, tecnico, options = {}) => {
     if (!periodicidade || !INTERVALOS[periodicidade]) return 0
 
     const intervaloDias = INTERVALOS[periodicidade].dias
@@ -1608,12 +1686,14 @@ export function DataProvider({ children }) {
     let novaCount = 0
 
     setManutencoes(prev => {
-      // 1. Mantém apenas as manutenções que NÃO são futuras pendentes/agendadas desta máquina
-      const semFuturas = prev.filter(m =>
-        !(m.maquinaId === maquinaId &&
-          (m.status === 'pendente' || m.status === 'agendada') &&
-          m.data > dataExecucao)
+      // 1. Identificar futuras pendentes/agendadas desta máquina a remover
+      const aRemover = prev.filter(m =>
+        m.maquinaId === maquinaId &&
+        (m.status === 'pendente' || m.status === 'agendada') &&
+        m.data > dataExecucao
       )
+      const idsRemover = new Set(aRemover.map(m => m.id))
+      const semFuturas = prev.filter(m => !idsRemover.has(m.id))
 
       // 2. Dias já ocupados (sem as removidas)
       const diasOcupados = new Set(
@@ -1651,23 +1731,43 @@ export function DataProvider({ children }) {
 
       novaCount = novas.length
 
-      if (novas.length > 0) {
-        logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
-          `${novas.length} periódicas recalculadas para máquina ${maquinaId}`,
-          { maquinaId, periodicidade, dataExecucao, count: novas.length })
-        import('../services/apiService').then(({ apiManutencoes }) =>
+      // Persistir remoção das antigas e criação das novas no servidor
+      import('../services/apiService').then(({ apiManutencoes }) => {
+        if (idsRemover.size > 0) {
+          ;[...idsRemover].forEach(rid =>
+            persist(() => apiManutencoes.remove(rid),
+                    { resource: 'manutencoes', action: 'delete', id: rid })
+          )
+        }
+        if (novas.length > 0) {
           persist(() => apiManutencoes.bulkCreate(novas),
                   { resource: 'manutencoes', action: 'bulk_create', data: novas })
-        ).catch(err => {
-          logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
-        })
+        }
+      }).catch(err => {
+        logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
+      })
+
+      if (novas.length > 0 || idsRemover.size > 0) {
+        logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
+          `${novas.length} periódicas criadas, ${idsRemover.size} removidas para máquina ${maquinaId}`,
+          { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.size })
       }
 
       return [...semFuturas, ...novas]
     })
 
+    queueMicrotask(() => {
+      const lista = manutencoesRef.current
+      const proxima = minDataManutencaoAberta(maquinaId, lista)
+      const patchMaq = { proximaManut: proxima }
+      if (options?.ultimaManutencaoData) {
+        patchMaq.ultimaManutencaoData = options.ultimaManutencaoData
+      }
+      updateMaquina(maquinaId, patchMaq)
+    })
+
     return novaCount
-  }, [persist])
+  }, [persist, updateMaquina])
 
   // ── Persistência local de pecasPlano ─────────────────────────────────────────
   useEffect(() => {
@@ -1860,6 +1960,7 @@ export function DataProvider({ children }) {
     prepararManutencoesPeriodicas,
     confirmarManutencoesPeriodicas,
     recalcularPeriodicasAposExecucao,
+    sincronizarProximaManutComAgenda,
     addPecaPlano,
     addPecasPlanoLote,
     updatePecaPlano,
@@ -1882,7 +1983,7 @@ export function DataProvider({ children }) {
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
     addReparacao, updateReparacao, removeReparacao,
     addRelatorioReparacao, updateRelatorioReparacao, getRelatorioByReparacao,
-    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao,
+    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao, sincronizarProximaManutComAgenda,
     addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,
     loading, fetchTodos,

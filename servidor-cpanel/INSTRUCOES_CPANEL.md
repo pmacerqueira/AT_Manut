@@ -30,7 +30,7 @@ public_html/
     db.php, config.php   ← ligação à base de dados
     atm_log.php          ← registo de logs do servidor
     send-email.php       ← envio de relatórios com PDF e lembretes de conformidade
-    send-report.php      ← envio do relatório de frota (HTML via email)
+    send-report.php      ← corpo HTML; anexo PDF opcional (base64), ex. relatório de frota
     fpdf.php             ← biblioteca FPDF (geração de PDF no servidor)
     font/                ← fontes FPDF (Helvetica, Courier, Times, etc.)
     log-receiver.php     ← receptor de logs do frontend

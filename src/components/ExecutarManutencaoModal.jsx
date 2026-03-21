@@ -1,9 +1,9 @@
 /**
  * ExecutarManutencaoModal – Modal para executar manutenção.
  * Fluxo: checklist → notas + fotos → técnico (obrigatório) → nome cliente (obrigatório) → assinatura digital (obrigatória).
- * Fotos: capturadas pela câmara ou galeria, comprimidas no browser (canvas), guardadas como base64.
+ * Fotos: câmara ou galeria; compressão em `utils/comprimirImagemRelatorio.js`.
  */
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
@@ -22,10 +22,8 @@ import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
 import { MAX_FOTOS } from '../config/limits'
 import { getDeclaracaoCliente } from '../constants/relatorio'
-
-const FOTO_MAX_W = 1200
-const FOTO_MAX_H = 1200
-const FOTO_QUALITY = 0.75
+import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
+import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 
 const STEP_LABELS = ['Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
 const TOTAL_STEPS = 7
@@ -51,43 +49,7 @@ function getQuickNotes() {
   return QUICK_NOTES_DEFAULT
 }
 
-/** Copia o ficheiro para memória imediatamente (evita revogação em mobile ao usar câmara) */
-function fileToMemory(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(new Blob([reader.result], { type: file.type || 'image/jpeg' }))
-    reader.onerror = reject
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-/** Redimensiona e comprime uma imagem para base64 JPEG via canvas.
- *  Em mobile, receber o Blob em memória evita que a foto desapareça (ficheiros temp da câmara são revogados). */
-function comprimirFoto(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = reject
-    reader.onload = (ev) => {
-      const img = new Image()
-      img.onerror = reject
-      img.onload = () => {
-        let { width, height } = img
-        const ratio = Math.min(FOTO_MAX_W / width, FOTO_MAX_H / height, 1)
-        width  = Math.round(width  * ratio)
-        height = Math.round(height * ratio)
-        const canvas = document.createElement('canvas')
-        canvas.width  = width
-        canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', FOTO_QUALITY))
-      }
-      img.src = ev.target.result
-    }
-    reader.readAsDataURL(blob)
-  })
-}
-
-export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina }) {
+export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false }) {
   const { isAdmin } = usePermissions()
   const {
     manutencoes,
@@ -100,6 +62,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     prepararManutencoesPeriodicas,
     confirmarManutencoesPeriodicas,
     recalcularPeriodicasAposExecucao,
+    sincronizarProximaManutComAgenda,
     getIntervaloDiasByMaquina,
     getChecklistBySubcategoria,
     getSubcategoria,
@@ -109,6 +72,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     tecnicos,
     getTecnicoByNome,
     relatorios: todosRelatorios,
+    marcas,
   } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -142,6 +106,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [preFilledFromLast, setPreFilledFromLast] = useState(false)
+  /** idle | form | no_intervention | choose_intervention — só para abertura sem `manutencao` explícita. */
+  const [execUiPhase, setExecUiPhase] = useState('idle')
+  const [opcoesEscolha, setOpcoesEscolha] = useState([])
 
   const navigate = useNavigate()
   const canvasRef   = useRef(null)
@@ -149,7 +116,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const lastPosRef  = useRef({ x: 0, y: 0 })
   const fotoInputRef = useRef(null)
   const fotoCameraRef = useRef(null)
-  const initRef = useRef(false)
+  /** Evita repetir bootstrap do formulário para o mesmo `manutencaoAtual.id`. */
+  const bootstrappedIdRef = useRef(null)
   const modalRef = useRef(null)
 
   const maq = maquina
@@ -159,44 +127,74 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const temContadorHoras = maq && SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq.subcategoriaId)
   const isCompressor = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen) {
-      initRef.current = false
+      setExecUiPhase('idle')
+      setOpcoesEscolha([])
+      setManutencaoAtual(null)
+      bootstrappedIdRef.current = null
       setStep(1)
       setConfirmacaoPendente(null)
       setPreviewLoading(false)
       if (previewPdfUrl) { URL.revokeObjectURL(previewPdfUrl); setPreviewPdfUrl(null) }
       return
     }
-    if (initRef.current) return
-    initRef.current = true
-    let m = manutencao
-    if (!m && maq) {
-      const existente = manutencoes.find(
-        x => x.maquinaId === maq.id && (x.status === 'pendente' || x.status === 'agendada' || x.status === 'em_progresso')
-      )
-      if (existente) {
-        m = existente
-      } else {
-        const hoje = getHojeAzores()
-        const id = addManutencao({
-          maquinaId: maq.id,
-          data: hoje,
-          tipo: 'periodica',
-          tecnico: '',
-          status: 'pendente',
-          observacoes: '',
-        })
-        m = { id, maquinaId: maq.id, data: hoje, tipo: 'periodica', tecnico: '', status: 'pendente', observacoes: '' }
-      }
-    }
-    setManutencaoAtual(m || null)
+    if (!maq) return
 
+    // Não repor bootstrappedIdRef aqui: `manutencoes` muda com frequência no DataContext e
+    // anular o ref fazia o useEffect de bootstrap voltar a correr e `setFotos(rel)` apagava
+    // fotos recém-adicionadas no «Editar relatório» / execução (menos de 1s após a galeria).
+    if (adminEdit && manutencao) {
+      setExecUiPhase('form')
+      setManutencaoAtual(prev => (prev?.id === manutencao.id ? prev : manutencao))
+      setOpcoesEscolha([])
+      return
+    }
+    if (manutencao) {
+      setExecUiPhase('form')
+      setManutencaoAtual(prev => (prev?.id === manutencao.id ? prev : manutencao))
+      setOpcoesEscolha([])
+      return
+    }
+    if (!adminEdit) {
+      const candidatos = candidatosMesmaDataMinimaAberta(maq.id, manutencoes)
+      if (candidatos.length === 0) {
+        setExecUiPhase('no_intervention')
+        setManutencaoAtual(null)
+        setOpcoesEscolha([])
+        bootstrappedIdRef.current = null
+        return
+      }
+      if (candidatos.length > 1) {
+        setExecUiPhase('choose_intervention')
+        setManutencaoAtual(null)
+        setOpcoesEscolha(candidatos)
+        bootstrappedIdRef.current = null
+        return
+      }
+      setExecUiPhase('form')
+      const escolhido = candidatos[0]
+      setManutencaoAtual(prev => {
+        if (prev?.id === escolhido.id) return prev
+        bootstrappedIdRef.current = null
+        return escolhido
+      })
+      setOpcoesEscolha([])
+    }
+  }, [isOpen, adminEdit, manutencao?.id, maq?.id, manutencoes])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (execUiPhase !== 'form' || !manutencaoAtual || !maq) return
+    const mid = manutencaoAtual.id
+    if (bootstrappedIdRef.current === mid) return
+    bootstrappedIdRef.current = mid
+
+    const m = manutencaoAtual
     const checklistRespostas = {}
     const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m?.tipo || 'periodica') : []
     const existingRel = m ? getRelatorioByManutencao(m.id) : null
 
-    // M1: Pré-preenchimento inteligente — usar última execução do mesmo tipo como base
     const tipoAtual = m?.tipo || 'periodica'
     let lastRel = null
     if (!existingRel && maq) {
@@ -215,18 +213,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     checklistItems.forEach(it => {
       checklistRespostas[it.id] = fontePreFill?.checklistRespostas?.[it.id] ?? ''
     })
-    // Auto-sugerir tipo pelo ciclo da máquina (posicaoKaeser), com fallback ao relatório existente
     const isCompressorMaq = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
     const tipoAutoCiclo = isCompressorMaq && maq.posicaoKaeser != null
       ? tipoKaeserNaPosicao(maq.posicaoKaeser)
       : ''
     const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
     const pecasExistentes = existingRel?.pecasUsadas ?? []
-    // Normalizar formato antigo (quantidadeUsada) para novo (usado: bool)
     const normalizarPecas = (lista) => lista.map(p =>
       'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
     )
-    // Pré-carregar peças do plano se houver tipo definido e ainda não houver peças no relatório
     const pecasUsadas = pecasExistentes.length > 0
       ? normalizarPecas(pecasExistentes)
       : (tipoManutKaeser && maq
@@ -242,7 +237,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       nomeAssinante: nomePreenchido,
       tipoManutKaeser,
       pecasUsadas,
-      dataRealizacao: '',
+      dataRealizacao: (!adminEdit && m?.data && m.data < getHojeAzores()) ? getHojeAzores() : '',
+      adminStatus: m?.status || 'concluida',
+      adminDataAgendada: m?.data || '',
+      adminDataExecucao: existingRel
+        ? ((existingRel.dataAssinatura || existingRel.dataCriacao || '').slice(0, 10) || m?.data || '')
+        : (m?.data || ''),
     })
     setFotos(existingRel?.fotos ?? [])
     setErroChecklist('')
@@ -265,7 +265,40 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         img.src = cli.assinaturaContacto
       }
     })
-  }, [isOpen, manutencao, maq?.id, manutencoes, addManutencao, getChecklistBySubcategoria, getRelatorioByManutencao])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios])
+
+  const confirmarCriarIntervencaoHoje = useCallback(() => {
+    if (!maq) return
+    if (!window.confirm('Criar uma manutenção pendente para hoje neste equipamento? Depois poderá preencher o relatório de execução.')) return
+    const hoje = getHojeAzores()
+    const id = addManutencao({
+      maquinaId: maq.id,
+      data: hoje,
+      tipo: 'periodica',
+      tecnico: '',
+      status: 'pendente',
+      observacoes: '',
+    })
+    bootstrappedIdRef.current = null
+    setManutencaoAtual({
+      id,
+      maquinaId: maq.id,
+      data: hoje,
+      tipo: 'periodica',
+      tecnico: '',
+      status: 'pendente',
+      observacoes: '',
+    })
+    setExecUiPhase('form')
+    logger.action('ExecutarManutencaoModal', 'criarIntervencaoHoje', `Pendente criada para ${hoje}`, { maquinaId: maq.id, manutencaoId: id })
+  }, [maq, addManutencao])
+
+  const escolherIntervencaoParaExecutar = useCallback((m) => {
+    bootstrappedIdRef.current = null
+    setManutencaoAtual(m)
+    setExecUiPhase('form')
+    setOpcoesEscolha([])
+  }, [])
 
   useEffect(() => {
     if (modalRef.current) modalRef.current.scrollTop = 0
@@ -351,25 +384,34 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const files = Array.from(e.target.files || [])
     if (!files.length) return
     const disponiveis = MAX_FOTOS - fotos.length
-    if (disponiveis <= 0) return
+    if (disponiveis <= 0) {
+      showToast(`Limite de ${MAX_FOTOS} fotografias atingido.`, 'warning')
+      if (fotoInputRef.current) fotoInputRef.current.value = ''
+      if (fotoCameraRef.current) fotoCameraRef.current.value = ''
+      return
+    }
     const ficheiros = files.slice(0, disponiveis)
+    if (files.length > ficheiros.length) {
+      showToast(`Só couberam mais ${ficheiros.length} foto(s) (máx. ${MAX_FOTOS} por relatório).`, 'warning')
+    }
     setFotoCarregando(true)
     const novas = []
     try {
       for (const file of ficheiros) {
         const blob = await fileToMemory(file)
-        const dataUrl = await comprimirFoto(blob)
+        const dataUrl = await comprimirFotoParaRelatorio(blob)
         novas.push(dataUrl)
       }
       setFotos(prev => [...prev, ...novas])
     } catch (err) {
-      logger.warn('ExecutarManutencaoModal', 'handleFotoChange', 'Falha ao adicionar foto (ficheiro inválido ou demasiado grande?)', { msg: err?.message })
+      showToast(err?.message || 'Não foi possível processar a fotografia.', 'error', 4000)
+      logger.warn('ExecutarManutencaoModal', 'handleFotoChange', 'Falha ao adicionar foto', { msg: err?.message })
     } finally {
       setFotoCarregando(false)
       if (fotoInputRef.current) fotoInputRef.current.value = ''
       if (fotoCameraRef.current) fotoCameraRef.current.value = ''
     }
-  }, [fotos.length])
+  }, [fotos.length, showToast])
 
   const removerFoto = useCallback((idx) => {
     setFotos(prev => prev.filter((_, i) => i !== idx))
@@ -481,6 +523,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         checklistItems: items,
         subcategoriaNome: sub?.nome ?? '',
         tecnicoObj: tecObj,
+        marcas,
       })
       const url = URL.createObjectURL(blob)
       setPreviewPdfUrl(url)
@@ -550,11 +593,29 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     // addRelatorio devolve { id, numeroRelatorio } — tem de ser capturado aqui
     // para ser passado ao logger e ao serviço de email (evita "undefined"/"S/N").
     let numeroRelatorioFinal
+    let relIdFinal
     if (rel) {
+      const anoExecucao = new Date(now).getFullYear()
+      const anoRelatorio = parseInt(rel.numeroRelatorio?.split('.')[0], 10)
+      if (anoExecucao && anoRelatorio && anoExecucao !== anoRelatorio) {
+        const tipoManut = manutencaoAtual.tipo ?? 'periodica'
+        const prefix = tipoManut === 'montagem' ? 'MT' : 'MP'
+        const pattern = `${anoExecucao}.${prefix}.`
+        const existingNums = todosRelatorios
+          .filter(r => r.id !== rel.id)
+          .map(r => r.numeroRelatorio)
+          .filter(n => typeof n === 'string' && n.startsWith(pattern))
+          .map(n => parseInt(n.split('.')[2] ?? '0', 10))
+          .filter(n => !isNaN(n))
+        const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
+        relPayload.numeroRelatorio = `${anoExecucao}.${prefix}.${String(next).padStart(5, '0')}`
+      }
       updateRelatorio(rel.id, relPayload)
-      numeroRelatorioFinal = rel.numeroRelatorio   // já existe no relatório anterior
+      relIdFinal = rel.id
+      numeroRelatorioFinal = relPayload.numeroRelatorio || rel.numeroRelatorio
     } else {
       const resultado = addRelatorio({ manutencaoId: manutencaoAtual.id, ...relPayload })
+      relIdFinal = resultado.id
       numeroRelatorioFinal = resultado.numeroRelatorio
     }
 
@@ -634,13 +695,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     updateMaquina(maq.id, updateMaqData)
 
-    if (!isHistoricoPassado && manutencaoAtual.tipo === 'periodica' && periodicidadeRecalc) {
+    if (manutencaoAtual.tipo === 'periodica' && periodicidadeRecalc) {
       const n = recalcularPeriodicasAposExecucao(maq.id, periodicidadeRecalc, hoje, form.tecnico)
       if (n > 0) {
         logger.action('ExecutarManutencaoModal', 'reagendarPeriodicas',
           `${n} periódicas reagendadas para ${maq.marca ?? ''} ${maq.modelo ?? ''} a partir de ${hoje}`,
           { maquinaId: maq.id, periodicidade: periodicidadeRecalc, n })
-        showToast(`${n} manutenções futuras reagendadas a partir de hoje.`, 'info', 2500)
+        showToast(`${n} manutenções futuras reagendadas a partir de ${hoje}.`, 'info', 2500)
       }
     }
 
@@ -673,19 +734,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const cliente = clientes.find(c => c.nif === maq?.clienteNif) ?? null
       try {
         const tecObj = getTecnicoByNome(relFinal?.tecnico || manutFinal?.tecnico)
+
         const resultado = await enviarRelatorioEmail({
           emailDestinatario: emailDestinatario.trim(),
-          relatorio:        relFinal,
-          manutencao:       manutFinal,
-          maquina:          maq,
-          cliente,
-          checklistItems:   items,
-          subcategoriaNome: sub?.nome ?? '',
-          logoUrl:          `${import.meta.env.BASE_URL}logo-navel.png`,
-          tecnicoObj:       tecObj,
+          relatorio: relFinal, manutencao: manutFinal, maquina: maq, cliente,
+          checklistItems: items, subcategoriaNome: sub?.nome || '',
+          logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+          tecnicoObj: tecObj,
+          marcas,
         })
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
+          const dest = emailDestinatario.trim().toLowerCase()
+          if (dest && dest !== 'comercial@navel.pt' && relIdFinal) {
+            updateRelatorio(relIdFinal, {
+              enviadoParaCliente: { data: new Date().toISOString(), email: dest },
+              ultimoEnvio: { data: new Date().toISOString(), destinatario: dest },
+            })
+          }
         } else {
           showToast(resultado.message || 'Erro ao enviar email.', 'error', 4000)
         }
@@ -709,6 +775,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (adminEdit) { handleAdminEditSave(); return }
     if (step < TOTAL_STEPS) { goNext(); return }
     gravar(false, true)
   }
@@ -721,9 +788,194 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     gravar(true)
   }
 
+  const handleAdminEditSave = () => {
+    if (!manutencaoAtual || !maq || !rel) return
+    if (!form.tecnico) {
+      showToast('Selecione o técnico responsável.', 'warning')
+      return
+    }
+
+    const relPayload = {
+      checklistRespostas: form.checklistRespostas,
+      checklistSnapshot: items.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
+      notas: form.notas.slice(0, 300),
+      fotos,
+      tecnico: form.tecnico,
+      nomeAssinante: form.nomeAssinante.trim(),
+      ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
+      ...(form.pecasUsadas.length > 0 && { pecasUsadas: form.pecasUsadas }),
+    }
+    if (form.limparAssinatura) {
+      relPayload.assinadoPeloCliente = false
+      relPayload.assinaturaDigital = null
+      relPayload.nomeAssinante = ''
+      relPayload.dataAssinatura = null
+    }
+
+    const assinadoEfetivo = form.limparAssinatura ? false : !!rel.assinadoPeloCliente
+
+    const agAnterior = manutencaoAtual.data
+    const execAnterior = (rel.dataAssinatura || rel.dataCriacao || '').slice(0, 10) || ''
+    const agNova = (form.adminDataAgendada || '').trim()
+    const execNova = (form.adminDataExecucao || '').trim()
+
+    if (!agNova) {
+      showToast('Indique a data de agendamento da manutenção.', 'warning')
+      return
+    }
+    if (!execNova) {
+      showToast('Indique a data de execução do relatório.', 'warning')
+      return
+    }
+
+    const execIso = `${execNova}T12:00:00.000Z`
+    if (execNova !== execAnterior) {
+      relPayload.dataCriacao = execIso
+      if (assinadoEfetivo) {
+        relPayload.dataAssinatura = execIso
+      } else {
+        relPayload.dataAssinatura = null
+      }
+    }
+
+    const anoNovo = new Date(execNova + 'T00:00:00').getFullYear()
+    const anoAtual = rel.numeroRelatorio ? parseInt(rel.numeroRelatorio.split('.')[0], 10) : null
+    if (anoNovo && anoAtual && anoNovo !== anoAtual) {
+      const tipoManut = manutencaoAtual.tipo ?? 'periodica'
+      const prefix = tipoManut === 'montagem' ? 'MT' : 'MP'
+      const pattern = `${anoNovo}.${prefix}.`
+      const existingNums = todosRelatorios
+        .filter(r => r.id !== rel.id)
+        .map(r => r.numeroRelatorio)
+        .filter(n => typeof n === 'string' && n.startsWith(pattern))
+        .map(n => parseInt(n.split('.')[2] ?? '0', 10))
+        .filter(n => !isNaN(n))
+      const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
+      relPayload.numeroRelatorio = `${anoNovo}.${prefix}.${String(next).padStart(5, '0')}`
+      relPayload.dataCriacao = execIso
+      if (assinadoEfetivo) relPayload.dataAssinatura = execIso
+    }
+
+    updateRelatorio(rel.id, relPayload)
+
+    const manutPayload = { tecnico: form.tecnico }
+    if (form.adminStatus && form.adminStatus !== manutencaoAtual.status) {
+      manutPayload.status = form.adminStatus
+    }
+    if (agNova !== agAnterior) {
+      manutPayload.data = agNova
+    }
+    updateManutencao(manutencaoAtual.id, manutPayload)
+
+    const dataAgendamentoChanged = agNova !== agAnterior
+    const dataExecucaoChanged = execNova !== execAnterior
+    const dataRecalc = execNova
+    if (manutencaoAtual.tipo === 'periodica' && dataRecalc) {
+      const periodicidade = maq.periodicidadeManut || manutencaoAtual.periodicidade
+      if (periodicidade) {
+        const n = recalcularPeriodicasAposExecucao(maq.id, periodicidade, dataRecalc, form.tecnico, {
+          ultimaManutencaoData: dataRecalc,
+        })
+        if (n > 0) {
+          showToast(`${n} manutenções futuras reagendadas a partir de ${dataRecalc}.`, 'info', 2500)
+        }
+      } else {
+        setTimeout(() => sincronizarProximaManutComAgenda(maq.id, { ultimaManutencaoData: dataRecalc }), 0)
+      }
+    }
+
+    const numFinal = relPayload.numeroRelatorio || rel.numeroRelatorio
+    const statusChanged = form.adminStatus && form.adminStatus !== manutencaoAtual.status
+    logger.action('ExecutarManutencaoModal', 'adminEditSave', `Admin editou relatório ${numFinal}`,
+      {
+        manutencaoId: manutencaoAtual.id,
+        numeroRelatorio: numFinal,
+        limparAssinatura: !!form.limparAssinatura,
+        statusChanged: statusChanged ? form.adminStatus : false,
+        dataAgendamentoChanged,
+        dataExecucaoChanged,
+      }
+    )
+    showToast(
+      relPayload.numeroRelatorio
+        ? `Relatório renumerado para ${relPayload.numeroRelatorio}.`
+        : statusChanged ? `Relatório actualizado. Status alterado para "${form.adminStatus}".` : 'Relatório actualizado com sucesso.',
+      'success'
+    )
+    onClose()
+  }
+
   if (!isOpen || !maq) return null
 
   const desc = `${maq.marca} ${maq.modelo} — Nº Série: ${maq.numeroSerie}`
+
+  if (!adminEdit && execUiPhase === 'no_intervention') {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal modal-compact" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+          <h2>Sem intervenção aberta</h2>
+          <p className="modal-hint" style={{ marginBottom: '1rem' }}>
+            Não há manutenção pendente, agendada ou em progresso para <strong>{desc}</strong>.
+            Para trabalhar no terreno, crie uma linha para hoje (com confirmação) ou vá a <strong>Manutenções</strong> / <strong>Agendar</strong>.
+          </p>
+          <div className="form-actions" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+            <button type="button" className="btn primary" onClick={confirmarCriarIntervencaoHoje}>
+              Criar intervenção para hoje…
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => { onClose(); navigate(`/manutencoes?filter=proximas&maquinaId=${encodeURIComponent(maq.id)}`) }}
+            >
+              Ir a manutenções próximas (este equipamento)
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => { onClose(); navigate(`/agendamento?maquinaId=${encodeURIComponent(maq.id)}`) }}
+            >
+              Agendar nova visita
+            </button>
+            <button type="button" className="secondary" onClick={onClose}>Fechar</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!adminEdit && execUiPhase === 'choose_intervention' && opcoesEscolha.length > 0) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal modal-compact" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+          <h2>Qual intervenção executar?</h2>
+          <p className="modal-hint" style={{ marginBottom: '0.75rem' }}>
+            Existem várias ordens com a mesma data ({formatarDataPT(opcoesEscolha[0].data)}). Escolha uma para continuar.
+          </p>
+          <ul className="intervencao-escolha-lista" style={{ listStyle: 'none', padding: 0, margin: '0 0 1rem' }}>
+            {opcoesEscolha.map((opt) => (
+              <li key={opt.id} style={{ marginBottom: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left' }}
+                  onClick={() => escolherIntervencaoParaExecutar(opt)}
+                >
+                  <strong>{opt.tipo === 'montagem' ? 'Montagem' : 'Manutenção'}</strong>
+                  {' · '}
+                  {formatarDataPT(opt.data)}
+                  {opt.tecnico ? ` · ${opt.tecnico}` : ''}
+                  <span className="text-muted" style={{ display: 'block', fontSize: '0.85rem' }}>ID {opt.id}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="form-actions">
+            <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (concluido) {
     const relFinal = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
@@ -863,25 +1115,76 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-assinatura modal-relatorio-form" ref={modalRef} onClick={e => e.stopPropagation()}>
-        <h2>Executar manutenção</h2>
+        <h2>{adminEdit ? 'Editar relatório' : 'Executar manutenção'}</h2>
         {maq && <p className="modal-hint">{desc}</p>}
+        {adminEdit && rel?.numeroRelatorio && (
+          <p className="modal-hint" style={{ marginTop: '-0.25rem' }}>Relatório {rel.numeroRelatorio}</p>
+        )}
 
-        <div className="wizard-progress">
-          <div className="wizard-progress-bar">
-            <div className="wizard-progress-fill" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
+        {!adminEdit && (
+          <div className="wizard-progress">
+            <div className="wizard-progress-bar">
+              <div className="wizard-progress-fill" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
+            </div>
+            <div className="wizard-progress-info">
+              <span className="wizard-progress-step">Passo {step} de {TOTAL_STEPS}</span>
+              <span className="wizard-progress-label">{STEP_LABELS[step - 1]}</span>
+            </div>
           </div>
-          <div className="wizard-progress-info">
-            <span className="wizard-progress-step">Passo {step} de {TOTAL_STEPS}</span>
-            <span className="wizard-progress-label">{STEP_LABELS[step - 1]}</span>
-          </div>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit}>
         <div className="wizard-body">
 
+          {/* ═══ Admin: Status e data da manutenção ═══ */}
+          {adminEdit && (
+            <div className="wizard-step-content" style={{ display: 'block' }}>
+              <h3 className="admin-edit-section-title">Status e datas</h3>
+              <p className="form-hint" style={{ marginBottom: '0.75rem', maxWidth: '42rem' }}>
+                <strong>Agendamento</strong> é a data prevista no plano (lista «Agendada»).{' '}
+                <strong>Execução</strong> é a data real do serviço no relatório (PDF, email e coluna «Execução» nas executadas).
+                São campos independentes.
+              </p>
+              <div className="admin-edit-status-row">
+                <label className="form-section">
+                  Status da manutenção
+                  <select value={form.adminStatus} onChange={e => setForm(f => ({ ...f, adminStatus: e.target.value }))}>
+                    <option value="concluida">Executada (concluída)</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="agendada">Agendada</option>
+                  </select>
+                  {form.adminStatus !== 'concluida' && (
+                    <span className="form-hint" style={{ color: 'var(--color-warning)' }}>
+                      Ao mudar para pendente/agendada, o relatório existente será mantido mas a manutenção ficará por concluir.
+                    </span>
+                  )}
+                </label>
+                <label className="form-section">
+                  Data de agendamento
+                  <input
+                    type="date"
+                    value={form.adminDataAgendada}
+                    onChange={e => setForm(f => ({ ...f, adminDataAgendada: e.target.value }))}
+                  />
+                  <span className="form-hint">Plano / data prevista do serviço.</span>
+                </label>
+                <label className="form-section">
+                  Data de execução (relatório)
+                  <input
+                    type="date"
+                    value={form.adminDataExecucao}
+                    onChange={e => setForm(f => ({ ...f, adminDataExecucao: e.target.value }))}
+                  />
+                  <span className="form-hint">Data real da intervenção; actualiza PDF, email e «Execução» na lista.</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {/* ═══ STEP 1 — Checklist ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 1 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 1) ? 'block' : 'none' }}>
+            {adminEdit && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
+            {!adminEdit && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
 
             {preFilledFromLast && (
               <div className="prefill-banner">
@@ -1059,8 +1362,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ STEP 2 — Observações ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 2 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Adicione notas ou observações relevantes sobre a manutenção.</p>
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 2) ? 'block' : 'none' }}>
+            {adminEdit && <h3 className="admin-edit-section-title">Observações</h3>}
+            {!adminEdit && <p className="wizard-step-hint">Adicione notas ou observações relevantes sobre a manutenção.</p>}
             <label className="form-section">
               Notas importantes <span className="char-count">({form.notas.length}/300)</span>
               <textarea
@@ -1079,17 +1383,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             <div className="quick-notes-section">
               <span className="quick-notes-label">Notas rápidas — toque para adicionar:</span>
               <div className="quick-notes-chips">
-                {quickNotes.map((note, i) => (
-                  <button key={i} type="button" className="quick-note-chip"
-                    onClick={() => {
-                      setForm(f => {
-                        const current = f.notas.trim()
-                        const sep = current ? (current.endsWith('.') ? ' ' : '. ') : ''
-                        return { ...f, notas: (current + sep + note).slice(0, 300) }
-                      })
-                      if (confirmacaoPendente) setConfirmacaoPendente(null)
-                    }}>{note}</button>
-                ))}
+                {quickNotes.map((note, i) => {
+                  const isIncluded = form.notas.includes(note)
+                  return (
+                    <button key={i} type="button"
+                      className={`quick-note-chip${isIncluded ? ' quick-note-chip--active' : ''}`}
+                      onClick={() => {
+                        setForm(f => {
+                          const current = f.notas.trim()
+                          const sep = current ? '\n' : ''
+                          return { ...f, notas: (current + sep + note).slice(0, 300) }
+                        })
+                        if (confirmacaoPendente) setConfirmacaoPendente(null)
+                      }}>{isIncluded && '✓ '}{note}</button>
+                  )
+                })}
               </div>
             </div>
             {confirmacaoPendente === 'notas' && (
@@ -1109,8 +1417,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ STEP 3 — Fotografias ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 3 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 3) ? 'block' : 'none' }}>
+            {adminEdit && <h3 className="admin-edit-section-title">Fotografias</h3>}
+            {!adminEdit && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
             <div className="form-section fotos-section">
               <div className="fotos-header">
                 <span className="fotos-label">
@@ -1131,6 +1440,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 )}
                 {fotoCarregando && <span className="fotos-loading">A processar…</span>}
               </div>
+              <p className="fotos-limite-hint">
+                Máximo de <strong>{MAX_FOTOS}</strong> fotografias por relatório (PDF e envio por email). As imagens são comprimidas no dispositivo.
+                {fotos.length >= MAX_FOTOS && (
+                  <span className="fotos-limite-atingido"> Limite atingido — remova uma foto para adicionar outra.</span>
+                )}
+              </p>
               {fotos.length > 0 && (
                 <div className="fotos-grid">
                   {fotos.map((src, idx) => (
@@ -1162,8 +1477,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ STEP 4 — Técnico ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 4 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 4) ? 'block' : 'none' }}>
+            {adminEdit && <h3 className="admin-edit-section-title">Técnico</h3>}
+            {!adminEdit && <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
             <label className="label-required form-section">
               <span>Técnico que realizou a manutenção <span className="req-star">*</span></span>
@@ -1178,19 +1494,22 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ STEP 5 — Nome do cliente ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 5 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 5) ? 'block' : 'none' }}>
+            {adminEdit && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
+            {!adminEdit && <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
-            <div className="declaracao-assinatura-box">
-              <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
-              <p className="declaracao-assinatura-texto">
-                {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
-              </p>
-            </div>
+            {!adminEdit && (
+              <div className="declaracao-assinatura-box">
+                <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
+                <p className="declaracao-assinatura-texto">
+                  {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
+                </p>
+              </div>
+            )}
 
-            <label className="label-required form-section">
-              <span>Nome do cliente que assina <span className="req-star">*</span></span>
+            <label className={`${adminEdit ? '' : 'label-required'} form-section`}>
+              <span>{adminEdit ? 'Nome do cliente que assinou' : 'Nome do cliente que assina'} {!adminEdit && <span className="req-star">*</span>}</span>
               <div className="campo-com-guardar">
                 <input type="text" value={form.nomeAssinante}
                   onChange={e => { setForm(f => ({ ...f, nomeAssinante: e.target.value })); setErroAssinatura('') }}
@@ -1208,52 +1527,86 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ STEP 6 — Assinatura ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 6 ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">O cliente deve assinar digitalmente para confirmar a aceitação do serviço.</p>
-            {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
-
-            <div className="assinatura-canvas-wrap">
-              <div className="assinatura-canvas-label">
-                Assinatura digital do cliente {!isAdmin && <span className="req-star">*</span>}
-              </div>
-              <canvas
-                ref={canvasRef}
-                width={480}
-                height={140}
-                className={`assinatura-canvas ${assinaturaFeita ? 'assinatura-canvas--feita' : ''}`}
-                onMouseDown={startDraw}
-                onMouseMove={draw}
-                onMouseUp={stopDraw}
-                onMouseLeave={stopDraw}
-                onTouchStart={startDraw}
-                onTouchMove={draw}
-                onTouchEnd={stopDraw}
-              />
-              <div className="assinatura-canvas-actions">
-                <button type="button" className="btn-link-checklist assinatura-limpar" onClick={limparAssinatura}>
-                  <Trash2 size={12} /> Limpar assinatura
-                </button>
-                {assinaturaFeita && (
-                  <>
-                    <span className="assinatura-ok">✓ Assinatura registada</span>
-                    <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
-                      title="Guardar esta assinatura para futuras intervenções deste cliente">
-                      <Bookmark size={14} /> Guardar assinatura
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === 6) ? 'block' : 'none' }}>
+            {adminEdit ? (
+              <>
+                <h3 className="admin-edit-section-title">Assinatura digital</h3>
+                {rel?.assinaturaDigital && !form.limparAssinatura ? (
+                  <div className="admin-edit-assinatura-preview">
+                    <img src={rel.assinaturaDigital} alt="Assinatura do cliente" className="assinatura-preview-img" />
+                    <div className="assinatura-preview-info">
+                      <span className="assinatura-ok">Assinado por: {rel.nomeAssinante || '(sem nome)'}</span>
+                      <button type="button" className="btn danger btn-sm" style={{ marginTop: '0.5rem' }}
+                        onClick={() => setForm(f => ({ ...f, nomeAssinante: '', limparAssinatura: true }))}>
+                        <Trash2 size={13} /> Limpar assinatura
+                      </button>
+                      <span className="form-hint" style={{ display: 'block', marginTop: '0.35rem' }}>
+                        Após limpar, use "Recolher assinatura" para obter nova assinatura do cliente.
+                      </span>
+                    </div>
+                  </div>
+                ) : form.limparAssinatura ? (
+                  <div className="admin-edit-assinatura-cleared">
+                    <p className="form-hint">Assinatura será removida ao guardar. Use depois "Recolher assinatura" no menu da manutenção.</p>
+                    <button type="button" className="btn secondary btn-sm"
+                      onClick={() => setForm(f => ({ ...f, nomeAssinante: rel?.nomeAssinante || '', limparAssinatura: false }))}>
+                      Cancelar remoção
                     </button>
-                  </>
+                  </div>
+                ) : (
+                  <p className="form-hint">Sem assinatura registada.</p>
                 )}
-              </div>
-            </div>
-            {isAdmin && !assinaturaFeita && (
-              <p className="wizard-step-hint" style={{ marginTop: '0.75rem', fontStyle: 'italic' }}>
-                Como Admin, pode avançar sem assinatura e gravar posteriormente.
-              </p>
+              </>
+            ) : (
+              <>
+                <p className="wizard-step-hint">O cliente deve assinar digitalmente para confirmar a aceitação do serviço.</p>
+                {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
+
+                <div className="assinatura-canvas-wrap">
+                  <div className="assinatura-canvas-label">
+                    Assinatura digital do cliente {!isAdmin && <span className="req-star">*</span>}
+                  </div>
+                  <canvas
+                    ref={canvasRef}
+                    width={480}
+                    height={140}
+                    className={`assinatura-canvas ${assinaturaFeita ? 'assinatura-canvas--feita' : ''}`}
+                    onMouseDown={startDraw}
+                    onMouseMove={draw}
+                    onMouseUp={stopDraw}
+                    onMouseLeave={stopDraw}
+                    onTouchStart={startDraw}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDraw}
+                  />
+                  <div className="assinatura-canvas-actions">
+                    <button type="button" className="btn-link-checklist assinatura-limpar" onClick={limparAssinatura}>
+                      <Trash2 size={12} /> Limpar assinatura
+                    </button>
+                    {assinaturaFeita && (
+                      <>
+                        <span className="assinatura-ok">✓ Assinatura registada</span>
+                        <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
+                          title="Guardar esta assinatura para futuras intervenções deste cliente">
+                          <Bookmark size={14} /> Guardar assinatura
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {isAdmin && !assinaturaFeita && (
+                  <p className="wizard-step-hint" style={{ marginTop: '0.75rem', fontStyle: 'italic' }}>
+                    Como Admin, pode avançar sem assinatura e gravar posteriormente.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
-          {/* ═══ STEP 7 — Finalizar ═══ */}
-          <div className="wizard-step-content" style={{ display: step === 7 ? 'block' : 'none' }}>
+          {/* ═══ STEP 7 — Finalizar (hidden in admin edit mode) ═══ */}
+          <div className="wizard-step-content" style={{ display: (!adminEdit && step === 7) ? 'block' : 'none' }}>
             <p className="wizard-step-hint">Reveja os dados, pré-visualize o relatório e finalize a manutenção.</p>
+            {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
             {(isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores())) && (
               <div className="form-section-historica">
@@ -1318,36 +1671,44 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
         </div>{/* fim .wizard-body */}
 
-        {/* ═══ Rodapé fixo — navegação unificada para todos os passos ═══ */}
+        {/* ═══ Rodapé fixo ═══ */}
         <div className="wizard-footer">
           <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
-          <div className="wizard-footer-actions">
-            {step > 1 && (
-              <button type="button" className="btn secondary" onClick={goPrev}>
-                <ChevronLeft size={16} /> Anterior
+          {adminEdit ? (
+            <div className="wizard-footer-actions">
+              <button type="button" className="btn btn-gravar-sucesso" onClick={handleAdminEditSave}>
+                <Save size={15} /> Guardar alterações
               </button>
-            )}
-            {step < TOTAL_STEPS && (
-              <button type="button" className="btn primary" onClick={goNext}>
-                Seguinte <ChevronRight size={16} />
-              </button>
-            )}
-            {step === TOTAL_STEPS && (
-              <>
-                {isAdmin && (
-                  <button type="button" className="btn btn-outline-warning" onClick={handleGravarSemAssinatura} disabled={emailEnviando}>
-                    <PenLine size={15} /> Guardar sem ass.
+            </div>
+          ) : (
+            <div className="wizard-footer-actions">
+              {step > 1 && (
+                <button type="button" className="btn secondary" onClick={goPrev}>
+                  <ChevronLeft size={16} /> Anterior
+                </button>
+              )}
+              {step < TOTAL_STEPS && (
+                <button type="button" className="btn primary" onClick={goNext}>
+                  Seguinte <ChevronRight size={16} />
+                </button>
+              )}
+              {step === TOTAL_STEPS && (
+                <>
+                  {isAdmin && (
+                    <button type="button" className="btn btn-outline-warning" onClick={handleGravarSemAssinatura} disabled={emailEnviando}>
+                      <PenLine size={15} /> Guardar sem ass.
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-gravar-sucesso" onClick={handleGravarSemEnvio} disabled={emailEnviando}>
+                    <Save size={15} /> Gravar
                   </button>
-                )}
-                <button type="button" className="btn btn-gravar-sucesso" onClick={handleGravarSemEnvio} disabled={emailEnviando}>
-                  <Save size={15} /> Gravar
-                </button>
-                <button type="submit" className="btn btn-enviar-relatorio" disabled={emailEnviando}>
-                  {emailEnviando ? 'A enviar…' : <><Mail size={15} /> Enviar</>}
-                </button>
-              </>
-            )}
-          </div>
+                  <button type="submit" className="btn btn-enviar-relatorio" disabled={emailEnviando}>
+                    {emailEnviando ? 'A enviar…' : <><Mail size={15} /> Enviar</>}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
         </form>
       </div>

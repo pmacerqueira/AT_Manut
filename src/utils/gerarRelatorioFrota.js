@@ -13,7 +13,7 @@
  */
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
-import { EMPRESA } from '../constants/empresa'
+import { normEntityId, dateKeyForFilter } from './frotaReportHelpers'
 
 const AZUL = [30, 58, 95]
 const AZUL_CLARO = [235, 242, 252]
@@ -63,65 +63,97 @@ export async function gerarRelatorioFrotaPdf(
   const ano = new Date().getFullYear()
   const periodoCustom = !!options.periodoCustom
   const periodoLabel = options.periodoLabel || String(ano)
+  const pinicio = options.periodoInicio ?? null
+  const pfim = options.periodoFim ?? null
+
+  const dataDentroPeriodo = (dk) => {
+    if (!dk) return false
+    if (pinicio && dk < pinicio) return false
+    if (pfim && dk > pfim) return false
+    return true
+  }
+
+  const { loadImageAsDataUrl, addImageFitInBoxMm } = await import('./gerarPdfRelatorio')
+  let frotaLogoDataUrl = null
+  try {
+    frotaLogoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+  } catch (_) { /* sem logo */ }
 
   // ── Pré-filtragem com Maps para O(1) lookup ─────────────────────────────
-  const maqIds = new Set(maquinas.map(m => m.id))
-  const manutsDoCliente = manutencoes.filter(mt => maqIds.has(mt.maquinaId))
-  const repsDoCliente = reparacoes.filter(r => maqIds.has(r.maquinaId))
-  const relMap = new Map(relatorios.filter(r => manutsDoCliente.some(mt => mt.id === r.manutencaoId)).map(r => [r.manutencaoId, r]))
+  const maqIds = new Set(maquinas.map(m => normEntityId(m.id)))
+  const manutsDoCliente = manutencoes.filter(mt => maqIds.has(normEntityId(mt.maquinaId)))
+  const repsDoCliente = reparacoes.filter(r => maqIds.has(normEntityId(r.maquinaId)))
+  const relMap = new Map()
+  for (const r of relatorios) {
+    const rid = normEntityId(r.manutencaoId)
+    if (!rid || !manutsDoCliente.some(mt => normEntityId(mt.id) === rid)) continue
+    relMap.set(rid, r)
+  }
 
   const manutsByMaq = new Map()
   manutsDoCliente.forEach(mt => {
-    if (!manutsByMaq.has(mt.maquinaId)) manutsByMaq.set(mt.maquinaId, [])
-    manutsByMaq.get(mt.maquinaId).push(mt)
+    const k = normEntityId(mt.maquinaId)
+    if (!manutsByMaq.has(k)) manutsByMaq.set(k, [])
+    manutsByMaq.get(k).push(mt)
   })
   const repsByMaq = new Map()
   repsDoCliente.forEach(r => {
-    if (!repsByMaq.has(r.maquinaId)) repsByMaq.set(r.maquinaId, [])
-    repsByMaq.get(r.maquinaId).push(r)
+    const k = normEntityId(r.maquinaId)
+    if (!repsByMaq.has(k)) repsByMaq.set(k, [])
+    repsByMaq.get(k).push(r)
   })
 
   // ── Calcular estado por máquina ──────────────────────────────────────────
   const linhas = maquinas.map(m => {
     const sub = getSubcategoria(m.subcategoriaId)
     const cat = sub ? getCategoria(sub.categoriaId) : null
-    const manutsM = manutsByMaq.get(m.id) || []
-    const repsM = repsByMaq.get(m.id) || []
+    const mid = normEntityId(m.id)
+    const manutsM = manutsByMaq.get(mid) || []
+    const repsM = repsByMaq.get(mid) || []
     const concluidas = manutsM.filter(mt => mt.status === 'concluida')
     const ultima = concluidas.sort((a, b) => b.data.localeCompare(a.data))[0]
     const proxima = manutsM
       .filter(mt => mt.status === 'agendada' || mt.status === 'pendente')
       .sort((a, b) => a.data.localeCompare(b.data))[0]
-    const emAtraso = proxima && proxima.data < hoje
+    const proxDataKey = proxima?.data != null
+      ? String(proxima.data).slice(0, 10)
+      : (m.proximaManut ? String(m.proximaManut).slice(0, 10) : '')
+    const emAtraso = !!(proxDataKey && proxDataKey < hoje)
     const totalManuts = concluidas.length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
-    const relUltima = ultima ? relMap.get(ultima.id) : null
+    const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
+    const proximaParaDias = proxima?.data ?? m.proximaManut
     let diasAtraso = null
-    if (proxima) {
-      diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proxima.data)) / 86400000)
+    if (proximaParaDias) {
+      diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proximaParaDias)) / 86400000)
     }
 
     let estado
-    if (!m.proximaManut) estado = 'instalar'
+    if (!ultima && !proxDataKey) estado = 'instalar'
     else if (emAtraso) estado = 'atraso'
     else estado = 'conforme'
 
-    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado }
+    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, proxDataKey }
   })
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
   const totalEquip = maquinas.length
   const totalAtraso = linhas.filter(l => l.estado === 'atraso').length
   const totalConformes = linhas.filter(l => l.estado === 'conforme').length
-  const totalPorInstalar = linhas.filter(l => l.estado === 'instalar').length
   const taxaCumprimento = totalEquip > 0 ? Math.round((totalConformes / totalEquip) * 100) : 0
   const totalManutsAno = periodoCustom
-    ? manutsDoCliente.filter(mt => mt.status === 'concluida').length
+    ? manutsDoCliente.filter(mt => {
+        if (mt.status !== 'concluida') return false
+        return dataDentroPeriodo(dateKeyForFilter(mt.data))
+      }).length
     : manutsDoCliente.filter(mt => mt.status === 'concluida' && mt.data?.startsWith(String(ano))).length
   const totalRepsAno = periodoCustom
-    ? repsDoCliente.filter(r => r.status === 'concluida').length
+    ? repsDoCliente.filter(r => {
+        if (r.status !== 'concluida') return false
+        return dataDentroPeriodo(dateKeyForFilter(r.data))
+      }).length
     : repsDoCliente.filter(r => r.status === 'concluida' && r.data?.startsWith(String(ano))).length
   const totalRepsAbertas = linhas.reduce((s, l) => s + l.repsAbertas, 0)
   const pendentesAgendadas = manutsDoCliente.filter(mt => mt.status === 'pendente' || mt.status === 'agendada').length
@@ -138,7 +170,11 @@ export async function gerarRelatorioFrotaPdf(
   // ── Reparações recentes ──────────────────────────────────────────────────
   const umAnoAtras = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)
   const repsRecentes = repsDoCliente
-    .filter(r => r.status === 'concluida' && (periodoCustom || r.data >= umAnoAtras))
+    .filter(r => {
+      if (r.status !== 'concluida') return false
+      if (periodoCustom) return dataDentroPeriodo(dateKeyForFilter(r.data))
+      return r.data >= umAnoAtras
+    })
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 25)
 
@@ -150,15 +186,27 @@ export async function gerarRelatorioFrotaPdf(
   }
 
   const drawHeader = () => {
-    pdf.setFillColor(...AZUL)
-    pdf.rect(0, 0, W, 24, 'F')
+    const headerH = 30
+    pdf.setFillColor(30, 58, 95)
+    pdf.rect(0, 0, W, headerH, 'F')
+    if (frotaLogoDataUrl) {
+      try {
+        const lW = 40; const lH = 13; const pad = 3; const r = 3
+        const bx = M; const by = (headerH - lH - pad * 2) / 2
+        const bw = lW + pad * 2; const bh = lH + pad * 2
+        pdf.setFillColor(255, 255, 255)
+        pdf.roundedRect(bx, by, bw, bh, r, r, 'F')
+        addImageFitInBoxMm(pdf, frotaLogoDataUrl, bx + pad, by + pad, lW, lH)
+      } catch (_) { /* logo inválido */ }
+    }
+    const txR = W - M
     pdf.setTextColor(...BRANCO)
-    pdf.setFontSize(12); pdf.setFont('helvetica', 'bold')
-    pdf.text('NAVEL-A\u00c7ORES', M, 10)
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
+    pdf.text('Jos\u00e9 Gon\u00e7alves Cerqueira (NAVEL \u2013 A\u00c7ORES), Lda.', txR, 10, { align: 'right' })
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
-    pdf.text(`${EMPRESA.telefones}  \u2022  geral@navel.pt  \u2022  ${EMPRESA.web}`, M, 16)
-    pdf.text(EMPRESA.nome, M, 21)
-    y = 32
+    pdf.text("Pico d'Agua Park \u2022 www.navel.pt", txR, 17, { align: 'right' })
+    pdf.text('S\u00e3o Miguel\u2013A\u00e7ores', txR, 23, { align: 'right' })
+    y = headerH + 6
   }
 
   const drawSectionTitle = (title, color = AZUL) => {
@@ -358,26 +406,45 @@ export async function gerarRelatorioFrotaPdf(
     y += 5
   }
 
-  const ROW_H = 11.5
-
   const drawEquipRow = (l, rowIdx) => {
-    const { m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estado } = l
-    if (y > 269) { pdf.addPage(); y = 18; drawTableHeader() }
+    const { m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estado, proxDataKey } = l
+
+    const xs = []
+    let cxx = M
+    colDefs.forEach(col => { xs.push(cxx); cxx += col.w })
+    const textColW = colDefs[0].w - 2
+
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(...TEXTO)
+    const block1 = pdf.splitTextToSize(`${(m.marca || '').trim()} ${(m.modelo || '').trim()}`.trim() || '\u2014', textColW)
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(...MUTED)
+    const subSerie = [sub?.nome, m.numeroSerie ? `S/N: ${m.numeroSerie}` : ''].filter(Boolean).join(' \u00b7 ')
+    const block2 = subSerie ? pdf.splitTextToSize(subSerie, textColW) : []
+    const lineH1 = 3.85
+    const lineH2 = 3.45
+    const padTop = 3.5
+    const rowH = Math.max(12.5, padTop + block1.length * lineH1 + (block2.length ? 1.2 + block2.length * lineH2 : 0) + 3)
+
+    if (y > 280 - rowH) { pdf.addPage(); y = 18; drawTableHeader() }
 
     if (rowIdx % 2 === 0) {
       pdf.setFillColor(249, 250, 251)
-      pdf.rect(M, y - 3.5, CW, ROW_H, 'F')
+      pdf.rect(M, y - 3.5, CW, rowH, 'F')
     }
     pdf.setDrawColor(...CINZA_BORDA); pdf.setLineWidth(0.15)
-    pdf.line(M, y - 3.5 + ROW_H, M + CW, y - 3.5 + ROW_H)
+    pdf.line(M, y - 3.5 + rowH, M + CW, y - 3.5 + rowH)
 
-    const y1 = y
-    const y2 = y + 5.5
-
-    // Compute column x starts from colDefs
-    const xs = []
-    let cx = M
-    colDefs.forEach(col => { xs.push(cx); cx += col.w })
+    let ty = y - 3.5 + padTop
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(...TEXTO)
+    block1.forEach((ln) => {
+      pdf.text(ln, xs[0] + 1, ty)
+      ty += lineH1
+    })
+    if (block2.length) ty += 0.8
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(...MUTED)
+    block2.forEach((ln) => {
+      pdf.text(ln, xs[0] + 1, ty)
+      ty += lineH2
+    })
 
     const diasStr = diasAtraso != null
       ? (diasAtraso > 0 ? `+${diasAtraso}` : diasAtraso === 0 ? 'Hoje' : String(diasAtraso))
@@ -385,53 +452,39 @@ export async function gerarRelatorioFrotaPdf(
     const diasColor = diasAtraso > 0 ? VERMELHO : diasAtraso != null && diasAtraso <= 0 ? VERDE : MUTED
 
     let estadoLabel, estadoColor
-    if (estado === 'atraso') { estadoLabel = 'Em atraso'; estadoColor = VERMELHO }
+    if (estado === 'atraso') { estadoLabel = 'N\u00e3o conforme'; estadoColor = VERMELHO }
     else if (estado === 'conforme') { estadoLabel = 'Conforme'; estadoColor = VERDE }
     else { estadoLabel = 'Por instalar'; estadoColor = LARANJA }
 
     const ultimaStr = ultima ? fmtD(ultima.data) : '\u2014'
-    const proximaStr = proxima?.data ? fmtD(proxima.data) : (m.proximaManut ? fmtD(m.proximaManut) : '\u2014')
-    const proximaColor = proxima?.data && proxima.data < hoje ? VERMELHO : VERDE
+    const proximaRaw = proxima?.data ?? m.proximaManut
+    const proximaStr = proximaRaw ? fmtD(proximaRaw) : '\u2014'
+    const proximaColor = proxDataKey && proxDataKey < hoje ? VERMELHO : VERDE
 
-    // ── Linha 1: Marca Modelo (col 0) + todos os campos numéricos/estado
-    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(...TEXTO)
-    pdf.text(truncate(`${m.marca} ${m.modelo}`, 44), xs[0] + 1, y1)
+    const yMid = y - 3.5 + rowH / 2 + 1.2
 
-    // Última (col 1)
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(...TEXTO)
-    pdf.text(ultimaStr, xs[1] + colDefs[1].w / 2, y1, { align: 'center' })
+    pdf.text(ultimaStr, xs[1] + colDefs[1].w / 2, yMid, { align: 'center' })
 
-    // Próxima (col 2)
     pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...proximaColor)
-    pdf.text(proximaStr, xs[2] + colDefs[2].w / 2, y1, { align: 'center' })
+    pdf.text(proximaStr, xs[2] + colDefs[2].w / 2, yMid, { align: 'center' })
 
-    // Dias (col 3)
     pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...diasColor)
-    pdf.text(diasStr, xs[3] + colDefs[3].w / 2, y1, { align: 'center' })
+    pdf.text(diasStr, xs[3] + colDefs[3].w / 2, yMid, { align: 'center' })
 
-    // Man. (col 4)
     pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
-    pdf.text(totalManuts ? String(totalManuts) : '\u2014', xs[4] + colDefs[4].w / 2, y1, { align: 'center' })
+    pdf.text(totalManuts ? String(totalManuts) : '\u2014', xs[4] + colDefs[4].w / 2, yMid, { align: 'center' })
 
-    // Rep. (col 5)
-    pdf.text(totalReps ? String(totalReps) : '\u2014', xs[5] + colDefs[5].w / 2, y1, { align: 'center' })
+    pdf.text(totalReps ? String(totalReps) : '\u2014', xs[5] + colDefs[5].w / 2, yMid, { align: 'center' })
 
-    // Estado (col 6)
     pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...estadoColor)
-    pdf.text(estadoLabel, xs[6] + colDefs[6].w / 2, y1, { align: 'center' })
+    pdf.text(estadoLabel, xs[6] + colDefs[6].w / 2, yMid, { align: 'center' })
 
-    // Últ. rel. (col 7)
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
-    pdf.text(relUltima?.numeroRelatorio || '\u2014', xs[7] + colDefs[7].w / 2, y1, { align: 'center' })
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED); pdf.setFontSize(6.5)
+    const nr = relUltima?.numeroRelatorio ? String(relUltima.numeroRelatorio) : '\u2014'
+    pdf.text(nr, xs[7] + colDefs[7].w / 2, yMid, { align: 'center' })
 
-    // ── Linha 2: Subcategoria · S/N (col 0) e nº série (cols seguintes)
-    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(...MUTED)
-    const subNome = sub ? sub.nome : ''
-    const serieParts = [subNome, m.numeroSerie ? `S/N: ${m.numeroSerie}` : ''].filter(Boolean)
-    const linha2Txt = serieParts.join('  \u00b7  ')
-    if (linha2Txt) pdf.text(truncate(linha2Txt, 52), xs[0] + 1, y2)
-
-    y += ROW_H
+    y += rowH
   }
 
   for (const [, grupo] of categoriasMap) {
@@ -489,17 +542,21 @@ export async function gerarRelatorioFrotaPdf(
       .forEach(({ m, sub, proxima, diasAtraso }, i) => {
         if (y > 272) { pdf.addPage(); y = 18 }
         if (i % 2 === 0) { pdf.setFillColor(254, 242, 242); pdf.rect(M, y - 3.5, CW, 7, 'F') }
+        const dataAtraso = proxima?.data ?? m.proximaManut
         let cx = M
         pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...TEXTO)
         pdf.text(truncate(`${m.marca} ${m.modelo}${sub ? ` (${sub.nome})` : ''}`, 42), cx + 1, y); cx += 52
         pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
-        pdf.text(truncate(m.numeroSerie, 22), cx + 1, y); cx += 30
+        const serieLines = pdf.splitTextToSize(String(m.numeroSerie || '\u2014'), 28)
+        pdf.text(serieLines[0] || '\u2014', cx + 1, y)
+        if (serieLines[1]) pdf.text(serieLines[1], cx + 1, y + 3.2)
+        cx += 30
         pdf.setTextColor(...VERMELHO); pdf.setFont('helvetica', 'bold')
-        pdf.text(fmtD(proxima.data), cx + 13, y, { align: 'center' }); cx += 26
+        pdf.text(fmtD(dataAtraso), cx + 13, y, { align: 'center' }); cx += 26
         pdf.text(`+${diasAtraso ?? 0}d`, cx + 10, y, { align: 'center' }); cx += 20
         pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED); pdf.setFontSize(6.5)
-        pdf.text(truncate(proxima.observacoes, 50), cx + 1, y)
-        y += 6.5
+        pdf.text(truncate(proxima?.observacoes, 50), cx + 1, y)
+        y += serieLines.length > 1 ? 9.8 : 6.5
       })
   }
 
@@ -534,21 +591,24 @@ export async function gerarRelatorioFrotaPdf(
     })
     y += 5
 
-    const maqMap = new Map(maquinas.map(m => [m.id, m]))
+    const maqMap = new Map(maquinas.map(m => [normEntityId(m.id), m]))
     repsRecentes.forEach((r, i) => {
       if (y > 272) { pdf.addPage(); y = 18 }
       if (i % 2 === 0) { pdf.setFillColor(254, 251, 235); pdf.rect(M, y - 3.5, CW, 7, 'F') }
-      const maq = maqMap.get(r.maquinaId)
+      const maq = maqMap.get(normEntityId(r.maquinaId))
       let cx = M
       pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...TEXTO)
       pdf.text(truncate(maq ? `${maq.marca} ${maq.modelo}` : '\u2014', 36), cx + 1, y); cx += 48
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
-      pdf.text(truncate(maq?.numeroSerie, 20), cx + 1, y); cx += 28
+      const snLines = pdf.splitTextToSize(String(maq?.numeroSerie || '\u2014'), 26)
+      pdf.text(snLines[0] || '\u2014', cx + 1, y)
+      if (snLines[1]) pdf.text(snLines[1], cx + 1, y + 3.1)
+      cx += 28
       pdf.setTextColor(...TEXTO)
       pdf.text(fmtD(r.data), cx + 11, y, { align: 'center' }); cx += 22
       pdf.setFontSize(6.5); pdf.setTextColor(...MUTED)
       pdf.text(truncate(r.descricao || r.descricaoAvaria || '', 80), cx + 1, y)
-      y += 6.5
+      y += snLines.length > 1 ? 9.5 : 6.5
     })
   }
 
@@ -563,7 +623,7 @@ export async function gerarRelatorioFrotaPdf(
     pdf.setTextColor(160, 180, 210); pdf.setFontSize(6.5); pdf.setFont('helvetica', 'normal')
     pdf.text(APP_FOOTER_TEXT, W / 2, 286, { align: 'center' })
     pdf.setFontSize(5.5)
-    pdf.text(`${EMPRESA.divisaoComercial}  \u2022  ${EMPRESA.telefones}  \u2022  ${EMPRESA.web}`, W / 2, 291, { align: 'center' })
+    pdf.text('Pico da Pedra & Ponta Delgada  \u2022  296 205 290 / 296 630 120  \u2022  www.navel.pt', W / 2, 291, { align: 'center' })
     if (totalPages > 1) {
       pdf.setTextColor(200, 210, 230)
       pdf.text(`P\u00e1gina ${p}/${totalPages}`, W - M, 293, { align: 'right' })
@@ -573,8 +633,3 @@ export async function gerarRelatorioFrotaPdf(
   return pdf.output('blob')
 }
 
-/**
- * Mantém a versão HTML para compatibilidade com envio de email.
- * Re-exporta da versão original (agora simplificada).
- */
-export { gerarRelatorioFrotaPdf as gerarRelatorioFrota }

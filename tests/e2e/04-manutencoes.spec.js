@@ -13,6 +13,8 @@ import { test, expect } from '@playwright/test'
 import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
   checklistMarcarTodos, checklistFillAllSim, signCanvas,
+  execWizardSeguinte,
+  fillExecucaoModal,
   MC,
 } from './helpers.js'
 
@@ -199,118 +201,83 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
   test('Submeter sem checklist completo mostra erro', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+    await expect(page.locator('.checklist-item-row, .checklist-respostas').first()).toBeVisible({ timeout: 8000 })
 
-    // Preencher técnico e nome assinante (required HTML5) para React poder validar checklist
-    const selectTecnico = page.locator('.assinatura-section select').first()
-    if (await selectTecnico.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await selectTecnico.selectOption({ index: 1 })
-    }
-    const inputNome = page.locator('.assinatura-section input[type="text"]').first()
-    if (await inputNome.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await inputNome.fill('Cliente Teste')
+    // O modal pré-preenche a partir da última execução (mt01) — limpar para forçar checklist incompleta
+    const desmarcar = page.locator('.checklist-quick-actions .btn-link-checklist').filter({ hasText: /Desmarcar todos/i })
+    if (await desmarcar.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await desmarcar.click()
+      await page.waitForTimeout(200)
     }
 
-    // NÃO preencher checklist — tentar submeter
-    await page.locator('.modal-relatorio-form button[type="submit"]').click()
-    await page.waitForTimeout(600)
+    await execWizardSeguinte(page)
 
-    // React handleSubmit deve mostrar erro de checklist (verifica ANTES de assinatura)
     await expect(
       page.locator('.form-erro').filter({ hasText: /checklist|verificadas/i }).first()
-    ).toBeVisible({ timeout: 3000 })
+    ).toBeVisible({ timeout: 5000 })
   })
 
   test('Submeter sem assinatura mostra erro', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
-    // Preencher checklist
     await checklistMarcarTodos(page)
     await checklistFillAllSim(page)
 
-    // Preencher técnico (required no HTML5) e nome assinante
-    const selectTecnico = page.locator('.assinatura-section select').first()
-    if (await selectTecnico.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await selectTecnico.selectOption({ index: 1 })
-    }
-    const inputNome = page.locator('.assinatura-section input[type="text"]').first()
-    if (await inputNome.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await inputNome.fill('Cliente Teste')
-    }
+    await execWizardSeguinte(page)
+    await execWizardSeguinte(page)
+    await execWizardSeguinte(page)
 
-    // Tentar submeter SEM assinatura canvas — React deve mostrar erro
-    await page.locator('.modal-relatorio-form button[type="submit"]').click()
-    await page.waitForTimeout(500)
+    const selectTecnico = page.locator('.modal select').filter({
+      has: page.locator('option[value="Aurélio Almeida"]')
+    }).first()
+    await selectTecnico.waitFor({ state: 'visible', timeout: 5000 })
+    await selectTecnico.selectOption({ index: 1 })
+    await execWizardSeguinte(page)
 
+    await page.locator('.modal input[placeholder*="Nome completo" i]').first().fill('Cliente Teste')
+    await execWizardSeguinte(page)
+
+    // Passo assinatura: Admin pode avançar sem desenhar; no passo final «Enviar» exige assinatura
+    await execWizardSeguinte(page)
+
+    await expect(page.locator('.wizard-progress-step')).toContainText(/7\s+de\s+7/i, { timeout: 8000 })
+
+    await page.locator('.modal-relatorio-form button[type="submit"]').filter({ hasText: /Enviar/i }).click()
+    await page.waitForTimeout(400)
+
+    // O mesmo `erroAssinatura` pode repetir-se no DOM (passos 6 e 7); o primeiro está no passo oculto.
     await expect(
-      page.locator('.form-erro').filter({ hasText: /assinatura|obrigatória/i }).first()
-    ).toBeVisible({ timeout: 3000 })
+      page.locator('.form-erro').filter({ hasText: /assinatura|obrigatória/i }).last()
+    ).toBeVisible({ timeout: 5000 })
   })
 
   test('Adicionar nota no campo de observações', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+    await checklistMarcarTodos(page)
+    await execWizardSeguinte(page)
 
-    const notasField = page.locator('.modal textarea').first()
-    if (await notasField.isVisible()) {
-      await notasField.fill('Manutenção periódica executada sem anomalias.')
-      // Verificar contador de caracteres
-      const charCount = page.locator('.char-count')
-      if (await charCount.isVisible()) {
-        await expect(charCount).toContainText(/\d+\/300/)
-      }
-    }
+    const notasField = page.locator('.modal textarea.textarea-full').first()
+    await expect(notasField).toBeVisible({ timeout: 5000 })
+    await notasField.fill('Manutenção periódica executada sem anomalias.')
+    await expect(page.locator('.char-count').first()).toContainText(/\d+\/300/)
   })
 
   test('FLUXO COMPLETO — Executar manutenção periódica sem email', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
-    // 1. Marcar todos como Sim
-    await checklistMarcarTodos(page)
-    await checklistFillAllSim(page)
+    await fillExecucaoModal(page, {
+      notas: 'Tudo em conformidade.',
+      nomeAssinante: 'João da Silva',
+    })
 
-    // 2. Notas (opcional)
-    const notasField = page.locator('.modal textarea').first()
-    if (await notasField.isVisible()) {
-      await notasField.fill('Tudo em conformidade.')
-    }
+    await page.locator('.btn-gravar-sucesso').click()
 
-    // 3. Seleccionar técnico
-    const selectTecnico = page.locator('.modal select').filter({
-      has: page.locator('option')
-    }).first()
-    if (await selectTecnico.isVisible()) {
-      await selectTecnico.selectOption({ index: 1 }).catch(() => {})
-    }
-
-    // 4. Nome do assinante
-    const inputNome = page.locator('.assinatura-section input[type="text"], .modal input[type="text"]')
-      .filter({ has: page.locator('[placeholder*="nome" i], [placeholder*="assinant" i]') }).first()
-    if (await inputNome.isVisible()) {
-      await inputNome.fill('João da Silva')
-    } else {
-      // Tentar input genérico na secção de assinatura
-      const fallbackInput = page.locator('.assinatura-section input, .form-section input[type="text"]').last()
-      if (await fallbackInput.isVisible()) await fallbackInput.fill('João da Silva')
-    }
-
-    // 5. Assinar canvas
-    await signCanvas(page)
-
-    // 6. Limpar campo email (não enviar)
-    const emailInput = page.locator('.email-section input[type="email"]')
-    if (await emailInput.isVisible()) {
-      await emailInput.clear()
-    }
-
-    // 7. Submeter
-    await page.locator('.modal-relatorio-form button[type="submit"]').click()
-
-    // 8. Verificar ecrã de sucesso
     await expect(
-      page.locator('.modal').filter({ hasText: /executada|concluída|sucesso/i }).first()
-    ).toBeVisible({ timeout: 10000 })
+      page.locator('.modal').filter({ hasText: /executada|concluída|sucesso|gravada/i }).first()
+    ).toBeVisible({ timeout: 12000 })
   })
 
   test('FLUXO COMPLETO — Botões Sim/Não individuais funcionam', async ({ page }) => {

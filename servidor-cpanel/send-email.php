@@ -1,4 +1,5 @@
 <?php
+@error_log(date('Y-m-d H:i:s') . " [DBG] === SEND-EMAIL.PHP HIT === method=" . ($_SERVER['REQUEST_METHOD'] ?? '?') . " size=" . ($_SERVER['CONTENT_LENGTH'] ?? '?') . "\n", 3, __DIR__ . '/atm_debug.log');
 /**
  * send-email.php — Relatórios NAVEL com PDF (FPDF)
  * =================================================
@@ -116,12 +117,16 @@ if (file_exists($_atm_log_path)) {
     if ($atm_log_loaded) $GLOBALS['_atm_log_route'] = 'send-email';
 }
 set_error_handler(function ($no, $str, $file, $line) use ($atm_log_loaded) {
-    @error_log(date('Y-m-d H:i:s') . " ERR($no): $str\n", 3, __DIR__ . '/atm_debug.log');
+    @error_log(date('Y-m-d H:i:s') . " ERR($no): $str [" . basename($file) . ":$line]\n", 3, __DIR__ . '/atm_debug.log');
     if ($atm_log_loaded) atm_log_api('error', 'send-email', 'php_error', $str, ['file' => basename($file), 'line' => $line]);
-    http_response_code(500);
-    $msg = str_replace(['"', "\n", "\r"], ["'", ' ', ''], $str);
-    echo '{"ok":false,"message":"Erro PHP (' . $no . '): ' . $msg . '"}';
-    exit;
+    $fatal = in_array($no, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR]);
+    if ($fatal) {
+        http_response_code(500);
+        $msg = str_replace(['"', "\n", "\r"], ["'", ' ', ''], $str);
+        echo '{"ok":false,"message":"Erro PHP (' . $no . '): ' . $msg . '"}';
+        exit;
+    }
+    return true;
 });
 register_shutdown_function(function () use ($atm_log_loaded) {
     $e = error_get_last();
@@ -138,6 +143,10 @@ register_shutdown_function(function () use ($atm_log_loaded) {
 define('AUTH_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
 define('FROM_EMAIL', 'no-reply@navel.pt');
 define('REPLY_TO',   'comercial@navel.pt');
+
+function _dbg($msg) {
+    @error_log(date('Y-m-d H:i:s') . " [DBG] $msg\n", 3, __DIR__ . '/atm_debug.log');
+}
 
 // ── Ler dados ─────────────────────────────────────────────────────────────────
 // NÃO dependemos de $_SERVER['CONTENT_TYPE'] — em LiteSpeed/LSAPI esse header
@@ -179,6 +188,15 @@ $proxima_manut   = $g('proxima_manut');
 $app_version     = $g('app_version') ?: '1.8.0';
 $tecnico_tel     = $g('tecnico_telefone');
 $tecnico_sig_b64 = $g('tecnico_assinatura_b64');
+$manutencao_tipo        = $g('manutencao_tipo', 'periodica');
+if (!in_array($manutencao_tipo, ['montagem', 'periodica', 'reparacao'], true)) {
+    $manutencao_tipo = 'periodica';
+}
+$periodicidade_maquina  = $g('periodicidade_maquina');
+$proximas_manut_json    = $g('proximas_manutencoes_json');
+$pecas_usadas_json      = $g('pecas_usadas_json');
+$navel_logo_b64         = isset($_data['navel_logo_b64']) ? (string)$_data['navel_logo_b64'] : '';
+$brand_logo_b64         = isset($_data['brand_logo_b64']) ? (string)$_data['brand_logo_b64'] : '';
 
 // Auth
 if ($token !== AUTH_TOKEN) {
@@ -186,6 +204,8 @@ if ($token !== AUTH_TOKEN) {
     echo json_encode(['ok' => false, 'message' => 'Acesso negado.']);
     exit;
 }
+
+_dbg("START to=$to_email rel=$num_rel tipo=$tipo_email");
 
 // Validate email
 $to_email = filter_var($to_email, FILTER_VALIDATE_EMAIL);
@@ -249,7 +269,7 @@ if ($tipo_email === 'lembrete') {
       <!-- Cabeçalho -->
       <tr>
         <td style='background:#1a4880;padding:22px 28px;'>
-          <p style='margin:0;font-size:1.15em;font-weight:700;color:#fff;'>NAVEL-AÇORES, Lda</p>
+          <p style='margin:0;font-size:1.15em;font-weight:700;color:#fff;'>NAVEL &ndash; AÇORES</p>
           <p style='margin:4px 0 0;font-size:0.8em;color:#bfdbfe;'>AT_Manut v$app_ver · Gestão de Manutenções</p>
         </td>
       </tr>
@@ -289,7 +309,7 @@ if ($tipo_email === 'lembrete') {
         <td style='padding:0 28px 24px;'>
           <p style='margin:0;font-size:0.85em;color:#6b7280;line-height:1.5;'>
             Para agendar ou esclarecer qualquer questão, contacte-nos:<br>
-            <strong>296 205 290 / 296 630 120</strong> · <a href='mailto:geral@navel.pt' style='color:#1a4880;'>geral@navel.pt</a>
+            <strong>296 205 290 / 296 630 120</strong> · <a href='mailto:comercial@navel.pt' style='color:#1a4880;'>comercial@navel.pt</a>
           </p>
         </td>
       </tr>
@@ -297,7 +317,7 @@ if ($tipo_email === 'lembrete') {
       <!-- Rodapé -->
       <tr>
         <td style='background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;font-size:0.75em;color:#9ca3af;text-align:center;'>
-          Navel-Açores, Lda — Todos os direitos reservados · AT_Manut v$app_ver
+          NAVEL &ndash; AÇORES, Lda — Todos os direitos reservados · AT_Manut v$app_ver
         </td>
       </tr>
 
@@ -308,7 +328,7 @@ if ($tipo_email === 'lembrete') {
 
     $headers  = "MIME-Version: 1.0\r\n";
     $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: =?UTF-8?B?" . base64_encode('NAVEL-AÇORES · AT_Manut') . "?= <" . FROM_EMAIL . ">\r\n";
+    $headers .= "From: =?UTF-8?B?" . base64_encode('NAVEL – AÇORES') . "?= <" . FROM_EMAIL . ">\r\n";
     $headers .= "Reply-To: " . REPLY_TO . "\r\n";
     $headers .= "Cc: " . REPLY_TO . "\r\n";   // CC sempre ao admin
     $headers .= "X-Mailer: AT_Manut/$app_ver\r\n";
@@ -332,6 +352,23 @@ if ($checklist_json) {
 $nSim = count(array_filter($checklist, function($i) { return ($i['resp'] ?? '') === 'sim'; }));
 $nNao = count(array_filter($checklist, function($i) { return ($i['resp'] ?? '') === 'nao'; }));
 
+// Próximas manutenções + peças (JSON — alinhado com gerarPdfCompacto)
+$proximas_list = [];
+if ($proximas_manut_json) {
+    $dec = json_decode($proximas_manut_json, true);
+    if (is_array($dec)) {
+        $proximas_list = $dec;
+        usort($proximas_list, function ($a, $b) {
+            return strcmp($a['data'] ?? '', $b['data'] ?? '');
+        });
+    }
+}
+$pecas_list = [];
+if ($pecas_usadas_json) {
+    $dec = json_decode($pecas_usadas_json, true);
+    if (is_array($dec)) $pecas_list = $dec;
+}
+
 // Fotos: o JS envia raw base64 (sem "data:image/jpeg;base64," prefix) para
 // contornar regras ModSecurity que bloqueiam data: URIs. Reconstruir aqui.
 $photos = [];
@@ -349,6 +386,15 @@ if ($photos_json && $photos_json !== '[]') {
     }
 }
 
+// Limite alinhado à app React (PDF + corpo HTML estáveis em tablets / memória PHP)
+if (!defined('ATM_MAX_FOTOS_RELATORIO')) {
+    define('ATM_MAX_FOTOS_RELATORIO', 6);
+}
+$photos_total_for_note = count($photos);
+if (count($photos) > ATM_MAX_FOTOS_RELATORIO) {
+    $photos = array_slice($photos, 0, ATM_MAX_FOTOS_RELATORIO);
+}
+
 // Assinatura digital do cliente: raw base64 (PNG do canvas) → binário
 $assinatura_bin = null;
 if ($assinatura_b64) {
@@ -363,12 +409,41 @@ if ($tecnico_sig_b64) {
     if ($dec !== false && strlen($dec) > 0) $tecnico_sig_bin = $dec;
 }
 
+// -- Declaração de aceitação (mesmo texto que src/constants/relatorio.js) -----
+function texto_declaracao_cliente($tipo) {
+    $labels = [
+        'montagem'  => 'montagem',
+        'periodica' => 'manutenção',
+        'reparacao' => 'reparação',
+    ];
+    $mid = $labels[$tipo] ?? 'manutenção';
+    $antes = 'Declaro que li e concordo com o que foi relatado pelo técnico na';
+    $depois = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    return $antes . ' ' . $mid . ' ' . $depois;
+}
+
+function fmt_data_iso_br($iso) {
+    if (!is_string($iso) || strlen($iso) < 10) return '-';
+    $p = explode('-', substr($iso, 0, 10));
+    if (count($p) !== 3) return '-';
+    return $p[2] . '/' . $p[1] . '/' . $p[0];
+}
+
 // -- Helper: converte UTF-8 (dados do formulario) para Latin-1 (FPDF) --------
 function f($s) {
     $s = (string)($s ?? '');
-    if (function_exists('iconv')) return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
-    if (function_exists('mb_convert_encoding')) return mb_convert_encoding($s, 'ISO-8859-1', 'UTF-8');
-    return utf8_decode($s);
+    if ($s === '') return '';
+    if (function_exists('iconv')) {
+        $r = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
+        if ($r !== false) return $r;
+        $r = @iconv('UTF-8', 'ISO-8859-1//IGNORE', $s);
+        if ($r !== false) return $r;
+    }
+    if (function_exists('mb_convert_encoding')) {
+        $r = @mb_convert_encoding($s, 'ISO-8859-1', 'UTF-8');
+        if ($r !== false) return $r;
+    }
+    return preg_replace('/[^\x20-\x7E]/', '?', $s);
 }
 
 // -- Helper: detecta formato de imagem pelos magic bytes -----------------------
@@ -380,50 +455,188 @@ function detect_image_format($bin) {
     return null;
 }
 
+// -- Helper: converte imagem binária para JPEG fundo branco (seguro para FPDF) --
+// FPDF não suporta PNG com canal alfa — esta função converte qualquer imagem para JPEG.
+function to_safe_jpeg($bin) {
+    if (!$bin || !is_string($bin) || strlen($bin) < 100) return null;
+    if (!function_exists('imagecreatefromstring')) {
+        @error_log(date('Y-m-d H:i:s') . " GD NOT AVAILABLE\n", 3, __DIR__ . '/atm_debug.log');
+        return null;
+    }
+    $src = @imagecreatefromstring($bin);
+    if (!$src) {
+        @error_log(date('Y-m-d H:i:s') . " imagecreatefromstring FAILED\n", 3, __DIR__ . '/atm_debug.log');
+        return null;
+    }
+    $w = imagesx($src);
+    $h = imagesy($src);
+    $dst = @imagecreatetruecolor($w, $h);
+    if (!$dst) { imagedestroy($src); return null; }
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefill($dst, 0, 0, $white);
+    imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
+    imagedestroy($src);
+    $tmp = tempnam(sys_get_temp_dir(), 'nav') . '.jpg';
+    $ok = @imagejpeg($dst, $tmp, 90);
+    imagedestroy($dst);
+    if (!$ok || !file_exists($tmp) || filesize($tmp) < 100) {
+        @unlink($tmp);
+        return null;
+    }
+    return $tmp;
+}
+
 // -- Gerar PDF com FPDF ------------------------------------------------------
+_dbg("PRE-PDF sig_cli=" . strlen($assinatura_b64) . " sig_tec=" . strlen($tecnico_sig_b64) . " photos=" . count($photos));
 $pdf_data = null;
+$pdf_error = '';
 
 if (file_exists(__DIR__ . '/fpdf.php')) {
+  try {
+    _dbg("FPDF loading");
     require_once __DIR__ . '/fpdf.php';
 
     // Subclasse com cabecalho e rodape automaticos em todas as paginas
     class NavelPDF extends FPDF {
         public $numRel     = '';
         public $tipo       = '';
-        public $totalPg    = 0; // preenchido apos Output()
+        public $totalPg    = 0;
         public $appVersion = '';
+        /** @var string|null caminho JPEG temporário (logo Navel) */
+        public $pathLogoNavel = null;
+        /** @var string|null caminho JPEG temporário (logo marca equipamento) */
+        public $pathLogoBrand = null;
+
+        function Error($msg) {
+            throw new Exception('FPDF error: ' . $msg);
+        }
+
+        /**
+         * Retângulo com cantos arredondados (FPDF script 35 — www.fpdf.org).
+         */
+        function RoundedRect($x, $y, $w, $h, $r, $style = 'F') {
+            $k  = $this->k;
+            $hp = $this->h;
+            if ($style === 'F') {
+                $op = 'f';
+            } elseif ($style === 'FD' || $style === 'DF') {
+                $op = 'B';
+            } else {
+                $op = 'S';
+            }
+            $MyArc = 4 / 3 * (sqrt(2) - 1);
+            $this->_out(sprintf('%.2F %.2F m', ($x + $r) * $k, ($hp - $y) * $k));
+            $xc = $x + $w - $r;
+            $yc = $y + $r;
+            $this->_out(sprintf('%.2F %.2F l', $xc * $k, ($hp - $y) * $k));
+            $this->_roundedCornerArc($xc + $r * $MyArc, $yc - $r, $xc + $r, $yc - $r * $MyArc, $xc + $r, $yc);
+            $xc = $x + $w - $r;
+            $yc = $y + $h - $r;
+            $this->_out(sprintf('%.2F %.2F l', ($x + $w) * $k, ($hp - $yc) * $k));
+            $this->_roundedCornerArc($xc + $r, $yc + $r * $MyArc, $xc + $r * $MyArc, $yc + $r, $xc, $yc + $r);
+            $xc = $x + $r;
+            $yc = $y + $h - $r;
+            $this->_out(sprintf('%.2F %.2F l', $xc * $k, ($hp - ($y + $h)) * $k));
+            $this->_roundedCornerArc($xc - $r * $MyArc, $yc + $r, $xc - $r, $yc + $r * $MyArc, $xc - $r, $yc);
+            $xc = $x + $r;
+            $yc = $y + $r;
+            $this->_out(sprintf('%.2F %.2F l', ($x) * $k, ($hp - $yc) * $k));
+            $this->_roundedCornerArc($xc - $r, $yc - $r * $MyArc, $xc - $r * $MyArc, $yc - $r, $xc, $yc - $r);
+            $this->_out($op);
+        }
+
+        function _roundedCornerArc($x1, $y1, $x2, $y2, $x3, $y3) {
+            $h = $this->h;
+            $k = $this->k;
+            $this->_out(sprintf('%.2F %.2F %.2F %.2F %.2F %.2F c ', $x1 * $k, ($h - $y1) * $k,
+                $x2 * $k, ($h - $y2) * $k, $x3 * $k, ($h - $y3) * $k));
+        }
+
+        /**
+         * Imagem centrada em zona maxW x maxH (mm), proporção preservada (object-fit: contain).
+         */
+        function imageFitContain($path, $innerX, $innerY, $maxW, $maxH) {
+            if (!is_string($path) || !file_exists($path)) {
+                return;
+            }
+            $info = @getimagesize($path);
+            if ($info === false || $info[0] < 1 || $info[1] < 1) {
+                return;
+            }
+            $pxW = $info[0];
+            $pxH = $info[1];
+            $ratio = $pxW / $pxH;
+            $boxRatio = $maxW / $maxH;
+            if ($ratio > $boxRatio) {
+                $w = $maxW;
+                $h = $maxW / $ratio;
+            } else {
+                $h = $maxH;
+                $w = $maxH * $ratio;
+            }
+            $ix = $innerX + ($maxW - $w) / 2;
+            $iy = $innerY + ($maxH - $h) / 2;
+            try {
+                $this->Image($path, $ix, $iy, $w, $h);
+            } catch (Exception $e) { /* noop */ }
+        }
 
         function Header() {
-            $W = 210; $M = 14;
-            // Fundo azul
+            $W = 210;
+            $M = 14;
+            $headerH = 30;
+            // Igual ao gerarPdfCompacto: mesma área interna e padding para os 2 logos
+            $innerW = 40;
+            $innerH = 13;
+            $pad    = 3;
+            $rCorn  = 3;
+            $gap    = 4;
+
             $this->SetFillColor(30, 58, 95);
-            $this->Rect(0, 0, $W, 26, 'F');
+            $this->Rect(0, 0, $W, $headerH, 'F');
             $this->SetTextColor(255, 255, 255);
-            // Nome empresa (esquerda)
-            $this->SetFont('Arial', 'B', 13);
-            $this->SetXY($M, 5);
-            $this->Cell(90, 6, 'NAVEL-ACORES', 0, 0);
-            // Telefone (direita)
+
+            $boxOuterW = $innerW + 2 * $pad;
+            $boxOuterH = $innerH + 2 * $pad;
+            $by = ($headerH - $boxOuterH) / 2;
+
+            $logoEndX = $M;
+            if (!empty($this->pathLogoNavel) && is_string($this->pathLogoNavel) && file_exists($this->pathLogoNavel)) {
+                $bx = $M;
+                $this->SetFillColor(255, 255, 255);
+                $this->RoundedRect($bx, $by, $boxOuterW, $boxOuterH, min($rCorn, $boxOuterW / 2 - 0.1, $boxOuterH / 2 - 0.1), 'F');
+                $this->imageFitContain($this->pathLogoNavel, $bx + $pad, $by + $pad, $innerW, $innerH);
+                $logoEndX = $bx + $boxOuterW + $gap;
+            } else {
+                $this->SetFont('Arial', 'B', 13);
+                $this->SetXY($M, 8);
+                $this->Cell(60, 6, 'NAVEL - ACORES', 0, 0);
+                $logoEndX = $M + 64;
+            }
+
+            if (!empty($this->pathLogoBrand) && is_string($this->pathLogoBrand) && file_exists($this->pathLogoBrand)) {
+                $this->SetFillColor(255, 255, 255);
+                $this->RoundedRect($logoEndX, $by, $boxOuterW, $boxOuterH, min($rCorn, $boxOuterW / 2 - 0.1, $boxOuterH / 2 - 0.1), 'F');
+                $this->imageFitContain($this->pathLogoBrand, $logoEndX + $pad, $by + $pad, $innerW, $innerH);
+            }
+
+            $txW = $W - $M * 2;
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetXY($M, 7);
+            $this->Cell($txW, 4, f('José Gonçalves Cerqueira (NAVEL – AÇORES), Lda.'), 0, 0, 'R');
             $this->SetFont('Arial', '', 7);
-            $this->SetXY(110, 5);
-            $this->Cell($W - 110 - $M, 5, '296 205 290 / 296 630 120', 0, 0, 'R');
-            // Email + site (direita)
-            $this->SetXY(110, 11);
-            $this->Cell($W - 110 - $M, 5, 'geral@navel.pt  |  www.navel.pt', 0, 0, 'R');
-            // Nome completo (esquerda)
-            $this->SetFont('Arial', '', 7);
-            $this->SetXY($M, 17);
-            $this->Cell(0, 5, 'JOSE GONCALVES CERQUEIRA (NAVEL-ACORES), Lda.', 0, 0);
-            // Numero do relatorio (direita, pequeno)
+            $this->SetXY($M, 13);
+            $this->Cell($txW, 4, f("Pico d'Agua Park • www.navel.pt"), 0, 0, 'R');
+            $this->SetXY($M, 19);
+            $this->Cell($txW, 4, f('São Miguel–Açores'), 0, 0, 'R');
             $this->SetFont('Arial', 'I', 6.5);
-            $this->SetXY(110, 17);
-            $this->Cell($W - 110 - $M, 5, 'Ref: ' . $this->numRel, 0, 0, 'R');
-            // Linha de separacao abaixo do cabecalho
+            $this->SetXY($M, 24);
+            $this->Cell($txW, 4, 'Ref: ' . $this->numRel, 0, 0, 'R');
+
             $this->SetDrawColor(13, 110, 253);
             $this->SetLineWidth(0.4);
-            $this->Line(0, 26, $W, 26);
-            // Repor cursor abaixo do cabecalho
-            $this->SetY(30);
+            $this->Line(0, $headerH, $W, $headerH);
+            $this->SetY($headerH + 8);
         }
 
         function Footer() {
@@ -433,7 +646,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $this->SetFillColor(30, 58, 95);
             $this->Rect(0, $yF, $W, 14, 'F');
             $this->SetTextColor(160, 180, 210);
-            $footerText = 'Navel-Acores, Lda — Todos os direitos reservados';
+            $footerText = 'NAVEL - ACORES, Lda - Todos os direitos reservados';
             if ($this->appVersion) {
                 $footerText .= ' · v' . $this->appVersion;
             }
@@ -441,10 +654,26 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $this->SetXY($M, $yF + 3);
             $this->Cell($W - $M * 2 - 28, 4, $footerText, 0, 0, 'L');
             $this->SetXY($M, $yF + 7);
-            $this->Cell($W - $M * 2 - 28, 4, 'Pico da Pedra & Ponta Delgada  |  296 205 290 / 296 630 120  |  www.navel.pt', 0, 0, 'L');
+            $this->Cell($W - $M * 2 - 28, 4, "Pico d'Agua Park  |  www.navel.pt", 0, 0, 'L');
             $this->SetFont('Arial', 'B', 6.5);
             $this->SetXY($W - $M - 28, $yF + 4);
             $this->Cell(28, 4, 'Pagina ' . $this->PageNo() . ' de {nb}', 0, 0, 'R');
+        }
+    }
+
+    _dbg("FPDF NavelPDF creating");
+    $tmp_logo_navel = null;
+    $tmp_logo_brand = null;
+    if ($navel_logo_b64 !== '') {
+        $decNv = base64_decode($navel_logo_b64, true);
+        if ($decNv !== false && strlen($decNv) > 80) {
+            $tmp_logo_navel = to_safe_jpeg($decNv);
+        }
+    }
+    if ($brand_logo_b64 !== '') {
+        $decBr = base64_decode($brand_logo_b64, true);
+        if ($decBr !== false && strlen($decBr) > 80) {
+            $tmp_logo_brand = to_safe_jpeg($decBr);
         }
     }
 
@@ -452,16 +681,17 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->numRel     = $num_rel;
     $pdf->tipo       = f($tipo);
     $pdf->appVersion = $app_version;
+    $pdf->pathLogoNavel = $tmp_logo_navel;
+    $pdf->pathLogoBrand = $tmp_logo_brand;
     $pdf->SetCreator('Navel Manutencoes');
-    $pdf->SetAuthor('NAVEL-ACORES');
+    $pdf->SetAuthor('NAVEL - ACORES');
     $pdf->SetTitle('Relatorio ' . $num_rel);
     $pdf->AliasNbPages('{nb}');
     $pdf->SetAutoPageBreak(true, 18);
     $pdf->AddPage();
     $W = 210; $M = 14; $cW = $W - 2 * $M;
 
-    // Tipo + Numero (primeira pagina, abaixo do Header automatico)
-    $pdf->SetY(32);
+    // Tipo + Numero (primeira pagina, abaixo do Header automatico — Y já definido no Header)
     $pdf->SetTextColor(30, 58, 95);
     $pdf->SetFont('Arial', 'B', 11);
     $pdf->SetX($M);
@@ -550,43 +780,206 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->Ln(3);
     }
 
-    // Fotos — incluir 1-2 imagens no PDF (melhor qualidade, 70x70 mm)
-    $photos_for_pdf = array_slice($photos, 0, 2);
-    if (count($photos_for_pdf) > 0) {
-        foreach ($photos_for_pdf as $idx => $p) {
-            if ($pdf->GetY() > 200) $pdf->AddPage();
-            $bin = null;
-            $ext = '.jpg';
-            if (strpos($p, 'data:image/') === 0) {
-                $ext = (strpos($p, 'image/png') !== false) ? '.png' : '.jpg';
-                $comma = strpos($p, ',');
-                if ($comma !== false) $bin = base64_decode(substr($p, $comma + 1), true);
+    // Fotos — grelha até 4 por linha (A4), proporção preservada; máx. ATM_MAX_FOTOS_RELATORIO
+    $n_pdf = count($photos);
+    if ($n_pdf > 0) {
+        $cols = 4;
+        $gap = 2;
+        $cellW = ($cW - ($cols - 1) * $gap) / $cols;
+        $cellH = $cellW * 0.72 + 4;
+        if ($pdf->GetY() > 245) {
+            $pdf->AddPage();
+        }
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetTextColor(30, 58, 95);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 6, f('DOCUMENTACAO FOTOGRAFICA'), 0, 1);
+        $pdf->SetFont('Arial', '', 7.5);
+        $pdf->SetTextColor(107, 114, 128);
+        $pdf->SetX($M);
+        $sub = $n_fotos . ' fotografia(s) no relatorio';
+        if ($photos_total_for_note > ATM_MAX_FOTOS_RELATORIO) {
+            $sub .= ' (mostradas as primeiras ' . ATM_MAX_FOTOS_RELATORIO . ')';
+        }
+        $pdf->Cell(0, 4, f($sub), 0, 1);
+        $pdf->Ln(1);
+
+        $tmp_list = [];
+        $n_rows = (int)ceil($n_pdf / $cols);
+        for ($row = 0; $row < $n_rows; $row++) {
+            if ($pdf->GetY() + $cellH > 268) {
+                $pdf->AddPage();
             }
-            if ($bin !== false && strlen($bin) > 0) {
-                $tmp = tempnam(sys_get_temp_dir(), 'nav') . $ext;
-                if (file_put_contents($tmp, $bin)) {
-                    $imgW = 70;
-                    $imgH = 70;
-                    $pdf->Image($tmp, $M, $pdf->GetY(), $imgW, $imgH);
-                    $pdf->SetY($pdf->GetY() + $imgH + 2);
+            $y0 = $pdf->GetY();
+            for ($c = 0; $c < $cols; $c++) {
+                $idx = $row * $cols + $c;
+                if ($idx >= $n_pdf) {
+                    break;
                 }
-                @unlink($tmp);
+                $p = $photos[$idx];
+                $bin = null;
+                if (strpos($p, 'data:image/') === 0) {
+                    $comma = strpos($p, ',');
+                    if ($comma !== false) {
+                        $bin = base64_decode(substr($p, $comma + 1), true);
+                    }
+                }
+                if ($bin !== false && $bin !== null && strlen($bin) > 100) {
+                    $tmp = to_safe_jpeg($bin);
+                    if ($tmp && file_exists($tmp)) {
+                        $tmp_list[] = $tmp;
+                        try {
+                            $pdf->imageFitContain($tmp, $M + $c * ($cellW + $gap), $y0, $cellW, $cellH - 1);
+                        } catch (Exception $imgErr) {
+                            @error_log(date('Y-m-d H:i:s') . ' IMG-ERR foto: ' . $imgErr->getMessage() . "\n", 3, __DIR__ . '/atm_debug.log');
+                        }
+                    }
+                }
+            }
+            $pdf->SetY($y0 + $cellH);
+        }
+        foreach ($tmp_list as $tf) {
+            if (is_string($tf) && file_exists($tf)) {
+                @unlink($tf);
             }
         }
-        if ($n_fotos > 2) {
-            $pdf->SetFont('Arial', '', 7.5);
-            $pdf->SetTextColor(107, 114, 128);
-            $pdf->SetX($M);
-            $pdf->Cell(0, 5, '+ ' . ($n_fotos - 2) . ' fotografia(s) adicionais no email', 0, 1);
-        }
-        $pdf->Ln(3);
+        $pdf->Ln(2);
     } elseif ($n_fotos > 0) {
-        if ($pdf->GetY() > 250) $pdf->AddPage();
+        if ($pdf->GetY() > 250) {
+            $pdf->AddPage();
+        }
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetTextColor(107, 114, 128);
         $pdf->SetX($M);
         $pdf->Cell(0, 5, $n_fotos . ' fotografia(s) documentadas no sistema.', 0, 1);
         $pdf->Ln(2);
+    }
+
+    // Consumíveis e peças (alinhar com gerarPdfRelatorio.js)
+    if (count($pecas_list) > 0) {
+        if ($pdf->GetY() > 210) $pdf->AddPage();
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor(30, 58, 95);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 7, 'CONSUMIVEIS E PECAS', 0, 1);
+        $usadas = 0;
+        $nao_us = 0;
+        foreach ($pecas_list as $p) {
+            $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
+            if ($u) $usadas++; else $nao_us++;
+        }
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetTextColor(107, 114, 128);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 5, $usadas . ' utilizado(s) / ' . $nao_us . ' nao substituido(s) / ' . count($pecas_list) . ' no plano', 0, 1);
+        $pdf->Ln(1);
+        $pdf->SetFont('Arial', '', 8);
+        foreach ($pecas_list as $i => $p) {
+            if ($pdf->GetY() > 270) $pdf->AddPage();
+            $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
+            if ($i % 2 === 0) {
+                $pdf->SetFillColor(249, 250, 251);
+                $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
+            }
+            $icon = $u ? 'OK' : '--';
+            $pdf->SetX($M + 1);
+            $pdf->SetTextColor($u ? 22 : 107, $u ? 163 : 114, $u ? 74 : 128);
+            $pdf->SetFont('Arial', 'B', 8);
+            $pdf->Cell(8, 7, $icon, 0, 0);
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->SetTextColor(55, 65, 81);
+            $cod = $p['codigoArtigo'] ?? '';
+            $desc = $p['descricao'] ?? '';
+            $lin = ($cod !== '' ? $cod . ' - ' : '') . $desc;
+            $pdf->Cell($cW - 35, 7, f(mb_substr($lin, 0, 120, 'UTF-8')), 0, 0);
+            $qtd = trim(($p['quantidade'] ?? '') . ' ' . ($p['unidade'] ?? ''));
+            if ($qtd !== '') {
+                $pdf->SetTextColor(107, 114, 128);
+                $pdf->Cell(26, 7, f($qtd), 0, 1, 'R');
+            } else {
+                $pdf->Ln(7);
+            }
+        }
+        $pdf->Ln(3);
+    }
+
+    // Declaração de aceitação (antes das assinaturas — igual ao PDF do browser)
+    {
+        if ($pdf->GetY() > 210) $pdf->AddPage();
+        $decl_txt = texto_declaracao_cliente($manutencao_tipo);
+        $pdf->SetFillColor(243, 244, 246);
+        $pdf->SetDrawColor(30, 58, 95);
+        $pdf->SetLineWidth(0.8);
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetTextColor(30, 58, 95);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 6, 'DECLARACAO DE ACEITACAO E COMPROMISSO DO CLIENTE', 0, 1);
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->SetTextColor(55, 65, 81);
+        $pdf->SetX($M);
+        $pdf->MultiCell($cW, 3.6, f($decl_txt), 0, 'L');
+        $pdf->Ln(4);
+    }
+
+    // Próximas manutenções agendadas
+    $peri_labels = ['trimestral' => 'Trimestral', 'semestral' => 'Semestral', 'anual' => 'Anual', 'mensal' => 'Mensal'];
+    $proximas_filtradas = array_values(array_filter($proximas_list, function ($pm) {
+        return !empty($pm['data']);
+    }));
+    $peri_maq = $periodicidade_maquina;
+    if (count($proximas_filtradas) > 0 || $peri_maq !== '') {
+        if ($pdf->GetY() > 230) $pdf->AddPage();
+        if (count($proximas_filtradas) > 0) {
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M);
+            $pdf->Cell(0, 6, 'PROXIMAS MANUTENCOES AGENDADAS', 0, 1);
+            $pdf->SetFont('Arial', 'B', 7.5);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M);
+            $pdf->Cell(10, 6, 'N.', 0, 0);
+            $pdf->Cell(40, 6, 'Data prevista', 0, 0);
+            $pdf->Cell(45, 6, 'Periodicidade', 0, 0);
+            $pdf->Cell(0, 6, 'Tecnico', 0, 1);
+            $pdf->SetDrawColor(209, 213, 219);
+            $pdf->Line($M, $pdf->GetY(), $W - $M, $pdf->GetY());
+            $pdf->Ln(1);
+            $pdf->SetFont('Arial', '', 8);
+            foreach ($proximas_filtradas as $i => $pm) {
+                if ($pdf->GetY() > 270) $pdf->AddPage();
+                if ($i % 2 === 0) {
+                    $pdf->SetFillColor(249, 250, 251);
+                    $pdf->Rect($M, $pdf->GetY() - 1, $cW, 7, 'F');
+                }
+                $pp = $pm['periodicidade'] ?? '';
+                $lab = isset($peri_labels[$pp]) ? $peri_labels[$pp] : (isset($peri_labels[$peri_maq]) ? $peri_labels[$peri_maq] : (($pm['tipo'] ?? '') !== '' ? f($pm['tipo']) : '-'));
+                $pdf->SetX($M + 2);
+                $pdf->SetTextColor(107, 114, 128);
+                $pdf->Cell(10, 7, (string)($i + 1), 0, 0);
+                $pdf->SetTextColor(17, 24, 39);
+                $pdf->Cell(40, 7, fmt_data_iso_br($pm['data']), 0, 0);
+                $pdf->SetTextColor(55, 65, 81);
+                $pdf->Cell(45, 7, f($lab), 0, 0);
+                $pdf->SetTextColor(107, 114, 128);
+                $tec_pm = $pm['tecnico'] ?? '';
+                $pdf->Cell(0, 7, f($tec_pm !== '' ? $tec_pm : 'A designar'), 0, 1);
+            }
+            $pdf->Ln(4);
+        } else {
+            $peri_str = isset($peri_labels[$peri_maq]) ? $peri_labels[$peri_maq] : '';
+            $pdf->SetFillColor(243, 244, 246);
+            $pdf->SetDrawColor(30, 58, 95);
+            $pdf->Rect($M, $pdf->GetY(), $cW, 14, 'FD');
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetXY($M + 4, $pdf->GetY() + 3);
+            $pdf->Cell(0, 5, 'Proxima manutencao prevista:', 0, 1);
+            $pdf->SetFont('Arial', '', 9);
+            $pdf->SetTextColor(55, 65, 81);
+            $pdf->SetX($M + 4);
+            $pdf->Cell(0, 5, '-' . ($peri_str !== '' ? ' (periodicidade ' . f($peri_str) . ')' : ''), 0, 1);
+            $pdf->Ln(6);
+        }
     }
 
     // Bloco de assinaturas — técnico (esquerda) + cliente (direita)
@@ -616,13 +1009,17 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->Cell($halfW - 4, 4, 'Tel: ' . f($tecnico_tel), 0, 1);
     }
     if ($hasTecSig) {
-        $fmt = detect_image_format($tecnico_sig_bin);
-        if ($fmt) {
-            $tmp = tempnam(sys_get_temp_dir(), 'nav') . $fmt['ext'];
-            if (file_put_contents($tmp, $tecnico_sig_bin)) {
-                $pdf->Image($tmp, $M + 2, $y0 + 17, $halfW - 8, 22, $fmt['type']);
-                @unlink($tmp);
+        _dbg("TEC-SIG converting " . strlen($tecnico_sig_bin) . " bytes");
+        $tmp = to_safe_jpeg($tecnico_sig_bin);
+        _dbg("TEC-SIG tmp=" . ($tmp ?: 'NULL'));
+        if ($tmp && file_exists($tmp)) {
+            try {
+                $pdf->Image($tmp, $M + 2, $y0 + 17, $halfW - 8, 22);
+                _dbg("TEC-SIG image OK");
+            } catch (Exception $e) {
+                _dbg("TEC-SIG image FAIL: " . $e->getMessage());
             }
+            @unlink($tmp);
         }
     }
 
@@ -645,18 +1042,41 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->SetXY($xR + 2, $y0 + 12);
     $pdf->Cell($halfW - 4, 4, 'Assinado em ' . f($data_real), 0, 1);
     if ($hasCliSig) {
-        $fmt = detect_image_format($assinatura_bin);
-        if ($fmt) {
-            $tmp = tempnam(sys_get_temp_dir(), 'nav') . $fmt['ext'];
-            if (file_put_contents($tmp, $assinatura_bin)) {
-                $pdf->Image($tmp, $xR + 2, $y0 + 17, $halfW - 8, 22, $fmt['type']);
-                @unlink($tmp);
+        _dbg("CLI-SIG converting " . strlen($assinatura_bin) . " bytes");
+        $tmp = to_safe_jpeg($assinatura_bin);
+        _dbg("CLI-SIG tmp=" . ($tmp ?: 'NULL'));
+        if ($tmp && file_exists($tmp)) {
+            try {
+                $pdf->Image($tmp, $xR + 2, $y0 + 17, $halfW - 8, 22);
+                _dbg("CLI-SIG image OK");
+            } catch (Exception $e) {
+                _dbg("CLI-SIG image FAIL: " . $e->getMessage());
             }
+            @unlink($tmp);
         }
     }
     $pdf->SetY($y0 + $boxH + 3);
 
+    _dbg("PDF Output()");
     $pdf_data = $pdf->Output('S');
+    _dbg("PDF OK " . strlen($pdf_data) . " bytes");
+    if (!empty($tmp_logo_navel) && is_string($tmp_logo_navel) && file_exists($tmp_logo_navel)) {
+        @unlink($tmp_logo_navel);
+    }
+    if (!empty($tmp_logo_brand) && is_string($tmp_logo_brand) && file_exists($tmp_logo_brand)) {
+        @unlink($tmp_logo_brand);
+    }
+  } catch (Throwable $e) {
+    $pdf_error = $e->getMessage();
+    $pdf_data = null;
+    @error_log(date('Y-m-d H:i:s') . " PDF-ERR: $pdf_error\n", 3, __DIR__ . '/atm_debug.log');
+    if (isset($tmp_logo_navel) && is_string($tmp_logo_navel) && file_exists($tmp_logo_navel)) {
+        @unlink($tmp_logo_navel);
+    }
+    if (isset($tmp_logo_brand) && is_string($tmp_logo_brand) && file_exists($tmp_logo_brand)) {
+        @unlink($tmp_logo_brand);
+    }
+  }
 }
 
 // -- HTML do email -----------------------------------------------------------
@@ -668,8 +1088,8 @@ $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
 <tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
   <tr><td style="background:linear-gradient(135deg,#1e3a5f,#0d6efd);padding:18px 24px;">
-    <span style="color:#fff;font-size:20px;font-weight:800;">NAVEL-A&Ccedil;ORES</span>
-    <span style="float:right;color:rgba(255,255,255,.7);font-size:11px;line-height:1.8;">296 205 290<br>geral@navel.pt</span>
+    <span style="color:#fff;font-size:20px;font-weight:800;">NAVEL &ndash; A&Ccedil;ORES</span>
+    <span style="float:right;color:rgba(255,255,255,.7);font-size:11px;line-height:1.8;">Pico d&#39;Agua Park<br>www.navel.pt</span>
   </td></tr>
   <tr><td style="padding:20px 24px 8px;border-bottom:3px solid #0d6efd;">
     <div style="font-size:17px;font-weight:700;color:#1e3a5f;">Relat&oacute;rio de ' . $tipo_h . '</div>
@@ -714,8 +1134,10 @@ if (count($photos) > 0) {
     $html .= '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#92400e;margin-bottom:8px;">Fotografias do servi&ccedil;o (' . count($photos) . ')</div>';
     $html .= '<table cellpadding="0" cellspacing="4" style="border-collapse:separate;"><tr>';
     foreach ($photos as $idx => $thumb) {
-        if ($idx > 0 && $idx % 3 === 0) $html .= '</tr><tr>';
-        $html .= '<td style="padding:3px;"><img src="' . $thumb . '" alt="Foto ' . ($idx + 1) . '" width="160" style="display:block;border-radius:6px;border:1px solid #e5e7eb;max-width:160px;"></td>';
+        if ($idx > 0 && $idx % 4 === 0) {
+            $html .= '</tr><tr>';
+        }
+        $html .= '<td style="padding:3px;"><img src="' . $thumb . '" alt="Foto ' . ($idx + 1) . '" width="132" style="display:block;border-radius:6px;border:1px solid #e5e7eb;max-width:132px;height:auto;"></td>';
     }
     $html .= '</tr></table></td></tr>';
 }
@@ -748,10 +1170,8 @@ if ($proxima_manut) {
 }
 
 $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255,255,.65);font-size:10px;text-align:center;line-height:1.9;">'
-       . 'JOS&Eacute; GON&Ccedil;ALVES CERQUEIRA (NAVEL-A&Ccedil;ORES), Lda.<br>'
-       . 'Div. Comercial: Pico d\'Agua Park, Rua 5 &mdash; 9600-049 Pico da Pedra<br>'
-       . 'Sede/Oficinas: Rua Eng.&ordm; Abel Ferin Coutinho &mdash; 9501-802 Ponta Delgada<br>'
-       . 'Tel: 296 205 290 / 296 630 120 &mdash; www.navel.pt'
+       . 'Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL &ndash; A&Ccedil;ORES), Lda.<br>'
+       . "Pico d'Agua Park &mdash; www.navel.pt"
        . '</td></tr>'
        . '</table></td></tr></table></body></html>';
 
@@ -761,12 +1181,12 @@ $text = "Exmo(a) Sr(a) " . $to_name . ",\r\n\r\n"
       . "Data: " . $data_real . "\r\n"
       . "Tecnico: " . $tecnico . "\r\n"
       . ($pdf_data ? "O relatorio em PDF encontra-se em anexo.\r\n" : "")
-      . "\r\nNAVEL-ACORES - 296 205 290 - www.navel.pt";
+      . "\r\nNAVEL - ACORES - www.navel.pt";
 
 // -- MIME --------------------------------------------------------------------
 $outer = '----=_NavelOuter_' . md5(uniqid());
 $inner = '----=_NavelInner_' . md5(uniqid());
-$subj  = '=?UTF-8?B?' . base64_encode('Relatorio N. ' . $num_rel . ' - NAVEL-ACORES') . '?=';
+$subj  = '=?UTF-8?B?' . base64_encode('Relatorio N. ' . $num_rel . ' - NAVEL – AÇORES') . '?=';
 $fname = preg_replace('/[^a-zA-Z0-9._\-]/', '_', 'relatorio_' . $num_rel . '.pdf');
 
 if ($pdf_data) {
@@ -781,13 +1201,14 @@ if ($pdf_data) {
     $body .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n$html\r\n--$inner--\r\n";
     $hdr   = "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"$inner\"\r\n";
 }
-$hdr .= 'From: ' . FROM_EMAIL . "\r\n"
+$hdr .= "From: =?UTF-8?B?" . base64_encode('NAVEL - ACORES') . "?= <" . FROM_EMAIL . ">\r\n"
       . 'Reply-To: ' . REPLY_TO . "\r\n"
       . 'Cc: ' . REPLY_TO . "\r\n"
       . 'X-Mailer: PHP/' . phpversion() . "\r\n";
 
+_dbg("MAIL sending to=$to_email subj_len=" . strlen($subj) . " body_len=" . strlen($body) . " hdr_len=" . strlen($hdr) . " pdf=" . ($pdf_data ? strlen($pdf_data) : 'NULL'));
 $sent = false;
-try { $sent = @mail($to_email, $subj, $body, $hdr); } catch (Throwable $e) {
+try { $sent = @mail($to_email, $subj, $body, $hdr); _dbg("MAIL result=" . ($sent ? 'OK' : 'FAIL')); } catch (Throwable $e) {
     if (function_exists('atm_log_api')) {
         $GLOBALS['_atm_log_user'] = $to_email;
         $GLOBALS['_atm_log_route'] = 'send-email/mail';

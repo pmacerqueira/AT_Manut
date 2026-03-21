@@ -106,10 +106,75 @@
   white-space: nowrap;
 }
 
+.event-clickable {
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+.event-clickable:hover,
+.event-clickable:focus-visible {
+  filter: brightness(1.25);
+  transform: scale(1.04);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
 .event-manut {
   background: var(--color-accent-muted);
   color: var(--color-accent);
   border: 1px solid rgba(26, 184, 240, 0.35);
+}
+
+/* Linha: editar (texto) + executar (ícone) — touch-friendly em tablet */
+.event-manut--row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.25rem;
+  min-height: 28px;
+}
+.event-manut-titulo {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.2rem 0.15rem;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.event-manut-titulo:hover,
+.event-manut-titulo:focus-visible {
+  filter: brightness(1.2);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+.event-manut-play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: rgba(26, 184, 240, 0.35);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+.event-manut-play:hover,
+.event-manut-play:focus-visible {
+  background: rgba(26, 184, 240, 0.55);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
 }
 
 .event-reparacao {

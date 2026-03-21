@@ -4,10 +4,9 @@ import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR, INTERVALOS, tipoKae
 import { usePermissions } from '../hooks/usePermissions'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
-import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import PecasPlanoModal from '../components/PecasPlanoModal'
 import '../components/PecasPlanoModal.css'
-import { ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen, CalendarDays } from 'lucide-react'
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
 import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
@@ -42,7 +41,6 @@ export default function Equipamentos() {
   const [selectedSubcategoria, setSelectedSubcategoria] = useState(null)
   const [modalEdit, setModalEdit] = useState(null)
   const [modalDoc, setModalDoc] = useState(null)
-  const [modalExecucao, setModalExecucao] = useState(null)
   const [modalQr, setModalQr] = useState(null)
   const [modalPecas, setModalPecas] = useState(null)
   const [loadingHistorico, setLoadingHistorico] = useState(null)
@@ -52,41 +50,46 @@ export default function Equipamentos() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filterAtraso = searchParams.get('filter') === 'atraso' // whitelist: apenas 'atraso' é aceite
 
-  // Abrir ficha directamente via ?maquina=ID (QR Code ou pesquisa global)
+  const [highlightMaqId, setHighlightMaqId] = useState(null)
+
+  const navigateToMaquina = (maqId) => {
+    const maq = maquinas.find(m => m.id === maqId)
+    if (!maq) return
+    const sub = getSubcategoria(maq.subcategoriaId)
+    if (!sub) return
+    const cat = categorias.find(c => c.id === sub.categoriaId)
+    if (!cat) return
+    setSelectedCategoria(cat)
+    setSelectedSubcategoria(sub)
+    setView('maquinas')
+    setHighlightMaqId(maqId)
+    setTimeout(() => {
+      const el = document.getElementById(`maq-${maqId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('maquina-row--highlight')
+        setTimeout(() => el.classList.remove('maquina-row--highlight'), 3000)
+      }
+    }, 200)
+  }
+
+  // Abrir ficha directamente via ?maquina=ID (QR Code, link nº série, pesquisa)
   useEffect(() => {
     const maqId = searchParams.get('maquina')
     if (!maqId) return
-    const maq = maquinas.find(m => m.id === maqId)
-    if (!maq) return
-    // Navegar até à subcategoria da máquina e seleccioná-la
-    const sub = getSubcategoria(maq.subcategoriaId)
-    if (sub) {
-      const cat = categorias.find(c => c.id === sub.categoriaId)
-      if (cat) {
-        setSelectedCategoria(cat)
-        setSelectedSubcategoria(sub)
-        setView('maquinas')
-      }
-    }
-    // Limpar o param para não re-activar no próximo render
-    setSearchParams(prev => { prev.delete('maquina'); return prev }, { replace: true })
+    navigateToMaquina(maqId)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('maquina')
+      return next
+    }, { replace: true })
   }, [maquinas]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Highlight via state (pesquisa global) — apenas scroll visual, sem abrir modal
+  // Highlight via state (pesquisa global)
   useEffect(() => {
     const hId = location.state?.highlightId
     if (!hId) return
-    const maq = maquinas.find(m => m.id === hId)
-    if (!maq) return
-    const sub = getSubcategoria(maq.subcategoriaId)
-    if (sub) {
-      const cat = categorias.find(c => c.id === sub.categoriaId)
-      if (cat) {
-        setSelectedCategoria(cat)
-        setSelectedSubcategoria(sub)
-        setView('maquinas')
-      }
-    }
+    navigateToMaquina(hId)
   }, [location.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
@@ -198,7 +201,7 @@ export default function Equipamentos() {
                   {list.map(m => {
                     const sub = getSubcategoria(m.subcategoriaId)
                     return (
-                      <div key={m.id} className="maquina-row maquina-row--atraso">
+                      <div key={m.id} id={`maq-${m.id}`} className="maquina-row maquina-row--atraso">
                         <div className="maquina-row-info">
                           <div className="equip-desc-block">
                             <strong>{sub?.nome || ''} — {m.marca} {m.modelo}</strong>
@@ -219,8 +222,13 @@ export default function Equipamentos() {
                           </div>
                         </div>
                         <div className="actions">
-                          <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
-                            <Play size={12} /> Executar
+                          <button
+                            type="button"
+                            className="btn-executar-manut"
+                            onClick={() => navigate(`/manutencoes?filter=proximas&maquinaId=${encodeURIComponent(m.id)}`)}
+                            title="Ver manutenções próximas deste equipamento (executar a partir da lista)"
+                          >
+                            <CalendarDays size={12} /> Próximas
                           </button>
                           <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
@@ -312,7 +320,7 @@ export default function Equipamentos() {
                     const docsCount = (m.documentos ?? []).length
                     const docsTotal = TIPOS_DOCUMENTO.length
                     return (
-                    <div key={m.id} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
+                    <div key={m.id} id={`maq-${m.id}`} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
                       <div className="maquina-row-info">
                         <div className="equip-desc-block">
                           <strong>{m.marca} {m.modelo}</strong>
@@ -345,8 +353,13 @@ export default function Equipamentos() {
                         </div>
                       </div>
                       <div className="actions">
-                        <button type="button" className="btn-executar-manut" onClick={() => setModalExecucao({ maquina: m })} title="Executar manutenção">
-                          <Play size={12} /> Executar
+                        <button
+                          type="button"
+                          className="btn-executar-manut"
+                          onClick={() => navigate(`/manutencoes?filter=proximas&maquinaId=${encodeURIComponent(m.id)}`)}
+                          title="Ver manutenções próximas deste equipamento (executar a partir da lista)"
+                        >
+                          <CalendarDays size={12} /> Próximas
                         </button>
                         <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
@@ -392,15 +405,6 @@ export default function Equipamentos() {
         subcategoria={modalQr ? getSubcategoria(modalQr.subcategoriaId) : null}
         cliente={modalQr ? getCliente(modalQr.clienteNif) : null}
       />
-
-      {modalExecucao && (
-        <ExecutarManutencaoModal
-          isOpen
-          onClose={() => setModalExecucao(null)}
-          manutencao={null}
-          maquina={modalExecucao.maquina}
-        />
-      )}
 
       <PecasPlanoModal
         isOpen={!!modalPecas}

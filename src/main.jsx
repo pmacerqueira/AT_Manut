@@ -8,6 +8,7 @@ import { ToastProvider } from './components/Toast'
 import { logEntry } from './utils/logger'
 import { STORAGE } from './config/storageKeys'
 import './index.css'
+import './styles/data-table-system.css'
 import App from './App.jsx'
 
 // ── Captura global de erros JavaScript não tratados ─────────────────────────

@@ -208,7 +208,7 @@ test.describe('Modal execução — upload de fotos', () => {
     }
   })
 
-  test('Limite de 8 fotos é respeitado', async ({ page }) => {
+  test('Limite de 6 fotos é respeitado', async ({ page }) => {
     await setupApiMock(page)
     await doLoginAdmin(page)
     await page.goto('/manut/manutencoes?filter=atraso')
@@ -219,10 +219,10 @@ test.describe('Modal execução — upload de fotos', () => {
       await executeBtn.click()
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
 
-      // O contador deve mostrar 0/8 inicialmente
+      // O contador deve mostrar 0/6 inicialmente
       const fotosCount = page.locator('.fotos-count, .fotos-label').first()
       if (await fotosCount.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(fotosCount).toContainText(/0\/8|0 \/ 8/)
+        await expect(fotosCount).toContainText(/0\/6|0 \/ 6/)
       }
 
       await page.locator('.modal-relatorio-form button.secondary').click()

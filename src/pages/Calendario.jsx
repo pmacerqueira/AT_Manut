@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
-import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowLeft, Play } from 'lucide-react'
 import {
   format,
   startOfMonth,
@@ -154,13 +154,46 @@ export default function Calendario() {
                     const maq = maquinas.find(e => e.id === m.maquinaId)
                     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
                     const desc = maq ? `${sub?.nome || ''} ${maq.marca}`.trim() : ''
-                    return <div key={m.id} className="event event-manut" title={`Manutenção: ${desc}`}>{desc?.slice(0, 12)}…</div>
+                    const podeExecutar = m.status === 'pendente' || m.status === 'agendada' || m.status === 'em_progresso'
+                    return (
+                      <div key={m.id} className="event event-manut event-manut--row">
+                        <button
+                          type="button"
+                          className="event-manut-titulo"
+                          title={`Manutenção: ${desc} — Editar agendamento`}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/manutencoes?editar=${m.id}`) }}
+                        >
+                          {desc?.slice(0, 12)}…
+                        </button>
+                        {podeExecutar && (
+                          <button
+                            type="button"
+                            className="event-manut-play"
+                            title={m.status === 'em_progresso' ? 'Continuar execução (abre Manutenções)' : 'Executar (abre Manutenções)'}
+                            aria-label={m.status === 'em_progresso' ? 'Continuar execução' : 'Executar manutenção'}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/manutencoes?filter=proximas&executar=${encodeURIComponent(m.id)}`)
+                            }}
+                          >
+                            <Play size={12} strokeWidth={2.5} />
+                          </button>
+                        )}
+                      </div>
+                    )
                   })}
                   {reps.map(r => {
                     const maq = maquinas.find(e => e.id === r.maquinaId)
                     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
                     const desc = maq ? `${sub?.nome || ''} ${maq.marca}`.trim() : (r.descricaoAvaria?.slice(0, 20) || 'Reparação')
-                    return <div key={r.id} className="event event-reparacao" title={`Reparação: ${desc}`}>{desc?.slice(0, 12)}…</div>
+                    return (
+                      <div key={r.id} className="event event-reparacao event-clickable"
+                        title={`Reparação: ${desc} — Clique para editar`}
+                        role="button" tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/reparacoes?editar=${r.id}`) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/reparacoes?editar=${r.id}`) }}
+                      >{desc?.slice(0, 12)}…</div>
+                    )
                   })}
                   {maqs.filter(e => !manuts.some(m => m.maquinaId === e.id)).map(e => {
                     const sub = getSubcategoria(e.subcategoriaId)

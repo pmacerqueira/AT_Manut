@@ -7,6 +7,7 @@ import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { resolveChecklist } from './resolveChecklist'
 import { getDeclaracaoCliente } from '../constants/relatorio'
+import { MAX_FOTOS } from '../config/limits'
 import {
   cssBase,
   htmlHeader,
@@ -96,7 +97,7 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
       ? JSON.parse(relatorio.fotos || '[]') : (relatorio.fotos ?? [])
     fotos = Array.isArray(f) ? f : []
   } catch { /* empty */ }
-  const fotosSafe = fotos.map(f => safeDataImageUrl(f)).filter(Boolean)
+  const fotosSafe = fotos.map(f => safeDataImageUrl(f)).filter(Boolean).slice(0, MAX_FOTOS)
 
   // Mapa id → texto legível para lookup rápido
   const checklistMap = {}

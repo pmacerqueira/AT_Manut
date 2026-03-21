@@ -59,7 +59,7 @@
 | # | Funcionalidade | Impacto | Esforço | Decisão |
 |---|----------------|---------|---------|---------|
 | 2.1 | **Actualização multi-tab** — BroadcastChannel API para sincronizar dados entre abas abertas | Baixo | Baixo | Recomendado |
-| 2.2 | **Relatório executivo PDF** — visão da frota para cliente (baseado em KPIs) | Médio | Médio | **IN PROGRESS** (v1.12.0) |
+| 2.2 | **Relatório executivo PDF** — visão da frota para cliente (baseado em KPIs) | Médio | Médio | **Entregue** (v1.13+; PDF+HTML; email com anexo desde v1.16.13) |
 | 2.3 | **Valores custo/venda em peças** — fase de faturação (invisível no relatório cliente) | Alto | Médio | Backlog prioritário |
 | 2.4 | **E2E: botões Pré-visualizar e Ver/Guardar PDF** em reparações | Baixo | Baixo | Recomendado |
 

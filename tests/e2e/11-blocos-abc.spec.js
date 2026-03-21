@@ -376,7 +376,7 @@ test.describe('Bloco B — Reagendamento de periódicas após execução', () =>
         await btnExec.click()
         await page.waitForTimeout(800)
         await fillExecucaoModal(page)
-        const btnGravar = page.locator('button[type="submit"]').first()
+        const btnGravar = page.locator('.btn-gravar-sucesso')
         if (await btnGravar.isVisible({ timeout: 3000 }).catch(() => false)) {
           await btnGravar.click()
           await page.waitForTimeout(2000)

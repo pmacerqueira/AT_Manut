@@ -8,6 +8,105 @@
 import { logger } from './logger'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { resolveChecklist } from './resolveChecklist'
+import { getDeclaracaoCliente } from '../constants/relatorio'
+import { MAX_FOTOS } from '../config/limits'
+
+/** Normaliza `relatorio.fotos` (array ou JSON string) para lista de URLs/data URLs. */
+function normalizeRelatorioFotos(fotos) {
+  if (fotos == null) return []
+  let arr = fotos
+  if (typeof fotos === 'string') {
+    try {
+      arr = JSON.parse(fotos)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(arr)) return []
+  return arr.filter(
+    (x) => typeof x === 'string' && x.length > 24 && (x.startsWith('data:image') || /^https?:\/\//i.test(x)),
+  )
+}
+
+/** Desenha imagem dentro de rectângulo maxW×maxH (mm), centrada, sem distorção. Falhas silenciosas. */
+export function addImageFitInBoxMm(pdf, dataUrl, innerX, innerY, maxW, maxH) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return
+  let p
+  try {
+    p = pdf.getImageProperties(dataUrl)
+  } catch {
+    return
+  }
+  const ratio = p.width / p.height
+  const boxRatio = maxW / maxH
+  let w
+  let h
+  if (ratio > boxRatio) {
+    w = maxW
+    h = maxW / ratio
+  } else {
+    h = maxH
+    w = maxH * ratio
+  }
+  const x = innerX + (maxW - w) / 2
+  const y = innerY + (maxH - h) / 2
+  const fmt = (p.fileType === 'JPEG' || p.fileType === 'JPG') ? 'JPEG' : 'PNG'
+  try {
+    pdf.addImage(dataUrl, fmt, x, y, w, h, undefined, 'FAST')
+  } catch {
+    /* formato inválido ou limite interno do jsPDF */
+  }
+}
+
+export async function loadImageAsDataUrl(src) {
+  if (!src) return null
+  if (src.startsWith('data:')) return src
+
+  const blobToDataUrl = (blob) => new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.onerror = () => resolve(null)
+    reader.readAsDataURL(blob)
+  })
+
+  // 1) Tentar fetch directo
+  try {
+    const resp = await fetch(src, { mode: 'cors' })
+    if (resp.ok) {
+      const blob = await resp.blob()
+      if (blob.size > 100) return await blobToDataUrl(blob)
+    }
+  } catch (_) { /* CORS bloqueado */ }
+
+  // 2) Se é URL externo, tentar via proxy no servidor Navel
+  if (/^https?:\/\//i.test(src) && !src.includes(location.host)) {
+    try {
+      const proxyUrl = `${import.meta.env.BASE_URL}../api/image-proxy.php?url=${encodeURIComponent(src)}`
+      const resp = await fetch(proxyUrl)
+      if (resp.ok) {
+        const blob = await resp.blob()
+        if (blob.size > 100) return await blobToDataUrl(blob)
+      }
+    } catch (_) { /* proxy indisponível */ }
+  }
+
+  // 3) Fallback via Image + canvas (same-origin)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas')
+        c.width = img.naturalWidth; c.height = img.naturalHeight
+        c.getContext('2d').drawImage(img, 0, 0)
+        resolve(c.toDataURL('image/png'))
+      } catch (_) { resolve(null) }
+    }
+    img.onerror = () => resolve(null)
+    img.src = src
+    setTimeout(() => resolve(null), 3000)
+  })
+}
 
 /** Deteta se o dispositivo parece ser mobile (para abrir visualizador em vez de impressão) */
 export function isMobileDevice() {
@@ -73,13 +172,13 @@ export function imprimirOuGuardarPdf(html) {
 
 /**
  * Gera um Blob PDF compacto usando a API nativa do jsPDF (sem html2canvas).
- * Produz PDFs de 30–80 KB (texto real, seleccionável, muito mais pequeno).
+ * Texto seleccionável; com fotografias o tamanho do ficheiro cresce (JPEG em base64).
  * Usado para enviar como anexo de email.
  *
  * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome }} params
  * @returns {Promise<Blob>}
  */
-export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null }) {
+export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null, proximasManutencoes = [], marcas = [] }) {
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { jsPDF } = await import('jspdf')
 
@@ -93,21 +192,65 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   const equipDesc    = maquina
     ? `${subcategoriaNome ? subcategoriaNome + ' \u2014 ' : ''}${maquina.marca} ${maquina.modelo} (N\u00ba ${maquina.numeroSerie})`
     : '\u2014'
+  const dataExecOpts = { dateStyle: 'long', timeStyle: 'short', timeZone: 'Atlantic/Azores' }
   const dataAssin    = relatorio?.dataAssinatura
-    ? new Date(relatorio.dataAssinatura).toLocaleString('pt-PT', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Atlantic/Azores' })
-    : '\u2014'
+    ? new Date(relatorio.dataAssinatura).toLocaleString('pt-PT', dataExecOpts)
+    : (relatorio?.dataCriacao
+      ? new Date(relatorio.dataCriacao).toLocaleString('pt-PT', dataExecOpts)
+      : '\u2014')
 
-  // ── Cabeçalho azul ────────────────────────────────────────────────────────
+  // ── Cabeçalho azul com logo ──────────────────────────────────────────────
+  const headerH = 30
   pdf.setFillColor(30, 58, 95)
-  pdf.rect(0, 0, W, 26, 'F')
-  pdf.setTextColor(255, 255, 255)
-  pdf.setFontSize(13); pdf.setFont('helvetica', 'bold')
-  pdf.text('NAVEL-A\u00c7ORES', M, 11)
-  pdf.setFontSize(8); pdf.setFont('helvetica', 'normal')
-  pdf.text('296 205 290 / 296 630 120  \u2022  geral@navel.pt  \u2022  www.navel.pt', M, 18)
-  pdf.text('JOS\u00c9 GON\u00c7ALVES CERQUEIRA (NAVEL-A\u00c7ORES), Lda.', M, 23)
+  pdf.rect(0, 0, W, headerH, 'F')
 
-  let y = 36
+  let logoEndX = M
+  try {
+    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    if (logoImg) {
+      const lW = 40, lH = 13, pad = 3, r = 3
+      const bx = M, by = (headerH - lH - pad * 2) / 2
+      const bw = lW + pad * 2, bh = lH + pad * 2
+      pdf.setFillColor(255, 255, 255)
+      pdf.roundedRect(bx, by, bw, bh, r, r, 'F')
+      addImageFitInBoxMm(pdf, logoImg, bx + pad, by + pad, lW, lH)
+      logoEndX = bx + bw + 4
+    }
+  } catch (_) { /* logo indisponível */ }
+
+  let brandLogoSrc = (maquina?.marcaLogoUrl || '').trim()
+  if (!brandLogoSrc && maquina?.marca && marcas.length > 0) {
+    const mk = marcas.find(m => (m.nome || '').toLowerCase() === (maquina.marca || '').toLowerCase())
+    if (mk?.logoUrl) brandLogoSrc = mk.logoUrl.trim()
+  }
+  if (brandLogoSrc) {
+    try {
+      const brandImg = await loadImageAsDataUrl(brandLogoSrc)
+      if (brandImg) {
+        // Mesma área interna e padding que o logo Navel (e que send-email.php FPDF)
+        const bInnerW = 40
+        const bInnerH = 13
+        const bPad = 3
+        const bR = 3
+        const bY = (headerH - bInnerH - bPad * 2) / 2
+        const bBoxW = bInnerW + bPad * 2
+        const bBoxH = bInnerH + bPad * 2
+        pdf.setFillColor(255, 255, 255)
+        pdf.roundedRect(logoEndX, bY, bBoxW, bBoxH, bR, bR, 'F')
+        addImageFitInBoxMm(pdf, brandImg, logoEndX + bPad, bY + bPad, bInnerW, bInnerH)
+      }
+    } catch (_) { /* logo marca indisponível */ }
+  }
+
+  const txR = W - M
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
+  pdf.text('Jos\u00e9 Gon\u00e7alves Cerqueira (NAVEL \u2013 A\u00c7ORES), Lda.', txR, 10, { align: 'right' })
+  pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
+  pdf.text("Pico d'Agua Park \u2022 www.navel.pt", txR, 17, { align: 'right' })
+  pdf.text('S\u00e3o Miguel\u2013A\u00e7ores', txR, 23, { align: 'right' })
+
+  let y = headerH + 8
 
   // ── Tipo de serviço + número ──────────────────────────────────────────────
   pdf.setTextColor(30, 58, 95)
@@ -184,11 +327,172 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     pdf.text(lines, M, y); y += lines.length * 5 + 5
   }
 
+  // ── Fotos — grelha até 4 por linha (A4), proporção preservada, nova página se necessário ──
+  {
+    const fotosAll = normalizeRelatorioFotos(relatorio?.fotos)
+    const nFotosTotal = fotosAll.length
+    if (nFotosTotal > 0) {
+      const fotosEmb = fotosAll.slice(0, MAX_FOTOS)
+      const resolved = []
+      for (const src of fotosEmb) {
+        if (src.startsWith('data:')) {
+          resolved.push(src)
+        } else {
+          const u = await loadImageAsDataUrl(src)
+          if (u) resolved.push(u)
+        }
+      }
+
+      if (y > 248) { pdf.addPage(); y = 20 }
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+      pdf.text('DOCUMENTA\u00c7\u00c3O FOTOGR\u00c1FICA', M, y); y += 5
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
+      let sub = `${nFotosTotal} fotografia(s)`
+      if (nFotosTotal > MAX_FOTOS) sub += ` (mostradas as primeiras ${MAX_FOTOS})`
+      pdf.text(sub, M, y); y += 6
+
+      if (resolved.length === 0) {
+        pdf.setFontSize(8.5); pdf.setFont('helvetica', 'italic')
+        pdf.text('N\u00e3o foi poss\u00edvel incorporar as imagens neste PDF.', M, y)
+        y += 6
+      } else {
+        const cols = 4
+        const gap = 2
+        const cellW = (cW - (cols - 1) * gap) / cols
+        const cellH = cellW * 0.72 + 4
+        const rows = Math.ceil(resolved.length / cols)
+        for (let row = 0; row < rows; row++) {
+          if (y + cellH > 272) { pdf.addPage(); y = 20 }
+          const y0 = y
+          for (let c = 0; c < cols; c++) {
+            const idx = row * cols + c
+            if (idx >= resolved.length) break
+            const x = M + c * (cellW + gap)
+            addImageFitInBoxMm(pdf, resolved[idx], x, y0, cellW, cellH - 1)
+          }
+          y = y0 + cellH
+        }
+        y += 2
+      }
+    }
+  }
+
+  // ── Consumíveis e peças ────────────────────────────────────────────────────
+  if (relatorio?.pecasUsadas?.length > 0) {
+    if (y > 220) { pdf.addPage(); y = 20 }
+    pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('CONSUM\u00cdVEIS E PE\u00c7AS', M, y); y += 6
+
+    const normalizar = (p) => 'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
+    const pecas = relatorio.pecasUsadas.map(normalizar)
+    const usadas = pecas.filter(p => p.usado)
+    const naoUsadas = pecas.filter(p => !p.usado)
+
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
+    pdf.text(`${usadas.length} utilizado(s) \u2022 ${naoUsadas.length} n\u00e3o substitu\u00eddo(s) \u2022 ${pecas.length} no plano`, M, y); y += 5
+
+    pdf.setFontSize(8)
+    pecas.forEach((p, i) => {
+      if (y > 270) { pdf.addPage(); y = 20 }
+      if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 6.5, 'F') }
+      const icon = p.usado ? '\u2713' : '\u2717'
+      const rgb = p.usado ? [22, 163, 74] : [107, 114, 128]
+      pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...rgb)
+      pdf.text(icon, M + 1, y)
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      const desc = `${p.codigoArtigo ? p.codigoArtigo + ' \u2014 ' : ''}${p.descricao ?? ''}`
+      pdf.text(desc, M + 7, y, { maxWidth: cW - 30 })
+      if (p.quantidade) {
+        pdf.setTextColor(107, 114, 128)
+        pdf.text(`${p.quantidade} ${p.unidade ?? ''}`.trim(), W - M - 2, y, { align: 'right' })
+      }
+      y += 6.5
+    })
+    y += 4
+  }
+
+  // ── Declaração de aceitação do cliente ──────────────────────────────────────
+  {
+    if (y > 220) { pdf.addPage(); y = 20 }
+    pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
+    const declText = getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
+    const declPad = 6
+    const declTextW = cW - declPad * 2
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
+    const declLines = pdf.splitTextToSize(declText, declTextW)
+    const declLineH = 3.6
+    const declBoxH = 10 + declLines.length * declLineH + declPad
+    if (y + declBoxH > 270) { pdf.addPage(); y = 20 }
+    pdf.rect(M, y - 4, cW, declBoxH, 'FD')
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('DECLARA\u00c7\u00c3O DE ACEITA\u00c7\u00c3O E COMPROMISSO DO CLIENTE', M + declPad, y + 1)
+    y += 8
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    declLines.forEach((line) => {
+      pdf.text(line, M + declPad, y)
+      y += declLineH
+    })
+    y += declPad + 4
+  }
+
+  // ── Próximas manutenções agendadas ──────────────────────────────────────────
+  {
+    const proximas = (proximasManutencoes ?? []).filter(pm => pm.data).sort((a, b) => a.data.localeCompare(b.data))
+    const periMaqVal = maquina?.periodicidadeManut
+    const periLabels = { trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual', mensal: 'Mensal' }
+    const resolvePeriodicidade = (pm) => periLabels[pm.periodicidade] || periLabels[periMaqVal] || pm.tipo || '\u2014'
+
+    if (proximas.length > 0 || periMaqVal) {
+      if (y > 250) { pdf.addPage(); y = 20 }
+      const fmtD = (d) => { const s = String(d ?? '').slice(0, 10).split('-'); return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : '\u2014' }
+      pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.5)
+
+      if (proximas.length > 0) {
+        const tblH = 8 + proximas.length * 7 + 6
+        if (y + tblH > 270) { pdf.addPage(); y = 20 }
+        pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+        pdf.text('PR\u00d3XIMAS MANUTEN\u00c7\u00d5ES AGENDADAS', M, y); y += 6
+
+        pdf.setFillColor(30, 58, 95); pdf.rect(M, y - 3.5, cW, 7, 'F')
+        pdf.setFontSize(7.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255)
+        pdf.text('N.\u00ba', M + 2, y)
+        pdf.text('Data prevista', M + 14, y)
+        pdf.text('Periodicidade', M + 60, y)
+        pdf.text('T\u00e9cnico', M + 110, y)
+        y += 5
+
+        pdf.setFontSize(8); pdf.setFont('helvetica', 'normal')
+        proximas.forEach((pm, i) => {
+          if (y > 270) { pdf.addPage(); y = 20 }
+          if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 7, 'F') }
+          pdf.setTextColor(107, 114, 128); pdf.text(String(i + 1), M + 2, y)
+          pdf.setTextColor(17, 24, 39); pdf.text(fmtD(pm.data), M + 14, y)
+          pdf.setTextColor(55, 65, 81); pdf.text(resolvePeriodicidade(pm), M + 60, y)
+          pdf.setTextColor(107, 114, 128); pdf.text(pm.tecnico ?? 'A designar', M + 110, y)
+          y += 7
+        })
+        y += 4
+      } else {
+        const dataProxStr = '\u2014'
+        const periStr = periLabels[periMaqVal] ?? ''
+        const boxH = 14
+        pdf.rect(M, y - 4, cW, boxH, 'FD')
+        pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+        pdf.text('Pr\u00f3xima manuten\u00e7\u00e3o prevista:', M + 4, y)
+        pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+        pdf.text(`${dataProxStr}${periStr ? ` (periodicidade ${periStr})` : ''}`, M + 60, y)
+        y += boxH + 4
+      }
+    }
+  }
+
   // ── Bloco de assinaturas (técnico + cliente) ──
   if (y > 230) { pdf.addPage(); y = 20 }
 
   const halfW = (cW - 4) / 2
-  const sigBoxH = tecnicoObj?.assinaturaDigital ? 38 : 20
+  const hasTecSig = !!(tecnicoObj?.assinaturaDigital)
+  const hasCliSig = !!(relatorio?.assinaturaDigital)
+  const sigBoxH = (hasTecSig || hasCliSig) ? 38 : 20
 
   // Caixa do técnico (esquerda)
   pdf.setFillColor(243, 244, 246); pdf.setDrawColor(209, 213, 219)
@@ -201,10 +505,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
     pdf.text('Tel: ' + tecnicoObj.telefone, M + 2, y + 10)
   }
-  if (tecnicoObj?.assinaturaDigital) {
-    try {
-      pdf.addImage(tecnicoObj.assinaturaDigital, 'PNG', M + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
-    } catch { /* fallback: sem imagem */ }
+  if (hasTecSig) {
+    try { pdf.addImage(tecnicoObj.assinaturaDigital, 'PNG', M + 2, y + 13, halfW - 8, 18, undefined, 'FAST') } catch (_) { /* sem imagem */ }
   }
 
   // Caixa do cliente (direita)
@@ -217,21 +519,11 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.text(relatorio?.nomeAssinante ?? '\u2014', xRight + 2, y + 5)
   pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
   pdf.text(`Assinado em ${dataAssin}`, xRight + 2, y + 10)
-  if (relatorio?.assinaturaDigital) {
-    try {
-      pdf.addImage(relatorio.assinaturaDigital, 'PNG', xRight + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
-    } catch { /* fallback: sem imagem */ }
+  if (hasCliSig) {
+    try { pdf.addImage(relatorio.assinaturaDigital, 'PNG', xRight + 2, y + 13, halfW - 8, 18, undefined, 'FAST') } catch (_) { /* sem imagem */ }
   }
 
-  y += sigBoxH + 6
-
-  // ── Fotos (menção) ────────────────────────────────────────────────────────
-  const nFotos = (relatorio?.fotos ?? []).length
-  if (nFotos > 0) {
-    if (y > 270) { pdf.addPage(); y = 20 }
-    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(107, 114, 128)
-    pdf.text(`\ud83d\udcf7 ${nFotos} fotografia(s) documentadas no sistema Navel Manutencoes.`, M, y)
-  }
+  y += sigBoxH + 8
 
   // ── Rodapé em todas as páginas ────────────────────────────────────────────
   const totalPages = pdf.internal.getNumberOfPages()
@@ -250,4 +542,38 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   }
 
   return pdf.output('blob')
+}
+
+/**
+ * Logos em base64 (sem prefixo data:) para o PDF do servidor (send-email.php / FPDF).
+ * Mesma lógica de carregamento que o cabeçalho de {@link gerarPdfCompacto} (incl. proxy para marcas).
+ *
+ * @param {{ maquina?: object, marcas?: object[] }} params
+ * @returns {Promise<{ navelLogoB64: string, brandLogoB64: string }>}
+ */
+export async function getHeaderLogosB64ForEmail({ maquina, marcas = [] }) {
+  let navelLogoB64 = ''
+  let brandLogoB64 = ''
+  try {
+    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    if (logoImg) {
+      const comma = logoImg.indexOf(',')
+      navelLogoB64 = comma >= 0 ? logoImg.substring(comma + 1) : ''
+    }
+  } catch (_) { /* noop */ }
+  let brandLogoSrc = (maquina?.marcaLogoUrl || '').trim()
+  if (!brandLogoSrc && maquina?.marca && marcas.length > 0) {
+    const mk = marcas.find(m => (m.nome || '').toLowerCase() === (maquina.marca || '').toLowerCase())
+    if (mk?.logoUrl) brandLogoSrc = mk.logoUrl.trim()
+  }
+  if (brandLogoSrc) {
+    try {
+      const brandImg = await loadImageAsDataUrl(brandLogoSrc)
+      if (brandImg) {
+        const comma = brandImg.indexOf(',')
+        brandLogoB64 = comma >= 0 ? brandImg.substring(comma + 1) : ''
+      }
+    } catch (_) { /* noop */ }
+  }
+  return { navelLogoB64, brandLogoB64 }
 }

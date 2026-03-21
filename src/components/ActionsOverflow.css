@@ -1,0 +1,89 @@
+/* ── ActionsOverflow — dropdown de acções (⋮ / ...) ─────────── */
+.actions-overflow {
+  position: relative;
+  display: inline-flex;
+}
+.actions-overflow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.actions-overflow-btn:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+
+/* Menu dropdown — position: fixed para escapar overflow de parents */
+.actions-overflow-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 11rem;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  padding: 0.3rem 0;
+}
+.actions-overflow-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.actions-overflow-menu button:hover {
+  background: var(--color-bg-elevated);
+}
+.actions-overflow-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.actions-overflow-menu button.danger-item {
+  color: var(--color-danger);
+}
+.actions-overflow-menu button.danger-item:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Modo campo (light theme) ─────────────────────────────────── */
+body.modo-campo .actions-overflow-btn {
+  border-color: #94a3b8;
+  color: #334155;
+  background: #f1f5f9;
+}
+body.modo-campo .actions-overflow-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+body.modo-campo .actions-overflow-menu {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 20px rgba(0,0,0,.15);
+}
+body.modo-campo .actions-overflow-menu button {
+  color: #1e293b;
+}
+body.modo-campo .actions-overflow-menu button:hover {
+  background: #f1f5f9;
+}
+body.modo-campo .actions-overflow-menu button.danger-item {
+  color: #dc2626;
+}

@@ -1,0 +1,9 @@
+; .user.ini para public_html/api/
+; Carregar este ficheiro para public_html/api/.user.ini
+; Funciona com PHP CGI/FastCGI (cPanel/LiteSpeed)
+
+post_max_size = 20M
+upload_max_filesize = 20M
+max_input_vars = 5000
+max_execution_time = 120
+memory_limit = 256M

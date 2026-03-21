@@ -1,0 +1,136 @@
+/* ============================================================
+ * DATA TABLE SYSTEM — classes semânticas reutilizáveis
+ * ============================================================
+ * Aplica-se a tabelas com a variante .dt-compact ou .dt-semi.
+ * Essas variantes usam table-layout: fixed + width: 100%
+ * para garantir que a tabela NUNCA excede o container.
+ *
+ * Cada <th>/<td> recebe uma classe de tamanho:
+ *   .col-xs       — muito estreita (dias, contadores)
+ *   .col-sm       — compacta (NIF, tipo, técnico)
+ *   .col-md       — média (cliente, data)
+ *   .col-lg       — larga (equipamento, nome)
+ *   .col-fill     — absorve todo o espaço restante
+ *   .col-actions  — shrink-to-fit, alinhada à direita
+ *
+ * Modificadores (combinar com a classe de tamanho):
+ *   .col-truncate — single-line com ellipsis
+ *   .col-badges   — wrap de badges, sem clip
+ *   .col-nowrap   — impede wrap
+ *   .col-center   — text-align center
+ * ============================================================ */
+
+/* ── Compact table (.dt-compact): manutenções ───────────────── */
+.dt-compact {
+  table-layout: fixed;
+  font-size: 0.78em;
+}
+.dt-compact th,
+.dt-compact td {
+  padding: 0.2rem 0.35rem;
+  line-height: 1.25;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dt-compact th {
+  font-size: 0.72em;
+  padding: 0.25rem 0.35rem;
+}
+.dt-compact .icon-btn,
+.dt-compact .icon-btn.readonly {
+  min-width: 1.75rem !important;
+  min-height: 1.75rem !important;
+  padding: 0.25rem !important;
+  flex-shrink: 0;
+}
+
+/* ── Semi-compact table (.dt-semi): reparações ──────────────── */
+.dt-semi {
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+.dt-semi th,
+.dt-semi td {
+  padding: 0.3rem 0.5rem;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dt-semi th {
+  font-size: 0.72rem;
+}
+.dt-semi .icon-btn {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* ── Categorias de coluna (width hints para fixed layout) ───── */
+.col-xs {
+  width: 3rem;
+  white-space: nowrap;
+  text-align: center;
+}
+.col-sm {
+  width: 8%;
+}
+.col-md {
+  width: 13%;
+}
+.col-lg {
+  width: 20%;
+}
+.col-fill {
+  width: 99%;
+}
+.col-actions {
+  width: 5rem;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ── Modificadores ──────────────────────────────────────────── */
+.col-truncate {
+  white-space: nowrap;
+}
+.col-nowrap {
+  white-space: nowrap;
+}
+.col-center {
+  text-align: center;
+}
+
+/* col-badges: MUST override the base overflow:hidden from dt-compact/dt-semi */
+.dt-compact td.col-badges,
+.dt-compact th.col-badges,
+.dt-semi td.col-badges,
+.dt-semi th.col-badges {
+  overflow: visible;
+  white-space: normal;
+}
+.col-badges .badge,
+.col-badges .badge-assinado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0.1rem 0.2rem 0.1rem 0;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Actions cell: inner flex row ───────────────────────────── */
+.col-actions .actions-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+}
+
+/* ── Table container: prevent scrollbar when using fixed layout ─ */
+.table-card.card:has(.dt-compact),
+.table-card.card:has(.dt-semi) {
+  overflow: hidden;
+}

@@ -70,47 +70,9 @@
   color: var(--color-text-muted);
 }
 
-/* Tabela */
+/* Tabela — visual overrides only (layout via data-table-system.css / dt-semi) */
 .reparacoes-table {
-  overflow-x: auto;
   padding: 0;
-}
-.reparacoes-table .data-table {
-  font-size: 0.82rem;
-}
-.reparacoes-table .data-table th,
-.reparacoes-table .data-table td {
-  padding: 0.3rem 0.5rem;
-  vertical-align: middle;
-}
-.reparacoes-table .data-table th {
-  font-size: 0.72rem;
-  padding: 0.3rem 0.5rem;
-}
-.reparacoes-table .data-table th:last-child {
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
-}
-.reparacoes-table .data-table td.actions {
-  display: table-cell !important;
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
-  vertical-align: middle !important;
-}
-.reparacoes-table .data-table td.actions .actions-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-.reparacoes-table .data-table .icon-btn {
-  min-width: 1.75rem;
-  min-height: 1.75rem;
-  padding: 0.25rem;
-  flex-shrink: 0;
 }
 .row-concluida td {
   opacity: 0.82;

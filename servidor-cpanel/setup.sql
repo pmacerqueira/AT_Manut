@@ -51,16 +51,18 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `clientes` (
-  `id`            VARCHAR(32)  NOT NULL,
-  `nif`           VARCHAR(20)  DEFAULT NULL,
-  `nome`          VARCHAR(255) NOT NULL,
-  `morada`        TEXT         DEFAULT NULL,
-  `codigo_postal` VARCHAR(20)  DEFAULT NULL,
-  `localidade`    VARCHAR(100) DEFAULT NULL,
-  `telefone`      VARCHAR(30)  DEFAULT NULL,
-  `email`         VARCHAR(255) DEFAULT NULL,
-  `notas`         TEXT         DEFAULT NULL,
-  `criado_em`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id`                    VARCHAR(32)  NOT NULL,
+  `nif`                   VARCHAR(20)  DEFAULT NULL,
+  `nome`                  VARCHAR(255) NOT NULL,
+  `morada`                TEXT         DEFAULT NULL,
+  `codigo_postal`         VARCHAR(20)  DEFAULT NULL,
+  `localidade`            VARCHAR(100) DEFAULT NULL,
+  `telefone`              VARCHAR(30)  DEFAULT NULL,
+  `email`                 VARCHAR(255) DEFAULT NULL,
+  `notas`                 TEXT         DEFAULT NULL,
+  `nome_contacto`         VARCHAR(255) DEFAULT NULL,
+  `assinatura_contacto`   LONGTEXT     DEFAULT NULL,
+  `criado_em`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -114,9 +116,13 @@ CREATE TABLE IF NOT EXISTS `relatorios` (
   `assinado_pelo_cliente` TINYINT(1)   NOT NULL DEFAULT 0,
   `assinatura_digital`    MEDIUMTEXT   DEFAULT NULL,
   `checklist_respostas`   TEXT         DEFAULT NULL,
+  `checklist_snapshot`    MEDIUMTEXT   DEFAULT NULL,
   `notas`                 TEXT         DEFAULT NULL,
   `fotos`                 LONGTEXT     DEFAULT NULL,
-  `ultimo_envio`          DATETIME     DEFAULT NULL,
+  `pecas_usadas`          TEXT         DEFAULT NULL,
+  `tipo_manut_kaeser`     VARCHAR(20)  DEFAULT NULL,
+  `ultimo_envio`          TEXT         DEFAULT NULL COMMENT 'JSON {data, destinatario} ou texto legado',
+  `enviado_para_cliente`  TEXT         DEFAULT NULL COMMENT 'JSON {data, email}',
   `criado_em`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_manutencao`     (`manutencao_id`),

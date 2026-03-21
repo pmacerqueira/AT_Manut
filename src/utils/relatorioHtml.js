@@ -16,6 +16,7 @@ import {
   isKaeserMarca,
 } from '../context/DataContext'
 import { resolveChecklist } from './resolveChecklist'
+import { MAX_FOTOS } from '../config/limits'
 import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
 
 const HISTORIAL_MAX = 5
@@ -100,6 +101,11 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
     return `<tr style="border-bottom:1px solid ${PALETA.bordaLeve}${rowBg}"><td class="cl-num" style="width:1.6em;color:${PALETA.muted};font-size:${TIPO.label};padding:3px 4px;white-space:nowrap;vertical-align:top">${i + offset + 1}.</td><td class="cl-texto" style="padding:3px 6px 3px 4px;vertical-align:top;font-size:${TIPO.pequeno};color:${PALETA.texto}">${esc(item.texto)}</td><td class="cl-badge" style="width:32px;text-align:center;padding:3px 2px;white-space:nowrap;vertical-align:top">${badge}</td></tr>`
   }
 
+  const tipoServico = manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'
+  const numRelPreview = relatorio?.numeroRelatorio ?? manutencao?.id ?? ''
+  const preheaderText = `Relatório de ${tipoServico}${numRelPreview ? ` N.º ${numRelPreview}` : ''} — no-reply@navel.pt`
+  const zwsp = '\u200C\u00A0'.repeat(80)
+
   let html = `<!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -132,6 +138,7 @@ ${cssBase(brandPrimary, brandSoft)}
 </style>
 </head>
 <body>
+<div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${esc(preheaderText)}${zwsp}</div>
 
 ${htmlHeader(logoSrc, logoMarcaSrc, logoMarcaAlt)}
 
@@ -349,8 +356,17 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
 </section>`
   }
 
-  // ── Fotografias (secção separada, layout adaptativo, sem cortes) ──
-  const fotosSafe = (relatorio.fotos ?? []).map(f => safeDataImageUrl(f)).filter(Boolean)
+  // ── Fotografias (secção separada; máx. MAX_FOTOS alinhado a PDF/email) ──
+  let fotosArr = relatorio.fotos ?? []
+  if (typeof fotosArr === 'string') {
+    try {
+      fotosArr = JSON.parse(fotosArr)
+    } catch {
+      fotosArr = []
+    }
+  }
+  if (!Array.isArray(fotosArr)) fotosArr = []
+  const fotosSafe = fotosArr.map(f => safeDataImageUrl(f)).filter(Boolean).slice(0, MAX_FOTOS)
   html += htmlFotos(fotosSafe)
 
   // ── Consumíveis e peças ──

@@ -545,6 +545,14 @@ body:has(.modal-overlay) {
 }
 .foto-remover:hover { background: var(--color-danger); }
 .fotos-vazio { font-size: 0.82rem; color: var(--color-text-muted); margin: 0; }
+.fotos-limite-hint {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  margin: 0 0 0.5rem 0;
+}
+.fotos-limite-hint strong { color: var(--color-text); font-weight: 600; }
+.fotos-limite-atingido { display: block; margin-top: 0.35rem; color: var(--color-warning, #d97706); font-weight: 500; }
 
 /* Assinatura digital no modal de execução */
 /* ── Registo histórico (Admin) ─────────────────────────────────────────────── */
@@ -1759,6 +1767,7 @@ body.modo-campo .alerta-item-dias.urgency-critico { background: #fff7ed; color: 
   padding: 1rem;
   margin-top: 0.25rem;
   background: rgba(13, 110, 253, 0.04);
+  overflow: visible;
 }
 .frota-email-panel-title {
   font-size: 0.82rem;
@@ -1768,18 +1777,57 @@ body.modo-campo .alerta-item-dias.urgency-critico { background: #fff7ed; color: 
   color: var(--color-text);
   margin: 0 0 0.75rem;
 }
-.frota-email-check {
-  display: flex;
+.frota-email-panel .frota-email-check {
+  display: flex !important;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 0.45rem 0;
+  padding: 0.55rem 0.5rem;
   border-bottom: 1px solid var(--color-border, rgba(255,255,255,0.08));
   cursor: pointer;
   font-size: 0.9rem;
+  width: 100%;
+  margin-bottom: 0;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
 }
-.frota-email-check:last-of-type { border-bottom: none; }
-.frota-email-check input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
-.frota-email-check span small { color: var(--color-text-muted); }
+.frota-email-panel .frota-email-check:last-of-type { border-bottom: none; }
+.frota-email-panel .frota-email-check input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: auto;
+}
+.frota-email-panel .frota-email-check > span {
+  flex: 1 1 auto;
+  overflow-wrap: break-word;
+  display: block !important;
+  color: #f4f7fa !important;
+}
+.frota-email-panel .frota-email-check > span strong {
+  color: #ffffff !important;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: block;
+}
+.frota-email-panel .frota-email-check > span small {
+  color: #5eead4 !important;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: block;
+  margin-top: 0.15rem;
+  letter-spacing: 0.01em;
+}
+body.modo-campo .frota-email-panel .frota-email-check {
+  background: rgba(0,0,0,0.03);
+}
+body.modo-campo .frota-email-panel .frota-email-check > span {
+  color: #1e293b !important;
+}
+body.modo-campo .frota-email-panel .frota-email-check > span strong {
+  color: #0f172a !important;
+}
+body.modo-campo .frota-email-panel .frota-email-check > span small {
+  color: #1d4ed8 !important;
+}
 .frota-email-outro-wrap { display: flex; flex-direction: column; gap: 0.3rem; flex: 1; }
 .frota-email-outro-wrap small { font-size: 0.78rem; color: var(--color-text-muted); }
 .frota-email-outro-input {

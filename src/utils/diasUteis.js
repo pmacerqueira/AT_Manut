@@ -222,6 +222,48 @@ export function distribuirHorarios(n) {
   })
 }
 
+// ── Computar próximas manutenções a partir de data de execução ────────────────
+
+const INTERVALOS_DIAS = { trimestral: 90, semestral: 180, anual: 365, mensal: 30 }
+
+/**
+ * Calcula as próximas N datas de manutenção periódica a partir de uma data de execução,
+ * ajustando para dias úteis e evitando feriados/fins-de-semana.
+ *
+ * @param {string} dataExecucao  - ISO date (YYYY-MM-DD) da execução
+ * @param {string} periodicidade - 'trimestral' | 'semestral' | 'anual' | 'mensal'
+ * @param {object} [opts]
+ * @param {number} [opts.count=12]   - quantidade de datas a gerar
+ * @param {string} [opts.tecnico=''] - técnico a atribuir
+ * @returns {Array<{data: string, periodicidade: string, tecnico: string}>}
+ */
+export function computarProximasDatas(dataExecucao, periodicidade, opts = {}) {
+  const intervaloDias = INTERVALOS_DIAS[periodicidade]
+  if (!intervaloDias || !dataExecucao) return []
+  const { count = 12, tecnico = '' } = opts
+
+  const anoInicio = new Date(dataExecucao).getFullYear()
+  const anoFim = anoInicio + 4
+  const feriadosSet = buildFeriadosSet(anoInicio, anoFim)
+  const diasOcupados = new Set()
+
+  const result = []
+  let d = new Date(dataExecucao + 'T12:00:00')
+
+  for (let i = 0; i < count; i++) {
+    d = new Date(d.getTime() + intervaloDias * 24 * 3600 * 1000)
+    const { data: dAjustada } = encontrarDiaLivre(d, feriadosSet, diasOcupados)
+    const iso = [
+      dAjustada.getFullYear(),
+      String(dAjustada.getMonth() + 1).padStart(2, '0'),
+      String(dAjustada.getDate()).padStart(2, '0'),
+    ].join('-')
+    result.push({ data: iso, periodicidade, tecnico })
+    diasOcupados.add(iso)
+  }
+  return result
+}
+
 // ── Formatação amigável ───────────────────────────────────────────────────────
 
 const DIAS_PT = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']

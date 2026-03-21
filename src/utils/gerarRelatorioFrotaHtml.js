@@ -6,6 +6,7 @@
 import { escapeHtml } from './sanitize'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
+import { normEntityId, dateKeyForFilter } from './frotaReportHelpers'
 
 const TENDENCIA_HISTORICO_MAX = 5
 const TENDENCIA_EXCELENTE_MIN = 3
@@ -26,51 +27,76 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
   const ano = new Date().getFullYear()
   const periodoCustom = !!options.periodoCustom
   const periodoLabel = options.periodoLabel || String(ano)
+  const pinicio = options.periodoInicio ?? null
+  const pfim = options.periodoFim ?? null
+  const dataDentroPeriodo = (dk) => {
+    if (!dk) return false
+    if (pinicio && dk < pinicio) return false
+    if (pfim && dk > pfim) return false
+    return true
+  }
 
-  const maqIds = new Set(maquinas.map(m => m.id))
-  const manutsCliente = manutencoes.filter(mt => maqIds.has(mt.maquinaId))
-  const repsCliente = reparacoes.filter(r => maqIds.has(r.maquinaId))
+  const maqIds = new Set(maquinas.map(m => normEntityId(m.id)))
+  const manutsCliente = manutencoes.filter(mt => maqIds.has(normEntityId(mt.maquinaId)))
+  const repsCliente = reparacoes.filter(r => maqIds.has(normEntityId(r.maquinaId)))
 
   const manutsByMaq = new Map()
   manutsCliente.forEach(mt => {
-    if (!manutsByMaq.has(mt.maquinaId)) manutsByMaq.set(mt.maquinaId, [])
-    manutsByMaq.get(mt.maquinaId).push(mt)
+    const k = normEntityId(mt.maquinaId)
+    if (!manutsByMaq.has(k)) manutsByMaq.set(k, [])
+    manutsByMaq.get(k).push(mt)
   })
   const repsByMaq = new Map()
   repsCliente.forEach(r => {
-    if (!repsByMaq.has(r.maquinaId)) repsByMaq.set(r.maquinaId, [])
-    repsByMaq.get(r.maquinaId).push(r)
+    const k = normEntityId(r.maquinaId)
+    if (!repsByMaq.has(k)) repsByMaq.set(k, [])
+    repsByMaq.get(k).push(r)
   })
-  const relMap = new Map(relatorios.filter(r => manutsCliente.some(mt => mt.id === r.manutencaoId)).map(r => [r.manutencaoId, r]))
+  const relMap = new Map()
+  for (const r of relatorios) {
+    const rid = normEntityId(r.manutencaoId)
+    if (!rid || !manutsCliente.some(mt => normEntityId(mt.id) === rid)) continue
+    relMap.set(rid, r)
+  }
 
   const linhas = maquinas.map(m => {
     const sub = getSubcategoria(m.subcategoriaId)
     const cat = sub ? getCategoria(sub.categoriaId) : null
-    const manutsM = manutsByMaq.get(m.id) || []
-    const repsM = repsByMaq.get(m.id) || []
+    const mid = normEntityId(m.id)
+    const manutsM = manutsByMaq.get(mid) || []
+    const repsM = repsByMaq.get(mid) || []
     const ultima = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))[0]
     const proxima = manutsM
       .filter(mt => mt.status === 'agendada' || mt.status === 'pendente')
       .sort((a, b) => a.data.localeCompare(b.data))[0]
-    const emAtraso = proxima && proxima.data < hoje
+    const proxDataKey = proxima?.data != null
+      ? String(proxima.data).slice(0, 10)
+      : (m.proximaManut ? String(m.proximaManut).slice(0, 10) : '')
+    const emAtraso = !!(proxDataKey && proxDataKey < hoje)
     const totalManuts = manutsM.filter(mt => mt.status === 'concluida').length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
-    const relUltima = ultima ? relMap.get(ultima.id) : null
+    const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
+    const proximaParaDias = proxima?.data ?? m.proximaManut
     let diasAtraso = null
-    if (proxima) diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proxima.data)) / 86400000)
+    if (proximaParaDias) diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proximaParaDias)) / 86400000)
+
+    let estado
+    if (!ultima && !proxDataKey) estado = 'instalar'
+    else if (emAtraso) estado = 'atraso'
+    else estado = 'conforme'
 
     let estadoBadge, estadoLabel
-    if (!m.proximaManut) { estadoBadge = 'badge-montagem'; estadoLabel = 'Por instalar' }
-    else if (emAtraso) { estadoBadge = 'badge-atraso'; estadoLabel = 'Em atraso' }
+    if (estado === 'instalar') { estadoBadge = 'badge-montagem'; estadoLabel = 'Por instalar' }
+    else if (estado === 'atraso') { estadoBadge = 'badge-atraso'; estadoLabel = 'N\u00e3o conforme' }
     else { estadoBadge = 'badge-ok'; estadoLabel = 'Conforme' }
 
     // R2: Indicador de tendência
     const manutsConclM = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))
     let tendencia = { nivel: 'neutro', texto: '—', cor: PALETA.muted }
     if (manutsConclM.length >= 2) {
-      const relsConcl = manutsConclM.slice(0, TENDENCIA_HISTORICO_MAX).map(mt => relMap.get(mt.id)).filter(Boolean)
+      const relsConcl = manutsConclM.slice(0, TENDENCIA_HISTORICO_MAX).map(mt => relMap.get(normEntityId(mt.id))).filter(Boolean)
       const anomaliasTotal = relsConcl.reduce((n, r) => {
         const snap = r.checklistSnapshot ?? []
         return n + snap.filter(item => r.checklistRespostas?.[item.id] === 'nao').length
@@ -86,24 +112,24 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
       } else {
         tendencia = { nivel: 'critico', texto: '⚠ Crítico', cor: PALETA.vermelho }
       }
-    } else if (manutsConclM.length === 0 && !m.proximaManut) {
+    } else if (manutsConclM.length === 0 && estado === 'instalar') {
       tendencia = { nivel: 'novo', texto: '○ Novo', cor: PALETA.muted }
     } else if (emAtraso) {
       tendencia = { nivel: 'critico', texto: '⚠ Atraso', cor: PALETA.vermelho }
     }
 
-    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estadoBadge, estadoLabel, tendencia }
+    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, estadoBadge, estadoLabel, tendencia, proxDataKey }
   })
 
   const totalEquip = maquinas.length
-  const totalAtraso = linhas.filter(l => l.emAtraso).length
-  const totalConformes = linhas.filter(l => !l.emAtraso && l.m.proximaManut).length
+  const totalAtraso = linhas.filter(l => l.estado === 'atraso').length
+  const totalConformes = linhas.filter(l => l.estado === 'conforme').length
   const taxaCumprimento = totalEquip > 0 ? Math.round((totalConformes / totalEquip) * 100) : 0
   const totalManutsAno = periodoCustom
-    ? manutsCliente.filter(mt => mt.status === 'concluida').length
+    ? manutsCliente.filter(mt => mt.status === 'concluida' && dataDentroPeriodo(dateKeyForFilter(mt.data))).length
     : manutsCliente.filter(mt => mt.status === 'concluida' && mt.data?.startsWith(String(ano))).length
   const totalRepsAno = periodoCustom
-    ? repsCliente.filter(r => r.status === 'concluida').length
+    ? repsCliente.filter(r => r.status === 'concluida' && dataDentroPeriodo(dateKeyForFilter(r.data))).length
     : repsCliente.filter(r => r.status === 'concluida' && r.data?.startsWith(String(ano))).length
   const totalRepsAbertas = linhas.reduce((s, l) => s + l.repsAbertas, 0)
 
@@ -117,7 +143,11 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 
   const umAnoAtras = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)
   const repsRecentes = repsCliente
-    .filter(r => r.status === 'concluida' && (periodoCustom || r.data >= umAnoAtras))
+    .filter(r => {
+      if (r.status !== 'concluida') return false
+      if (periodoCustom) return dataDentroPeriodo(dateKeyForFilter(r.data))
+      return r.data >= umAnoAtras
+    })
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 20)
 
@@ -131,7 +161,7 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 .cliente-field{display:flex;flex-direction:column;gap:1px}
 .cliente-field .c-label{font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .cliente-field .c-value{font-size:9pt;font-weight:700;color:var(--texto)}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:10px}
 .kpi-card{background:var(--cinza);border:1px solid var(--borda);border-radius:5px;padding:7px 8px;text-align:center}
 .kpi-card.kpi-verde{background:#dcfce7;border-color:#15803d}
 .kpi-card.kpi-vermelho{background:#fee2e2;border-color:#b91c1c}
@@ -146,9 +176,9 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 .tabela-frota{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:6px}
 .tabela-frota th{background:var(--azul);color:var(--branco);padding:4px 5px;text-align:left;font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .tabela-frota td{padding:3px 5px;vertical-align:top;color:var(--texto)}
-.tabela-frota .eq-row td{border-top:1px solid var(--borda-leve);padding-top:4px;padding-bottom:1px}
-.tabela-frota .sub-row td{padding-top:0;padding-bottom:4px;border-bottom:1px solid var(--borda)}
-.tabela-frota .eq-row.par td,.tabela-frota .sub-row.par td{background:var(--cinza)}
+.tabela-frota .eq-row td{border-top:1px solid var(--borda-leve);padding-top:4px;padding-bottom:4px;border-bottom:1px solid var(--borda)}
+.tabela-frota .eq-row.par td{background:var(--cinza)}
+.tabela-frota .eq-cell-stack .eq-nome{display:block;margin-bottom:2px}
 .tabela-frota .cell-eq{width:30%}
 .tabela-frota .cell-center{text-align:center}
 .tabela-frota .cell-muted{color:var(--muted)}
@@ -161,7 +191,7 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 .data-ok{color:#15803d;font-weight:600}
 .eq-nome{font-weight:700;font-size:8.5pt}
 .eq-sub{font-size:7pt;color:var(--muted)}
-.eq-serie{font-family:'Courier New',monospace;font-size:7pt;color:var(--muted)}
+.eq-serie{font-family:'Courier New',monospace;font-size:7pt;color:var(--muted);word-break:break-all;overflow-wrap:anywhere;max-width:100%}
 .cat-header{background:var(--azul-claro);padding:5px 8px;font-size:9pt;font-weight:700;color:var(--azul);margin:8px 0 4px;border-radius:3px;border-left:3px solid var(--azul)}
 .cat-header .atraso-count{color:#b91c1c}
 .resumo-anual{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
@@ -199,7 +229,7 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
 </div>`
 
   for (const [, grupo] of categoriasMap) {
-    const grupoAtraso = grupo.linhas.filter(l => l.emAtraso).length
+    const grupoAtraso = grupo.linhas.filter(l => l.estado === 'atraso').length
     html += `<div class="cat-header">${esc(grupo.nome)} (${grupo.linhas.length} equip.${grupoAtraso > 0 ? ` · <span class="atraso-count">${grupoAtraso} em atraso</span>` : ''})</div>
 <table class="tabela-frota"><thead><tr>
   <th class="cell-eq" style="width:26%">Equipamento / N.º Série</th>
@@ -212,22 +242,21 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
   <th class="cell-center" style="width:11%">Tendência</th>
   <th class="cell-center" style="width:18%">Últ. rel.</th>
 </tr></thead><tbody>`
-    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia }, idx) => {
+    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
       const diasStr = diasAtraso != null ? (diasAtraso > 0 ? `<span class="data-atraso">+${diasAtraso}</span>` : diasAtraso === 0 ? 'Hoje' : `<span class="data-ok">${diasAtraso}</span>`) : '—'
       const parClass = idx % 2 === 0 ? 'par' : ''
+      const proximaRaw = proxima?.data ?? m.proximaManut
+      const subSerie = [sub ? `<span class="eq-sub">${esc(sub.nome)}</span>` : '', m.numeroSerie ? `<span class="eq-serie">S/N: ${esc(m.numeroSerie)}</span>` : ''].filter(Boolean).join(' ')
       html += `<tr class="eq-row ${parClass}">
-        <td class="cell-eq"><span class="eq-nome">${esc(m.marca)} ${esc(m.modelo)}</span></td>
+        <td class="cell-eq eq-cell-stack"><span class="eq-nome">${esc(m.marca)} ${esc(m.modelo)}</span>${subSerie ? `<br/>${subSerie}` : ''}</td>
         <td class="cell-center">${ultima ? fmtD(ultima.data) : '—'}</td>
-        <td class="cell-center">${proxima ? `<span class="${proxima.data < hoje ? 'data-atraso' : 'data-ok'}">${fmtD(proxima.data)}</span>` : '—'}</td>
+        <td class="cell-center">${proximaRaw ? `<span class="${proxDataKey && proxDataKey < hoje ? 'data-atraso' : 'data-ok'}">${fmtD(proximaRaw)}</span>` : '—'}</td>
         <td class="cell-center cell-dias">${diasStr}</td>
         <td class="cell-center cell-muted">${totalManuts || '—'}</td>
         <td class="cell-center cell-muted">${totalReps || '—'}</td>
         <td class="cell-center"><span class="badge ${estadoBadge}">${esc(estadoLabel)}</span></td>
         <td class="cell-center" style="font-size:7.5pt;font-weight:700;color:${tendencia.cor}">${tendencia.texto}</td>
         <td class="cell-center cell-rel">${relUltima?.numeroRelatorio ?? '—'}</td>
-      </tr><tr class="sub-row ${parClass}">
-        <td colspan="1" class="cell-eq">${sub ? `<span class="eq-sub">${esc(sub.nome)}</span>` : ''} ${m.numeroSerie ? `<span class="eq-serie">S/N: ${esc(m.numeroSerie)}</span>` : ''}</td>
-        <td colspan="8"></td>
       </tr>`
     })
     html += `</tbody></table>`
@@ -240,13 +269,14 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
   <th style="width:14%">Data prevista</th><th class="cell-center" style="width:10%">Dias atraso</th>
   <th style="width:30%">Observações</th>
 </tr></thead><tbody>`
-    linhas.filter(l => l.emAtraso).sort((a, b) => (b.diasAtraso ?? 0) - (a.diasAtraso ?? 0)).forEach(({ m, sub, proxima, diasAtraso }) => {
+    linhas.filter(l => l.estado === 'atraso').sort((a, b) => (b.diasAtraso ?? 0) - (a.diasAtraso ?? 0)).forEach(({ m, sub, proxima, diasAtraso }) => {
+      const dataPrev = proxima?.data ?? m.proximaManut
       html += `<tr>
         <td><strong>${esc(m.marca)} ${esc(m.modelo)}</strong>${sub ? ` <span class="sub-muted">· ${esc(sub.nome)}</span>` : ''}</td>
         <td class="cell-serie">${esc(m.numeroSerie)}</td>
-        <td class="data-atraso">${fmtD(proxima.data)}</td>
+        <td class="data-atraso">${fmtD(dataPrev)}</td>
         <td class="data-atraso cell-center cell-dias">+${diasAtraso ?? 0}d</td>
-        <td class="sub-muted">${esc(proxima.observacoes ?? '')}</td>
+        <td class="sub-muted">${esc(proxima?.observacoes ?? '')}</td>
       </tr>`
     })
     html += `</tbody></table>`
@@ -259,9 +289,9 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
   <th class="cell-eq" style="width:28%">Equipamento</th><th class="cell-serie" style="width:14%">Nº Série</th>
   <th style="width:12%">Data</th><th style="width:46%">Descrição</th>
 </tr></thead><tbody>`
-    const maqMap = new Map(maquinas.map(mm => [mm.id, mm]))
+    const maqMap = new Map(maquinas.map(mm => [normEntityId(mm.id), mm]))
     repsRecentes.forEach(r => {
-      const maq = maqMap.get(r.maquinaId)
+      const maq = maqMap.get(normEntityId(r.maquinaId))
       html += `<tr>
         <td><strong>${maq ? esc(`${maq.marca} ${maq.modelo}`) : '—'}</strong></td>
         <td class="cell-serie">${maq ? esc(maq.numeroSerie) : '—'}</td>

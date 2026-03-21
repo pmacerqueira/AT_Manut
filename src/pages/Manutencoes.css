@@ -1,71 +1,14 @@
-/* Tabela condensada: fichas compactas, máximo de linhas por ecrã */
-.manutencoes-table .data-table {
-  font-size: 0.78em;
-}
-.manutencoes-table .data-table th,
-.manutencoes-table .data-table td {
-  padding: 0.2rem 0.35rem;
-  line-height: 1.2;
-  vertical-align: middle;
-}
-.manutencoes-table .data-table th {
-  font-size: 0.7em;
-  padding: 0.25rem 0.35rem;
-}
-/* Coluna de ações */
-.manutencoes-table .data-table th:last-child {
-  width: 1%;
-  min-width: 13rem;
-  white-space: nowrap;
-  text-align: right;
-  padding-right: 0.5rem;
-}
-.manutencoes-table .data-table td.actions {
-  display: table-cell !important;
-  width: 1%;
-  min-width: 13rem;
-  white-space: nowrap;
-  text-align: right;
-  vertical-align: middle !important;
-  padding-right: 0.5rem !important;
-}
-/* O flex fica no wrapper interno — nunca no td */
-.manutencoes-table .data-table td.actions .actions-inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-.manutencoes-table .data-table .icon-btn,
-.manutencoes-table .data-table .icon-btn.readonly {
-  min-width: 1.75rem !important;
-  min-height: 1.75rem !important;
-  padding: 0.25rem !important;
-  flex-shrink: 0;
-}
+/* ── Manutencoes table — visual overrides only ─────────────── */
+/* Layout, column sizing, actions, overflow menu and badges are
+   handled by data-table-system.css and ActionsOverflow.css.    */
 
-/* Botão Executar — mesmo tamanho dos icon-btn mas verde */
+/* Botão Executar — verde */
 .icon-btn.btn-executar-manut {
   color: var(--color-success-dark) !important;
 }
 .icon-btn.btn-executar-manut:hover {
   color: var(--color-white) !important;
   background: var(--color-success-dark) !important;
-}
-/* Tipo, Data, Técnico e Status em linha única — evita badge "Em atraso" partir em 2 linhas */
-/* Cols: 1=Dias, 2=Equip, 3=Cliente, 4=Tipo, 5=Data, 6=Técnico, 7=Status, 8=Ações */
-.manutencoes-table .data-table td:nth-child(3),
-.manutencoes-table .data-table td:nth-child(4),
-.manutencoes-table .data-table td:nth-child(5),
-.manutencoes-table .data-table td:nth-child(6),
-.manutencoes-table .data-table td.col-status {
-  white-space: nowrap;
-}
-/* Status: min-width para garantir que badge fica inteiro */
-.manutencoes-table .data-table th:nth-child(7),
-.manutencoes-table .data-table td.col-status {
-  min-width: 6rem;
 }
 
 .manutencoes-list-title {
@@ -252,6 +195,37 @@
 .modal-relatorio-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-shrink: 0; }
 .btn-fechar { padding: 0.4rem 0.8rem; font-size: 0.85em; }
 
+/* ── Coluna de email enviado ao cliente (semáforo) ── */
+.col-email-status {
+  width: 2.2rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.email-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.email-dot--sent {
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+}
+.email-dot--pending {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+body.modo-campo .email-dot--sent {
+  background: #16a34a;
+  box-shadow: 0 0 3px rgba(22, 163, 74, 0.4);
+}
+body.modo-campo .email-dot--pending {
+  background: #dc2626;
+  box-shadow: 0 0 3px rgba(220, 38, 38, 0.3);
+}
+
 /* Modal envio de email */
 .modal-email-envio h2 { display: flex; align-items: center; gap: 0.4rem; }
 
@@ -368,6 +342,28 @@
   color: var(--color-text-muted);
 }
 .mc-serie { font-family: 'Courier New', monospace; }
+.mc-serie-link,
+.equip-num-serie-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+.mc-serie-link:hover,
+.mc-serie-link:focus-visible,
+.equip-num-serie-link:hover,
+.equip-num-serie-link:focus-visible {
+  color: var(--color-accent, #60a5fa);
+  text-decoration-style: solid;
+  outline: none;
+}
+body.modo-campo .mc-serie-link:hover,
+body.modo-campo .mc-serie-link:focus-visible,
+body.modo-campo .equip-num-serie-link:hover,
+body.modo-campo .equip-num-serie-link:focus-visible {
+  color: #2563eb;
+}
 
 /* Data + técnico */
 .mc-meta {
@@ -502,10 +498,13 @@
   font-size: 0.72em;
   font-family: 'Courier New', monospace;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #93c5fd;
   letter-spacing: 0.03em;
   margin-top: 1px;
   white-space: nowrap;
+}
+body.modo-campo .num-servico {
+  color: #1e40af;
 }
 
 /* Modal pré-visualização de fotografias */
@@ -747,7 +746,6 @@
 }
 
 /* ── Coluna "Dias" na tabela desktop ─────────────────────────────────────── */
-.col-dias { width: 4rem; text-align: center; }
 .col-dias-val {
   text-align: center;
   font-weight: 700;
@@ -861,6 +859,60 @@
   line-height: 1.4;
 }
 
+/* ── Admin edit mode ──────────────────────────────────────────── */
+.admin-edit-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-accent, #3b82f6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 1.25rem 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.wizard-step-content:first-child .admin-edit-section-title {
+  margin-top: 0;
+}
+.admin-edit-assinatura-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+.assinatura-preview-img {
+  max-width: 240px;
+  max-height: 100px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: #fff;
+}
+.assinatura-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.admin-edit-assinatura-cleared {
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius);
+}
+.admin-edit-status-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+@media (max-width: 960px) {
+  .admin-edit-status-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .admin-edit-status-row { grid-template-columns: 1fr; }
+}
+
 /* Inline confirmation box (observações/fotos vazias) */
 .wizard-confirm {
   display: flex;
@@ -937,30 +989,7 @@
 
 /* ── Modo campo (light): tabela de manutenções ─────────────────────────── */
 body.modo-campo .manutencoes-table.table-card.card {
-  overflow-x: auto;
-  overflow-y: visible;
   border: 2px solid #94a3b8;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: #94a3b8 #e2e8f0;
-  touch-action: pan-x pan-y;
-}
-body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar {
-  height: 10px;
-}
-body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-track {
-  background: #e2e8f0;
-  border-radius: 5px;
-}
-body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 5px;
-}
-body.modo-campo .manutencoes-table.table-card.card::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-body.modo-campo .manutencoes-table .data-table {
-  min-width: 900px;
 }
 body.modo-campo .manutencoes-table .data-table th {
   background: #e2e8f0;
@@ -976,18 +1005,8 @@ body.modo-campo .manutencoes-table .data-table tbody tr:nth-child(even) {
 body.modo-campo .manutencoes-table .data-table tbody tr:hover {
   background: #e0e7f1;
 }
-body.modo-campo .manutencoes-table .data-table th:last-child,
-body.modo-campo .manutencoes-table .data-table td.actions {
-  min-width: 10rem;
-  padding-right: 0.6rem !important;
-}
-body.modo-campo .manutencoes-table .data-table td.actions .actions-inner {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.3rem;
-}
-body.modo-campo .manutencoes-table .data-table .icon-btn,
-body.modo-campo .manutencoes-table .data-table .icon-btn.readonly {
+body.modo-campo .dt-compact .icon-btn,
+body.modo-campo .dt-compact .icon-btn.readonly {
   min-width: 2rem !important;
   min-height: 2rem !important;
   padding: 0.3rem !important;
@@ -996,21 +1015,21 @@ body.modo-campo .manutencoes-table .data-table .icon-btn.readonly {
   background: #eff6ff !important;
   border-radius: 6px;
 }
-body.modo-campo .manutencoes-table .data-table .icon-btn:hover {
+body.modo-campo .dt-compact .icon-btn:hover {
   background: #dbeafe !important;
   color: #1e3a8a !important;
 }
-body.modo-campo .manutencoes-table .data-table .icon-btn.btn-executar-manut {
+body.modo-campo .dt-compact .icon-btn.btn-executar-manut {
   color: #166534 !important;
   border-color: #86efac !important;
   background: #f0fdf4 !important;
 }
-body.modo-campo .manutencoes-table .data-table .icon-btn.btn-executar-manut:hover {
+body.modo-campo .dt-compact .icon-btn.btn-executar-manut:hover {
   background: #dcfce7 !important;
   color: #14532d !important;
 }
-body.modo-campo .manutencoes-table .data-table .icon-btn.danger,
-body.modo-campo .manutencoes-table .data-table .icon-btn.danger:hover {
+body.modo-campo .dt-compact .icon-btn.danger,
+body.modo-campo .dt-compact .icon-btn.danger:hover {
   color: #991b1b !important;
   border-color: #fca5a5 !important;
   background: #fef2f2 !important;
@@ -1389,6 +1408,16 @@ body.modo-campo .prefill-banner {
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
+.quick-note-chip--active {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #16a34a;
+}
+.quick-note-chip--active:hover {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: #16a34a;
+  color: #15803d;
+}
 body.modo-campo .quick-note-chip {
   background: #e2e8f0;
   border-color: #94a3b8;
@@ -1398,4 +1427,331 @@ body.modo-campo .quick-note-chip:hover {
   background: #dbeafe;
   border-color: #3b82f6;
   color: #1e40af;
+}
+body.modo-campo .quick-note-chip--active {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #15803d;
+}
+body.modo-campo .quick-note-chip--active:hover {
+  background: #bbf7d0;
+  border-color: #16a34a;
+  color: #166534;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Filtros para manutenções executadas
+   ══════════════════════════════════════════════════════════════════════════════ */
+.exec-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--color-bg-elevated, #1a2332);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.08));
+  border-radius: var(--radius-md, 8px);
+}
+.exec-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── Period chips ── */
+.exec-filter-chips {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.period-chip {
+  background: var(--color-bg-elevated, #1e293b);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 20px;
+  padding: 0.28rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.period-chip:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+.period-chip--active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+/* ── Date range ── */
+.exec-date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.exec-date-range label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #94a3b8);
+  white-space: nowrap;
+}
+.exec-date-range input[type="date"] {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.78rem;
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 4px;
+  background: var(--color-bg, #0d1117);
+  color: var(--color-text, #e2e8f0);
+  width: 130px;
+}
+.exec-date-clear {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+}
+.exec-date-clear:hover { color: var(--color-danger, #ef4444); }
+
+/* ── Search ── */
+.exec-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 200px;
+  min-width: 0;
+  background: var(--color-bg, #0d1117);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.exec-search input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text, #e2e8f0);
+  font-size: 0.78rem;
+  min-width: 0;
+}
+.exec-search input::placeholder { color: var(--color-text-muted, #64748b); }
+.exec-search-clear {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+}
+.exec-search-clear:hover { color: var(--color-danger, #ef4444); }
+
+/* ── Email filter ── */
+.exec-email-filter select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 4px;
+  background: var(--color-bg, #0d1117);
+  color: var(--color-text, #e2e8f0);
+  cursor: pointer;
+}
+
+/* ── Reset button ── */
+.exec-filter-reset {
+  background: none;
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.exec-filter-reset:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ── Ordenação executadas (mobile / reforço visual) ── */
+.exec-sort-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+}
+.exec-sort-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.exec-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #94a3b8);
+  background: var(--color-bg, #0d1117);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.exec-sort-btn:hover {
+  border-color: #3b82f6;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+}
+.exec-sort-btn--active {
+  border-color: #3b82f6;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
+}
+
+/* ── Cabeçalho tabela: ordenar por equipamento / série ── */
+.th-equip-sort-wrap {
+  vertical-align: middle;
+}
+.th-equip-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.th-equip-sort-btn:hover {
+  color: var(--color-accent, #60a5fa);
+}
+.th-equip-sort-btn:focus-visible {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: 2px;
+}
+.th-equip-sort-ico {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* ── modo-campo (light theme) ── */
+body.modo-campo .exec-filter-bar {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+body.modo-campo .period-chip {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #475569;
+}
+body.modo-campo .period-chip:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+body.modo-campo .period-chip--active {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+body.modo-campo .exec-date-range input[type="date"] {
+  background: #fff;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+body.modo-campo .exec-date-range label {
+  color: #475569;
+}
+body.modo-campo .exec-search {
+  background: #fff;
+  border-color: #94a3b8;
+  color: #475569;
+}
+body.modo-campo .exec-search input {
+  color: #1e293b;
+}
+body.modo-campo .exec-search input::placeholder { color: #94a3b8; }
+body.modo-campo .exec-email-filter select {
+  background: #fff;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+body.modo-campo .exec-filter-reset {
+  border-color: #94a3b8;
+  color: #475569;
+}
+body.modo-campo .exec-filter-reset:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+body.modo-campo .exec-sort-row {
+  border-top-color: #e2e8f0;
+}
+body.modo-campo .exec-sort-hint {
+  color: #64748b;
+}
+body.modo-campo .exec-sort-btn {
+  background: #fff;
+  border-color: #94a3b8;
+  color: #475569;
+}
+body.modo-campo .exec-sort-btn:hover {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+body.modo-campo .exec-sort-btn--active {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+body.modo-campo .th-equip-sort-btn:hover {
+  color: #2563eb;
+}
+
+/* ── Responsivo: empilhar em mobile ── */
+@media (max-width: 768px) {
+  .exec-filter-row { flex-direction: column; align-items: stretch; }
+  .exec-filter-chips { flex-wrap: wrap; }
+  .exec-date-range { flex-wrap: wrap; }
+  .exec-search { flex: 1 1 auto; }
+}
+@media (max-width: 480px) {
+  .exec-filter-bar { padding: 0.5rem 0.6rem; }
+  .period-chip { padding: 0.22rem 0.55rem; font-size: 0.72rem; }
+  .exec-date-range input[type="date"] { width: 110px; }
 }

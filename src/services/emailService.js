@@ -3,14 +3,17 @@
  *
  * Dois endpoints no cPanel:
  *   send-email.php  — recebe dados estruturados, gera PDF com FPDF, envia com anexo
- *   send-report.php — recebe HTML pré-renderizado, envia como corpo do email (sem PDF)
+ *   send-report.php — recebe HTML pré-renderizado; se `pdf_base64`+`pdf_filename` forem enviados, anexa PDF (multipart)
  *
  * Funções exportadas:
  *   enviarRelatorioEmail       — manutenções (dados → send-email.php → PDF anexo)
- *   enviarRelatorioHtmlEmail   — reparações e envio genérico (HTML → send-report.php)
+ *   enviarRelatorioHtmlEmail   — HTML no corpo (reparações, frota, etc.); PDF opcional via base64
  *   enviarLembreteEmail        — alertas de manutenção próxima (dados → send-email.php)
  */
 import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
+import { computarProximasDatas } from '../utils/diasUteis'
+import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
+import { resolveChecklist } from '../utils/resolveChecklist'
 import { EMAIL_CONFIG, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
@@ -73,6 +76,7 @@ export async function enviarRelatorioEmail({
   subcategoriaNome = '',
   logoUrl          = '',
   tecnicoObj       = null,
+  marcas           = [],
 }) {
   if (!emailDestinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
@@ -91,7 +95,6 @@ export async function enviarRelatorioEmail({
   if (isEmailConfigured()) {
     try {
       // Usar snapshot do relatório quando disponível (imutabilidade)
-      const { resolveChecklist } = await import('../utils/resolveChecklist')
       const itemsResolvidos = resolveChecklist(relatorio, checklistItems)
       const checklistJson = JSON.stringify(
         itemsResolvidos.map(item => ({
@@ -119,11 +122,29 @@ export async function enviarRelatorioEmail({
         if (rawB64.length > 0) photosJson = JSON.stringify(rawB64)
       }
 
-      // Data da próxima manutenção agendada (da ficha da máquina)
+      // Data da próxima manutenção agendada (da ficha da máquina) — texto informativo no email
       const proximaManutRaw = maquina?.proximaManut ?? ''
       const proximaManutFmt = proximaManutRaw
         ? formatDataAzores(proximaManutRaw, true)
         : ''
+
+      // Mesma lógica que gerarPdfCompacto / Obter PDF: próximas datas + declaração no PDF anexo
+      const dataExec =
+        relatorio?.dataCriacao?.slice(0, 10) ||
+        relatorio?.dataAssinatura?.slice(0, 10) ||
+        manutencao?.data ||
+        ''
+      const periMaq = maquina?.periodicidadeManut
+      const proximasManutencoes =
+        periMaq && dataExec
+          ? computarProximasDatas(dataExec, periMaq, {
+              tecnico: manutencao?.tecnico || relatorio?.tecnico || '',
+            })
+          : []
+      const manutencaoTipo = manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'
+      const pecasUsadas = relatorio?.pecasUsadas ?? []
+
+      const { navelLogoB64, brandLogoB64 } = await getHeaderLogosB64ForEmail({ maquina, marcas })
 
       // Enviamos um JSON body (Content-Type: application/json).
       // As regras ModSecurity para URL-encoded POST (que filtram @ e $) NÃO se aplicam
@@ -161,6 +182,14 @@ export async function enviarRelatorioEmail({
         photos_json:      photosJson,
         n_fotos:          fotosOriginais.length,
         proxima_manut:    proximaManutFmt,
+        /** PDF FPDF: alinhar com Obter PDF (gerarPdfCompacto) */
+        manutencao_tipo:          manutencaoTipo,
+        periodicidade_maquina:    periMaq ?? '',
+        proximas_manutencoes_json: JSON.stringify(proximasManutencoes),
+        pecas_usadas_json:        JSON.stringify(pecasUsadas),
+        /** Cabeçalho FPDF: mesmos logos que "Obter PDF" (base64 raw, sem prefixo data:) */
+        navel_logo_b64:  navelLogoB64 || '',
+        brand_logo_b64:  brandLogoB64 || '',
         tecnico_telefone:       tecnicoObj?.telefone ?? '',
         tecnico_assinatura_b64: tecnicoAssinaturaB64,
       }
@@ -206,7 +235,7 @@ export async function enviarRelatorioEmail({
     `Equipamento: ${equipDesc}\n` +
     `Data de execução: ${dataReal}\n` +
     `Técnico: ${relatorio?.tecnico ?? '—'}\n\n` +
-    `Com os melhores cumprimentos,\nNAVEL-AÇORES\n296 205 290 / 296 630 120`
+    `Com os melhores cumprimentos,\nNAVEL \u2013 AÇORES\nwww.navel.pt`
   )
   window.open(`mailto:${emailDestinatario}?subject=${subject}&body=${body}`, '_blank')
 
@@ -229,6 +258,8 @@ export async function enviarRelatorioEmail({
  * @param {string} params.html          - Corpo HTML completo pré-renderizado
  * @param {string} [params.cc]          - Email em cópia (default: comercial@navel.pt)
  * @param {string} [params.nomeCliente] - Nome do cliente (para logging)
+ * @param {string} [params.pdfBase64]   - PDF em base64 sem prefixo data: (anexo multipart)
+ * @param {string} [params.pdfFilename] - Nome do ficheiro anexo (default relatorio.pdf)
  * @returns {Promise<{ ok: boolean, message: string }>}
  */
 export async function enviarRelatorioHtmlEmail({
@@ -237,6 +268,8 @@ export async function enviarRelatorioHtmlEmail({
   html,
   cc = 'comercial@navel.pt',
   nomeCliente = '',
+  pdfBase64 = '',
+  pdfFilename = 'relatorio.pdf',
 }) {
   if (!destinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
@@ -245,7 +278,7 @@ export async function enviarRelatorioHtmlEmail({
   if (!isEmailConfigured()) {
     const subject = encodeURIComponent(assunto || 'Relatório — Navel')
     const body = encodeURIComponent(
-      `Exmo(a) Sr(a) ${nomeCliente},\n\nSegue em anexo o relatório.\n\nNAVEL-AÇORES\n296 205 290 / 296 630 120`
+      `Exmo(a) Sr(a) ${nomeCliente},\n\nSegue em anexo o relatório.\n\nNAVEL \u2013 AÇORES\nwww.navel.pt`
     )
     window.open(`mailto:${destinatario}?subject=${subject}&body=${body}`, '_blank')
     return { ok: true, message: `Cliente de email aberto para ${destinatario}.`, isMailto: true }
@@ -267,6 +300,7 @@ export async function enviarRelatorioHtmlEmail({
         cc,
         assunto: assunto || 'Relatório — Navel',
         corpoHtml: html,
+        ...(pdfBase64 ? { pdf_base64: pdfBase64, pdf_filename: pdfFilename } : {}),
       }),
     })
 
@@ -274,8 +308,8 @@ export async function enviarRelatorioHtmlEmail({
 
     if (response.ok && json.ok) {
       logger.action('emailService', 'sendHtmlEmail',
-        `Relatório HTML enviado para ${destinatario}`,
-        { destinatario, assunto: assunto?.substring(0, 60) })
+        `${pdfBase64 ? 'Email HTML+PDF' : 'Email HTML'} enviado para ${destinatario}`,
+        { destinatario, assunto: assunto?.substring(0, 60), comAnexo: !!pdfBase64 })
       return { ok: true, message: `Email enviado com sucesso para ${destinatario}.` }
     }
 
@@ -288,6 +322,7 @@ export async function enviarRelatorioHtmlEmail({
     return {
       ok: false,
       message: `Não foi possível contactar o servidor de email. (${err.message})`,
+      isNetworkError: true,
     }
   }
 }
@@ -368,7 +403,7 @@ export async function enviarLembreteEmail({ emailDestinatario, clienteNome, aler
       `• ${a.maquina?.marca ?? ''} ${a.maquina?.modelo ?? ''} (S/N: ${a.maquina?.numeroSerie ?? '—'})` +
       ` — Data: ${a.manutencao?.data ?? '?'} (daqui a ${a.diasRestantes} dia(s))`
     ).join('\n') +
-    `\n\nCom os melhores cumprimentos,\nNAVEL-AÇORES\n296 205 290 / 296 630 120`
+    `\n\nCom os melhores cumprimentos,\nNAVEL \u2013 AÇORES\nwww.navel.pt`
   )
   window.open(`mailto:${emailDestinatario}?subject=${subjectFallback}&body=${bodyFallback}`, '_blank')
   alertas.forEach(a => marcarAlertaEnviado(a.maquina?.id, a.manutencao?.data))
@@ -377,4 +412,21 @@ export async function enviarLembreteEmail({ emailDestinatario, clienteNome, aler
     message:  `Cliente de email aberto para ${emailDestinatario}.`,
     isMailto: true,
   }
+}
+
+/**
+ * Converte Blob (ex. PDF gerado no browser) para base64 **sem** prefixo `data:*;base64,`
+ * — formato de `pdf_base64` em {@link enviarRelatorioHtmlEmail} / `send-report.php`.
+ */
+export function blobToRawBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onloadend = () => {
+      const s = String(r.result || '')
+      const i = s.indexOf(',')
+      resolve(i >= 0 ? s.slice(i + 1) : '')
+    }
+    r.onerror = () => reject(new Error('Leitura do ficheiro falhou'))
+    r.readAsDataURL(blob)
+  })
 }

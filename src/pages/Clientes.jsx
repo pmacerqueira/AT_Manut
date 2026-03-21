@@ -20,8 +20,11 @@ import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
-import { enviarRelatorioHtmlEmail } from '../services/emailService'
+import { enviarRelatorioHtmlEmail, blobToRawBase64 } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
+import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
+import { computarProximasDatas } from '../utils/diasUteis'
+import { maquinaPertenceCliente } from '../utils/frotaReportHelpers'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
@@ -48,6 +51,7 @@ export default function Clientes() {
     getRelatorioByManutencao,
     getTecnicoByNome,
     updateManutencao,
+    marcas,
   } = useData()
   const contentReady = useDeferredReady(clientes.length >= 0)
   const { canDelete, canEditCliente, canAddCliente, isAdmin } = usePermissions()
@@ -70,7 +74,7 @@ export default function Clientes() {
   const [modalDocumentoEmail, setModalDocumentoEmail] = useState(null)
   const [modalExecucao, setModalExecucao] = useState(null)
   const [fichaKpiFilter, setFichaKpiFilter] = useState(null)
-  const [modalFrota, setModalFrota] = useState(null) // { cliente, manusFiltradas, repsFiltradas, options }
+  const [modalFrota, setModalFrota] = useState(null) // { cliente, options }
   const [modalFrotaFiltro, setModalFrotaFiltro] = useState(null) // { cliente }
   const [frotaDataInicio, setFrotaDataInicio] = useState('')
   const [frotaDataFim, setFrotaDataFim] = useState('')
@@ -157,8 +161,8 @@ export default function Clientes() {
     if (modal !== 'ficha') setModal(null)
   }
 
-  const getMaquinasCount = (nif) => maquinas.filter(m => m.clienteNif === nif).length
-  const getMaquinasDoCliente = (nif) => maquinas.filter(m => m.clienteNif === nif)
+  const getMaquinasCount = (nif) => maquinas.filter(m => maquinaPertenceCliente(m, { nif })).length
+  const getMaquinasDoCliente = (nif) => maquinas.filter(m => maquinaPertenceCliente(m, { nif }))
 
   const handleAbrirFiltroFrota = (cliente) => {
     const maqsCliente = getMaquinasDoCliente(cliente.nif)
@@ -178,21 +182,12 @@ export default function Clientes() {
     const inicio = frotaDataInicio || null
     const fim = frotaDataFim || new Date().toISOString().slice(0, 10)
 
-    const filtraPorData = (arr) => (arr ?? []).filter(item => {
-      const d = item.data
-      if (!d) return true
-      if (inicio && d < inicio) return false
-      if (d > fim) return false
-      return true
-    })
-    const manusFiltradas = filtraPorData(manutencoes)
-    const repsFiltradas = filtraPorData(reparacoes)
-
     const fmtD = (s) => s ? s.slice(8, 10) + '-' + s.slice(5, 7) + '-' + s.slice(0, 4) : null
     const periodoLabel = inicio
       ? `${fmtD(inicio)} a ${fmtD(fim)}`
       : `Até ${fmtD(fim)}`
-    const options = { periodoLabel, periodoCustom: true }
+    // Período filtra só os KPIs «no período»; estado/próxima/última usam sempre todas as manutenções
+    const options = { periodoLabel, periodoCustom: true, periodoInicio: inicio, periodoFim: fim }
 
     setModalFrotaFiltro(null)
     setFrotaEmailPane(false)
@@ -200,7 +195,7 @@ export default function Clientes() {
     setFrotaEmailAdmin(true)
     setFrotaEmailOutro('')
     setFrotaAcaoLoading(null)
-    setModalFrota({ cliente, manusFiltradas, repsFiltradas, options })
+    setModalFrota({ cliente, options })
   }
 
   const closeFrotaModal = () => {
@@ -214,6 +209,11 @@ export default function Clientes() {
       const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
       const checklistItems = getChecklistBySubcategoria(maquina.subcategoriaId, manut.tipo || 'periodica')
       const sub = getSubcategoria(maquina.subcategoriaId)
+      const dataExec = rel?.dataCriacao?.slice(0, 10) || rel?.dataAssinatura?.slice(0, 10) || manut?.data || ''
+      const periMaq = maquina?.periodicidadeManut
+      const proximas = (periMaq && dataExec)
+        ? computarProximasDatas(dataExec, periMaq, { tecnico: manut.tecnico || rel?.tecnico || '' })
+        : []
       const blob = await gerarPdfCompacto({
         relatorio: rel,
         manutencao: manut,
@@ -222,6 +222,8 @@ export default function Clientes() {
         checklistItems,
         subcategoriaNome: sub?.nome ?? '',
         tecnicoObj: getTecnicoByNome(manut.tecnico || rel?.tecnico),
+        proximasManutencoes: proximas,
+        marcas,
       })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -245,8 +247,8 @@ export default function Clientes() {
       const maqsCliente = getMaquinasDoCliente(cli.nif)
       const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')
       const html = gerarRelatorioFrotaHtml(
-        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
-        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        cli, maqsCliente, manutencoes,
+        relatorios ?? [], reparacoes ?? [],
         getSubcategoria, getCategoria,
         { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
       )
@@ -267,8 +269,8 @@ export default function Clientes() {
     try {
       const maqsCliente = getMaquinasDoCliente(cli.nif)
       const blob = await gerarRelatorioFrotaPdf(
-        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
-        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        cli, maqsCliente, manutencoes,
+        relatorios ?? [], reparacoes ?? [],
         getSubcategoria, getCategoria, modalFrota.options ?? {}
       )
       const url = URL.createObjectURL(blob)
@@ -298,18 +300,34 @@ export default function Clientes() {
     setFrotaAcaoLoading('email')
     try {
       const maqsCliente = getMaquinasDoCliente(cli.nif)
+      const frotaOpts = { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
       const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')
       const html = gerarRelatorioFrotaHtml(
-        cli, maqsCliente, modalFrota.manusFiltradas ?? manutencoes,
-        relatorios ?? [], modalFrota.repsFiltradas ?? reparacoes ?? [],
+        cli, maqsCliente, manutencoes,
+        relatorios ?? [], reparacoes ?? [],
         getSubcategoria, getCategoria,
-        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
+        frotaOpts
       )
+      const pdfBlob = await gerarRelatorioFrotaPdf(
+        cli, maqsCliente, manutencoes,
+        relatorios ?? [], reparacoes ?? [],
+        getSubcategoria, getCategoria,
+        modalFrota.options ?? {}
+      )
+      const pdfBase64 = await blobToRawBase64(pdfBlob)
+      const pdfFilename = `frota_${String(cli.nif ?? 'cliente').replace(/\W/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`
       const periodo = modalFrota.options?.periodoLabel || new Date().getFullYear()
       const assunto = `Relatório Executivo de Frota — ${periodo} — ${cli.nome} — Navel`
       let erros = 0
       for (const dest of dests) {
-        const result = await enviarRelatorioHtmlEmail({ destinatario: dest, assunto, html, nomeCliente: cli.nome })
+        const result = await enviarRelatorioHtmlEmail({
+          destinatario: dest,
+          assunto,
+          html,
+          nomeCliente: cli.nome,
+          pdfBase64,
+          pdfFilename,
+        })
         if (!result.ok) { erros++; logger.error('Clientes', 'enviarFrotaEmail', result.message, { dest }) }
       }
       if (erros === 0) {
@@ -402,8 +420,9 @@ export default function Clientes() {
     manutencoes.filter(m => m.maquinaId === maquinaId).sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
 
   const renderProximaManut = (maq) => {
-    if (!maq.proximaManut) return <span className="badge badge-sem-data">Sem data</span>
-    const data = parseDateLocal(maq.proximaManut)
+    const prox = proximaDataNaFicha(maq)
+    if (!prox) return <span className="badge badge-sem-data">Sem data</span>
+    const data = parseDateLocal(prox)
     const hoje = startOfDay(new Date(getHojeAzores() + 'T12:00:00'))
     const vencida = isBefore(startOfDay(data), hoje)
     return (
@@ -528,13 +547,13 @@ export default function Clientes() {
 
       {/* Tabela completa — desktop */}
       <div className="table-card card clientes-table">
-        <table className="data-table">
+        <table className="data-table dt-semi">
           <thead>
             <tr>
-              <th className="col-nif">NIF</th>
-              <th className="col-nome">Nome do Cliente</th>
-              <th className="col-local">Localidade</th>
-              <th className="col-maq">Máq.</th>
+              <th className="col-nif col-sm col-nowrap">NIF</th>
+              <th className="col-nome col-fill">Nome do Cliente</th>
+              <th className="col-local col-md col-truncate">Localidade</th>
+              <th className="col-maq col-xs">Máq.</th>
               <th className="col-actions"></th>
             </tr>
           </thead>
@@ -543,14 +562,14 @@ export default function Clientes() {
               const nMaq = getMaquinasCount(c.nif)
               return (
                 <tr key={c.nif}>
-                  <td className="col-nif"><code>{c.nif}</code></td>
-                  <td className="col-nome">
+                  <td className="col-nif col-sm col-nowrap"><code>{c.nif}</code></td>
+                  <td className="col-nome col-fill">
                     <button type="button" className="btn-link-inline" onClick={() => openFicha(c)} title="Abrir ficha">
                       <strong>{c.nome}</strong>
                     </button>
                   </td>
-                  <td className="col-local">{c.localidade || '—'}</td>
-                  <td className="col-maq">{nMaq}</td>
+                  <td className="col-local col-md col-truncate">{c.localidade || '—'}</td>
+                  <td className="col-maq col-xs">{nMaq}</td>
                   <td className="col-actions">
                     <span className="actions-row">
                       {nMaq > 0 && (
@@ -638,6 +657,16 @@ export default function Clientes() {
                 >
                   <FileBarChart size={15} /> Relatório de frota
                 </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="btn secondary ficha-btn-novo-equip"
+                    title="Registar novo equipamento para este cliente"
+                    onClick={() => setModalMaquina({ mode: 'add', clienteNif: fichaCliente.nif })}
+                  >
+                    <Plus size={15} /> Novo equipamento
+                  </button>
+                )}
                 {fichaView !== 'flat' && fichaView !== 'maquina-detalhe' && (
                   <button className="btn secondary ficha-btn-flat" onClick={() => setFichaView('flat')}>
                     Ver todos os equipamentos
@@ -773,15 +802,16 @@ export default function Clientes() {
                       <div className="kpi-manut-list">
                         {maquinasComManutencao.map(({ maq, manutPendente, totalPendentes }) => {
                           const sub = getSubcategoria(maq.subcategoriaId)
-                          const dias = maq.proximaManut ? Math.round((startOfDay(new Date(getHojeAzores())) - startOfDay(parseDateLocal(maq.proximaManut))) / 86400000) : null
+                          const proxKpi = proximaDataNaFicha(maq)
+                          const dias = proxKpi ? Math.round((startOfDay(new Date(getHojeAzores())) - startOfDay(parseDateLocal(proxKpi))) / 86400000) : null
                           return (
                             <div key={maq.id} className="kpi-manut-card">
                               <div className="kpi-manut-card-info">
                                 <strong>{sub?.nome ? `${sub.nome} — ` : ''}{maq.marca} {maq.modelo}</strong>
                                 <span className="text-muted">Nº Série: {maq.numeroSerie}</span>
                                 <div className="kpi-manut-card-meta">
-                                  {maq.proximaManut && (
-                                    <span>Próxima: <strong>{format(parseDateLocal(maq.proximaManut), 'dd/MM/yyyy')}</strong></span>
+                                  {proxKpi && (
+                                    <span>Próxima: <strong>{format(parseDateLocal(proxKpi), 'dd/MM/yyyy')}</strong></span>
                                   )}
                                   {dias != null && dias > 0 && <span className="kpi-dias-atraso">+{dias} dias</span>}
                                   {manutPendente && (
@@ -1055,7 +1085,7 @@ export default function Clientes() {
             <p className="text-muted modal-frota-subtitle">{modalFrotaFiltro.cliente.nome}</p>
             <form onSubmit={handleGerarFrotaComFiltro}>
               <p className="frota-filtro-desc">
-                Seleccione o período de dados a incluir no relatório. Campos em branco incluem dados desde sempre ou até hoje.
+                O período limita as contagens «no período» (manutenções e reparações executadas, reparações listadas). Próximas datas, estado e histórico por equipamento usam sempre todos os registos.
               </p>
               <div className="frota-filtro-row">
                 <div className="form-group">

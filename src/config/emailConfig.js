@@ -23,7 +23,7 @@ export const EMAIL_CONFIG = {
   AUTH_TOKEN: 'Navel2026$Api!Key#xZ99',
 
   /** Endereço de resposta visível pelo cliente (remetente visível: no-reply@navel.pt). */
-  REPLY_TO: 'geral@navel.pt',
+  REPLY_TO: 'comercial@navel.pt',
 }
 
 /**

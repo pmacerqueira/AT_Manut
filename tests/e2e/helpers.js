@@ -125,6 +125,12 @@ export const MC = {
     },
   ],
 
+  tecnicos: [
+    { id: 'tec1', nome: 'Aurélio Almeida', ativo: true },
+    { id: 'tec2', nome: 'Paulo Medeiros', ativo: true },
+    { id: 'tec3', nome: 'Aldevino Costa', ativo: true },
+  ],
+
   // ── Reparações ─────────────────────────────────────────────────────────────
   reparacoes: [
     // rep01: pendente — para testar criação e execução
@@ -410,10 +416,24 @@ export function getInputByLabel(page, labelText, scope = '.modal') {
 
 /** Marca todos os itens do checklist como "Sim" via botão "Marcar todos". */
 export async function checklistMarcarTodos(page) {
-  const btn = page.locator('.btn-link-checklist').first()
-  if (await btn.isVisible()) {
+  const btn = page.locator('.checklist-quick-actions .btn-link-checklist').filter({ hasText: /^Marcar todos$/i })
+  if (await btn.isVisible({ timeout: 4000 }).catch(() => false)) {
     await btn.click()
     await page.waitForTimeout(300)
+  }
+}
+
+/** Wizard de execução: «Seguinte» e, se aparecer, confirmação «Sim, avançar» (notas/fotos vazias). */
+export async function execWizardSeguinte(page) {
+  const seguinte = page.locator('.wizard-footer-actions button.btn.primary').filter({ hasText: /Seguinte/ })
+  if (await seguinte.isVisible({ timeout: 4000 }).catch(() => false)) {
+    await seguinte.click()
+    await page.waitForTimeout(250)
+  }
+  const simAvancar = page.locator('.wizard-confirm-actions button.btn.primary').filter({ hasText: /Sim, avançar/i })
+  if (await simAvancar.isVisible({ timeout: 2500 }).catch(() => false)) {
+    await simAvancar.click()
+    await page.waitForTimeout(250)
   }
 }
 
@@ -465,46 +485,47 @@ export async function signCanvas(page) {
 // ── Preencher formulário de execução de manutenção ────────────────────────────
 
 /**
- * Executa o fluxo completo de preenchimento do modal de execução:
- * 1. Marcar todos checklist
- * 2. Seleccionar técnico
- * 3. Preencher nome assinante
- * 4. Assinar canvas
- * 5. (opcional) email
+ * Executa o fluxo completo de preenchimento do modal de execução (wizard 7 passos):
+ * checklist → notas → fotos → técnico → nome → assinatura → finalizar
  */
 export async function fillExecucaoModal(page, {
   tecnico       = 'Aurélio Almeida',
   nomeAssinante = 'Cliente Teste',
   email         = '',
+  notas         = '',
 } = {}) {
-  // 1. Checklist
   await checklistMarcarTodos(page)
-  // Fallback: marcar individualmente se "Marcar todos" não existir
   await checklistFillAllSim(page)
 
-  // 2. Técnico
-  const selectTecnico = page.locator('.assinatura-section select, select').filter({
+  await execWizardSeguinte(page)
+
+  const notasField = page.locator('.modal textarea.textarea-full').first()
+  if (notas && await notasField.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await notasField.fill(notas)
+  }
+  await execWizardSeguinte(page)
+  await execWizardSeguinte(page)
+
+  const selectTecnico = page.locator('.modal select').filter({
     has: page.locator('option[value="Aurélio Almeida"], option[value="Paulo Medeiros"]')
   }).first()
-  if (await selectTecnico.isVisible()) {
-    await selectTecnico.selectOption({ label: tecnico }).catch(() =>
-      selectTecnico.selectOption({ index: 1 })
-    )
+  if (await selectTecnico.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await selectTecnico.selectOption({ label: tecnico }).catch(() => selectTecnico.selectOption({ index: 1 }))
   }
+  await execWizardSeguinte(page)
 
-  // 3. Nome assinante
-  const inputNome = page.locator('.assinatura-section input[type="text"], input[placeholder*="signat"], input[placeholder*="nome"]').first()
-  if (await inputNome.isVisible()) {
+  const inputNome = page.locator('.modal input[placeholder*="Nome completo" i], .modal input[placeholder*="responsável" i]').first()
+  if (await inputNome.isVisible({ timeout: 2000 }).catch(() => false)) {
     await inputNome.fill(nomeAssinante)
   }
+  await execWizardSeguinte(page)
 
-  // 4. Assinatura canvas
   await signCanvas(page)
+  await execWizardSeguinte(page)
 
-  // 5. Email (opcional)
   if (email) {
     const inputEmail = page.locator('.email-section input[type="email"]')
-    if (await inputEmail.isVisible()) await inputEmail.fill(email)
+    if (await inputEmail.isVisible({ timeout: 2000 }).catch(() => false)) await inputEmail.fill(email)
   }
 }
 

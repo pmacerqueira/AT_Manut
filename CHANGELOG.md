@@ -9,6 +9,276 @@ Política de continuidade:
 
 ---
 
+## [1.16.13] — 2026-03-21 — Frota: correcções de dados, email HTML+PDF, limpeza
+
+### Relatório de frota (dados e layout)
+- **`frotaReportHelpers.js`:** `normEntityId`, `dateKeyForFilter`, `maquinaPertenceCliente`.
+- **Período vs listagem:** intervalo limita só KPIs «no período»; estado/próxima/última usam todas as manutenções.
+- **Conformidade (HTML):** alinhada ao PDF (`estado === 'conforme'`), não `proximaManut` na máquina.
+- **Estado:** Conforme / Não conforme (atraso) / Por instalar; próxima = registo agendado ou `proximaManut`.
+- **PDF:** S/N sem truncagem agressiva; cabeçalho com logo Navel; rodapé como relatório de manutenção; exports `loadImageAsDataUrl` / `addImageFitInBoxMm` em `gerarPdfRelatorio.js`.
+- **`DataContext.jsx`:** `getSubcategoria` / `getCategoria` com match `String(id)`.
+
+### Email frota
+- Envio usa `enviarRelatorioHtmlEmail` com **HTML no corpo** e **PDF jsPDF em anexo** (`pdf_base64` — já suportado por `send-report.php`).
+- **`emailService.js`:** `blobToRawBase64`; documentação do endpoint actualizada.
+
+### Limpeza / documentação
+- Removido re-export morto `gerarRelatorioFrota` (só se usava `gerarRelatorioFrotaPdf`).
+- **`.gitignore`:** `tests/playwright-report/` (artefactos gerados).
+- **`docs/ROADMAP-EVOLUCAO-2026.md`:** item relatório executivo marcado entregue.
+- **`DESENVOLVIMENTO.md`**, **`INSTRUCOES_CPANEL.md`:** envio frota / `send-report.php` actualizados.
+
+---
+
+## [1.16.12] — 2026-03-21 — Equipamentos: crash ao abrir ficha via nº série (Manutenções)
+
+### Contexto
+Ao clicar no número de série na lista (ex. manutenções executadas), a navegação para `?maquina=` abria a vista de máquinas da subcategoria; o JSX usa o ícone `CalendarDays` nos botões «Próximas», mas o símbolo **não estava importado** de `lucide-react` → `ReferenceError` → `ErrorBoundary` a vermelho em toda a app até recarregar/sessão.
+
+### Alterações
+- **`Equipamentos.jsx`:** importar `CalendarDays`; `setSearchParams` ao remover `maquina` passa a clonar `URLSearchParams` (evita mutar o objecto interno do router).
+
+### Ficheiros
+- `src/pages/Equipamentos.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.11] — 2026-03-21 — Fotos: máx. 6, PDF grelha 4×A4, compressão mais segura, PHP alinhado
+
+### Contexto
+Reduzir risco de falhas de memória / timeout em tablets (Chrome, Edge, Firefox) ao gerar PDF ou enviar email; melhorar apresentação em A4 (até 4 fotos por linha, proporção preservada, quebra de página).
+
+### Alterações
+- **`MAX_FOTOS` = 6** (`limits.js`); UI, toasts e E2E actualizados.
+- **`comprimirImagemRelatorio.js`:** meta de base64 mais baixa, mais passagens de qualidade/tamanho, passagem extra dura se ainda exceder ~560k caracteres.
+- **`gerarPdfRelatorio.js` (`gerarPdfCompacto`):** secção de fotos com miniaturas em grelha (4 colunas, `addImageFitInBoxMm` com try/catch em `getImageProperties` e `addImage`); suporta `fotos` como JSON string; URLs remotas via `loadImageAsDataUrl`.
+- **`relatorioBaseStyles.js` (`htmlFotos`):** impressão/HTML com linhas de até 4 fotos + classes triple/quad.
+- **`send-email.php`:** cap de 6 fotos após parse; PDF FPDF com mesma lógica de grelha (`imageFitContain`); galeria no email HTML a 4 colunas.
+- **Regra `.cursor`:** secção 6 do PDF canónico actualizada (documentação fotográfica em grelha).
+
+### Qualidade (E2E)
+- `17-reparacoes-avancado.spec.js`: input de ficheiros no modal de reparação usa `input[type="file"][multiple]` (Galeria) para evitar strict mode com dois inputs (câmara + galeria).
+
+### Documentação (pós-deploy)
+- `docs/FOTOS-PDF-EMAIL-LIMITES.md` — memória operacional: MAX_FOTOS, compressão, PDF/HTML, PHP, E2E, hosting.
+- `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `docs/BUILD-E-ZIP.md` — versão e referências cruzadas.
+
+### Ficheiros
+- `src/config/limits.js`, `src/utils/comprimirImagemRelatorio.js`, `src/utils/gerarPdfRelatorio.js`, `src/utils/relatorioBaseStyles.js`, `src/utils/relatorioHtml.js`, `src/utils/relatorioReparacaoHtml.js`, `servidor-cpanel/send-email.php`, `tests/e2e/09-edge-cases.spec.js`, `tests/e2e/17-reparacoes-avancado.spec.js`, `docs/TESTES-E2E.md`, `.cursor/rules/at-manut-workflow.mdc`, `src/config/version.js`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`, `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `docs/BUILD-E-ZIP.md`
+
+---
+
+## [1.16.10] — 2026-03-21 — UX: limite de fotos visível + toast ao atingir máximo
+
+### Alterações
+- Texto de ajuda no painel de fotos (manutenção e reparação): **máx. 8** fotos por relatório, alinhado a PDF/email e compressão no dispositivo; aviso quando o limite está cheio.
+- **Toast** ao tentar adicionar com limite cheio; mensagem alinhada quando a galeria devolve mais ficheiros do que cabem.
+
+### Ficheiros
+- `src/config/limits.js`, `src/index.css`, `src/components/ExecutarManutencaoModal.jsx`, `src/components/ExecutarReparacaoModal.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.9] — 2026-03-20 — ATecnica: fotos no «Editar» + compressão adaptativa para relatórios
+
+### Contexto
+Utilizadores **ATecnica** com relatório em rascunho (não assinado) ao escolher **Editar** no menu da linha abriam apenas o formulário simples de manutenção, **sem** passo de fotografias nem botões «Tirar foto» / «Galeria» (fluxo completo existia só via **Continuar execução** ou via admin «Editar relatório»).
+
+### Alterações
+- **`Manutencoes.jsx`:** se o perfil não é admin, existe relatório e **não** está assinado pelo cliente, **Editar** abre `ExecutarManutencaoModal` (igual ao fluxo de execução), com câmara e galeria no passo de fotos.
+- **`comprimirImagemRelatorio.js`:** utilitário partilhado — redimensiona para lado máx. até 1280 px, JPEG; se o base64 continuar grande, novas passagens com menor qualidade e resolução (**sem** rejeitar ficheiros por limite rígido de KB).
+- **`ExecutarManutencaoModal` / `ExecutarReparacaoModal`:** usam o utilitário; toast com mensagem clara em falha de decode; reparações processam fotos em sequência (menos pressão de memória em tablets).
+
+### Ficheiros
+- `src/pages/Manutencoes.jsx`, `src/utils/comprimirImagemRelatorio.js`, `src/components/ExecutarManutencaoModal.jsx`, `src/components/ExecutarReparacaoModal.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.8] — 2026-03-21 — Fotos no «Editar relatório» não desaparecem ao sincronizar dados
+
+### Contexto
+Ao anexar fotos pela Galeria no modal de admin (editar relatório), as miniaturas apareciam e sumiam em menos de 1 segundo: qualquer actualização de `manutencoes` no `DataContext` disparava o `useLayoutEffect` do modal, repunha `bootstrappedIdRef` e o bootstrap voltava a executar `setFotos(existingRel?.fotos ?? [])`, apagando o estado local.
+
+### Alterações
+- **`ExecutarManutencaoModal`:** deixar de anular `bootstrappedIdRef` nos ramos com `manutencao` já definida; no ramo de candidato único, só anular quando o id da intervenção escolhida muda; `setManutencaoAtual` preserva a referência se o id for o mesmo.
+
+### Ficheiros
+- `src/components/ExecutarManutencaoModal.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.7] — 2026-03-20 — E2E: sessão dev + wizard de execução
+
+### Contexto
+A suite Playwright falhava em massa após `page.goto()` pós-login: o bypass de desenvolvimento em `localhost` não gravava JWT em `sessionStorage`. Os testes do modal de execução assumiam o formulário single-page antigo; o UI passou a wizard de 7 passos.
+
+### Alterações
+- **`AuthContext`:** em DEV (`localhost` / `127.0.0.1`), login válido grava JWT mínimo via `setToken`; restauração de sessão no arranque igual à produção; password errada continua a falhar (validação `admin123` / `tecnico123`).
+- **`ExecutarManutencaoModal`:** mensagem de erro de assinatura também no passo 7 (visível ao falhar «Enviar»).
+- **E2E (`helpers.js`):** `tecnicos` no mock da API; `checklistMarcarTodos` usa o botão da zona «Marcar todos» (não «Limpar tudo» do pré-preenchimento); `execWizardSeguinte` + `fillExecucaoModal` alinhados ao wizard.
+- **E2E (`04-manutencoes`, `05-montagem`, `11-blocos-abc`):** fluxos actualizados; montagem abre sempre a linha **Montagem** (não o primeiro «Executar» da lista).
+
+### Ficheiros
+- `src/context/AuthContext.jsx`, `src/components/ExecutarManutencaoModal.jsx`, `src/config/version.js`, `tests/e2e/helpers.js`, `tests/e2e/04-manutencoes.spec.js`, `tests/e2e/05-montagem.spec.js`, `tests/e2e/11-blocos-abc.spec.js`
+
+---
+
+## [1.16.6] — 2026-03-21 — Fluxo executar: hábito único + plano persistido (Fase A)
+
+### Contexto
+Reduzir redundâncias que geravam inconsistências e percursos confusos (especialmente em tablet/campo). Plano de execução acordado em `docs/PLANO-FLUXOS-EXECUCAO.md`.
+
+### Alterações
+- **`ExecutarManutencaoModal`:** já não cria pendente para hoje automaticamente; ecrã **sem intervenção aberta** com confirmação **«Criar intervenção para hoje»**; se várias ordens com a **mesma data mínima**, lista de escolha; escolha canónica via `candidatosMesmaDataMinimaAberta`.
+- **`Equipamentos`:** removido modal de execução; botão **Próximas** → `Manutenções` com `?filter=proximas&maquinaId=`.
+- **`Manutencoes`:** suporte a `maquinaId` na URL + banner «Mostrar todas».
+- **`Calendario`:** por evento de manutenção aberta, botão **Executar/Continuar** → `manutencoes?filter=proximas&executar=`.
+- **`proximaManutAgenda.js`:** `listManutencoesAbertasOrdenadas`, `candidatosMesmaDataMinimaAberta`, export `STATUS_MANUTENCAO_ABERTA`.
+- **Regras Cursor:** referência ao plano e proibição de `addManutencao` implícito no fluxo de execução.
+
+### Ficheiros
+- `docs/PLANO-FLUXOS-EXECUCAO.md`, `src/utils/proximaManutAgenda.js`, `src/components/ExecutarManutencaoModal.jsx`, `src/pages/Equipamentos.jsx`, `src/pages/Manutencoes.jsx`, `src/pages/Calendario.jsx`, `src/pages/Calendario.css`, `.cursor/rules/at-manut-workflow.mdc`, `src/config/version.js`
+
+---
+
+## [1.16.5] — 2026-03-21 — Sincronizar `proximaManut` na BD em toda mutação de manutenções
+
+### Contexto
+`proximaManut` na tabela de máquinas deve reflectir sempre a primeira data «aberta» na agenda (pendente / agendada / em_progresso), não só após `recalcularPeriodicasAposExecucao`.
+
+### Alterações
+- **`scheduleSyncProximaParaMaquinas(ids)`** em `DataContext.jsx`: após `setManutencoes`, `queueMicrotask` + `manutencoesRef` + `updateMaquina` por máquina afectada.
+- Chamado em **`addManutencao`**, **`addManutencoesBatch`**, **`updateManutencao`** (inclui mudança de `maquinaId` hipotética), **`removeManutencao`**, **`confirmarManutencoesPeriodicas`**.
+- **`sincronizarProximaManutComAgenda`:** passa a usar microtask + ref (consistente com o resto).
+- **`recalcularPeriodicasAposExecucao`:** patch da máquina (`proximaManut` + opcional `ultimaManutencaoData`) aplicado no mesmo microtask após o merge do estado.
+
+### Ficheiros
+- `src/context/DataContext.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.4] — 2026-03-21 — Ficha cliente: próxima data alinhada à agenda + «Novo equipamento»
+
+### Problema
+- Na ficha do cliente, badges/KPIs usavam sobretudo `maquinas.proximaManut`, que podia ficar desactualizado após `recalcularPeriodicasAposExecucao` (lista «próximas» correcta, ficha com datas erradas).
+- Dois `updateMaquina` seguidos no edit admin (recalc + `ultimaManutencaoData`) podiam competir; faltava sincronizar `proximaManut` com a agenda após o recálculo.
+- Com cliente que já tinha equipamentos, não havia acção visível para **adicionar** mais um (só no estado vazio).
+
+### Correcção
+- **`proximaManutAgenda.js`:** `minDataManutencaoAberta` — menor data entre pendente / agendada / em_progresso.
+- **`DataContext`:** após recalcular periódicas, `updateMaquina` com `proximaManut` derivada da lista fundida; opção `ultimaManutencaoData` no mesmo patch (edit admin); `sincronizarProximaManutComAgenda` para periódica sem periodicidade definida (micro-delay).
+- **`Clientes.jsx`:** KPIs, filtros, badges e vista KPI usam agenda primeiro, fallback `proximaManut`; botão **Novo equipamento** (Admin) na barra da ficha.
+
+### Ficheiros
+- `src/utils/proximaManutAgenda.js`, `src/context/DataContext.jsx`, `src/components/ExecutarManutencaoModal.jsx`, `src/pages/Clientes.jsx`, `src/config/version.js`
+
+---
+
+## [1.16.3] — 2026-03-21 — Admin editar relatório: agendamento vs execução (PDF/email/lista)
+
+### Problema
+O modal «Editar relatório» tinha um único campo de data ligado a `manutencoes.data` (agendamento). Ao «corrigir a execução», gravava-se na data agendada; `dataCriacao`/`dataAssinatura` do relatório não eram actualizados — lista executadas e relatórios ficavam incoerentes.
+
+### Correcção
+- **Dois campos no admin:** «Data de agendamento» (`manut.data`) e «Data de execução (relatório)» (`dataAssinatura` se assinado, senão `dataCriacao`), com texto de ajuda.
+- **Gravação:** `updateManutencao` só altera agendamento; `updateRelatorio` actualiza datas de execução; renumerar relatório pelo **ano da execução**; `recalcularPeriodicasAposExecucao` e `ultimaManutencaoData` usam a **data de execução**.
+- **PDF:** linha «DATA DE EXECUÇÃO» com fallback `dataCriacao` quando não há assinatura (alinhado ao HTML do email).
+
+### Ficheiros
+- `src/components/ExecutarManutencaoModal.jsx`, `src/pages/Manutencoes.css`, `src/utils/gerarPdfRelatorio.js`
+
+---
+
+## [1.16.2] — 2026-03-21 — Admin: marcar envio ao cliente manualmente
+
+### Funcionalidade
+- **Manutenções (executadas), só Admin:** no menu «…» (e no menu mobile «Mais acções»), **Marcar enviado ao cliente (manual)** abre um modal com email editável (pré-preenchido com a ficha do cliente). Confirma grava `enviadoParaCliente` + `ultimoEnvio` na BD **sem reenviar** email — semáforo verde e filtros «Email: Enviados» passam a incluir a linha.
+- **Reverter marca de envio ao cliente** (vermelho de novo), com confirmação — não apaga emails já enviados.
+
+### Ficheiro
+- `src/pages/Manutencoes.jsx`
+
+---
+
+## [1.16.1] — 2026-03-20 — Persistência email ao cliente + carregamento offline
+
+### Contexto
+Conclusão do trabalho interrompido (OOM): garantir que o estado «enviado ao cliente» e `ultimoEnvio` sobrevivem a refresh, sync e queda para cache offline; alinhar schema de `relatorios` com a API.
+
+### Alterações
+- **`DataContext.jsx`:** ao carregar dados do `localStorage` (offline), `setRelatorios` usa `mergeRelatoriosMantendoEnvio` como no `fetchTodos` online — não perde `enviadoParaCliente` / `ultimoEnvio` já presentes em memória quando o snapshot em cache está desactualizado.
+- **`servidor-cpanel/api/data.php`:** `ultimo_envio` incluído em `json_cols` para `relatorios` — leitura devolve objecto `{ data, destinatario }` quando gravado como JSON; valores legados (datetime em texto) mantêm-se como string (`json_decode` falha de forma segura).
+- **`servidor-cpanel/setup.sql`:** tabela `relatorios` com `checklist_snapshot`, `pecas_usadas`, `tipo_manut_kaeser`, `enviado_para_cliente` e `ultimo_envio` em TEXT (novas instalações alinhadas com `data.php`).
+- **Migrações:** `migrations/alter_relatorios_ultimo_envio_text.sql` — alterar coluna existente de DATETIME para TEXT em produção; `add_relatorio_enviado_cliente.sql` — removido `AFTER pecas_usadas` para não falhar em BD antigas.
+
+### Deploy cPanel
+1. Executar `add_relatorio_enviado_cliente.sql` se a coluna ainda não existir.
+2. Executar `alter_relatorios_ultimo_envio_text.sql` se `ultimo_envio` ainda for DATETIME (necessário para gravar JSON do envio).
+3. Fazer upload de `data.php` actualizado.
+
+---
+
+## [1.16.0] — 2026-03-19 — Correcções críticas PDF, datas periódicas, filtros executadas, link equipamento
+
+### Contexto da sessão
+Sessão intensa de correcção de bugs acumulados nos relatórios PDF, cálculo de datas periódicas, envio de email e navegação. Múltiplas iterações foram necessárias devido a regressões introduzidas ao longo da sessão. As lições aprendidas foram documentadas em `.cursor/rules/at-manut-workflow.mdc` para prevenção futura.
+
+### Correcções PDF (`gerarPdfRelatorio.js`)
+- **Ordem das secções restruturada (DEFINITIVA):** Checklist → Notas → Fotos → Consumíveis → Declaração → Próximas → Assinaturas. A declaração e próximas manutenções aparecem ANTES das assinaturas (lógica legal: cliente lê tudo e depois assina).
+- **Declaração de aceitação:** renderiza SEMPRE (não condicional), com espaçamento adequado entre secções (eliminada sobreposição de texto).
+- **Periodicidade na tabela:** mostra "Trimestral"/"Semestral"/"Anual" (capitalizado) em vez de "periodica".
+- **Altura das caixas de assinatura:** avalia AMBAS as assinaturas (técnico e cliente) para dimensionar a caixa.
+- **Blocos isolados:** declaração e próximas envolvidos em blocos `{}` para isolar variáveis e evitar conflitos de escopo.
+
+### Cálculo de datas periódicas — abordagem redesenhada
+- **Nova função `computarProximasDatas()`** em `diasUteis.js`: calcula N datas futuras a partir da data de execução + periodicidade, ajustando para dias úteis e feriados dos Açores.
+- **PDF e Email usam datas computadas em tempo real** (não registos da base de dados). Isto elimina discrepâncias causadas por persistência assíncrona falhada ou recálculos com data errada.
+- **Callers actualizados:** `Manutencoes.jsx` (`handleAbrirPdf`), `Clientes.jsx` (`handleDownloadPdfManutencao`), `EnviarEmailModal.jsx`.
+
+### Bug corrigido: auto-preenchimento `dataRealizacao`
+- **Antes:** manutenções em atraso pré-preenchiam `dataRealizacao` com `m.data` (data ORIGINAL de agendamento, e.g., Março).
+- **Depois:** pré-preenche com `getHojeAzores()` (data ACTUAL). Se o técnico não alterasse o campo, todo o recálculo periódico usava a data errada como base.
+- **Ficheiro:** `ExecutarManutencaoModal.jsx` linha ~245.
+
+### Bug corrigido: admin edit não recalculava datas
+- **Antes:** `recalcularPeriodicasAposExecucao` só era chamado se `form.adminData !== manutencaoAtual.data` (data efectivamente alterada).
+- **Depois:** recalcula SEMPRE que o admin grava uma manutenção periódica, usando `form.adminData || manutencaoAtual.data`. Garante consistência mesmo com dados previamente corrompidos.
+- **Ficheiro:** `ExecutarManutencaoModal.jsx` bloco de admin edit save.
+
+### Funcionalidades novas
+- **Filtros para executadas** (`Manutencoes.jsx`/`.css`): chips de período (último mês, 2 meses, 3 meses), intervalo de datas, pesquisa por texto, filtro por estado de envio de email.
+- **Indicador de email enviado**: coluna com dot verde/vermelho na tabela de executadas, indicando se o relatório foi enviado por email para endereço do cliente.
+- **Link directo ao equipamento**: nº de série clicável na lista de executadas → abre ficha do equipamento com scroll e highlight animado (CSS `maq-highlight-pulse`).
+- **Contraste email modal**: CSS com alta especificidade e cores hardcoded para garantir visibilidade dos endereços de email em dark mode.
+
+### Ficheiros alterados
+- `src/utils/gerarPdfRelatorio.js` — reestruturação completa da ordem das secções
+- `src/utils/diasUteis.js` — nova função `computarProximasDatas()`
+- `src/pages/Manutencoes.jsx` — filtros executadas, email indicator, link equipamento, datas computadas
+- `src/pages/Manutencoes.css` — estilos filtros, email dot, link série
+- `src/pages/Clientes.jsx` — datas computadas no PDF
+- `src/components/EnviarEmailModal.jsx` — datas computadas no email
+- `src/components/ExecutarManutencaoModal.jsx` — fix auto-fill dataRealizacao, fix admin recalc
+- `src/pages/Equipamentos.jsx` — navigateToMaquina, highlight, scroll
+- `src/pages/Equipamentos.css` — highlight animation
+- `src/index.css` — contraste email modal
+- `src/config/version.js` — v1.16.0
+- `.cursor/rules/at-manut-workflow.mdc` — regras canónicas PDF + datas + prevenção regressões
+
+### Documentação
+- Regras canónicas adicionadas a `.cursor/rules/at-manut-workflow.mdc`:
+  - Estrutura exacta do PDF (10 secções numeradas)
+  - Regras de cálculo de datas futuras
+  - Prevenção de regressões (lições da sessão)
+
+### Handoff
+- Build v1.16.0 compilado com sucesso. ZIP disponível em `dist-manut.zip`.
+- Ordem do PDF é DEFINITIVA — não alterar sem confirmar com a lista canónica nas regras.
+- As datas no PDF são computadas; as datas na BD são geridas por `recalcularPeriodicasAposExecucao` (que agora é SEMPRE chamado no admin edit).
+
+---
+
 ## [1.15.1] — 2026-03-18 — Edição de reparações; Email piping ISTOBAL via cPanel
 
 ### Funcionalidades

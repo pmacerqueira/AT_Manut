@@ -78,27 +78,55 @@ $corpoHtml = preg_replace('/javascript:/i', '', $corpoHtml);
 $corpoHtml = mb_substr($corpoHtml, 0, 512000, 'UTF-8');
 $corpoHtml = $corpoHtml ?: '<p>Relatório de manutenção enviado pela aplicação Navel.</p>';
 
-// Cabeçalhos para email HTML
-$headers = [
-    'MIME-Version: 1.0',
-    'Content-type: text/html; charset=UTF-8',
-    'X-Mailer: PHP/' . phpversion(),
-];
-
 $from = 'noreply@navel.pt';
-$headers[] = "From: Navel Manutenções <{$from}>";
-$headers[] = "Reply-To: comercial@navel.pt";
-
 $adminCc = 'comercial@navel.pt';
 $ccList = [$adminCc];
 if (!empty($cc) && filter_var($cc, FILTER_VALIDATE_EMAIL) && strtolower($cc) !== strtolower($adminCc)) {
     $ccList[] = $cc;
 }
-$ccHeader = "Cc: " . implode(', ', $ccList) . "\r\n";
 
-$headersStr = implode("\r\n", $headers);
+$pdfBase64 = $data['pdf_base64'] ?? '';
+$pdfFilename = $data['pdf_filename'] ?? 'relatorio.pdf';
 
-$enviado = @mail($destinatario, $assunto, $corpoHtml, $headersStr . "\r\n" . $ccHeader);
+if (!empty($pdfBase64)) {
+    // Multipart MIME: HTML body + PDF attachment
+    $boundary = md5(uniqid(time()));
+    $headers = [
+        'MIME-Version: 1.0',
+        "Content-Type: multipart/mixed; boundary=\"{$boundary}\"",
+        'X-Mailer: PHP/' . phpversion(),
+        "From: =?UTF-8?B?" . base64_encode('NAVEL – AÇORES') . "?= <{$from}>",
+        "Reply-To: comercial@navel.pt",
+        "Cc: " . implode(', ', $ccList),
+    ];
+
+    $emailBody  = "--{$boundary}\r\n";
+    $emailBody .= "Content-Type: text/html; charset=UTF-8\r\n";
+    $emailBody .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+    $emailBody .= $corpoHtml . "\r\n\r\n";
+    $emailBody .= "--{$boundary}\r\n";
+    $emailBody .= "Content-Type: application/pdf; name=\"{$pdfFilename}\"\r\n";
+    $emailBody .= "Content-Transfer-Encoding: base64\r\n";
+    $emailBody .= "Content-Disposition: attachment; filename=\"{$pdfFilename}\"\r\n\r\n";
+    $emailBody .= chunk_split($pdfBase64) . "\r\n";
+    $emailBody .= "--{$boundary}--";
+
+    $headersStr = implode("\r\n", $headers);
+    $enviado = @mail($destinatario, $assunto, $emailBody, $headersStr);
+} else {
+    // Simple HTML email (no attachment)
+    $headers = [
+        'MIME-Version: 1.0',
+        'Content-type: text/html; charset=UTF-8',
+        'X-Mailer: PHP/' . phpversion(),
+        "From: =?UTF-8?B?" . base64_encode('NAVEL – AÇORES') . "?= <{$from}>",
+        "Reply-To: comercial@navel.pt",
+        "Cc: " . implode(', ', $ccList),
+    ];
+
+    $headersStr = implode("\r\n", $headers);
+    $enviado = @mail($destinatario, $assunto, $corpoHtml, $headersStr);
+}
 
 if (!$enviado) {
     http_response_code(500);

@@ -48,6 +48,15 @@
   border-left: 3px solid var(--color-danger, #dc2626);
 }
 
+/* ── Maquina row — highlight pulse (via link nº série / pesquisa) ── */
+.maquina-row--highlight {
+  animation: maq-highlight-pulse 2.5s ease-out;
+}
+@keyframes maq-highlight-pulse {
+  0%   { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.6); background: rgba(59, 130, 246, 0.12); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+
 /* ── Badges row inside equip row ── */
 .equip-badges-row {
   display: flex;

@@ -3,8 +3,8 @@
  * Permite criar, executar e enviar relatório de reparação por email.
  * Inclui reparações geradas automaticamente via email ISTOBAL.
  */
-import { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
@@ -49,6 +49,8 @@ export default function Reparacoes() {
   } = useData()
   const contentReady = useDeferredReady(reparacoes.length >= 0)
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { canDelete, canDeleteReparacao, isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -77,6 +79,17 @@ export default function Reparacoes() {
     const d = new Date()
     return { ano: d.getFullYear(), mes: d.getMonth() } // mes 0-11
   })
+
+  useEffect(() => {
+    const editId = searchParams.get('editar')
+    if (!editId) return
+    if (!reparacoes.length) return
+    const rep = reparacoes.find(x => x.id === editId)
+    if (rep) abrirEditar(rep)
+    const params = new URLSearchParams(searchParams)
+    params.delete('editar')
+    navigate(location.pathname + (params.toString() ? `?${params}` : ''), { replace: true, state: {} })
+  }, [searchParams, reparacoes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Relatório mensal ISTOBAL ──────────────────────────────────────────────
 
@@ -217,6 +230,7 @@ export default function Reparacoes() {
       data: rep.data || getHojeAzores(),
       numeroAviso: rep.numeroAviso || '',
       descricaoAvaria: rep.descricaoAvaria || '',
+      status: rep.status || 'pendente',
     })
     setFiltroClienteEditar(maq?.clienteNif || '')
     setErrorsEditar({})
@@ -234,13 +248,15 @@ export default function Reparacoes() {
 
   const handleGravarEditar = () => {
     if (!validarEditar() || !modalEditar) return
-    updateReparacao(modalEditar.id, {
+    const payload = {
       maquinaId:       formEditar.maquinaId,
       tecnico:         formEditar.tecnico.trim(),
       data:            formEditar.data,
       numeroAviso:     formEditar.numeroAviso.trim(),
       descricaoAvaria: formEditar.descricaoAvaria.trim(),
-    })
+    }
+    if (isAdmin && formEditar.status) payload.status = formEditar.status
+    updateReparacao(modalEditar.id, payload)
     showToast('Reparação actualizada', 'success')
     logger.action('Reparacoes', 'editarReparacao', `Reparação ${modalEditar.id} actualizada`, { id: modalEditar.id })
     setModalEditar(null)
@@ -431,7 +447,7 @@ export default function Reparacoes() {
                       </button>
                     </>
                   )}
-                  {!concluida && isAdmin && (
+                  {isAdmin && (
                     <button type="button" className="icon-btn secondary" title="Editar" onClick={() => abrirEditar(rep)}>
                       <Pencil size={18} />
                     </button>
@@ -449,16 +465,16 @@ export default function Reparacoes() {
 
         {/* Table view — desktop */}
         <div className="reparacoes-table card">
-          <table className="data-table">
+          <table className="data-table dt-semi">
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Máquina</th>
-                <th>Cliente</th>
-                <th>Técnico</th>
-                <th>Estado</th>
-                <th>Aviso</th>
-                <th></th>
+                <th className="col-sm col-nowrap">Data</th>
+                <th className="col-lg">Máquina</th>
+                <th className="col-md col-truncate">Cliente</th>
+                <th className="col-sm col-truncate">Técnico</th>
+                <th className="col-sm col-badges">Estado</th>
+                <th className="col-sm col-nowrap">Aviso</th>
+                <th className="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -470,19 +486,19 @@ export default function Reparacoes() {
                 const concluida = rep.status === 'concluida'
                 return (
                   <tr key={rep.id} className={concluida ? 'row-concluida' : ''}>
-                    <td className="td-data">{formatDataAzores(rep.data)}</td>
-                    <td>
+                    <td className="col-sm col-nowrap">{formatDataAzores(rep.data)}</td>
+                    <td className="col-lg">
                       <div className="td-maquina">
                         <span className="maq-nome">{maq ? `${maq.marca} ${maq.modelo}` : <em className="text-muted">Máquina removida</em>}</span>
                         {sub && <span className="maq-sub text-muted">{sub.nome}</span>}
                         {renderOrigem(rep)}
                       </div>
                     </td>
-                    <td>{cli?.nome ?? <em className="text-muted">—</em>}</td>
-                    <td>{rep.tecnico ?? '—'}</td>
-                    <td>{renderStatusBadge(rep.status)}</td>
-                    <td className="td-aviso">{rep.numeroAviso ?? '—'}</td>
-                    <td className="actions">
+                    <td className="col-md col-truncate">{cli?.nome ?? <em className="text-muted">—</em>}</td>
+                    <td className="col-sm col-truncate">{rep.tecnico ?? '—'}</td>
+                    <td className="col-sm col-badges">{renderStatusBadge(rep.status)}</td>
+                    <td className="col-sm col-nowrap">{rep.numeroAviso ?? '—'}</td>
+                    <td className="col-actions">
                       <div className="actions-inner">
                         {!concluida && (
                           <button
@@ -514,7 +530,7 @@ export default function Reparacoes() {
                             </button>
                           </>
                         )}
-                        {!concluida && isAdmin && (
+                        {isAdmin && (
                           <button
                             type="button"
                             className="icon-btn secondary"
@@ -744,6 +760,17 @@ export default function Reparacoes() {
                     placeholder={isIstobal ? 'Ex: ES00549609 (aviso ISTOBAL)' : 'Ex: 2026-RP-001'}
                   />
                 </div>
+
+                {isAdmin && (
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select value={formEditar.status} onChange={e => setFormEditar(p => ({ ...p, status: e.target.value }))}>
+                      <option value="pendente">Pendente</option>
+                      <option value="em_progresso">Em progresso</option>
+                      <option value="concluida">Concluída</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group form-group-full">
                   <label>Descrição da avaria / problema</label>

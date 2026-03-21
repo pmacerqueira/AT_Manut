@@ -25,6 +25,8 @@ npm run build:zip
 
 Executa `npm run build` (inclui optimize-images) e depois cria `dist_upload.zip`.
 
+**Além do zip:** se alterou envio de email ou PDF no servidor, fazer upload separado de `servidor-cpanel/send-email.php` (ver `docs/FOTOS-PDF-EMAIL-LIMITES.md`).
+
 ---
 
 ## Opção 2: Script PowerShell

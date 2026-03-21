@@ -16,6 +16,7 @@ alwaysApply: true
 - Log de sistema em `logger.js` (`logEntry`, `logger.*`) — registar erros, acções importantes e eventos de autenticação
 - Email e PDF gerados pelo servidor cPanel via `servidor-cpanel/send-email.php`
 - Relação com **navel-site** (`c:\Cursor_Projetos\NAVEL\navel-site\`): projectos separados; Supabase existe no navel-site mas **não** é usado no AT_Manut — não misturar decisões de arquitectura entre os dois
+- **Fluxos de execução (v1.16.6+):** Plano canónico em `docs/PLANO-FLUXOS-EXECUCAO.md`. **Proibido** criar linhas em `manutencoes` em silêncio ao abrir `ExecutarManutencaoModal` — só com confirmação explícita (ex.: «Criar intervenção para hoje»). Hábito de trabalho no terreno: **Manutenções** (lista / `executar=` na URL), não botão «Executar» directo na lista de **Equipamentos**.
 
 ## Continuidade entre agentes/modelos
 
@@ -378,3 +379,75 @@ await page.waitForTimeout(500)
 
 - Usar `APP_FOOTER_TEXT` de `src/config/version.js` (inclui versão automaticamente)
 - Aplicar em: relatorioHtml.js, gerarPdfRelatorio.js, send-email.php, EnviarDocumentoModal, e qualquer novo relatório
+
+## ⚠ ESTRUTURA CANÓNICA DO PDF — `gerarPdfCompacto` (gerarPdfRelatorio.js)
+
+**REGRA ABSOLUTA — não alterar a ordem das secções.** Qualquer alteração à estrutura do PDF deve preservar esta sequência exacta. Incumprimento desta regra provocou múltiplos ciclos de regressão em 2026-03-19.
+
+### Ordem das secções (definitiva desde v1.16.0):
+
+```
+1. Cabeçalho azul (logo, contactos)
+2. Tipo de serviço + número do relatório
+3. Dados do serviço (cliente, equipamento, data, técnico, assinante)
+4. Checklist de verificação
+5. Notas adicionais
+6. Fotos (secção "Documentação fotográfica": grelha até 4 por linha em A4, proporção preservada; máx. 6 imagens por relatório; nova página se a linha não couber)
+7. Consumíveis e peças (condicional — só se existirem)
+8. Declaração de aceitação e compromisso do cliente
+9. Próximas manutenções agendadas (tabela)
+10. Bloco de assinaturas (técnico + cliente) ← ÚLTIMO conteúdo antes do rodapé
+11. Rodapé (em todas as páginas)
+```
+
+### Regras de paginação:
+- Cada secção verifica `if (y > N) { pdf.addPage(); y = 20 }` antes de renderizar
+- A declaração e as próximas podem ficar na mesma página se couberem
+- As assinaturas são SEMPRE o último bloco de conteúdo (o cliente lê tudo, depois assina)
+
+### Razão da regra:
+A ordem "declaração → próximas → assinaturas" é lógica do ponto de vista legal/documental: o cliente lê o relatório, a declaração de compromisso e as próximas datas, e SÓ DEPOIS assina confirmando que viu tudo.
+
+## ⚠ CÁLCULO DE DATAS FUTURAS — Próximas Manutenções
+
+### Regra para PDF e Email (desde v1.16.0):
+As datas das próximas manutenções mostradas no PDF e no email HTML são **SEMPRE COMPUTADAS em tempo real** a partir de:
+- `dataExecucao` = data de criação do relatório (`rel.dataCriacao`) ou data de assinatura (`rel.dataAssinatura`) ou data da manutenção (`m.data`)
+- `periodicidade` = `maquina.periodicidadeManut` ('trimestral' = 90 dias, 'semestral' = 180, 'anual' = 365)
+
+**NÃO usar registos da base de dados** para as próximas manutenções no PDF/email. Os registos na BD podem estar desactualizados devido a race conditions na persistência assíncrona.
+
+### Função canónica: `computarProximasDatas()` em `src/utils/diasUteis.js`
+```js
+import { computarProximasDatas } from '../utils/diasUteis'
+
+// Gera 12 datas futuras a partir da data de execução, ajustadas para dias úteis
+const proximas = computarProximasDatas(dataExecucao, periodicidade, { tecnico, count: 12 })
+```
+
+### Callers que usam `computarProximasDatas`:
+1. `Manutencoes.jsx` → `handleAbrirPdf` (botão "Obter PDF")
+2. `Clientes.jsx` → `handleDownloadPdfManutencao`
+3. `EnviarEmailModal.jsx` → `handleSubmit`
+
+### Recálculo no servidor (base de dados):
+A função `recalcularPeriodicasAposExecucao()` em `DataContext.jsx` recria os registos futuros no estado e persiste-os no MySQL. É chamada:
+- No fluxo normal de execução (com `hoje` = data de realização ou data actual)
+- No admin edit — SEMPRE que o admin grava uma manutenção periódica (não apenas quando a data muda)
+
+### Bug histórico corrigido (v1.16.0):
+- O auto-preenchimento de `dataRealizacao` para manutenções em atraso usava a **data original de agendamento** (`m.data`) em vez da **data actual** (`getHojeAzores()`). Isto fazia com que o recálculo periódico usasse a data errada como base.
+- Corrigido em `ExecutarManutencaoModal.jsx` linha ~245: `dataRealizacao` agora pré-preenche com `getHojeAzores()` para manutenções em atraso.
+
+## ⚠ PREVENÇÃO DE REGRESSÕES — Lições de 2026-03-19
+
+Nesta sessão, múltiplas correcções foram revertidas acidentalmente por edições subsequentes. Para evitar:
+
+1. **Antes de editar `gerarPdfRelatorio.js`:** ler o ficheiro completo e verificar a ordem das secções contra a lista canónica acima.
+2. **Nunca mover blocos de código** sem verificar que TODAS as secções mantêm a ordem correcta.
+3. **Testar o PDF visualmente** após qualquer alteração ao ficheiro — confirmar que:
+   - A declaração aparece ANTES das assinaturas
+   - As próximas manutenções aparecem ANTES das assinaturas
+   - As fotos aparecem logo após as notas
+   - As datas começam no trimestre correcto (data de execução + periodicidade)
+4. **Não confiar na extracção de texto de PDFs** — o Read tool pode não capturar todo o texto de PDFs gerados por jsPDF. Confirmar sempre com screenshot visual.

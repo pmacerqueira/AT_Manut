@@ -301,14 +301,14 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     }
   })
 
-  test('Contador de fotos mostra 0/8 inicialmente', async ({ page }) => {
+  test('Contador de fotos mostra 0/6 inicialmente', async ({ page }) => {
     await irParaReparacoes(page)
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
 
-    const counter = modal.locator('.fotos-count, .fotos-label, [class*="foto"]').filter({ hasText: /0\/8|0 \/ 8/ })
+    const counter = modal.locator('.fotos-count, .fotos-label, [class*="foto"], h3.exec-section-title').filter({ hasText: /0\/6|0 \/ 6/ })
     if (await counter.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(counter).toContainText(/0\/8|0 \/ 8/)
+      await expect(counter).toContainText(/0\/6|0 \/ 6/)
     }
   })
 
@@ -317,7 +317,8 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
 
-    const fileInput = modal.locator('input[type="file"]')
+    // Galeria (multiple) — distinto do input da câmara (capture)
+    const fileInput = modal.locator('input[type="file"][multiple]')
     // Adicionar foto 1
     await fileInput.setInputFiles({ name: 'foto1.png', mimeType: 'image/png', buffer: PNG_1x1 })
     await page.waitForTimeout(1200)
@@ -330,13 +331,13 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await expect(thumbs).toHaveCount(2, { timeout: 6000 })
   })
 
-  test('Limite de 8 fotos é respeitado — toast de aviso ao exceder', async ({ page }) => {
+  test('Limite de 6 fotos é respeitado — toast de aviso ao exceder', async ({ page }) => {
     await irParaReparacoes(page)
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
 
-    const fileInput = modal.locator('input[type="file"]')
-    // Tentar carregar 9 fotos (excede limite de 8)
+    const fileInput = modal.locator('input[type="file"][multiple]')
+    // Tentar carregar 9 fotos (excede limite de 6)
     const noveFiles = Array.from({ length: 9 }, (_, i) => ({
       name: `foto${i + 1}.png`, mimeType: 'image/png', buffer: PNG_1x1,
     }))
@@ -344,7 +345,7 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await page.waitForTimeout(1500)
 
     // Deve mostrar toast de aviso sobre o limite
-    const toast = page.locator('.toast, [role="alert"]').filter({ hasText: /máximo|8 foto/i })
+    const toast = page.locator('.toast, [role="alert"]').filter({ hasText: /máximo|6 foto/i })
     await expect(toast).toBeVisible({ timeout: 5000 })
   })
 

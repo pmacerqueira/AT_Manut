@@ -194,6 +194,12 @@ section { margin-bottom: 10px; page-break-inside: avoid }
 /* 2 fotos: 50% cada */
 .rpt-fotos-row--pair .rpt-foto-item { flex: 0 1 50% }
 .rpt-fotos-row--pair .rpt-foto-item img { max-height: 200px }
+/* 3 fotos: terços */
+.rpt-fotos-row--triple .rpt-foto-item { flex: 0 1 33.33% }
+.rpt-fotos-row--triple .rpt-foto-item img { max-height: 170px }
+/* 4 fotos: quarta parte da largura (A4 / impressão) */
+.rpt-fotos-row--quad .rpt-foto-item { flex: 0 1 25% }
+.rpt-fotos-row--quad .rpt-foto-item img { max-height: 150px }
 
 /* ── Checklist ── */
 .checklist-1col { width: 100% }
@@ -368,12 +374,10 @@ export function htmlHeader(logoSrc, logoMarcaSrc = '', logoMarcaAlt = '') {
         onerror="this.parentNode.style.display='none'">
     </div>` : ''}
   </div>
-  <div class="rpt-empresa" style="text-align:left;font-size:${TIPO.pequeno};line-height:1.55;color:${PALETA.texto}">
+  <div class="rpt-empresa" style="text-align:right;font-size:${TIPO.pequeno};line-height:1.55;color:${PALETA.texto}">
     <strong style="font-size:${TIPO.corpo};color:${PALETA.azulNavel}">${esc(EMPRESA.nome)}</strong><br>
-    ${esc(EMPRESA.divisaoComercial)}<br>
-    ${esc(EMPRESA.sede)}<br>
-    ${esc(EMPRESA.telefones)} &nbsp;|&nbsp; <a href="https://${EMPRESA.web}" style="color:${PALETA.azulNavel};text-decoration:none;font-weight:600">${EMPRESA.web}</a><br>
-    ${esc(EMPRESA.pais)}
+    ${esc(EMPRESA.localidade)} &bull; <a href="https://${EMPRESA.web}" style="color:${PALETA.azulNavel};text-decoration:none;font-weight:600">${EMPRESA.web}</a><br>
+    ${esc(EMPRESA.regiao)}
   </div>
 </header>`
 }
@@ -536,9 +540,8 @@ export function htmlPaginaCliente({
 }
 
 /**
- * Bloco de fotografias adaptativo — agrupa em linhas de 2, cada linha protegida
- * contra cortes de paginação. 1 foto fica centrada; número ímpar coloca a última
- * centrada na sua própria linha.
+ * Bloco de fotografias — até **4** por linha (largura A4), proporção preservada (`object-fit: contain`).
+ * Cada linha com `page-break-inside: avoid` para reduzir cortes feios na impressão/PDF do browser.
  *
  * @param {string[]} fotosSafe - URLs seguras (data:image ou http)
  * @param {string}   titulo    - Título da secção (default: "Documentação fotográfica")
@@ -552,19 +555,25 @@ export function htmlFotos(fotosSafe = [], titulo = 'Documentação fotográfica'
       <div class="rpt-foto-caption">Foto ${idx + 1}</div>
     </div>`
 
-  let rowsHtml = ''
+  const rowClassForCount = (n) => {
+    if (n === 1) return 'rpt-fotos-row rpt-fotos-row--single'
+    if (n === 2) return 'rpt-fotos-row rpt-fotos-row--pair'
+    if (n === 3) return 'rpt-fotos-row rpt-fotos-row--triple'
+    return 'rpt-fotos-row rpt-fotos-row--quad'
+  }
 
-  if (fotosSafe.length === 1) {
-    rowsHtml = `<div class="rpt-fotos-row rpt-fotos-row--single">${fotoItem(fotosSafe[0], 0)}</div>`
-  } else {
-    for (let i = 0; i < fotosSafe.length; i += 2) {
-      const isLastAlone = (i + 1 >= fotosSafe.length)
-      const rowClass = isLastAlone ? 'rpt-fotos-row rpt-fotos-row--single' : 'rpt-fotos-row rpt-fotos-row--pair'
-      rowsHtml += `<div class="${rowClass}">`
-      rowsHtml += fotoItem(fotosSafe[i], i)
-      if (!isLastAlone) rowsHtml += fotoItem(fotosSafe[i + 1], i + 1)
-      rowsHtml += `</div>`
+  let rowsHtml = ''
+  for (let i = 0; i < fotosSafe.length; ) {
+    const remaining = fotosSafe.length - i
+    const n = Math.min(4, remaining)
+    const rowClass = rowClassForCount(n)
+    rowsHtml += `<div class="${rowClass}">`
+    for (let j = 0; j < n; j++) {
+      const idx = i + j
+      rowsHtml += fotoItem(fotosSafe[idx], idx)
     }
+    rowsHtml += '</div>'
+    i += n
   }
 
   return `

@@ -10,8 +10,15 @@
 import { test, expect } from '@playwright/test'
 import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
-  checklistMarcarTodos, checklistFillAllSim, signCanvas,
+  fillExecucaoModal,
 } from './helpers.js'
+
+/** Abre o modal de execução da linha de MONTAGEM (evita apanhar mt11 periódica primeiro na lista). */
+async function abrirModalMontagem(page) {
+  const row = page.locator('.manutencoes-table tbody tr').filter({ hasText: /Montagem/i }).first()
+  await expect(row).toBeVisible({ timeout: 8000 })
+  await row.locator('.btn-executar-manut').click()
+}
 
 test.describe('Montagem — Execução completa', () => {
 
@@ -43,8 +50,7 @@ test.describe('Montagem — Execução completa', () => {
   })
 
   test('Modal de montagem tem checklist com grupos (Mecânica, Eléctrica, Teste)', async ({ page }) => {
-    // Usar directamente o botão da tabela desktop
-    await page.locator('.btn-executar-manut').first().click()
+    await abrirModalMontagem(page)
 
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
@@ -53,43 +59,16 @@ test.describe('Montagem — Execução completa', () => {
   })
 
   test('FLUXO COMPLETO — Executar montagem e confirmar agendamento de periódicas', async ({ page }) => {
-    // Usar sempre o botão da tabela desktop
-    await page.locator('.btn-executar-manut').first().click()
+    await abrirModalMontagem(page)
 
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 6000 })
 
-    // 1. Marcar todos como Sim
-    await checklistMarcarTodos(page)
-    await checklistFillAllSim(page)
+    await fillExecucaoModal(page, {
+      notas: 'Montagem concluída conforme especificações técnicas.',
+      nomeAssinante: 'Técnico Responsável',
+    })
 
-    // 2. Notas
-    const notasField = page.locator('.modal textarea').first()
-    if (await notasField.isVisible()) {
-      await notasField.fill('Montagem concluída conforme especificações técnicas.')
-    }
-
-    // 3. Técnico
-    const selectTecnico = page.locator('.modal select').first()
-    if (await selectTecnico.isVisible()) {
-      await selectTecnico.selectOption({ index: 1 }).catch(() => {})
-    }
-
-    // 4. Nome assinante
-    const allTextInputs = page.locator('.assinatura-section input[type="text"], .modal input[type="text"]')
-    const inputCount = await allTextInputs.count()
-    if (inputCount > 0) {
-      await allTextInputs.last().fill('Técnico Responsável')
-    }
-
-    // 5. Assinar canvas
-    await signCanvas(page)
-
-    // 6. Limpar email
-    const emailInput = page.locator('.email-section input[type="email"]')
-    if (await emailInput.isVisible()) await emailInput.clear()
-
-    // 7. Submeter
-    await page.locator('.modal-relatorio-form button[type="submit"]').click()
+    await page.locator('.btn-gravar-sucesso').click()
     await page.waitForTimeout(2000)
 
     // 8. Verificar resultado:

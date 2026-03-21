@@ -220,9 +220,9 @@ MC = {
 - Secção de fotos presente (botão `.foto-add`)
 - Upload PNG: foto aparece na grid
 - Botão remover: foto eliminada da grid
-- Contador 0/8 inicialmente
+- Contador 0/6 inicialmente
 - Múltiplas fotos adicionadas sequencialmente
-- Limite de 8 fotos respeitado — toast de aviso ao exceder
+- Limite de 6 fotos respeitado — toast de aviso ao exceder
 - Fotos guardadas no progresso recarregadas ao retomar
 
 **RA-4 — Envio de email após conclusão (5 testes):**

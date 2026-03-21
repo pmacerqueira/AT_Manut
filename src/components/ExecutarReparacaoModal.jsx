@@ -15,44 +15,8 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
 import { getDeclaracaoCliente } from '../constants/relatorio'
+import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import './ExecutarReparacaoModal.css'
-
-const FOTO_MAX_W   = 1200
-const FOTO_MAX_H   = 1200
-const FOTO_QUALITY = 0.75
-
-function fileToMemory(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload  = () => resolve(new Blob([reader.result], { type: file.type || 'image/jpeg' }))
-    reader.onerror = reject
-    reader.readAsArrayBuffer(file)
-  })
-}
-
-function comprimirFoto(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = reject
-    reader.onload  = (ev) => {
-      const img = new Image()
-      img.onerror = reject
-      img.onload  = () => {
-        let { width, height } = img
-        const ratio = Math.min(FOTO_MAX_W / width, FOTO_MAX_H / height, 1)
-        width  = Math.round(width  * ratio)
-        height = Math.round(height * ratio)
-        const canvas = document.createElement('canvas')
-        canvas.width  = width
-        canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', FOTO_QUALITY))
-      }
-      img.src = ev.target.result
-    }
-    reader.readAsDataURL(blob)
-  })
-}
 
 export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const { isAdmin } = usePermissions()
@@ -250,20 +214,29 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const handleFotoChange = async (e) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-    if (fotos.length + files.length > MAX_FOTOS) {
-      showToast(`Máximo de ${MAX_FOTOS} fotos permitido`, 'warning')
+    const disponiveis = MAX_FOTOS - fotos.length
+    if (disponiveis <= 0) {
+      showToast(`Limite de ${MAX_FOTOS} fotografias atingido.`, 'warning')
+      if (fotoInputRef.current) fotoInputRef.current.value = ''
+      if (fotoCameraRef.current) fotoCameraRef.current.value = ''
       return
     }
+    const ficheiros = files.slice(0, disponiveis)
+    if (files.length > ficheiros.length) {
+      showToast(`Só couberam mais ${ficheiros.length} foto(s) (máx. ${MAX_FOTOS}).`, 'warning')
+    }
     setFotoCarregando(true)
+    const novas = []
     try {
-      const novas = await Promise.all(files.map(async f => {
-        const blob = await fileToMemory(f)
-        return comprimirFoto(blob)
-      }))
+      for (const file of ficheiros) {
+        const blob = await fileToMemory(file)
+        const dataUrl = await comprimirFotoParaRelatorio(blob)
+        novas.push(dataUrl)
+      }
       setFotos(prev => [...prev, ...novas])
     } catch (err) {
-      showToast('Erro ao carregar foto', 'error')
-      logger.error('ExecutarReparacaoModal', 'handleFotoChange', err.message)
+      showToast(err?.message || 'Não foi possível processar a fotografia.', 'error', 4000)
+      logger.error('ExecutarReparacaoModal', 'handleFotoChange', err?.message || String(err))
     } finally {
       setFotoCarregando(false)
       if (fotoInputRef.current) fotoInputRef.current.value = ''
@@ -822,6 +795,12 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 </div>
                 <input ref={fotoCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFotoChange} />
                 <input ref={fotoInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFotoChange} />
+                <p className="fotos-limite-hint" style={{ marginTop: '0.5rem' }}>
+                  Máximo de <strong>{MAX_FOTOS}</strong> fotos por relatório (PDF e email). Compressão automática no tablet ou telemóvel.
+                  {fotos.length >= MAX_FOTOS && (
+                    <span className="fotos-limite-atingido"> Limite atingido — apague uma foto para adicionar outra.</span>
+                  )}
+                </p>
               </div>
 
               {/* Secção: Notas */}

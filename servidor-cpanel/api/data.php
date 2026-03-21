@@ -234,8 +234,8 @@ $RESOURCE_MAP = [
     ],
     'relatorios' => [
         'table'      => 'relatorios',
-        'json_cols'  => ['checklist_respostas','checklist_snapshot','fotos','pecas_usadas'],
-        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','criado_em'],
+        'json_cols'  => ['checklist_respostas','checklist_snapshot','fotos','pecas_usadas','ultimo_envio','enviado_para_cliente'],
+        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','enviado_para_cliente','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
     'reparacoes' => [
@@ -615,9 +615,22 @@ $_user_role = $authPayload['role'] ?? '';
 
 if ($_user_role !== 'admin') {
     $blocked = false;
-    // Clientes: admin only para qualquer escrita
-    if ($resource === 'clientes' && in_array($action, ['create','update','delete','bulk_create','bulk_restore'], true)) {
-        $blocked = true;
+    // Clientes: admin only para escrita, EXCEPTO update de campos de contacto (nome_contacto, assinatura_contacto)
+    // Técnicos podem guardar nome/assinatura do contacto ao executar manutenção.
+    if ($resource === 'clientes') {
+        if ($action === 'update') {
+            $contactFieldsAllowed = ['id', 'nomeContacto', 'nome_contacto', 'assinaturaContacto', 'assinatura_contacto'];
+            $updateData = $body['data'] ?? [];
+            $filteredData = array_intersect_key($updateData, array_flip($contactFieldsAllowed));
+            $hasContactData = !empty(array_diff_key($filteredData, ['id' => 1]));
+            if (!$hasContactData) {
+                $blocked = true;
+            } else {
+                $body['data'] = $filteredData;
+            }
+        } elseif (in_array($action, ['create','delete','bulk_create','bulk_restore'], true)) {
+            $blocked = true;
+        }
     }
     // Maquinas: admin only para criar/eliminar (update permitido — necessário ao executar manutenção)
     if ($resource === 'maquinas' && in_array($action, ['create','delete','bulk_create','bulk_restore'], true)) {

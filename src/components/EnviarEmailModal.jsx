@@ -3,15 +3,14 @@ import { Mail, X } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
-import { relatorioParaHtml } from '../utils/relatorioHtml'
-import { enviarRelatorioHtmlEmail } from '../services/emailService'
+import { enviarRelatorioEmail } from '../services/emailService'
 import { formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 
 const EMAIL_ADMIN = 'comercial@navel.pt'
 
 export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatorio, maquina, cliente }) {
-  const { getChecklistBySubcategoria, getSubcategoria, updateRelatorio, getTecnicoByNome, manutencoes, relatorios: todosRelatorios } = useData()
+  const { getChecklistBySubcategoria, getSubcategoria, updateRelatorio, getTecnicoByNome, marcas } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
 
@@ -53,49 +52,30 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
     try {
       const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
       const tecObj = getTecnicoByNome(manutencao?.tecnico || relatorio?.tecnico)
-      const proximas = maquina ? manutencoes.filter(x =>
-        x.maquinaId === maquina.id && (x.status === 'pendente' || x.status === 'agendada') && x.data > (manutencao?.data ?? '')
-      ) : []
-      const historicoRelatorios = manutencoes
-        .filter(mt => mt.maquinaId === maquina?.id && mt.status === 'concluida' && mt.id !== manutencao?.id)
-        .sort((a, b) => b.data.localeCompare(a.data))
-        .slice(0, 5)
-        .map(mt => {
-          const r = todosRelatorios.find(rr => rr.manutencaoId === mt.id)
-          if (!r) return null
-          const anomalias = (r.checklistSnapshot ?? [])
-            .filter(item => r.checklistRespostas?.[item.id] === 'nao')
-            .map(item => (item.texto ?? '').slice(0, 100))
-          return { data: mt.data, tipo: mt.tipo, tecnico: mt.tecnico ?? r.tecnico, anomalias }
-        })
-        .filter(Boolean)
-
-      const htmlBody = relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItems, {
-        subcategoriaNome: sub?.nome,
-        ultimoEnvio: relatorio.ultimoEnvio,
-        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
-        tecnicoObj: tecObj,
-        proximasManutencoes: proximas,
-        historicoRelatorios,
-      })
 
       let sucesso = 0
       for (const dest of dests) {
-        const resultado = await enviarRelatorioHtmlEmail({
-          destinatario: dest,
-          assunto: subject,
-          html: htmlBody,
-          nomeCliente: cliente?.nome ?? '',
+        const resultado = await enviarRelatorioEmail({
+          emailDestinatario: dest,
+          relatorio, manutencao, maquina, cliente, checklistItems,
+          subcategoriaNome: sub?.nome || '',
+          logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+          tecnicoObj: tecObj,
+          marcas,
         })
-        if (resultado.ok) sucesso++
-        else logger.error('EnviarEmailModal', 'enviarEmail', resultado.message ?? 'Erro', { dest })
+        if (resultado?.ok) sucesso++
+        else logger.error('EnviarEmailModal', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
       }
 
       if (sucesso > 0) {
         const destsArr = [...dests]
-        updateRelatorio(relatorio.id, {
-          ultimoEnvio: { data: new Date().toISOString(), destinatario: destsArr[0] },
-        })
+        const now = new Date().toISOString()
+        const relUpdate = { ultimoEnvio: { data: now, destinatario: destsArr[0] } }
+        const clientDests = destsArr.filter(e => e !== EMAIL_ADMIN)
+        if (clientDests.length > 0) {
+          relUpdate.enviadoParaCliente = { data: now, email: clientDests[0] }
+        }
+        updateRelatorio(relatorio.id, relUpdate)
         showToast(
           sucesso === dests.size
             ? `Email enviado para ${sucesso} destinatário${sucesso > 1 ? 's' : ''}.`

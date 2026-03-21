@@ -36,7 +36,7 @@ define('CRON_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99'
 
 // Emails da Navel
 define('FROM_EMAIL',   'no-reply@navel.pt');
-define('REPLY_TO',     'geral@navel.pt');
+define('REPLY_TO',     'comercial@navel.pt');
 define('EMAIL_ADMIN',  'comercial@navel.pt');
 
 // Versão da app (para o rodapé dos emails)
@@ -222,7 +222,7 @@ foreach ($manutencoes as $row) {
 
     $headers  = "MIME-Version: 1.0\r\n";
     $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: Navel-Açores <" . FROM_EMAIL . ">\r\n";
+    $headers .= "From: =?UTF-8?B?" . base64_encode('NAVEL – AÇORES') . "?= <" . FROM_EMAIL . ">\r\n";
     $headers .= "Reply-To: " . REPLY_TO . "\r\n";
     $headers .= "X-Mailer: AT_Manut-Cron/1.0\r\n";
 
@@ -283,7 +283,7 @@ if ($enviados > 0 || $erros > 0) {
         $corpo_admin .= "<h4 style='font-family:Arial,sans-serif'>Lembretes enviados:</h4>";
         $corpo_admin .= "<pre style='background:#f5f5f5;padding:12px;border-radius:4px;font-size:13px'>" . htmlspecialchars($resumo_linhas) . "</pre>";
     }
-    $corpo_admin .= "<p style='color:#888;font-size:11px;font-family:Arial,sans-serif;margin-top:24px'>Navel-Açores, Lda — Todos os direitos reservados · v" . APP_VERSION_CRON . "</p>";
+    $corpo_admin .= "<p style='color:#888;font-size:11px;font-family:Arial,sans-serif;margin-top:24px'>NAVEL – AÇORES, Lda — Todos os direitos reservados · v" . APP_VERSION_CRON . "</p>";
 
     $headers_admin  = "MIME-Version: 1.0\r\n";
     $headers_admin .= "Content-Type: text/html; charset=UTF-8\r\n";
@@ -332,7 +332,7 @@ function construir_email_lembrete(
       <!-- Cabeçalho -->
       <tr>
         <td style="background:#0d2340;padding:24px 32px;text-align:center">
-          <h1 style="color:#ffffff;margin:0;font-size:22px;letter-spacing:1px">NAVEL-AÇORES</h1>
+          <h1 style="color:#ffffff;margin:0;font-size:22px;letter-spacing:1px">NAVEL &ndash; AÇORES</h1>
           <p style="color:#a0b4cc;margin:4px 0 0;font-size:13px">Assistência Técnica — Manutenções</p>
         </td>
       </tr>
@@ -377,7 +377,7 @@ function construir_email_lembrete(
           </p>
           <p style="color:#555;font-size:14px;line-height:1.6;margin:0">
             Obrigado pela confiança,<br>
-            <strong>Equipa de Assistência Técnica Navel-Açores</strong>
+            <strong>Equipa de Assistência Técnica NAVEL &ndash; AÇORES</strong>
           </p>
         </td>
       </tr>
@@ -386,10 +386,10 @@ function construir_email_lembrete(
       <tr>
         <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center">
           <p style="color:#aaa;font-size:11px;margin:0">
-            Navel-Açores, Lda — Todos os direitos reservados · v{$app_v}
+            NAVEL &ndash; AÇORES, Lda — Todos os direitos reservados · v{$app_v}
           </p>
           <p style="color:#ccc;font-size:10px;margin:4px 0 0">
-            Este email foi gerado automaticamente. Responda para <a href="mailto:geral@navel.pt" style="color:#0d2340">geral@navel.pt</a>
+            Este email foi gerado automaticamente. Responda para <a href="mailto:comercial@navel.pt" style="color:#0d2340">comercial@navel.pt</a>
           </p>
         </td>
       </tr>

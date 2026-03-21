@@ -124,37 +124,22 @@
   .clientes-table { display: none; }
 }
 
-/* ── Tabela de clientes (apenas desktop ≥ 1025px) ── */
+/* ── Tabela de clientes — visual overrides only ── */
+/* Layout via data-table-system.css                */
 .clientes-table {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.clientes-table .data-table {
-  width: 100%;
-  table-layout: auto;
-  border-collapse: collapse;
+  padding: 0;
 }
 .clientes-table .data-table th,
 .clientes-table .data-table td {
   padding: 0.45rem 0.6rem;
   line-height: 1.35;
-  vertical-align: middle;
-}
-.clientes-table .data-table th {
-  font-size: 0.72em;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
-/* col NIF — compacta, monospace */
-.clientes-table .col-nif { white-space: nowrap; }
+/* col NIF — monospace styling */
 .clientes-table .col-nif code { font-size: 0.88em; }
 
-/* col Nome — absorve todo o espaço disponível */
-.clientes-table .col-nome { width: 99%; max-width: 0; }
+/* col Nome — link styling */
 .clientes-table .col-nome .btn-link-inline {
   display: block;
   max-width: 100%;
@@ -165,37 +150,13 @@
   white-space: nowrap;
 }
 
-/* col Localidade — encolhe ao conteúdo, trunca se necessário */
-.clientes-table .col-local {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: min(180px, 18vw);
-}
-
-/* col Máquinas — centrada, estreita */
-.clientes-table .col-maq { white-space: nowrap; text-align: center; }
-
-/* col Acções — justa ao conteúdo, nunca quebra */
-.clientes-table .col-actions {
-  white-space: nowrap;
-  text-align: right;
-  padding-right: 0.4rem !important;
-}
+/* col Acções — row styling */
 .clientes-table .col-actions .actions-row {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.15rem;
   align-items: center;
   justify-content: flex-end;
-}
-.clientes-table .col-actions .icon-btn {
-  min-width: var(--space-2xl) !important;
-  min-height: var(--space-2xl) !important;
-  width: var(--space-2xl);
-  height: var(--space-2xl);
-  padding: 0.1rem !important;
-  border-radius: var(--radius-xs);
 }
 
 /* ── Ficha do cliente — header e acções ── */

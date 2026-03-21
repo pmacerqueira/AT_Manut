@@ -80,10 +80,10 @@ Próximo passo:
 | Indicador de armazenamento | `Definicoes.jsx`, `Definicoes.css` |
 | Histórico HTML máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx`, `Clientes.jsx` |
 | Relatório individual PDF | `relatorioHtml.js`, `relatorioBaseStyles.js`, `gerarPdfRelatorio.js` |
-| Relatório de frota | `gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `Clientes.jsx` |
+| Relatório de frota | `gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `frotaReportHelpers.js`, `Clientes.jsx` |
 | Relatório de reparação | `relatorioReparacaoHtml.js`, `relatorioBaseStyles.js` |
-| Envio de email (destinatários) | `emailService.js`, `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` |
-| Envio de relatório de frota | `emailService.js`, `servidor-cpanel/send-report.php` |
+| Envio de email (manutenção, lembretes) | `emailService.js`, `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` |
+| Envio HTML + PDF opcional (frota, reparação, etc.) | `emailService.js` (`enviarRelatorioHtmlEmail`, `blobToRawBase64`), `servidor-cpanel/api/send-report.php` |
 | Alertas automáticos (cron) | `servidor-cpanel/cron-alertas.php`, `docs/CRON-ALERTAS.md` |
 | Agendamento novo (pipeline) | `Agendamento.jsx` |
 | Execução de manutenção (wizard) | `ExecutarManutencaoModal.jsx`, `Manutencoes.css` |
@@ -147,7 +147,7 @@ Próximo passo:
   pecasUsadas, fotos, assinaturaDigital, nomeAssinante,
   checklistRespostas, numeroRelatorio }
 // pecasUsadas: [{ referencia, descricao, quantidade }]
-// fotos: máx. 8 (base64 JPEG/PNG)
+// fotos: máx. 6 (base64 JPEG/PNG), compressão em comprimirImagemRelatorio.js
 // numeroRelatorio: formato 'AAAA.RP.NNNNN' (sequencial por ano)
 ```
 

@@ -1,9 +1,17 @@
 # .htaccess para public_html/api/
 # Carregar este ficheiro para public_html/api/.htaccess
-# Não necessita de desativar ModSecurity — os dados enviados são texto pequeno (~3 KB)
-# pelo que o ModSecurity não deverá bloquear.
+#
+# NOTA: NÃO usar php_value aqui — o servidor usa PHP CGI/FastCGI.
+#       Os limites PHP estão em .user.ini (mesmo directório).
 
-# Opcional: cabeçalhos CORS a nível Apache (PHP já os envia, mas por garantia)
+# ── Desactivar ModSecurity para send-email.php ──────────────────────
+<IfModule mod_security2.c>
+    <Files "send-email.php">
+        SecRuleEngine Off
+    </Files>
+</IfModule>
+
+# ── CORS headers ─────────────────────────────────────────────────────
 <IfModule mod_headers.c>
     Header always set Access-Control-Allow-Methods "POST, OPTIONS"
 </IfModule>

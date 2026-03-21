@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.14.0 · **Última actualização:** 2026-03-17
+**Versão:** 1.16.12 · **Última actualização:** 2026-03-21
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -12,6 +12,8 @@
 ## 1. Visão Geral
 
 Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos Navel (elevadores, compressores, geradores, equipamentos de trabalho em altura). Dois perfis de utilizador com permissões bem separadas.
+
+**Plano de fluxos e anti-redundância (campo / tablet):** `docs/PLANO-FLUXOS-EXECUCAO.md`.
 
 ### Três fluxos de negócio principais
 
@@ -117,10 +119,12 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── relatorioHtml.js            # HTML do relatório individual (manutenções)
 │   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios (assinaturas, tabelas)
 │   │   ├── relatorioReparacaoHtml.js   # HTML do relatório de reparação
-│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — download directo sem impressão
+│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — grelha fotos A4, email anexo
+│   │   ├── comprimirImagemRelatorio.js # Compressão JPEG das fotos no browser (relatórios)
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
 │   │   ├── gerarRelatorioFrota.js      # PDF do relatório executivo de frota (jsPDF)
 │   │   ├── gerarRelatorioFrotaHtml.js  # HTML do relatório executivo de frota
+│   │   ├── frotaReportHelpers.js       # IDs / período / cliente↔máquina (frota)
 │   │   ├── kpis.js                     # calcResumoCounts, calcTaxaCumprimento, calcEvolucaoMensal…
 │   │   ├── datasAzores.js              # Feriados dos Açores, dias úteis
 │   │   ├── diasUteis.js               # Cálculo de dias úteis
@@ -137,7 +141,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── api/
 │   │   └── data.php                    # Endpoint central: CRUD MySQL (todas as entidades)
 │   ├── send-email.php                  # Backend: envio de email + PDF
-│   ├── send-report.php                 # Backend: envio de relatório de frota por email
+│   ├── send-report.php                 # Backend: email HTML (+ PDF base64 opcional, ex. frota)
 │   ├── cron-alertas.php                # Cron diário: lembretes automáticos + log alertas_log
 │   ├── INSTRUCOES_CPANEL.md
 │   └── MIGRACAO_MYSQL.md
@@ -157,7 +161,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
 │
-├── docs/                               # Documentação técnica
+├── docs/                               # Documentação técnica (ver `FOTOS-PDF-EMAIL-LIMITES.md`)
 ├── public/                             # Assets públicos (logo, favicon, manifest)
 └── dist/                               # Build de produção (gerado por npm run build)
 ```
@@ -330,8 +334,31 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 Após execução de qualquer manutenção (montagem ou periódica):
 1. Obtém a `periodicidadeManut` da máquina (anual, semestral, trimestral)
 2. Remove todas as manutenções futuras pendentes da máquina
-3. Recria manutenções para os próximos 2 anos, espaçadas pela periodicidade
-4. Data base = data de conclusão do relatório recém-criado
+3. Recria manutenções para os próximos 3 anos, espaçadas pela periodicidade
+4. Data base = data de conclusão real (dataRealizacao ou data actual, NUNCA a data original de agendamento)
+5. Dias úteis: ajusta para dias úteis (evita feriados dos Açores e fins-de-semana)
+
+### Estrutura do PDF de relatório (`gerarPdfCompacto`)
+
+Ordem canónica das secções — **não alterar** (ver `.cursor/rules/at-manut-workflow.mdc`):
+
+| # | Secção | Condicional? |
+|---|--------|-------------|
+| 1 | Cabeçalho (logo, contactos) | Não |
+| 2 | Tipo de serviço + nº relatório | Não |
+| 3 | Dados (cliente, equipamento, data, técnico) | Não |
+| 4 | Checklist de verificação | Se existir |
+| 5 | Notas adicionais | Se existirem |
+| 6 | Fotos (menção textual) | Se existirem |
+| 7 | Consumíveis e peças | Se existirem |
+| 8 | Declaração de aceitação do cliente | **Sempre** |
+| 9 | Próximas manutenções agendadas | Se periódica |
+| 10 | Assinaturas (técnico + cliente) | **Sempre — último conteúdo** |
+| 11 | Rodapé (todas as páginas) | Não |
+
+### Cálculo das datas futuras no PDF/email
+
+As datas mostradas na secção "Próximas Manutenções Agendadas" são **computadas em tempo real** via `computarProximasDatas()` (em `diasUteis.js`), partindo da data de execução do relatório e da periodicidade da máquina. Não dependem dos registos na base de dados.
 
 ### Fluxo de reparação (multi-dia)
 1. **Criação:** Admin ou ATecnica regista a reparação com máquina, data, técnico, avaria (+ aviso ISTOBAL se aplicável)
