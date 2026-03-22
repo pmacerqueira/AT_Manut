@@ -107,4 +107,33 @@ describe('sugerirFaseKaeser', () => {
     assert.equal(r.detalhes.disparouHoras, false)
     assert.equal(r.motivoPrincipal, 'fallback')
   })
+
+  it('first intervention (no posicaoKaeser): fallback pre-selects B; counter hint still A for low hours', () => {
+    const r = sugerirFaseKaeser({
+      maquina: {
+        ultimaManutencaoData: '2025-11-01',
+        horasServicoAcumuladas: 1000,
+      },
+      horasServicoAtuais: 1200,
+      dataExecucao: '2025-12-01',
+    })
+    assert.equal(r.motivoPrincipal, 'fallback')
+    assert.equal(r.tipoPreSelecao, 'B')
+    assert.equal(r.tipoIndicadoPorContadorHoras, 'A')
+  })
+
+  it('first intervention: annual window without calendar nor delta uses B', () => {
+    const r = sugerirFaseKaeser({
+      maquina: {
+        ultimaManutencaoData: '2024-01-01',
+        horasServicoAcumuladas: 5000,
+      },
+      horasServicoAtuais: 5100,
+      dataExecucao: '2025-06-01',
+    })
+    assert.equal(r.motivoPrincipal, 'anual')
+    assert.equal(r.tipoSugeridoCalendario, null)
+    assert.equal(r.detalhes.disparouHoras, false)
+    assert.equal(r.tipoPreSelecao, 'B')
+  })
 })

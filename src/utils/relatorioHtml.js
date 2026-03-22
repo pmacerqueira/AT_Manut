@@ -17,8 +17,8 @@ import {
   isKaeserAbcdMaquina,
 } from '../context/DataContext'
 import { resolveChecklist } from './resolveChecklist'
-import { horasContadorParaRelatorio, horasContadorNaManutencao, parseHorasContadorForm } from './horasContadorEquipamento'
-import { relatorioObrigaBlocoConsumiveisPlano } from './relatorioBlocosEquipamento'
+import { horasContadorParaRelatorio } from './horasContadorEquipamento'
+import { relatorioObrigaBlocoConsumiveisPlano, relatorioIncluiSecaoConsumiveisContador } from './relatorioBlocosEquipamento'
 import { MAX_FOTOS } from '../config/limits'
 import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
 
@@ -46,7 +46,7 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
   if (!relatorio) return ''
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios, form } = options
-  const horasContadorRelatorioGeral = horasContadorNaManutencao(manutencao) ?? parseHorasContadorForm(form?.horasServico)
+  const horasContadorRelatorioGeral = horasContadorParaRelatorio(maquina, manutencao, form, relatorio)
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -148,7 +148,7 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeserAbcdReport ? ' — Compr
   if (isKaeserAbcdReport) {
     const tipoLabel    = infoTipoKaeser?.label ?? (tipoKaeser ? `Tipo ${tipoKaeser}` : 'Compressor')
     const tipoDesc     = infoTipoKaeser?.descricao ?? ''
-    const horContador  = horasContadorParaRelatorio(maquina, manutencao, form)
+    const horContador  = horasContadorParaRelatorio(maquina, manutencao, form, relatorio)
     const anoFabrico   = maquina?.anoFabrico ?? '—'
     const marca        = esc(maquina?.marca ?? '—')
     const modelo       = esc(maquina?.modelo ?? '—')
@@ -374,10 +374,11 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeserAbcdReport ? ' — Compr
   const fotosSafe = fotosArr.map(f => safeDataImageUrl(f)).filter(Boolean).slice(0, MAX_FOTOS)
   html += htmlFotos(fotosSafe)
 
-  // ── Consumíveis e peças (obrigatório p/ equip. com plano por série, ex. KAESER) ──
+  // ── Consumíveis e peças (plano KAESER + equipamentos com contador de horas) ──
   const obrigaPecasHtml = relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
+  const secaoConsumiveisContador = relatorioIncluiSecaoConsumiveisContador(maquina, manutencao)
   const pecasRaw = Array.isArray(relatorio.pecasUsadas) ? relatorio.pecasUsadas : []
-  if (obrigaPecasHtml || pecasRaw.length > 0) {
+  if (obrigaPecasHtml || pecasRaw.length > 0 || secaoConsumiveisContador) {
     const normalizar = (p) => {
       if ('usado' in p) return p
       return { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
@@ -388,7 +389,9 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeserAbcdReport ? ' — Compr
 
     const tipoHeaderLabel = tipoKaeser
       ? `Consumíveis e peças (plano fabricante) — Tipo ${tipoKaeser}${infoTipoKaeser ? ` · ${infoTipoKaeser.label}` : ''}`
-      : (obrigaPecasHtml ? 'Consumíveis e peças (plano fabricante)' : 'Consumíveis e peças')
+      : (obrigaPecasHtml
+        ? 'Consumíveis e peças (plano fabricante)'
+        : (secaoConsumiveisContador ? 'Consumíveis e peças (intervenção)' : 'Consumíveis e peças'))
 
     const thS = `background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:left;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em`
     const tdS = `padding:3px 6px;border-bottom:1px solid ${PALETA.bordaLeve};vertical-align:middle;font-size:${TIPO.pequeno};color:${PALETA.texto}`
@@ -416,7 +419,9 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeserAbcdReport ? ' — Compr
 
     const tbodyVazio = obrigaPecasHtml
       ? `<tr><td colspan="6" style="${tdS};font-style:italic;color:${PALETA.muted};padding:10px 8px">Nenhuma linha do plano foi registada nesta intervenção. Edite o relatório na app para associar o tipo A/B/C/D e as peças importadas por número de série.</td></tr>`
-      : `<tr><td colspan="6" style="${tdS};color:${PALETA.muted}">—</td></tr>`
+      : (secaoConsumiveisContador
+        ? `<tr><td colspan="6" style="${tdS};font-style:italic;color:${PALETA.muted};padding:10px 8px">Nenhum consumível ou peça foi listado nesta intervenção.</td></tr>`
+        : `<tr><td colspan="6" style="${tdS};color:${PALETA.muted}">—</td></tr>`)
 
     html += `
 <section class="section-can-break${isKaeserAbcdReport ? ' page-break-before' : ''}">

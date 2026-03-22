@@ -8,7 +8,7 @@ import { useData, isKaeserAbcdMaquina, isKaeserMarca } from '../context/DataCont
 import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
-import { parseKaeserPlanoPdf } from '../utils/parseKaeserPlanoPdf'
+import { buildPecasPlanoItemsFromPdfArrayBuffer, contagemPorTipoKaeser } from '../utils/kaeserPlanoPdfImport'
 import { logger } from '../utils/logger'
 import { consumiveisRegularRowsFromMaquina, normCodigoConsumivel } from '../utils/kaeserConsumiveisFicha'
 import { Plus, Trash2, Upload, X, Save, ChevronDown, PackageOpen } from 'lucide-react'
@@ -128,21 +128,8 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
 
     showGlobalLoading()
     try {
-      const { PDFParse } = await import('pdf-parse')
-      // Worker obrigatório no browser (pdfjs-dist)
-      PDFParse.setWorker(`${import.meta.env.BASE_URL}pdf.worker.mjs`)
       const arrayBuffer = await file.arrayBuffer()
-      const parser = new PDFParse({ data: new Uint8Array(arrayBuffer) })
-      const { text } = await parser.getText()
-      parser.destroy?.()
-
-      const parsed = parseKaeserPlanoPdf(text || '')
-      const todas = []
-      for (const tipo of ['A', 'B', 'C', 'D']) {
-        for (const p of parsed[tipo] || []) {
-          todas.push({ ...p, maquinaId: maquina.id, tipoManut: tipo })
-        }
-      }
+      const todas = await buildPecasPlanoItemsFromPdfArrayBuffer(arrayBuffer, maquina.id)
 
       if (todas.length === 0) {
         showToast('Não foi possível extrair peças do PDF. Verifique se o formato é um plano KAESER A/B/C/D.', 'warning')
@@ -151,8 +138,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
 
       const kept = getPecasPlanoByMaquina(maquina.id).filter(p => !['A', 'B', 'C', 'D'].includes(p.tipoManut))
       await replacePecasPlanoMaquina(maquina.id, [...kept, ...todas])
-      const porTipo = { A: 0, B: 0, C: 0, D: 0 }
-      todas.forEach(p => { porTipo[p.tipoManut] = (porTipo[p.tipoManut] || 0) + 1 })
+      const porTipo = contagemPorTipoKaeser(todas)
       showToast(`${todas.length} peças importadas (A: ${porTipo.A}, B: ${porTipo.B}, C: ${porTipo.C}, D: ${porTipo.D}).`, 'success')
     } catch (err) {
       logger.error('PecasPlanoModal', 'importarPdfKaeser', err?.message || 'Falha na importação PDF ou na gravação do plano', {

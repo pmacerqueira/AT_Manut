@@ -88,8 +88,15 @@ export function sugerirFaseKaeser({ maquina, horasServicoAtuais, dataExecucao, f
     motivoPrincipal = 'horas'
   }
 
-  /** Pré-selecção: dual → calendário primeiro; só horas → horas; só anual → calendário; senão absoluto. */
-  let tipoPreSelecao = horasAtuaisOk ? tipoKaeserSugeridoPorHorasServico(horasAtuais) : 'A'
+  /** Indicador informativo (contador absoluto / intervalo 3000 h) — pode diferir do tipo escolhido na intervenção anual. */
+  const tipoIndicadoPorContadorHoras = horasAtuaisOk ? tipoKaeserSugeridoPorHorasServico(horasAtuais) : null
+
+  /**
+   * Pré-selecção: dual → calendário primeiro; só horas → horas; só anual → calendário; senão absoluto.
+   * Sem posição no ciclo (1.ª intervenção ABCD na ficha): fallback e anual sem Δh/calendário → **B** (kit mais seguro/comum).
+   */
+  const defaultSemHoras = posOk ? 'A' : 'B'
+  let tipoPreSelecao = horasAtuaisOk ? tipoKaeserSugeridoPorHorasServico(horasAtuais) : defaultSemHoras
   if (mostrarDual && tipoSugeridoCalendario && tipoSugeridoHoras) {
     tipoPreSelecao = tipoSugeridoCalendario
   } else if (motivoPrincipal === 'horas' && tipoSugeridoHoras) {
@@ -102,12 +109,20 @@ export function sugerirFaseKaeser({ maquina, horasServicoAtuais, dataExecucao, f
     tipoPreSelecao = tipoSugeridoHoras
   }
 
+  if (!posOk && motivoPrincipal === 'fallback') {
+    tipoPreSelecao = 'B'
+  }
+  if (!posOk && motivoPrincipal === 'anual' && !tipoSugeridoCalendario && !tipoSugeridoHoras) {
+    tipoPreSelecao = 'B'
+  }
+
   return {
     tipoSugeridoCalendario,
     tipoSugeridoHoras,
     motivoPrincipal,
     mostrarDual,
     tipoPreSelecao,
+    tipoIndicadoPorContadorHoras,
     detalhes: {
       diasDesdeUltima,
       deltaH,

@@ -6,7 +6,7 @@
  */
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useData, isKaeserAbcdMaquina, isKaeserMarca } from '../context/DataContext'
+import { useData, isKaeserAbcdMaquina, isKaeserMarca, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
 import { INTERVALOS } from '../context/DataContext'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
@@ -391,6 +391,15 @@ export default function Agendamento() {
               (muitas vezes só serão lidas no local). Após escolher a data abaixo e confirmar, a manutenção fica registada.
               Na <strong>execução</strong>, o técnico regista primeiro as horas de serviço, confirma o tipo A/B/C/D e preenche os consumíveis dessa fase.
             </p>
+            {maquinaSelecionada.posicaoKaeser != null && maquinaSelecionada.posicaoKaeser !== '' && (
+              <p style={{ margin: '0.65rem 0 0', fontSize: '0.9rem', lineHeight: 1.45 }}>
+                <strong>Próxima prevista no ciclo:</strong>{' '}
+                Tipo <strong>{tipoKaeserNaPosicao(maquinaSelecionada.posicaoKaeser)}</strong>
+                {' — '}
+                {descricaoCicloKaeser(maquinaSelecionada.posicaoKaeser)}.
+                <span className="text-muted"> A fase efectiva continua <strong>editável na execução</strong> (horas no local, intervenção anual ou outra decisão técnica).</span>
+              </p>
+            )}
           </div>
         )}
 

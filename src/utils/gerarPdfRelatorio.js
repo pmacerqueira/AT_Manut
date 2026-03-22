@@ -16,7 +16,11 @@ import {
   descricaoCicloKaeser,
   proximaPosicaoKaeser,
 } from '../context/DataContext'
-import { relatorioIncluiResumoPlanoNoPdf, relatorioObrigaBlocoConsumiveisPlano } from './relatorioBlocosEquipamento'
+import {
+  relatorioIncluiResumoPlanoNoPdf,
+  relatorioObrigaBlocoConsumiveisPlano,
+  relatorioIncluiSecaoConsumiveisContador,
+} from './relatorioBlocosEquipamento'
 
 /** Normaliza `relatorio.fotos` (array ou JSON string) para lista de URLs/data URLs. */
 function normalizeRelatorioFotos(fotos) {
@@ -272,7 +276,7 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.line(M, y, W - M, y); y += 7
 
   // ── Dados do serviço ──────────────────────────────────────────────────────
-  const horasPdf = horasContadorParaRelatorio(maquina, manutencao, null)
+  const horasPdf = horasContadorParaRelatorio(maquina, manutencao, null, relatorio)
   const dataRows = [
     ['CLIENTE',           cliente?.nome ?? '\u2014'],
     ['EQUIPAMENTO',       equipDesc],
@@ -423,16 +427,22 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     }
   }
 
-  // ── Consumíveis e peças (obrigatório para equipamentos com plano por série, ex. KAESER) ──
+  // ── Consumíveis e peças (KAESER plano + equipamentos com contador de horas) ──
   const obrigaBlocoPecas = relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
+  const secaoConsumiveisContador = relatorioIncluiSecaoConsumiveisContador(maquina, manutencao)
   const pecasRaw = Array.isArray(relatorio?.pecasUsadas) ? relatorio.pecasUsadas : []
-  if (obrigaBlocoPecas || pecasRaw.length > 0) {
+  if (obrigaBlocoPecas || pecasRaw.length > 0 || secaoConsumiveisContador) {
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     const subTit = relatorio?.tipoManutKaeser && INTERVALOS_KAESER[relatorio.tipoManutKaeser]
       ? ` \u2014 Tipo ${relatorio.tipoManutKaeser}`
       : ''
-    pdf.text(`CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`, M, y); y += 6
+    const tituloConsumiveis = obrigaBlocoPecas
+      ? `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`
+      : (secaoConsumiveisContador
+        ? 'CONSUM\u00cdVEIS E PE\u00c7AS (INTERVEN\u00c7\u00c3O)'
+        : `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`)
+    pdf.text(tituloConsumiveis, M, y); y += 6
 
     const normalizar = (p) => 'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
     const pecas = pecasRaw.map(normalizar)
@@ -440,7 +450,9 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
       pdf.setFontSize(8.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(107, 114, 128)
       const msg = obrigaBlocoPecas
         ? 'Nenhuma linha do plano foi registada nesta interven\u00e7\u00e3o. Edite o relat\u00f3rio para associar o tipo A/B/C/D e as pe\u00e7as importadas por n.\u00ba de s\u00e9rie.'
-        : 'Sem consum\u00edveis listados.'
+        : (secaoConsumiveisContador
+          ? 'Nenhum consum\u00edvel ou pe\u00e7a foi listado nesta interven\u00e7\u00e3o.'
+          : 'Sem consum\u00edveis listados.')
       const wrapped = pdf.splitTextToSize(msg, cW)
       pdf.text(wrapped, M, y)
       y += wrapped.length * 4 + 6

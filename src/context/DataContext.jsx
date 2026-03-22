@@ -645,8 +645,20 @@ export function DataProvider({ children }) {
   const [syncPending,  setSyncPending]  = useState(() => queueSize())
   const [isSyncing,    setIsSyncing]    = useState(false)
 
+  /** Evita que `focus` dispare fetch completo em cadeia e repor `maquinas` com payload ligeiramente antigo logo após gravar. */
+  const lastBulkFetchOkAtRef = useRef(0)
+
   // ── Fetch inicial e re-fetch ao recuperar o foco da janela ────────────────
-  const fetchTodos = useCallback(async () => {
+  const fetchTodos = useCallback(async (options = {}) => {
+    const source = options?.source ?? 'default'
+    const force = options?.force === true
+    if (source === 'focus' && !force) {
+      const elapsed = Date.now() - lastBulkFetchOkAtRef.current
+      if (elapsed >= 0 && elapsed < 45_000) {
+        logger.info('DataContext', 'fetchTodos', 'Ignorado (throttle pós-fetch / pós-focus)', { elapsedMs: elapsed })
+        return
+      }
+    }
     const { isTokenValid, fetchTodosOsDados } = await import('../services/apiService')
     if (!isTokenValid()) { setLoading(false); return }
     try {
@@ -663,6 +675,7 @@ export function DataProvider({ children }) {
       setRelatoriosReparacao(d.relatoriosReparacao ?? [])
       setTecnicos(d.tecnicos                 ?? [])
       setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
+      lastBulkFetchOkAtRef.current = Date.now()
       // Guardar snapshot no cache para uso offline
       saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
@@ -689,6 +702,7 @@ export function DataProvider({ children }) {
           setRelatoriosReparacao(d.relatoriosReparacao ?? [])
           setTecnicos(d.tecnicos                 ?? [])
           setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
+          lastBulkFetchOkAtRef.current = Date.now()
           logger.info('DataContext', 'fetchTodos', 'Dados carregados do cache local (offline)', {
             cacheAge: Math.round((Date.now() - cache.ts) / 60000) + ' min',
           })
@@ -702,6 +716,8 @@ export function DataProvider({ children }) {
       setLoading(false)
     }
   }, [])
+
+  const refreshData = useCallback(() => fetchTodos({ source: 'manual', force: true }), [fetchTodos])
 
   // ── Processar fila de sync e actualizar dados quando volta online ─────────
   const processSync = useCallback(async () => {
@@ -730,8 +746,8 @@ export function DataProvider({ children }) {
   }, [fetchTodos])
 
   useEffect(() => {
-    fetchTodos()
-    const handleFocus = () => fetchTodos()
+    fetchTodos({ source: 'mount' })
+    const handleFocus = () => fetchTodos({ source: 'focus' })
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [fetchTodos])
@@ -1383,12 +1399,19 @@ export function DataProvider({ children }) {
     })
     try {
       const { apiMaquinas } = await import('../services/apiService')
+      let serverRow = null
       await persist(
-        () => apiMaquinas.update(id, data),
+        async () => {
+          serverRow = await apiMaquinas.update(id, data)
+        },
         { resource: 'maquinas', action: 'update', id, data },
         () => { if (snapshot) setMaquinas(snapshot) },
         { throwOnFailure: true }
       )
+      if (serverRow && typeof serverRow === 'object') {
+        setMaquinas(prev =>
+          prev.map(m => (String(m.id) === String(id) ? { ...m, ...serverRow } : m)))
+      }
     } catch (err) {
       logger.error('DataContext', 'updateMaquina', err?.message || 'Falha ao atualizar equipamento', { stack: err?.stack?.slice(0, 300) })
       throw err
@@ -1966,8 +1989,10 @@ export function DataProvider({ children }) {
   }, [replacePecasPlanoMaquina])
 
   const getPecasPlanoByMaquina = useCallback((maquinaId, tipoManut = null) => {
+    const mid = maquinaId != null ? String(maquinaId) : ''
+    const filtroTipo = tipoManut === null || tipoManut === ''
     return pecasPlano
-      .filter(p => p.maquinaId === maquinaId && (tipoManut === null || p.tipoManut === tipoManut))
+      .filter(p => String(p.maquinaId) === mid && (filtroTipo || p.tipoManut === tipoManut))
       .sort((a, b) => (a.posicao ?? '').localeCompare(b.posicao ?? ''))
   }, [pecasPlano])
 
@@ -2062,7 +2087,7 @@ export function DataProvider({ children }) {
 
   const value = useMemo(() => ({
     loading,
-    refreshData: fetchTodos,
+    refreshData,
     isOnline,
     syncPending,
     isSyncing,
@@ -2154,7 +2179,7 @@ export function DataProvider({ children }) {
     prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao, sincronizarProximaManutComAgenda,
     addPecaPlano, replacePecasPlanoMaquina, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,
-    loading, fetchTodos,
+    loading, refreshData,
     isOnline, syncPending, isSyncing, processSync,
   ])
 

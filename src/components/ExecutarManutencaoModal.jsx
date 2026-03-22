@@ -143,6 +143,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [kaeserPecasDirty, setKaeserPecasDirty] = useState(false)
   const [confirmaEquipamentoSerie, setConfirmaEquipamentoSerie] = useState(false)
   const [kaeserSemConsumiveis, setKaeserSemConsumiveis] = useState(false)
+  /** Intervenção anual: escolha livre de kit A/B/C/D; não sobrescrever tipo no blur das horas. */
+  const [kaeserIntervencaoAnual, setKaeserIntervencaoAnual] = useState(false)
 
   const navigate = useNavigate()
   const canvasRef   = useRef(null)
@@ -233,6 +235,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setKaeserPecasDirty(false)
       setConfirmaEquipamentoSerie(false)
       setKaeserSemConsumiveis(false)
+      setKaeserIntervencaoAnual(false)
       kaeserAuditoriaRef.current = { tipoSugerido: null, motivo: null }
       kaeserWarnAnualHighDeltaRef.current = false
       return
@@ -886,6 +889,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const dias = getIntervaloDiasByMaquina(maq)
     const proxima = addDays(new Date(hoje), dias)
 
+    const pecasSanGravar = sanitizarPecasRelatorio(form.pecasUsadas || [])
+    const pecasParaRelatorio =
+      isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem'
+        ? pecasSanGravar
+        : (pecasSanGravar.length > 0 ? pecasSanGravar : undefined)
+    const hContadorRel = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
+
     const relPayload = {
       checklistRespostas: form.checklistRespostas,
       checklistSnapshot: items.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
@@ -898,7 +908,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       dataAssinatura: semAssinatura ? null : now,
       dataCriacao: rel?.dataCriacao ?? now,
       ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
-      ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
+      ...(pecasParaRelatorio !== undefined && { pecasUsadas: pecasParaRelatorio }),
+      ...(hContadorRel != null && { horasLeituraContador: hContadorRel }),
     }
     if (isKaeserAbcdMaq && form.tipoManutKaeser && manutencaoAtual?.tipo !== 'montagem') {
       const aud = kaeserAuditoriaRef.current
@@ -1232,6 +1243,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (assinadoEfetivo) relPayload.dataAssinatura = execIso
     }
 
+    const hContadorAdmin = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
+    if (hContadorAdmin != null) {
+      relPayload.horasLeituraContador = hContadorAdmin
+    }
+
     updateRelatorio(rel.id, relPayload)
 
     const manutPayload = { tecnico: form.tecnico }
@@ -1241,7 +1257,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (agNova !== agAnterior) {
       manutPayload.data = agNova
     }
-    const hContadorAdmin = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
     if (hContadorAdmin != null) {
       manutPayload.horasServico = hContadorAdmin
       manutPayload.horasTotais = hContadorAdmin
@@ -1796,6 +1811,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                         fallbackUltimaData: fallbackUltimaManutDataKaeser,
                       })
                       kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
+                      if (kaeserIntervencaoAnual) return
                       setForm(f => ({
                         ...f,
                         tipoManutKaeser: f.tipoManutKaeser || sug.tipoPreSelecao,
@@ -1806,6 +1822,40 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   />
                 </label>
               </div>
+              <div className="form-section" style={{ marginTop: '0.25rem' }}>
+                <label className="kaeser-anual-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.95rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={kaeserIntervencaoAnual}
+                    onChange={e => setKaeserIntervencaoAnual(e.target.checked)}
+                    style={{ marginTop: '0.2rem' }}
+                  />
+                  <span>
+                    <strong>Intervenção anual</strong> — escolher livremente o kit (A/B/C/D). A sugestão automática deixa de alterar o tipo ao sair do campo das horas; escolha o kit no menu abaixo e carregue os consumíveis desse tipo.
+                  </span>
+                </label>
+              </div>
+              {kaeserSugestaoLive?.tipoIndicadoPorContadorHoras && (
+                <div className="form-section kaeser-aviso-tipo-horas" style={{
+                  marginTop: '0.35rem',
+                  padding: '0.6rem 0.75rem',
+                  borderRadius: 8,
+                  border: '1px solid var(--color-border, #e5e7eb)',
+                  background: 'var(--color-bg-elevated, #f8fafc)',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.45,
+                }}
+                >
+                  Pelo número de horas indicado no contador, o tipo associado ao <strong>intervalo de horas</strong> do plano seria{' '}
+                  <strong>Tipo {kaeserSugestaoLive.tipoIndicadoPorContadorHoras}</strong>
+                  {INTERVALOS_KAESER[kaeserSugestaoLive.tipoIndicadoPorContadorHoras]
+                    ? ` (${INTERVALOS_KAESER[kaeserSugestaoLive.tipoIndicadoPorContadorHoras].label})`
+                    : ''}.
+                  {kaeserIntervencaoAnual
+                    ? ' Na intervenção anual pode manter este tipo ou seleccionar outro (A, B, C ou D) conforme a decisão no local.'
+                    : ' Pode aceitar a sugestão do resumo abaixo ou seleccionar outro tipo se a intervenção for diferente (ex.: emergência, outro kit).'}
+                </div>
+              )}
               {kaeserSugestaoLive && (
                 <div className="form-section kaeser-sugestao-resumo">
                   <p className="form-hint" style={{ marginTop: 0 }}>
@@ -2026,23 +2076,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {temContadorHoras && !adminEdit && !(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem') && (
-              <div className="form-section">
-                <label>
-                  Horas no contador (acumuladas)
-                  <input
-                    className="wizard-input-horas-compact"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.horasServico}
-                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                    placeholder="Ex: 6000"
-                  />
-                </label>
               </div>
             )}
 

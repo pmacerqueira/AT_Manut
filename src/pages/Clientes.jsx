@@ -9,7 +9,7 @@ import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
 import MaquinaDocumentacaoLinks from '../components/MaquinaDocumentacaoLinks'
-import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X, AlertTriangle, PackageOpen } from 'lucide-react'
 
 const ExecutarManutencaoModal = lazy(() => import('../components/ExecutarManutencaoModal'))
 import { gerarRelatorioFrotaPdf } from '../utils/gerarRelatorioFrota'
@@ -25,6 +25,7 @@ import { enviarRelatorioHtmlEmail, blobToRawBase64 } from '../services/emailServ
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import { computarProximasDatas } from '../utils/diasUteis'
 import { maquinaPertenceCliente, normEntityId, resolveProximaManutParaFrota } from '../utils/frotaReportHelpers'
+import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
@@ -68,6 +69,7 @@ export default function Clientes() {
   const [fichaMaquina, setFichaMaquina] = useState(null)
   const [modalMaquina, setModalMaquina] = useState(null)
   const [modalPecasAuto, setModalPecasAuto] = useState(null) // auto-aberto ao criar compressor KAESER
+  const [modalPecasManual, setModalPecasManual] = useState(null) // plano de peças desde Documentação ou cabeçalho da ficha
   const [modalDoc, setModalDoc] = useState(null)
   const [modalRelatorio, setModalRelatorio] = useState(null)
   const [modalEmail, setModalEmail] = useState(null)
@@ -880,7 +882,7 @@ export default function Clientes() {
                 )}
 
                 {fichaView === 'maquina-detalhe' && fichaMaquina && (() => {
-                    const maquinaAtual = maquinas.find(m => m.id === fichaMaquina.id) ?? fichaMaquina
+                    const maquinaAtual = maquinas.find(m => String(m.id) === String(fichaMaquina.id)) ?? fichaMaquina
                     const docs = maquinaAtual.documentos ?? []
                     const getDocPorTipo = (tipo) => docs.find(d => d.tipo === tipo)
                     const getDocLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
@@ -888,31 +890,41 @@ export default function Clientes() {
                   <div className="ficha-maquina-detalhe">
                     <div className="equipamentos-nav">
                       <button type="button" className="breadcrumb-btn" onClick={() => { setFichaMaquina(null); setFichaView(prevFichaView === 'flat' ? 'flat' : 'maquinas'); }}><ArrowLeft size={16} /> {prevFichaView === 'flat' ? 'Todos' : 'Frota'}</button>
-                      <span className="breadcrumb">/ {fichaMaquina.marca} {fichaMaquina.modelo}</span>
+                      <span className="breadcrumb">/ {maquinaAtual.marca} {maquinaAtual.modelo}</span>
                     </div>
                     <div className="maquina-detalhe-header">
-                      <h3>{fichaMaquina.marca} {fichaMaquina.modelo} — Nº Série: {fichaMaquina.numeroSerie}</h3>
+                      <h3>{maquinaAtual.marca} {maquinaAtual.modelo} — Nº Série: {maquinaAtual.numeroSerie}</h3>
                       <div className="maquina-detalhe-actions">
-                        <button type="button" className="secondary" onClick={() => setModalDoc(fichaMaquina)}><FolderPlus size={16} /> Documentação técnica</button>
+                        <button type="button" className="secondary" onClick={() => setModalDoc(maquinaAtual)} title={COPY_DOC_TITLE_BOTAO_LISTA} aria-label={COPY_DOC_TITLE_BOTAO_LISTA}><FolderPlus size={16} /> Documentação técnica</button>
+                        {isKaeserAbcdMaquina(maquinaAtual) && (
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => setModalPecasManual(maquinaAtual)}
+                            title="Plano de peças e consumíveis A/B/C/D"
+                          >
+                            <PackageOpen size={16} aria-hidden /> Plano de peças
+                          </button>
+                        )}
                         {isAdmin && (
-                          <button type="button" className="secondary" onClick={() => { setModalDoc(null); setModalMaquina({ mode: 'edit', maquina: fichaMaquina }); }}><Pencil size={16} /> Editar</button>
+                          <button type="button" className="secondary" onClick={() => { setModalDoc(null); setModalMaquina({ mode: 'edit', maquina: maquinaAtual }); }}><Pencil size={16} /> Editar</button>
                         )}
                       </div>
                     </div>
                     <div className="maq-quick-actions">
-                      <button type="button" className="btn-quick" onClick={() => navigate(`/agendamento?maquinaId=${fichaMaquina.id}`)}><Calendar size={14} /> Agendar</button>
-                      <button type="button" className="btn-quick" onClick={() => navigate(`/equipamentos?qr=${fichaMaquina.id}`)}><QrCode size={14} /> QR</button>
+                      <button type="button" className="btn-quick" onClick={() => navigate(`/agendamento?maquinaId=${maquinaAtual.id}`)}><Calendar size={14} /> Agendar</button>
+                      <button type="button" className="btn-quick" onClick={() => navigate(`/equipamentos?qr=${maquinaAtual.id}`)}><QrCode size={14} /> QR</button>
                       <button type="button" className="btn-quick" onClick={() => {
-                        const sub = getSubcategoria(fichaMaquina.subcategoriaId)
+                        const sub = getSubcategoria(maquinaAtual.subcategoriaId)
                         const cat = sub ? getCategoria(sub.categoriaId) : null
                         const html = gerarHtmlHistoricoMaquina({
-                          maquina: fichaMaquina,
+                          maquina: maquinaAtual,
                           cliente: fichaCliente,
                           subcategoria: sub,
                           categoria: cat,
-                          manutencoes: manutencoes.filter(m => m.maquinaId === fichaMaquina.id),
+                          manutencoes: manutencoes.filter(m => String(m.maquinaId) === String(maquinaAtual.id)),
                           relatorios,
-                          reparacoes: reparacoes.filter(r => r.maquinaId === fichaMaquina.id),
+                          reparacoes: reparacoes.filter(r => String(r.maquinaId) === String(maquinaAtual.id)),
                           tecnicos,
                         })
                         const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
@@ -923,13 +935,16 @@ export default function Clientes() {
                     </div>
                     {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maquinaAtual.subcategoriaId) && (
                       <div className="consumiveis-card" style={{ marginBottom: '1rem' }}>
-                        <h4>PDFs e documentação técnica</h4>
+                        <h4>Documentação técnica</h4>
+                        <p className="text-muted" style={{ fontSize: '0.9rem', margin: '0 0 0.5rem' }}>
+                          {COPY_DOC_FIO_CONDUTOR}
+                        </p>
                         <p className="text-muted" style={{ fontSize: '0.9rem', margin: '0 0 0.75rem' }}>
-                          Plano de manutenção, manual do utilizador e outros documentos do fabricante. Estão acessíveis aqui, no botão «Documentação técnica» acima e durante a execução de manutenções e reparações, para consulta ao preencher relatórios.
+                          {COPY_DOC_PARAFUSO_KAESER}
                         </p>
                         <MaquinaDocumentacaoLinks maquina={maquinaAtual} />
                         {(maquinaAtual.documentos ?? []).length === 0 && (
-                          <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>Ainda não há PDFs associados.{isAdmin ? ' Utilize «Documentação técnica» para importar ou colar URL.' : ''}</p>
+                          <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>Ainda não há documentos associados.{isAdmin ? ' Utilize o botão «Documentação técnica» acima (ou Equipamentos › ícone de pasta na mesma linha) para importar PDF ou colar URL.' : ''}</p>
                         )}
                       </div>
                     )}
@@ -968,7 +983,7 @@ export default function Clientes() {
                       </table>
                     </div>
                     <h4>Histórico de manutenções</h4>
-                    {getManutencoesDaMaquina(fichaMaquina.id).length === 0 ? (
+                    {getManutencoesDaMaquina(maquinaAtual.id).length === 0 ? (
                       <p className="text-muted">Nenhuma manutenção registada.</p>
                     ) : (
                       <div className="hist-manut-wrap">
@@ -983,7 +998,7 @@ export default function Clientes() {
                             </tr>
                           </thead>
                           <tbody>
-                            {getManutencoesDaMaquina(fichaMaquina.id).map(manut => {
+                            {getManutencoesDaMaquina(maquinaAtual.id).map(manut => {
                               const rel = getRelatorioByManutencao(manut.id)
                               return (
                                 <tr key={manut.id}>
@@ -996,7 +1011,7 @@ export default function Clientes() {
                                       type="button"
                                       className="icon-btn secondary"
                                       title="Ver ficha de manutenção"
-                                      onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
+                                      onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
                                     >
                                       <Eye size={14} />
                                     </button>
@@ -1005,7 +1020,7 @@ export default function Clientes() {
                                         type="button"
                                         className="icon-btn secondary"
                                         title="Obter PDF (sem pré-visualizador)"
-                                        onClick={() => handleDownloadPdfManutencao(manut, rel, fichaMaquina, fichaCliente)}
+                                        onClick={() => handleDownloadPdfManutencao(manut, rel, maquinaAtual, fichaCliente)}
                                       >
                                         <FileDown size={14} />
                                       </button>
@@ -1015,7 +1030,7 @@ export default function Clientes() {
                                         type="button"
                                         className="icon-btn secondary"
                                         title="Enviar relatório por email"
-                                        onClick={() => setModalEmail({ manutencao: manut, relatorio: rel, maquina: fichaMaquina, cliente: fichaCliente })}
+                                        onClick={() => setModalEmail({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
                                       >
                                         <Mail size={14} />
                                       </button>
@@ -1057,13 +1072,22 @@ export default function Clientes() {
       )}
 
       <PecasPlanoModal
-        isOpen={!!modalPecasAuto}
-        onClose={() => setModalPecasAuto(null)}
-        maquina={modalPecasAuto}
-        modoInicial
+        isOpen={!!modalPecasAuto || !!modalPecasManual}
+        onClose={() => { setModalPecasAuto(null); setModalPecasManual(null) }}
+        maquina={modalPecasAuto || modalPecasManual}
+        modoInicial={!!modalPecasAuto}
       />
 
-      <DocumentacaoModal isOpen={!!modalDoc} onClose={() => setModalDoc(null)} maquina={modalDoc} />
+      <DocumentacaoModal
+        isOpen={!!modalDoc}
+        onClose={() => setModalDoc(null)}
+        maquina={modalDoc}
+        onOpenPlanoPecas={(m) => {
+          const resolved = m && (maquinas.find(x => String(x.id) === String(m.id)) ?? m)
+          setModalDoc(null)
+          setModalPecasManual(resolved)
+        }}
+      />
 
       {modalRelatorio && (
         <div className="modal-overlay" onClick={() => setModalRelatorio(null)}>

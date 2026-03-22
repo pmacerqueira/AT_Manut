@@ -44,9 +44,16 @@ export function parseHorasContadorForm(raw) {
 }
 
 /**
- * Valor único para relatório HTML/PDF: leitura da intervenção (manutenção) → formulário → última ficha.
+ * Valor único para relatório HTML/PDF:
+ * snapshot gravado no relatório → manutenção → formulário em curso → ficha do equipamento.
+ * @param {object|null|undefined} relatorio — opcional; usa `horasLeituraContador` quando existir (BD: horas_leitura_contador).
  */
-export function horasContadorParaRelatorio(maquina, manutencao, form) {
+export function horasContadorParaRelatorio(maquina, manutencao, form, relatorio = null) {
+  const snap = relatorio?.horasLeituraContador
+  if (snap != null && snap !== '') {
+    const n = Number(snap)
+    if (Number.isFinite(n) && n >= 0) return n
+  }
   const m = horasContadorNaManutencao(manutencao)
   if (m != null) return m
   const f = parseHorasContadorForm(form?.horasServico)

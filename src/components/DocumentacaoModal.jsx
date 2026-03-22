@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useToast } from './Toast'
 import { usePermissions } from '../hooks/usePermissions'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -7,15 +7,18 @@ import {
   TIPOS_DOCUMENTO,
   SUBCATEGORIAS_COM_CONTADOR_HORAS,
   SUBCATEGORIAS_COMPRESSOR_PARAFUSO,
+  isKaeserAbcdMaquina,
+  isKaeserMarca,
 } from '../context/DataContext'
 import { safeHttpUrl } from '../utils/sanitize'
 import { apiUploadMachinePdf } from '../services/apiService'
 import { logger } from '../utils/logger'
-import { Plus, ExternalLink, Trash2, Upload } from 'lucide-react'
+import { Plus, ExternalLink, Trash2, Upload, PackageOpen } from 'lucide-react'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
-import { parseDateLocal } from '../utils/datasAzores'
 import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
+import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/documentacaoEquipamentoCopy'
+import { buildPecasPlanoItemsFromPdfArrayBuffer, contagemPorTipoKaeser } from '../utils/kaeserPlanoPdfImport'
 
 const PDF_MAX_BYTES = 8 * 1024 * 1024
 
@@ -41,8 +44,16 @@ function pathFromMachineDocUrl(url) {
   }
 }
 
-export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
-  const { maquinas, addDocumentoMaquina, removeDocumentoMaquina } = useData()
+export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlanoPecas }) {
+  const {
+    maquinas,
+    manutencoes,
+    addDocumentoMaquina,
+    removeDocumentoMaquina,
+    updateMaquina,
+    getPecasPlanoByMaquina,
+    replacePecasPlanoMaquina,
+  } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const { isAdmin } = usePermissions()
@@ -51,6 +62,21 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
   const [confirmDeleteDocId, setConfirmDeleteDocId] = useState(null)
 
   const maq = maquinas.find(m => String(m.id) === String(maquina?.id)) ?? maquina
+
+  const temManutencaoConcluidaNaMaq = useMemo(() => {
+    if (!maq?.id) return false
+    return manutencoes.some(
+      m => String(m.maquinaId) === String(maq.id) && m.status === 'concluida',
+    )
+  }, [manutencoes, maq?.id])
+
+  const mostrarPlanoKaeserNaDoc =
+    !!maq && isKaeserAbcdMaquina(maq) && isKaeserMarca(maq.marca)
+
+  const docPlanoManutPdf = useMemo(
+    () => (maq?.documentos ?? []).find(d => d.tipo === 'plano_manutencao'),
+    [maq?.documentos],
+  )
 
   useEffect(() => {
     if (!isOpen || !maq) return
@@ -143,24 +169,167 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina }) {
     }
   }
 
+  const handleImportarPecasDoPdfNaFicha = async () => {
+    if (!isAdmin || !maq?.id || !docPlanoManutPdf?.url) {
+      showToast('É necessário um documento «Plano de manutenção (PDF)» na lista abaixo.', 'warning')
+      return
+    }
+    const href = safeHttpUrl(docPlanoManutPdf.url)
+    if (href === '#') {
+      showToast('URL do PDF inválida.', 'warning')
+      return
+    }
+    showGlobalLoading()
+    try {
+      const res = await fetch(href, { credentials: 'same-origin', mode: 'cors' })
+      if (!res.ok) {
+        showToast(`Não foi possível obter o PDF (${res.status}). Abra o documento num separador e importe pelo plano de peças, se preferir.`, 'error', 4500)
+        return
+      }
+      const arrayBuffer = await res.arrayBuffer()
+      const todas = await buildPecasPlanoItemsFromPdfArrayBuffer(arrayBuffer, maq.id)
+      if (todas.length === 0) {
+        showToast('Não foi possível extrair peças deste PDF. Confirme que é um plano KAESER A/B/C/D ou importe a partir do ficheiro original no plano de peças.', 'warning', 4500)
+        return
+      }
+      const kept = getPecasPlanoByMaquina(maq.id).filter(p => !['A', 'B', 'C', 'D'].includes(p.tipoManut))
+      await replacePecasPlanoMaquina(maq.id, [...kept, ...todas])
+      const porTipo = contagemPorTipoKaeser(todas)
+      showToast(
+        `Importação concluída: ${todas.length} linhas (A: ${porTipo.A}, B: ${porTipo.B}, C: ${porTipo.C}, D: ${porTipo.D}).`,
+        'success',
+        5000,
+      )
+      logger.action('DocumentacaoModal', 'importarPecasDoPdfFicha', 'Consumíveis KAESER importados do PDF na ficha', {
+        maquinaId: maq.id,
+        linhas: todas.length,
+        porTipo,
+      })
+    } catch (err) {
+      logger.error('DocumentacaoModal', 'importarPecasDoPdfFicha', err?.message || String(err), {
+        maquinaId: maq?.id,
+        stack: err?.stack?.slice(0, 400),
+      })
+      showToast(
+        err?.message?.includes('Failed to fetch') || err?.name === 'TypeError'
+          ? 'Não foi possível ler o PDF (rede ou permissões). Use «Abrir plano de peças» e importe o ficheiro localmente.'
+          : (err?.message || 'Falha ao importar consumíveis.'),
+        'error',
+        5000,
+      )
+    } finally {
+      hideGlobalLoading()
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-documentacao" onClick={e => e.stopPropagation()}>
         <h2>Documentação — {maq?.marca} {maq?.modelo}</h2>
-        <p className="modal-hint">
-          {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq?.subcategoriaId)
-            ? 'Plano de manutenção, manual do utilizador e outros PDFs ficam disponíveis aqui, na ficha do equipamento e nos ecrãs de execução de manutenção e reparação.'
-            : 'Adicione manuais, esquemas e planos para os técnicos consultarem durante o serviço e no preenchimento de relatórios.'}
-        </p>
+        <p className="modal-hint">{COPY_DOC_FIO_CONDUTOR}</p>
+        {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq?.subcategoriaId) && (
+          <p className="modal-hint" style={{ marginTop: '0.5rem' }}>{COPY_DOC_PARAFUSO_KAESER}</p>
+        )}
+        {mostrarPlanoKaeserNaDoc && (
+          <div className="consumiveis-card doc-plano-kaeser-card">
+            <h4>Plano de peças KAESER (A / B / C / D)</h4>
+            <p className="modal-hint" style={{ marginTop: 0 }}>
+              Os consumíveis por fase ficam na base após importação. Pode abrir o gestor de plano aqui ou importar directamente a partir do PDF «Plano de manutenção» já associado a este equipamento (só administrador).
+            </p>
+            <div className="form-row doc-kaeser-actions" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.65rem' }}>
+              {typeof onOpenPlanoPecas === 'function' && (
+                <button
+                  type="button"
+                  className="btn secondary btn-sm"
+                  onClick={() => onOpenPlanoPecas(maq)}
+                >
+                  <PackageOpen size={14} aria-hidden /> Abrir plano de peças (A/B/C/D)
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="btn primary btn-sm"
+                  onClick={handleImportarPecasDoPdfNaFicha}
+                  disabled={!docPlanoManutPdf}
+                  title={docPlanoManutPdf ? 'Lê o PDF do plano na lista e grava consumíveis A–D na base' : 'Associe primeiro um PDF como «Plano de manutenção (PDF)»'}
+                >
+                  Importar consumíveis do PDF já na ficha
+                </button>
+              )}
+            </div>
+            {!isAdmin && typeof onOpenPlanoPecas === 'function' && (
+              <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: 0, marginTop: '0.5rem' }}>
+                A importação a partir de PDF é feita pelo administrador. Use «Abrir plano de peças» para consultar as linhas já gravadas.
+              </p>
+            )}
+          </div>
+        )}
         {SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq?.subcategoriaId) && (() => {
-          const hc = horasContadorNaFicha(maq)
-          if (!maq?.ultimaManutencaoData && hc == null) return null
+          if (!maq) return null
+          const horasFicha = horasContadorNaFicha(maq)
+          const temOrfaosNaFicha = !temManutencaoConcluidaNaMaq && (!!maq.ultimaManutencaoData || horasFicha != null)
+
+          if (!temManutencaoConcluidaNaMaq) {
+            return (
+              <div className="consumiveis-card">
+                <h4>Contador</h4>
+                {!temOrfaosNaFicha ? (
+                  <p className="modal-hint" style={{ margin: 0 }}>
+                    Sem manutenções <strong>concluídas</strong> neste equipamento. Referência: <strong>0 h</strong> até à primeira intervenção finalizada com relatório.
+                  </p>
+                ) : (
+                  <>
+                    <p className="modal-hint" style={{ margin: 0 }}>
+                      Não há manutenções concluídas, mas a ficha na base ainda tem data ou horas antigas. A referência correcta é <strong>0 h</strong> até voltar a concluir uma visita.
+                    </p>
+                    {isAdmin && (
+                      <p className="modal-hint" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+                        <span className="text-muted" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                          Valores órfãos: {maq.ultimaManutencaoData
+                            ? `última data ${format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}`
+                            : 'sem data'}
+                          {horasFicha != null ? ` · ${horasFicha} h` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn secondary btn-sm"
+                          onClick={async () => {
+                            if (!window.confirm('Limpar na ficha a data da última manutenção e as horas acumuladas? (Recomendado após apagar intervenções antigas.)')) return
+                            try {
+                              await updateMaquina(maq.id, {
+                                ultimaManutencaoData: null,
+                                horasServicoAcumuladas: null,
+                                horasTotaisAcumuladas: null,
+                              })
+                              showToast('Contador e data repostos na ficha.', 'success')
+                            } catch (err) {
+                              showToast(err?.message || 'Não foi possível limpar a ficha.', 'error', 4000)
+                            }
+                          }}
+                        >
+                          Limpar contador e data na ficha
+                        </button>
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          }
+
+          if (!maq.ultimaManutencaoData && horasFicha == null) return null
           return (
             <div className="consumiveis-card">
               <h4>Contador (à data da última manutenção)</h4>
               <div className="consumiveis-grid">
-                {maq.ultimaManutencaoData && <span><strong>Última manut.:</strong> {format(parseDateLocal(maq.ultimaManutencaoData), 'd MMM yyyy', { locale: pt })}</span>}
-                {hc != null && <span><strong>Horas no contador:</strong> {hc} h</span>}
+                {maq.ultimaManutencaoData && (
+                  <span>
+                    <strong>Última manut.:</strong>{' '}
+                    {format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}
+                  </span>
+                )}
+                {horasFicha != null && <span><strong>Horas no contador:</strong> {horasFicha} h</span>}
               </div>
             </div>
           )

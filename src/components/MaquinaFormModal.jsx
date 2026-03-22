@@ -8,6 +8,7 @@ import { useToast } from './Toast'
 import { getHojeAzores } from '../utils/datasAzores'
 import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
 import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
+import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/documentacaoEquipamentoCopy'
 
 const isElevadores = (getCategoria, categoriaId) => {
   const cat = getCategoria(categoriaId)
@@ -115,6 +116,14 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     for (let a = ano - 1; a <= ano + 3; a++) getFeriadosAno(a).forEach(f => set.add(f))
     return set
   }, [])
+
+  /** Há pelo menos uma intervenção concluída — aí a ficha pode mostrar contador/data actualizados pela última execução. */
+  const temManutencaoConcluidaNaMaq = useMemo(() => {
+    if (!form.id) return false
+    return manutencoes.some(
+      m => String(m.maquinaId) === String(form.id) && m.status === 'concluida',
+    )
+  }, [manutencoes, form.id])
 
   const validarDataManut = useCallback((dateStr) => {
     if (!dateStr) { setAvisoData(''); return true }
@@ -317,7 +326,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         // A5: Se proximaManut mudou, sincronizar manutenção pendente
         if (payload.proximaManut && payload.proximaManut !== maquina?.proximaManut) {
           const pendente = manutencoes.find(m =>
-            m.maquinaId === id && (m.status === 'pendente' || m.status === 'agendada')
+            String(m.maquinaId) === String(id) && (m.status === 'pendente' || m.status === 'agendada')
           )
           if (pendente) {
             updateManutencao(pendente.id, { data: payload.proximaManut })
@@ -586,9 +595,60 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
             {avisoData && <span className="form-aviso-data">{avisoData}</span>}
           </label>
           {mode === 'edit' && (() => {
-            const maqAtual = maquinas.find(x => x.id === form.id)
+            const maqAtual = maquinas.find(x => String(x.id) === String(form.id))
             if (!maqAtual || !temContadorHoras(maqAtual.subcategoriaId)) return null
             const horasFicha = horasContadorNaFicha(maqAtual)
+            const temOrfaosNaFicha = !temManutencaoConcluidaNaMaq && (!!maqAtual.ultimaManutencaoData || horasFicha != null)
+
+            if (!temManutencaoConcluidaNaMaq) {
+              return (
+                <div className="form-section horas-acumuladas-section">
+                  <h3>Contador</h3>
+                  {!temOrfaosNaFicha ? (
+                    <p className="horas-info">
+                      Sem manutenções <strong>concluídas</strong> neste equipamento. Referência na ficha: <strong>0 h</strong> até à primeira intervenção finalizada com relatório.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="horas-info">
+                        Não há manutenções concluídas, mas a ficha na base ainda tem data/horas de intervenções que já não existem.
+                        A referência correcta é <strong>0 h</strong> até voltar a concluir uma visita.
+                      </p>
+                      {isAdmin && (
+                        <p className="horas-info" style={{ marginTop: '0.5rem' }}>
+                          <span className="text-muted" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                            Valores órfãos na base: {maqAtual.ultimaManutencaoData
+                              ? `última data ${format(new Date(maqAtual.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}`
+                              : 'sem data'}
+                            {horasFicha != null ? ` · ${horasFicha} h` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn secondary btn-sm"
+                            onClick={async () => {
+                              if (!window.confirm('Limpar na ficha a data da última manutenção e as horas acumuladas? (Recomendado após apagar intervenções antigas.)')) return
+                              try {
+                                await updateMaquina(maqAtual.id, {
+                                  ultimaManutencaoData: null,
+                                  horasServicoAcumuladas: null,
+                                  horasTotaisAcumuladas: null,
+                                })
+                                showToast('Contador e data repostos na ficha.', 'success')
+                              } catch (err) {
+                                showToast(err?.message || 'Não foi possível limpar a ficha.', 'error', 4000)
+                              }
+                            }}
+                          >
+                            Limpar contador e data na ficha
+                          </button>
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            }
+
             if (!maqAtual.ultimaManutencaoData && horasFicha == null) return null
             return (
               <div className="form-section horas-acumuladas-section">
@@ -678,10 +738,9 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           )}
           {isCompressorParafuso(form.subcategoriaId) && (
             <div className="form-section">
-              <h3>PDFs técnicos do equipamento</h3>
-              <p className="horas-info">
-                O plano de manutenção, o manual do utilizador e outros PDFs do fabricante são associados na <strong>ficha completa do equipamento</strong> (Clientes, botão «Documentação técnica») ou na lista de Equipamentos. Todos os utilizadores podem abri-los durante manutenções, montagens e reparações.
-              </p>
+              <h3>Documentação técnica do equipamento</h3>
+              <p className="horas-info">{COPY_DOC_FIO_CONDUTOR}</p>
+              <p className="horas-info" style={{ marginTop: '0.5rem' }}>{COPY_DOC_PARAFUSO_KAESER}</p>
             </div>
           )}
           <div className="form-actions">

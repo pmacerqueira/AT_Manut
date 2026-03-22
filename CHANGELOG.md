@@ -9,6 +9,28 @@ Política de continuidade:
 
 ---
 
+## [1.16.32] — 2026-03-22 — Contador órfão (ficha + documentação) + plano KAESER na documentação
+
+### Correcção / UX
+- **`MaquinaFormModal.jsx`:** não mostrar data/horas da ficha como «última manutenção» sem intervenção **concluída**; referência 0 h; Admin pode **limpar órfãos** (`ultimaManutencaoData` + horas).
+- **`DocumentacaoModal.jsx`:** mesma lógica de contador; secção KAESER com **Abrir plano de peças**, **Importar consumíveis do PDF já na ficha** (Admin); util `kaeserPlanoPdfImport.js` partilhado com `PecasPlanoModal`.
+- **`Clientes.jsx`:** botão **Plano de peças** na ficha do equipamento (KAESER A/B/C/D); `modalPecasManual` + `DocumentacaoModal.onOpenPlanoPecas`.
+- **`Equipamentos.jsx`:** `DocumentacaoModal` com `onOpenPlanoPecas` para abrir o plano de peças.
+
+---
+
+## [1.16.31] — 2026-03-22 — KAESER (agendamento, 1.ª intervenção B, anual) + ficha equipamento + plano peças
+
+### Alteração
+- **`Agendamento.jsx`:** com `posicaoKaeser` na ficha, mostra «Próxima prevista no ciclo: Tipo X» (editável na execução).
+- **`sugerirFaseKaeser.js`:** 1.ª intervenção sem posição no ciclo — pré-selecção **B** em fallback e em janela anual sem Δh/calendário; `tipoIndicadoPorContadorHoras` para aviso por horas.
+- **`ExecutarManutencaoModal.jsx`:** modo «Intervenção anual — escolher livremente o kit»; aviso de tipo indicado pelas horas.
+- **`DataContext.jsx`:** resposta API fundida em `updateMaquina`; throttle de `fetchTodos` no `focus`; `refreshData` forçado; `getPecasPlanoByMaquina` com `String(maquinaId)`.
+- **`Clientes.jsx` / `MaquinaFormModal.jsx`:** ficha frota alinhada a `maquinaAtual`; IDs em `String` onde aplicável.
+- **`tests/unit/sugerirFaseKaeser.test.js`:** casos 1.ª intervenção.
+
+---
+
 ## [1.16.30] — 2026-03-22 — Documentação de deploy (PDFs técnicos, data.php) + pacote build
 
 ### Alteração

@@ -18,6 +18,7 @@ import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
+import { COPY_DOC_RESUMO_EQUIPAMENTOS, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 
 export default function Equipamentos() {
   const {
@@ -53,7 +54,7 @@ export default function Equipamentos() {
   const [highlightMaqId, setHighlightMaqId] = useState(null)
 
   const navigateToMaquina = (maqId) => {
-    const maq = maquinas.find(m => m.id === maqId)
+    const maq = maquinas.find(m => String(m.id) === String(maqId))
     if (!maq) return
     const sub = getSubcategoria(maq.subcategoriaId)
     if (!sub) return
@@ -171,7 +172,9 @@ export default function Equipamentos() {
           </button>
           <h1>Equipamentos</h1>
           <p className="page-sub">
-            {filterAtraso ? 'Equipamentos em atraso de manutenção' : 'Navegação por categorias e subcategorias'}
+            {filterAtraso
+              ? 'Equipamentos em atraso de manutenção'
+              : <>Navegação por categorias e subcategorias. <span className="page-sub-hint">{COPY_DOC_RESUMO_EQUIPAMENTOS}</span></>}
           </p>
         </div>
         {filterAtraso && (
@@ -232,7 +235,7 @@ export default function Equipamentos() {
                           </button>
                           <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                           <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
-                          <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
+                          <button type="button" className="icon-btn secondary" onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA} aria-label={COPY_DOC_TITLE_BOTAO_LISTA}><FolderPlus size={16} /></button>
                           {isAdmin && (
                             <>
                               <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
@@ -363,7 +366,7 @@ export default function Equipamentos() {
                         </button>
                         <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
                         <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
-                        <button className="icon-btn secondary" onClick={() => setModalDoc(m)} title="Documentação"><FolderPlus size={16} /></button>
+                        <button type="button" className="icon-btn secondary" onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA} aria-label={COPY_DOC_TITLE_BOTAO_LISTA}><FolderPlus size={16} /></button>
                         {isAdmin && (
                           <>
                             <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
@@ -396,7 +399,16 @@ export default function Equipamentos() {
         />
       )}
 
-      <DocumentacaoModal isOpen={!!modalDoc} onClose={() => setModalDoc(null)} maquina={modalDoc} />
+      <DocumentacaoModal
+        isOpen={!!modalDoc}
+        onClose={() => setModalDoc(null)}
+        maquina={modalDoc}
+        onOpenPlanoPecas={(m) => {
+          setModalDoc(null)
+          const resolved = m && (maquinas.find(x => String(x.id) === String(m.id)) ?? m)
+          setModalPecas(resolved)
+        }}
+      />
 
       <QrEtiquetaModal
         isOpen={!!modalQr}

@@ -253,7 +253,7 @@ $RESOURCE_MAP = [
     'relatorios' => [
         'table'      => 'relatorios',
         'json_cols'  => ['checklist_respostas','checklist_snapshot','fotos','pecas_usadas','ultimo_envio','enviado_para_cliente'],
-        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','tipo_manut_kaeser_sugerido','sugestao_fase_motivo','ultimo_envio','enviado_para_cliente','criado_em'],
+        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','horas_leitura_contador','tipo_manut_kaeser','tipo_manut_kaeser_sugerido','sugestao_fase_motivo','ultimo_envio','enviado_para_cliente','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
     'reparacoes' => [
