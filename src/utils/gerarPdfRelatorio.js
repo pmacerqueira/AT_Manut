@@ -8,7 +8,7 @@
 import { logger } from './logger'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { resolveChecklist } from './resolveChecklist'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import {
@@ -128,11 +128,13 @@ export function isMobileDevice() {
  * Em mobile: gera PDF e abre num visualizador. Em desktop: abre diálogo de impressão.
  * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, html }} params
  */
-export async function abrirPdfRelatorio({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', html, tecnicoObj = null }) {
+export async function abrirPdfRelatorio({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', html, tecnicoObj = null, categoriaNome = '', declaracaoClienteDepois = '' }) {
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   if (isMobileDevice()) {
     try {
-      const blob = await gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, tecnicoObj })
+      const blob = await gerarPdfCompacto({
+        relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, tecnicoObj, categoriaNome, declaracaoClienteDepois,
+      })
       const url = URL.createObjectURL(blob)
       const w = window.open(url, '_blank')
       if (!w) {
@@ -189,7 +191,7 @@ export function imprimirOuGuardarPdf(html) {
  * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome }} params
  * @returns {Promise<Blob>}
  */
-export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null, proximasManutencoes = [], marcas = [] }) {
+export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null, proximasManutencoes = [], marcas = [], categoriaNome = '', declaracaoClienteDepois = '' }) {
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { jsPDF } = await import('jspdf')
 
@@ -289,14 +291,24 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   }
 
   pdf.setFontSize(9)
+  /** Largura máx. da coluna de rótulos (mm) — evita sobrepor o valor (ex.: «HORAS NO CONTADOR (ACUMULADAS)»). */
+  const dataLabelColW = 72
+  const dataValueX = M + 74
+  const dataValueMaxW = Math.max(24, W - M - dataValueX - 2)
+  const dataLineH = 4.5
   dataRows.forEach(([label, val], i) => {
-    if (i % 2 === 1) { pdf.setFillColor(248, 249, 250); pdf.rect(M, y - 4, cW, 7.5, 'F') }
     pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
-    pdf.text(label, M + 1, y)
+    const labelLines = pdf.splitTextToSize(label, dataLabelColW)
     pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
-    const wrapped = pdf.splitTextToSize(String(val), cW - 55)
-    pdf.text(wrapped, M + 55, y)
-    y += wrapped.length > 1 ? wrapped.length * 5 + 2 : 7.5
+    const valLines = pdf.splitTextToSize(String(val), dataValueMaxW)
+    const nLines = Math.max(labelLines.length, valLines.length, 1)
+    const rowH = Math.max(7.5, (nLines - 1) * dataLineH + 7)
+    if (i % 2 === 1) { pdf.setFillColor(248, 249, 250); pdf.rect(M, y - 4, cW, rowH, 'F') }
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
+    labelLines.forEach((ln, li) => { pdf.text(ln, M + 1, y + li * dataLineH) })
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    valLines.forEach((ln, li) => { pdf.text(ln, dataValueX, y + li * dataLineH) })
+    y += rowH
   })
 
   if (relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
@@ -491,7 +503,11 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   {
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
-    const declText = getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
+    const declText = resolveDeclaracaoCliente(
+      manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
+      categoriaNome,
+      declaracaoClienteDepois,
+    )
     const declPad = 6
     const declTextW = cW - declPad * 2
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')

@@ -217,7 +217,7 @@ $RESOURCE_MAP = [
     'categorias' => [
         'table'      => 'categorias',
         'json_cols'  => [],
-        'allowed'    => ['id','nome','intervalo_tipo'],
+        'allowed'    => ['id','nome','intervalo_tipo','declaracao_cliente_depois'],
         'order'      => 'nome ASC',
     ],
     'subcategorias' => [

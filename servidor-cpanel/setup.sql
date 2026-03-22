@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS `categorias` (
   `id`            VARCHAR(32)  NOT NULL,
   `nome`          VARCHAR(255) NOT NULL,
   `intervalo_tipo` VARCHAR(20)  NOT NULL DEFAULT 'anual',
+  `declaracao_cliente_depois` TEXT DEFAULT NULL COMMENT 'Opcional: sufixo da declaração após «na {serviço} »; vazio = texto canónico da app',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -16,6 +16,7 @@ import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { EMAIL_CONFIG, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
+import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
 
@@ -77,6 +78,10 @@ export async function enviarRelatorioEmail({
   logoUrl          = '',
   tecnicoObj       = null,
   marcas           = [],
+  /** Nome da categoria do equipamento (ex.: "Elevadores…", "Compressores…") — PDF/email no servidor */
+  categoriaNome    = '',
+  /** Sufixo opcional definido na categoria (BD); vazio = canónico */
+  declaracaoClienteDepois = '',
 }) {
   if (!emailDestinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
@@ -142,6 +147,8 @@ export async function enviarRelatorioEmail({
             })
           : []
       const manutencaoTipo = manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'
+      const declaracaoLegislacao = declaracaoLegislacaoVariantFromCategoriaNome(categoriaNome)
+      const declaracaoTexto = resolveDeclaracaoCliente(manutencaoTipo, categoriaNome, declaracaoClienteDepois)
       const pecasUsadas = relatorio?.pecasUsadas ?? []
 
       const { navelLogoB64, brandLogoB64 } = await getHeaderLogosB64ForEmail({ maquina, marcas })
@@ -192,6 +199,10 @@ export async function enviarRelatorioEmail({
         brand_logo_b64:  brandLogoB64 || '',
         tecnico_telefone:       tecnicoObj?.telefone ?? '',
         tecnico_assinatura_b64: tecnicoAssinaturaB64,
+        /** Fallback no PHP se declaracao_texto vier vazio */
+        declaracao_legislacao: declaracaoLegislacao,
+        /** Texto completo resolvido no browser (override categoria + canónico) — fonte única para FPDF */
+        declaracao_texto: declaracaoTexto,
       }
 
       const bodyStr = JSON.stringify(payload)

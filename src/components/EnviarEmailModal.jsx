@@ -4,13 +4,14 @@ import { useData } from '../context/DataContext'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { enviarRelatorioEmail } from '../services/emailService'
+import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import { formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 
 const EMAIL_ADMIN = 'comercial@navel.pt'
 
 export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatorio, maquina, cliente }) {
-  const { getChecklistBySubcategoria, getSubcategoria, updateRelatorio, getTecnicoByNome, marcas } = useData()
+  const { getChecklistBySubcategoria, getSubcategoria, getCategoria, updateRelatorio, getTecnicoByNome, marcas } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
 
@@ -52,6 +53,8 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
     try {
       const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
       const tecObj = getTecnicoByNome(manutencao?.tecnico || relatorio?.tecnico)
+      const categoriaNome = categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria)
+      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria)
 
       let sucesso = 0
       for (const dest of dests) {
@@ -62,6 +65,8 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
           logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
           tecnicoObj: tecObj,
           marcas,
+          categoriaNome,
+          declaracaoClienteDepois,
         })
         if (resultado?.ok) sucesso++
         else logger.error('EnviarEmailModal', 'enviarEmail', resultado?.message ?? 'Erro', { dest })

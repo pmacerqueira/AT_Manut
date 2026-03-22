@@ -136,4 +136,25 @@ describe('sugerirFaseKaeser', () => {
     assert.equal(r.detalhes.disparouHoras, false)
     assert.equal(r.tipoPreSelecao, 'B')
   })
+
+  it('contadorFichaConfiavel false ignores orphan ficha date and hours', () => {
+    const r = sugerirFaseKaeser({
+      maquina: {
+        ultimaManutencaoData: '2026-03-18',
+        horasServicoAcumuladas: 6000,
+        posicaoKaeser: 0,
+      },
+      horasServicoAtuais: 6100,
+      dataExecucao: '2026-03-22',
+      contadorFichaConfiavel: false,
+    })
+    assert.equal(r.detalhes.contadorFichaConfiavel, false)
+    assert.equal(r.detalhes.dataUltimaReferencia, null)
+    assert.equal(r.detalhes.horasUltima, null)
+    assert.equal(r.detalhes.deltaH, null)
+    assert.equal(r.detalhes.diasDesdeUltima, null)
+    assert.equal(r.detalhes.disparouAnual, false)
+    assert.equal(r.detalhes.disparouHoras, false)
+    assert.equal(r.motivoPrincipal, 'fallback')
+  })
 })

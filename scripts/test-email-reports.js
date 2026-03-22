@@ -23,7 +23,6 @@ const esbuild = await import('esbuild')
 const entryCode = `
 export { relatorioParaHtml } from './src/utils/relatorioHtml.js'
 export { relatorioReparacaoParaHtml } from './src/utils/relatorioReparacaoHtml.js'
-export { getDeclaracaoCliente } from './src/constants/relatorio.js'
 `
 const bundleResult = await esbuild.build({
   stdin: { contents: entryCode, resolveDir: ROOT, loader: 'js' },
@@ -212,6 +211,7 @@ console.log('  Generating report HTML...\n')
 
 const opts = (proximas = PROXIMAS) => ({
   subcategoriaNome: 'Elevadores de 2 colunas',
+  categoriaNome: 'Elevadores de veículos',
   logoUrl: LOGO,
   tecnicoObj: TECNICO,
   proximasManutencoes: proximas,
@@ -221,6 +221,7 @@ const htmlPerio    = relatorioParaHtml(relPerio, manutPerio, MAQUINA, CLIENTE, C
 const htmlMontagem = relatorioParaHtml(relMontagem, manutMontagem, MAQUINA, CLIENTE, CHECKLIST, opts())
 const htmlRepara   = relatorioReparacaoParaHtml(relReparacao, reparacao, MAQUINA, CLIENTE, checklistRep, {
   subcategoriaNome: 'Elevadores de 2 colunas',
+  categoriaNome: 'Elevadores de veículos',
   logoUrl: LOGO,
   tecnicoObj: TECNICO,
 })

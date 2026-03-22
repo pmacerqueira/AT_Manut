@@ -15,7 +15,7 @@ import { safeHttpUrl } from '../utils/sanitize'
 import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import './ExecutarReparacaoModal.css'
 
@@ -30,6 +30,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     getRelatorioByReparacao,
     getChecklistBySubcategoria,
     getSubcategoria,
+    getCategoria,
     tecnicos,
     getTecnicoByNome,
   } = useData()
@@ -47,6 +48,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const maq = maquinas.find(m => m.id === reparacao.maquinaId)
   const cli = clientes.find(c => c.nif === maq?.clienteNif)
   const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+  const cat = sub ? getCategoria(sub.categoriaId ?? sub.categoria_id) : null
+  const categoriaNome = cat?.nome ?? ''
+  const declaracaoClienteDepois = String(cat?.declaracaoClienteDepois ?? cat?.declaracao_cliente_depois ?? '').trim()
   const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
 
   // ── Estado do formulário ────────────────────────────────────────────────
@@ -312,7 +316,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
     const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
     const tecObj  = getTecnicoByNome(relGerado.tecnico)
-    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
+    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
     const assunto = `Relatório de Reparação ${relGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
 
     const destsSet = new Set()
@@ -478,7 +482,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       numeroRelatorio:    '(pré-visualização)',
     }
     const tecObj = getTecnicoByNome(form.tecnico)
-    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
+    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
     if (html) {
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -490,7 +494,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const handleVerPdf = useCallback(async (relGerado) => {
     const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
     const tecObj = getTecnicoByNome(relGerado.tecnico)
-    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
+    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
     if (html) {
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -509,7 +513,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
       const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
       const tecObj = getTecnicoByNome(relatorioGerado.tecnico)
-      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj })
+      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
       const resultado = await enviarRelatorioHtmlEmail({
         destinatario: emailDestinatario.trim(),
         assunto: `Relatório de Reparação ${relatorioGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
@@ -824,7 +828,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 <div className="declaracao-assinatura-box">
                   <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
                   <p className="declaracao-assinatura-texto">
-                    {getDeclaracaoCliente('reparacao')}
+                    {resolveDeclaracaoCliente('reparacao', categoriaNome, declaracaoClienteDepois)}
                   </p>
                 </div>
                 <div className="form-group">

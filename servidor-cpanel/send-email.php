@@ -209,6 +209,12 @@ $manutencao_tipo        = $g('manutencao_tipo', 'periodica');
 if (!in_array($manutencao_tipo, ['montagem', 'periodica', 'reparacao'], true)) {
     $manutencao_tipo = 'periodica';
 }
+$declaracao_legislacao = $g('declaracao_legislacao', 'outros');
+if (!in_array($declaracao_legislacao, ['elevadores', 'compressores', 'outros'], true)) {
+    $declaracao_legislacao = 'outros';
+}
+// Texto completo da declaração já resolvido no browser (override por categoria + canónico) — evita duplicar regras no PHP
+$declaracao_texto = isset($_data['declaracao_texto']) ? trim((string)$_data['declaracao_texto']) : '';
 $periodicidade_maquina  = $g('periodicidade_maquina');
 $proximas_manut_json    = $g('proximas_manutencoes_json');
 $pecas_usadas_json      = $g('pecas_usadas_json');
@@ -430,8 +436,8 @@ if ($tecnico_sig_b64) {
     if ($dec !== false && strlen($dec) > 0) $tecnico_sig_bin = $dec;
 }
 
-// -- Declaração de aceitação (mesmo texto que src/constants/relatorio.js) -----
-function texto_declaracao_cliente($tipo) {
+// -- Declaração de aceitação (alinhado a src/constants/relatorio.js + declaracao_legislacao) -----
+function texto_declaracao_cliente($tipo, $legislacao = 'outros') {
     $labels = [
         'montagem'  => 'montagem',
         'periodica' => 'manutenção',
@@ -439,7 +445,16 @@ function texto_declaracao_cliente($tipo) {
     ];
     $mid = $labels[$tipo] ?? 'manutenção';
     $antes = 'Declaro que li e concordo com o que foi relatado pelo técnico na';
-    $depois = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $depois_comp = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
+    $depois_outros = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
+    if ($legislacao === 'elevadores') {
+        $depois = $depois_elev;
+    } elseif ($legislacao === 'compressores') {
+        $depois = $depois_comp;
+    } else {
+        $depois = $depois_outros;
+    }
     return $antes . ' ' . $mid . ' ' . $depois;
 }
 
@@ -927,7 +942,9 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     // Declaração de aceitação (antes das assinaturas — igual ao PDF do browser)
     {
         if ($pdf->GetY() > 210) $pdf->AddPage();
-        $decl_txt = texto_declaracao_cliente($manutencao_tipo);
+        $decl_txt = ($declaracao_texto !== '')
+            ? $declaracao_texto
+            : texto_declaracao_cliente($manutencao_tipo, $declaracao_legislacao);
         $pdf->SetFillColor(243, 244, 246);
         $pdf->SetDrawColor(30, 58, 95);
         $pdf->SetLineWidth(0.8);

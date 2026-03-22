@@ -32,7 +32,7 @@ import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { isEmailConfigured } from '../config/emailConfig'
 import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { MAX_FOTOS } from '../config/limits'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
 import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import {
@@ -97,6 +97,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     getIntervaloDiasByMaquina,
     getChecklistBySubcategoria,
     getSubcategoria,
+    getCategoria,
     updateMaquina,
     updateCliente,
     getPecasPlanoByMaquina,
@@ -160,6 +161,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const kaeserWarnAnualHighDeltaRef = useRef(false)
 
   const maq = maquina
+  const { categoriaNome, declaracaoClienteDepois } = useMemo(() => ({
+    categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
+    declaracaoClienteDepois: declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria),
+  }), [maq, getSubcategoria, getCategoria])
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
@@ -168,13 +173,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual && manutencaoAtual.tipo !== 'montagem')
   const useKaeserPipeline = isKaeserPeriodicExec && !adminEdit
 
+  /** Data da manutenção concluída mais recente (para fallback quando a ficha não tem `ultimaManutencaoData`). */
   const fallbackUltimaManutDataKaeser = useMemo(() => {
     if (!maq?.id) return null
     const done = manutencoes
-      .filter(mt => mt.maquinaId === maq.id && mt.status === 'concluida')
-      .sort((a, b) => a.data.localeCompare(b.data))
+      .filter(mt => String(mt.maquinaId) === String(maq.id) && mt.status === 'concluida')
+      .sort((a, b) => b.data.localeCompare(a.data))
     return done[0]?.data ?? null
   }, [maq?.id, manutencoes])
+
+  const temManutencaoConcluidaNaMaq = useMemo(() => {
+    if (!maq?.id) return false
+    return manutencoes.some(m => String(m.maquinaId) === String(maq.id) && m.status === 'concluida')
+  }, [manutencoes, maq?.id])
 
   const conflitoHorasFichaVsUltimoRel = useMemo(() => {
     if (!maq?.id) return null
@@ -318,7 +329,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       ? tipoKaeserNaPosicao(maq.posicaoKaeser)
       : ''
     const horasNaManutAberta = m ? horasContadorNaManutencao(m) : null
-    const horasNaFicha = horasContadorNaFicha(maq)
+    const horasNaFicha = temManutencaoConcluidaNaMaq ? horasContadorNaFicha(maq) : null
     const hsBootstrapRaw = horasNaManutAberta ?? horasNaFicha
     const hsBootstrap = hsBootstrapRaw != null ? Number(hsBootstrapRaw) : NaN
     const sugBootstrap = isKaeserAbcdMaquina(maq) && Number.isFinite(hsBootstrap) && hsBootstrap >= 0
@@ -327,6 +338,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           horasServicoAtuais: hsBootstrap,
           dataExecucao: getHojeAzores(),
           fallbackUltimaData: fallbackUltimaManutDataKaeser,
+          contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
         })
       : null
     let tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
@@ -398,7 +410,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         img.src = cli.assinaturaContacto
       }
     })
-  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq])
 
   const confirmarCriarIntervencaoHoje = useCallback(() => {
     if (!maq) return
@@ -752,8 +764,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       horasServicoAtuais: hs,
       dataExecucao: getHojeAzores(),
       fallbackUltimaData: fallbackUltimaManutDataKaeser,
+      contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
     })
-  }, [maq, isKaeserAbcdMaq, form.horasServico, fallbackUltimaManutDataKaeser])
+  }, [maq, isKaeserAbcdMaq, form.horasServico, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq])
 
   useEffect(() => {
     if (!useKaeserPipeline || step !== W.horas) return
@@ -813,6 +826,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         subcategoriaNome: sub?.nome ?? '',
         tecnicoObj: tecObj,
         marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
       })
       const url = URL.createObjectURL(blob)
       setPreviewPdfUrl(url)
@@ -822,7 +837,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     } finally {
       setPreviewLoading(false)
     }
-  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, getTecnicoByNome, showToast])
+  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, getTecnicoByNome, showToast, categoriaNome, declaracaoClienteDepois])
 
   const gravar = (semAssinatura = false, enviarEmailAoGravar = true) => {
     setErroChecklist('')
@@ -1104,6 +1119,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
           tecnicoObj: tecObj,
           marcas,
+          categoriaNome,
+          declaracaoClienteDepois,
         })
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
@@ -1809,6 +1826,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                         horasServicoAtuais: hs,
                         dataExecucao: getHojeAzores(),
                         fallbackUltimaData: fallbackUltimaManutDataKaeser,
+                        contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
                       })
                       kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
                       if (kaeserIntervencaoAnual) return
@@ -1905,7 +1923,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                     <ul className="kaeser-calc-detalhes text-muted" style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                       <li>Data de referência: {kaeserSugestaoLive.detalhes.dataUltimaReferencia ?? '—'}</li>
                       <li>Dias desde a referência: {kaeserSugestaoLive.detalhes.diasDesdeUltima ?? '—'}</li>
-                      <li>Horas na ficha (última): {kaeserSugestaoLive.detalhes.horasUltima ?? '—'}</li>
+                      <li>
+                        Horas na ficha (última):{' '}
+                        {kaeserSugestaoLive.detalhes.contadorFichaConfiavel
+                          ? (kaeserSugestaoLive.detalhes.horasUltima ?? '—')
+                          : '0'}
+                        {!kaeserSugestaoLive.detalhes.contadorFichaConfiavel && (
+                          <span className="text-muted"> (sem manutenção concluída — valores da ficha ignorados)</span>
+                        )}
+                      </li>
                       <li>Δh (actual − ficha): {kaeserSugestaoLive.detalhes.deltaH ?? '—'}</li>
                       <li>Limiar horas: {KAESER_INTERVALO_HORAS_REF} h · Limiar anual: {KAESER_ANUAL_MIN_DIAS} d</li>
                       {kaeserSugestaoLive.tipoSugeridoCalendario && (
@@ -2290,7 +2316,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               <div className="declaracao-assinatura-box">
                 <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
                 <p className="declaracao-assinatura-texto">
-                  {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
+                  {resolveDeclaracaoClienteForMaquina(
+                    manutencaoAtual?.tipo === 'montagem' ? 'montagem' : 'periodica',
+                    maq,
+                    getSubcategoria,
+                    getCategoria,
+                  )}
                 </p>
               </div>
             )}

@@ -26,6 +26,7 @@ import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import { computarProximasDatas } from '../utils/diasUteis'
 import { maquinaPertenceCliente, normEntityId, resolveProximaManutParaFrota } from '../utils/frotaReportHelpers'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
+import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
@@ -216,6 +217,8 @@ export default function Clientes() {
       const proximas = (periMaq && dataExec)
         ? computarProximasDatas(dataExec, periMaq, { tecnico: manut.tecnico || rel?.tecnico || '' })
         : []
+      const categoriaNome = categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria)
+      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria)
       const blob = await gerarPdfCompacto({
         relatorio: rel,
         manutencao: manut,
@@ -226,6 +229,8 @@ export default function Clientes() {
         tecnicoObj: getTecnicoByNome(manut.tecnico || rel?.tecnico),
         proximasManutencoes: proximas,
         marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
       })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

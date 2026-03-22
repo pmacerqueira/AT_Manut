@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft, ArrowUp, ArrowDown, Check, X, MessageSquareText } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { getCanonicalDeclaracaoDepoisSuffix } from '../constants/relatorio'
 import './Categorias.css'
 
 const QUICK_NOTES_DEFAULT = [
@@ -58,7 +59,7 @@ export default function Categorias() {
   const [addingSubcategoria, setAddingSubcategoria] = useState(null)
   const [editingCategoria, setEditingCategoria] = useState(null)
   const [editingSubcategoria, setEditingSubcategoria] = useState(null)
-  const [formCat, setFormCat] = useState({ nome: '', intervaloTipo: 'semestral' })
+  const [formCat, setFormCat] = useState({ nome: '', intervaloTipo: 'semestral', declaracaoClienteDepois: '' })
   const [formSub, setFormSub] = useState({ nome: '' })
 
   const [editingCheckItem, setEditingCheckItem] = useState(null)
@@ -165,9 +166,13 @@ export default function Categorias() {
 
   const handleAddCategoria = (e) => {
     e.preventDefault()
-    const newId = addCategoria(formCat)
+    const newId = addCategoria({
+      ...formCat,
+      nome: formCat.nome.trim(),
+      declaracaoClienteDepois: (formCat.declaracaoClienteDepois ?? '').trim(),
+    })
     if (newId) setExpandedCat(prev => new Set([...prev, newId]))
-    setFormCat({ nome: '', intervaloTipo: 'semestral' })
+    setFormCat({ nome: '', intervaloTipo: 'semestral', declaracaoClienteDepois: '' })
     setAddingCategoria(false)
     showToast('Categoria adicionada.', 'success')
   }
@@ -181,13 +186,18 @@ export default function Categorias() {
   }
 
   const openEditCategoria = (cat) => {
-    setFormCat({ nome: cat.nome, intervaloTipo: cat.intervaloTipo })
+    setFormCat({
+      nome: cat.nome,
+      intervaloTipo: cat.intervaloTipo,
+      declaracaoClienteDepois: cat.declaracaoClienteDepois ?? cat.declaracao_cliente_depois ?? '',
+    })
     setEditingCategoria(cat.id)
   }
 
   const handleEditCategoria = (e) => {
     e.preventDefault()
-    updateCategoria(editingCategoria, formCat)
+    const decl = (formCat.declaracaoClienteDepois ?? '').trim()
+    updateCategoria(editingCategoria, { ...formCat, declaracaoClienteDepois: decl })
     setEditingCategoria(null)
     showToast('Categoria actualizada.', 'success')
   }
@@ -256,9 +266,19 @@ export default function Categorias() {
                 ))}
               </select>
             </label>
+            <label className="label-declaracao-cat">
+              Declaração do cliente (opcional)
+              <textarea
+                rows={5}
+                maxLength={8000}
+                value={formCat.declaracaoClienteDepois}
+                onChange={e => setFormCat(f => ({ ...f, declaracaoClienteDepois: e.target.value }))}
+                placeholder="Vazio = texto legal canónico da aplicação para esta família de equipamento. Se preencher, comece por «do equipamento…» (o início «Declaro… na manutenção/montagem» é gerado automaticamente)."
+              />
+            </label>
             <div className="form-actions">
               <button type="submit">Adicionar</button>
-              <button type="button" className="secondary" onClick={() => { setAddingCategoria(false); setFormCat({ nome: '', intervaloTipo: 'semestral' }) }}>Cancelar</button>
+              <button type="button" className="secondary" onClick={() => { setAddingCategoria(false); setFormCat({ nome: '', intervaloTipo: 'semestral', declaracaoClienteDepois: '' }) }}>Cancelar</button>
             </div>
           </form>
         </div>
@@ -285,6 +305,39 @@ export default function Categorias() {
                         ))}
                       </select>
                     </div>
+                    <div className="form-field label-declaracao-cat">
+                      <label>Declaração de aceitação do cliente (opcional)</label>
+                      <p className="field-hint text-muted">
+                        Sobrepõe o texto legal canónico só para esta categoria. Deixe vazio para usar o modelo da aplicação (elevadores / compressores / outros).
+                        O texto aqui é o <strong>sufixo</strong> após «…na manutenção / montagem / reparação » — deve começar tipicamente por «do equipamento…».
+                      </p>
+                      <textarea
+                        rows={6}
+                        maxLength={8000}
+                        value={formCat.declaracaoClienteDepois}
+                        onChange={e => setFormCat(f => ({ ...f, declaracaoClienteDepois: e.target.value }))}
+                        placeholder="do equipamento e que obtive…"
+                      />
+                      <div className="form-actions-inline">
+                        <button
+                          type="button"
+                          className="secondary btn-sm"
+                          onClick={() => setFormCat(f => ({
+                            ...f,
+                            declaracaoClienteDepois: getCanonicalDeclaracaoDepoisSuffix(f.nome),
+                          }))}
+                        >
+                          Repor texto canónico (pré-visualização)
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary btn-sm"
+                          onClick={() => setFormCat(f => ({ ...f, declaracaoClienteDepois: '' }))}
+                        >
+                          Limpar (usar canónico automático)
+                        </button>
+                      </div>
+                    </div>
                     <div className="form-actions">
                       <button type="submit">Guardar</button>
                       <button type="button" className="secondary" onClick={() => setEditingCategoria(null)}>Cancelar</button>
@@ -297,6 +350,9 @@ export default function Categorias() {
                     {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                   </button>
                   <span className="categoria-nome">{cat.nome}</span>
+                  {String(cat.declaracaoClienteDepois ?? cat.declaracao_cliente_depois ?? '').trim() ? (
+                    <span className="badge badge-decl-custom" title="Declaração personalizada na categoria">Decl. custom</span>
+                  ) : null}
                   <span className="badge badge-intervalo">{INTERVALOS[cat.intervaloTipo]?.label}</span>
                   <div className="categoria-actions">
                     <button type="button" className="icon-btn secondary" onClick={() => openEditCategoria(cat)} title="Editar categoria"><Pencil size={14} /></button>

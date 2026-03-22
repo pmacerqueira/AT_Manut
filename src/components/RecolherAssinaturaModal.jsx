@@ -5,10 +5,10 @@ import { logger } from '../utils/logger'
 import SignaturePad from './SignaturePad'
 import { PenLine, X, Bookmark } from 'lucide-react'
 import { formatDataAzores } from '../utils/datasAzores'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 
 export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, maquina }) {
-  const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes, updateCliente } = useData()
+  const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes, updateCliente, getSubcategoria, getCategoria } = useData()
   const { showToast } = useToast()
 
   const [nomeAssinante, setNomeAssinante] = useState('')
@@ -123,7 +123,12 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         <div className="declaracao-assinatura-box">
           <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
           <p className="declaracao-assinatura-texto">
-            {getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}
+            {resolveDeclaracaoClienteForMaquina(
+              manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
+              maquina,
+              getSubcategoria,
+              getCategoria,
+            )}
           </p>
         </div>
 

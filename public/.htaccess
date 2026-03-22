@@ -1,6 +1,11 @@
 # AT_Manut — Apache config para cPanel (public_html/manut/)
 # Copiado automaticamente para dist/ pelo Vite (pasta public/).
 
+# Worker PDF.js (e outros .mjs em assets/) — MIME correcto para import() dinâmico no browser.
+<IfModule mod_mime.c>
+  AddType application/javascript .mjs
+</IfModule>
+
 # ── Cache-Control ────────────────────────────────────────────────────────────
 # index.html nunca em cache: garante que após cada deployment o browser
 # carrega o HTML novo (que referencia os assets JS/CSS com novo hash).
@@ -13,7 +18,7 @@
 
   # Assets com hash no nome (Vite): cache de 1 ano — imutáveis.
   # O nome muda a cada build, pelo que ficheiros antigos nunca conflituam.
-  <FilesMatch "\.(js|css|woff2?|ttf|otf|png|svg|ico|webp|jpg|jpeg)$">
+  <FilesMatch "\.(js|mjs|css|woff2?|ttf|otf|png|svg|ico|webp|jpg|jpeg)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 </IfModule>

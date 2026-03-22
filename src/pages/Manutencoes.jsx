@@ -21,6 +21,7 @@ import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from 
 import { pt } from 'date-fns/locale'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
+import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import { logger } from '../utils/logger'
 import { parseHorasContadorForm } from '../utils/horasContadorEquipamento'
 import { STORAGE } from '../config/storageKeys'
@@ -65,6 +66,7 @@ export default function Manutencoes() {
     getRelatorioByManutencao,
     getIntervaloDiasByMaquina,
     getSubcategoria,
+    getCategoria,
     getChecklistBySubcategoria,
     getTecnicoByNome,
     tecnicos,
@@ -471,6 +473,8 @@ export default function Manutencoes() {
     try {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
       const tecObj = getTecnicoByNome(rel?.tecnico || m?.tecnico)
+      const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
+      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
 
       let sucesso = 0
       for (const dest of dests) {
@@ -485,6 +489,8 @@ export default function Manutencoes() {
           logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
           tecnicoObj: tecObj,
           marcas,
+          categoriaNome,
+          declaracaoClienteDepois,
         })
         if (resultado?.ok) sucesso++
         else logger.error('Manutencoes', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
@@ -527,6 +533,8 @@ export default function Manutencoes() {
       const proximas = (periMaq && dataExec)
         ? computarProximasDatas(dataExec, periMaq, { tecnico: m.tecnico || rel?.tecnico || '' })
         : []
+      const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
+      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
       const blob = await gerarPdfCompacto({
         relatorio: rel,
         manutencao: m,
@@ -537,6 +545,8 @@ export default function Manutencoes() {
         tecnicoObj: tecObj,
         proximasManutencoes: proximas,
         marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
       })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

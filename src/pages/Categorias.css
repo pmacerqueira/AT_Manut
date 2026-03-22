@@ -109,6 +109,56 @@
   border: 1px solid rgba(26, 184, 240, 0.35);
 }
 
+.badge-decl-custom {
+  background: rgba(124, 58, 237, 0.12);
+  color: #5b21b6;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.65em;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+.edit-form-inline .form-field.label-declaracao-cat {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.edit-form-inline .form-field.label-declaracao-cat textarea {
+  width: 100%;
+  min-height: 130px;
+  resize: vertical;
+  font-size: 0.85em;
+  line-height: 1.45;
+  padding: 0.5rem 0.65rem;
+}
+
+.edit-form-inline .form-field.label-declaracao-cat .field-hint {
+  font-size: 0.8em;
+  margin: 0 0 0.35rem;
+  line-height: 1.35;
+}
+
+.form-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.add-form .label-declaracao-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.add-form .label-declaracao-cat textarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  font-size: 0.9em;
+}
+
 .badge-count {
   background: var(--color-bg-elevated);
   color: var(--color-text-muted);

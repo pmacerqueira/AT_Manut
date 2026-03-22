@@ -135,7 +135,7 @@ Default: `c:\Planos exemplo kaeser\PARQUE_MAQUINAS_SM12_2601.pdf`
 ### Implementado
 - Parser `parseKaeserPlanoPdf.js` — extrai A/B/C/D do texto do PDF
 - Botão "Importar template para esta máquina" no `PecasPlanoModal` — **exclusivo para marca KAESER**
-- Worker `pdf.worker.mjs` em `public/` com `PDFParse.setWorker()` para compatibilidade browser
+- Worker PDF.js via `pdfjs-dist/build/pdf.worker.min.mjs?url` em `kaeserPlanoPdfImport.js` (Vite emite para `assets/` com hash; `PDFParse.setWorker()` com esse URL). **A versão de `pdfjs-dist` no `package.json` tem de coincidir com a de `pdf-parse`** (actualmente 5.4.296); caso contrário o browser reporta mismatch API vs Worker.
 - **Regra de negócio:** compressores de outras marcas (Fini, ECF, IES, LaPadana) mostram apenas tab Periódica — consumíveis adicionados manualmente
 
 ### Próximos passos
@@ -160,4 +160,4 @@ A aplicação já usa `SEQUENCIA_KAESER` e `INTERVALOS_KAESER` para o ciclo de 1
 
 **Sessão 2026-02-24:** Implementação completa da importação de PDFs KAESER. Regra de negócio: apenas compressores KAESER têm acesso ao botão de importação e aos tabs A/B/C/D; outras marcas (Fini, ECF, IES, LaPadana) usam apenas Periódica com adição manual de consumíveis um a um.
 
-**Ficheiros principais:** `PecasPlanoModal.jsx`, `parseKaeserPlanoPdf.js`, `public/pdf.worker.mjs`
+**Ficheiros principais:** `PecasPlanoModal.jsx`, `parseKaeserPlanoPdf.js`, `kaeserPlanoPdfImport.js`

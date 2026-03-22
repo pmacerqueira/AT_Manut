@@ -2,12 +2,14 @@ import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { safeHttpUrl } from '../utils/sanitize'
 import { ExternalLink } from 'lucide-react'
 import { TIPOS_DOCUMENTO } from '../context/DataContext'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { useData } from '../context/DataContext'
+import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { horasContadorNaManutencao } from '../utils/horasContadorEquipamento'
 import './RelatorioView.css'
 
 export default function RelatorioView({ relatorio, manutencao, maquina, cliente, checklistItems = [] }) {
+  const { getSubcategoria, getCategoria } = useData()
   if (!relatorio) return null
   const items = resolveChecklist(relatorio, checklistItems)
   const horasContador = horasContadorNaManutencao(manutencao)
@@ -95,7 +97,12 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
       </section>
 
       <section className="relatorio-section declaracao">
-        <p className="declaracao-texto">{getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')}</p>
+        <p className="declaracao-texto">{resolveDeclaracaoClienteForMaquina(
+          manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
+          maquina,
+          getSubcategoria,
+          getCategoria,
+        )}</p>
       </section>
 
       {relatorio.assinadoPeloCliente && (

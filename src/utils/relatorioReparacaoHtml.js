@@ -6,7 +6,7 @@
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { resolveChecklist } from './resolveChecklist'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
 import {
   cssBase,
@@ -38,7 +38,7 @@ function hexToRgba(hex, alpha) {
 
 export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
-  const { subcategoriaNome, logoUrl, istobalLogoUrl, tecnicoObj } = options
+  const { subcategoriaNome, logoUrl, istobalLogoUrl, tecnicoObj, categoriaNome = '', declaracaoClienteDepois = '' } = options
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -254,7 +254,7 @@ ${htmlPaginaCliente({
   clienteAssinatura: relatorio.assinaturaDigital ?? '',
   dataCriacao,
   dataAssinatura,
-  declaracaoTexto: getDeclaracaoCliente('reparacao'),
+  declaracaoTexto: resolveDeclaracaoCliente('reparacao', categoriaNome, declaracaoClienteDepois),
   proximasManutencoes: [],
 })}
 

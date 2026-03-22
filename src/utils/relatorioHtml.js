@@ -5,7 +5,7 @@
  * @see DESENVOLVIMENTO.md §4.1
  */
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
-import { getDeclaracaoCliente } from '../constants/relatorio'
+import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import {
   INTERVALOS_KAESER,
@@ -45,7 +45,7 @@ function hexToRgba(hex, alpha) {
 export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItemsLive = [], options = {}) {
   if (!relatorio) return ''
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
-  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios, form } = options
+  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios, form, categoriaNome = '', declaracaoClienteDepois = '' } = options
   const horasContadorRelatorioGeral = horasContadorParaRelatorio(maquina, manutencao, form, relatorio)
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
@@ -526,7 +526,11 @@ ${htmlPaginaCliente({
   clienteAssinatura: relatorio.assinaturaDigital,
   dataCriacao,
   dataAssinatura,
-  declaracaoTexto: getDeclaracaoCliente(manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'),
+  declaracaoTexto: resolveDeclaracaoCliente(
+    manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
+    categoriaNome,
+    declaracaoClienteDepois,
+  ),
   proximasManutencoes,
 })}
 

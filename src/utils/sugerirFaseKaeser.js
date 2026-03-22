@@ -45,15 +45,24 @@ export function tipoKaeserSugeridoPorDeltaHoras(deltaH, posicaoKaeser) {
  * @param {number|string} params.horasServicoAtuais — leitura actual
  * @param {string} params.dataExecucao — yyyy-MM-dd (hoje ou data histórica)
  * @param {string|null} [params.fallbackUltimaData] — se `ultimaManutencaoData` vazia (ex.: 1.ª manutenção concluída)
+ * @param {boolean} [params.contadorFichaConfiavel=true] — se false, ignora `ultimaManutencaoData` e horas na ficha (valores órfãos após apagar intervenções; 1.ª execução real sem concluídas).
  */
-export function sugerirFaseKaeser({ maquina, horasServicoAtuais, dataExecucao, fallbackUltimaData = null }) {
-  const dataUltimaReferencia = (maquina?.ultimaManutencaoData || fallbackUltimaData || '').trim() || null
+export function sugerirFaseKaeser({
+  maquina,
+  horasServicoAtuais,
+  dataExecucao,
+  fallbackUltimaData = null,
+  contadorFichaConfiavel = true,
+}) {
+  const dataUltimaReferencia = contadorFichaConfiavel
+    ? ((maquina?.ultimaManutencaoData || fallbackUltimaData || '').trim() || null)
+    : ((fallbackUltimaData || '').trim() || null)
   const dExec = parseYmdLocal(dataExecucao)
   const dUlt = parseYmdLocal(dataUltimaReferencia)
   const diasDesdeUltima =
     dExec && dUlt != null ? differenceInCalendarDays(dExec, dUlt) : null
 
-  const horasUltima = horasContadorNaFicha(maquina)
+  const horasUltima = contadorFichaConfiavel ? horasContadorNaFicha(maquina) : null
   const horasAtuais = Number(horasServicoAtuais)
   const horasAtuaisOk = Number.isFinite(horasAtuais) && horasAtuais >= 0
 
@@ -132,6 +141,7 @@ export function sugerirFaseKaeser({ maquina, horasServicoAtuais, dataExecucao, f
       disparouAnual,
       disparouHoras,
       posicaoKaeser: maquina?.posicaoKaeser ?? null,
+      contadorFichaConfiavel,
     },
   }
 }

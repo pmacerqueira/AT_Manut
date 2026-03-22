@@ -51,6 +51,7 @@ export default function Reparacoes() {
     removeReparacao,
     getRelatorioByReparacao,
     getSubcategoria,
+    getCategoria,
     getChecklistBySubcategoria,
     tecnicos,
     getTecnicoByNome,
@@ -335,7 +336,11 @@ export default function Reparacoes() {
       const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
       const itensChecklist = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
       const tecObj = getTecnicoByNome(rep.tecnico || rel?.tecnico)
-      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist, { tecnicoObj: tecObj })
+      const subRep = maq ? getSubcategoria(maq.subcategoriaId) : null
+      const catRep = subRep ? getCategoria(subRep.categoriaId ?? subRep.categoria_id) : null
+      const categoriaNome = catRep?.nome ?? ''
+      const declaracaoClienteDepois = String(catRep?.declaracaoClienteDepois ?? catRep?.declaracao_cliente_depois ?? '').trim()
+      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
       const assunto = `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
       let sucesso = 0
       for (const dest of dests) {

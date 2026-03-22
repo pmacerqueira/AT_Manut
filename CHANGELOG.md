@@ -9,6 +9,56 @@ Política de continuidade:
 
 ---
 
+## [1.16.37] — 2026-03-22 — Declaração do cliente: variantes + override por categoria
+
+### Contexto
+- Texto de declaração de aceitação alinhado ao tipo de equipamento (elevadores / compressores / outros).
+- Opcional: admin define sufixo legal por categoria na BD, com fallback canónico na app e sem duplicar lógica no PHP do email.
+
+### Alteração
+- **`src/constants/relatorio.js`:** variantes `elevadores`, `compressores`, `outros`; `resolveDeclaracaoCliente`, `resolveDeclaracaoClienteForMaquina`, `getCategoriaFromMaquina`, `declaracaoClienteDepoisFromMaquina`, `getCanonicalDeclaracaoDepoisSuffix`; compressores citam Dir. Máquinas + DL 50/2005 + PED 2014/68/UE + DL 32/2015 (sem EN 1493 / Reg. 2023/1230).
+- **PDF / HTML / modais / vistas:** uso da resolução única; `gerarPdfCompacto` e fluxos de email recebem `declaracaoClienteDepois`.
+- **`emailService.js`:** payload `declaracao_texto` (texto final resolvido no browser).
+- **`send-email.php`:** FPDF usa `declaracao_texto` quando preenchido; fallback `texto_declaracao_cliente(tipo, legislacao)`.
+- **BD:** coluna `categorias.declaracao_cliente_depois` — `setup.sql` + migração `servidor-cpanel/migrations/20250322_categorias_declaracao_cliente.sql`; **`data.php`:** whitelist do campo.
+- **`Categorias.jsx` / CSS:** textarea opcional, botões Repor canónico / Limpar, badge «Decl. custom».
+- **`MIGRACAO_MYSQL.md`:** secção 9 (migração incremental).
+
+### Deploy
+- Correr a migração SQL na BD existente; enviar `data.php`, `send-email.php`, front (`dist_upload.zip`).
+
+---
+
+## [1.16.36] — 2026-03-22 — PDF relatório: coluna «dados do serviço»
+
+### Correcção
+- **`gerarPdfRelatorio.js`:** tabela CLIENTE / EQUIPAMENTO / … — rótulos com `splitTextToSize` e coluna de valores mais à direita (`M+74` mm), para rótulos longos (ex. **HORAS NO CONTADOR (ACUMULADAS)**) não sobreporem o valor.
+
+---
+
+## [1.16.35] — 2026-03-22 — KAESER execução: ignorar contador órfão sem concluídas
+
+### Correcção
+- **`sugerirFaseKaeser.js`:** parâmetro `contadorFichaConfiavel` (default true); quando false, não usa `ultimaManutencaoData` nem horas da ficha para Δh / janela anual.
+- **`ExecutarManutencaoModal.jsx`:** sem manutenções **concluídas** na máquina, passa `contadorFichaConfiavel: false`; detalhes mostram **0 h** e texto explicativo; bootstrap de horas não usa ficha órfã; correcção da data de fallback (última concluída = mais **recente**, não a mais antiga).
+
+---
+
+## [1.16.34] — 2026-03-22 — PDF.js worker alinhado ao pdf-parse (5.4.296)
+
+### Correcção
+- **`package.json`:** `pdfjs-dist` fixo em **5.4.296** (mesma versão que `pdf-parse` usa no bundle browser). Corrige erro *«The API version "5.4.296" does not match the Worker version "5.4.624"»* na importação KAESER.
+
+---
+
+## [1.16.33] — 2026-03-22 — PDF worker KAESER (importação template)
+
+### Correcção
+- **`kaeserPlanoPdfImport.js`:** `PDFParse.setWorker()` passa a usar URL gerada pelo Vite a partir de `pdfjs-dist/build/pdf.worker.min.mjs?url` → ficheiro em `assets/` com hash (deploy conjunto com o bundle). Corrige falha em produção quando `/manut/pdf.worker.mjs` na raiz não existia ou o fetch do worker falhava.
+- **`public/pdf.worker.mjs`:** removido (duplicado e desalinhado com a versão npm); **`public/.htaccess`:** `AddType application/javascript .mjs` e cache longo também para `.mjs`.
+
+---
+
 ## [1.16.32] — 2026-03-22 — Contador órfão (ficha + documentação) + plano KAESER na documentação
 
 ### Correcção / UX

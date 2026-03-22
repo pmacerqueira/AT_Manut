@@ -228,3 +228,13 @@ INSERT INTO tecnicos (id, nome, ativo) VALUES
   ('tec-init-2', 'Carlos Ferreira', 1),
   ('tec-init-3', 'Emanuel Santos', 1);
 ```
+
+---
+
+## 9. Migração incremental — declaração por categoria (2025-03)
+
+Bases já criadas antes desta data: executar **uma vez** o script:
+
+`servidor-cpanel/migrations/20250322_categorias_declaracao_cliente.sql`
+
+Isto adiciona a coluna `categorias.declaracao_cliente_depois` (texto opcional do sufixo da declaração de aceitação). Instalações novas a partir de `setup.sql` actualizado já incluem a coluna.
