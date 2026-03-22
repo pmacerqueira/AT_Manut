@@ -14,8 +14,11 @@ import {
   proximaPosicaoKaeser,
   descricaoCicloKaeser,
   isKaeserMarca,
+  isKaeserAbcdMaquina,
 } from '../context/DataContext'
 import { resolveChecklist } from './resolveChecklist'
+import { horasContadorParaRelatorio, horasContadorNaManutencao, parseHorasContadorForm } from './horasContadorEquipamento'
+import { relatorioObrigaBlocoConsumiveisPlano } from './relatorioBlocosEquipamento'
 import { MAX_FOTOS } from '../config/limits'
 import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
 
@@ -42,7 +45,8 @@ function hexToRgba(hex, alpha) {
 export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, checklistItemsLive = [], options = {}) {
   if (!relatorio) return ''
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
-  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios } = options
+  const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios, form } = options
+  const horasContadorRelatorioGeral = horasContadorNaManutencao(manutencao) ?? parseHorasContadorForm(form?.horasServico)
   const logoSrc = logoUrl ?? '/manut/logo-navel.png'
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
@@ -55,13 +59,9 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
   const brandPrimary = normalizeHexColor(maquina?.marcaCorHex, isIstobalReport ? '#c8102e' : '#1a4880')
   const brandSoft = hexToRgba(brandPrimary, 0.12)
 
-  // ── Detecção KAESER — baseada na marca da máquina (não na subcategoria)
-  // KAESER é exclusivo da categoria Compressores; outras marcas (Fini, ECF, IES, LaPadana)
-  // também são compressores mas não usam o formato de relatório KAESER dedicado.
-  const isKaeser = !!(
-    relatorio.tipoManutKaeser ||
-    isKaeserMarca(maquina?.marca)
-  )
+  // Layout dedicado A/B/C/D: só compressores KAESER de parafuso (sub5) ou com secador (sub14).
+  const isKaeserAbcdReport = isKaeserAbcdMaquina(maquina)
+    || (!!relatorio.tipoManutKaeser && isKaeserMarca(maquina?.marca) && ['sub5', 'sub14'].includes(maquina?.subcategoriaId))
   const tipoKaeser       = relatorio.tipoManutKaeser ?? ''
   const infoTipoKaeser   = tipoKaeser ? INTERVALOS_KAESER[tipoKaeser] : null
   const posicaoAtual     = maquina?.posicaoKaeser ?? null
@@ -142,14 +142,13 @@ ${cssBase(brandPrimary, brandSoft)}
 
 ${htmlHeader(logoSrc, logoMarcaSrc, logoMarcaAlt)}
 
-${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : ''), 'Nº de Serviço', relatorio?.numeroRelatorio ?? manutencao?.id ?? '—')}`
+${htmlTituloBar('Relatório de Manutenção' + (isKaeserAbcdReport ? ' — Compressor' : ''), 'Nº de Serviço', relatorio?.numeroRelatorio ?? manutencao?.id ?? '—')}`
 
   // ── Bloco KAESER ── mostrado antes dos dados gerais
-  if (isKaeser) {
+  if (isKaeserAbcdReport) {
     const tipoLabel    = infoTipoKaeser?.label ?? (tipoKaeser ? `Tipo ${tipoKaeser}` : 'Compressor')
     const tipoDesc     = infoTipoKaeser?.descricao ?? ''
-    const horTotal     = maquina?.horasTotaisAcumuladas  ?? form?.horasTotais  ?? null
-    const horServico   = maquina?.horasServicoAcumuladas ?? form?.horasServico ?? null
+    const horContador  = horasContadorParaRelatorio(maquina, manutencao, form)
     const anoFabrico   = maquina?.anoFabrico ?? '—'
     const marca        = esc(maquina?.marca ?? '—')
     const modelo       = esc(maquina?.modelo ?? '—')
@@ -187,15 +186,10 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
       <span class="kaeser-item-valor">${anoFabrico}</span>
       ${numDocVenda ? `<span class="kaeser-item-val-sub">Doc. venda: ${numDocVenda}</span>` : ''}
     </div>
-    ${horTotal != null ? `
+    ${horContador != null ? `
     <div class="kaeser-item">
-      <span class="kaeser-item-label">Horas totais acumuladas</span>
-      <span class="kaeser-item-valor destaque">${horTotal} h</span>
-    </div>` : ''}
-    ${horServico != null ? `
-    <div class="kaeser-item">
-      <span class="kaeser-item-label">Horas de serviço</span>
-      <span class="kaeser-item-valor">${horServico} h</span>
+      <span class="kaeser-item-label">Horas no contador (acumuladas)</span>
+      <span class="kaeser-item-valor destaque">${horContador} h</span>
     </div>` : ''}
     ${cicloAtualDesc ? `
     <div class="kaeser-item">
@@ -212,6 +206,17 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
         </span>` : ''}
       </div>
     </div>
+    ${relatorio.tipoManutKaeserSugerido || relatorio.sugestaoFaseMotivo ? `
+    <div class="kaeser-item" style="grid-column:1/-1;margin-top:4px;padding-top:6px;border-top:1px solid var(--kaeser-borda)">
+      <span class="kaeser-item-label">Registo de sugestão (auditoria)</span>
+      <span class="kaeser-item-valor" style="font-size:10px;font-weight:600">
+        Sugerido: ${esc(relatorio.tipoManutKaeserSugerido ?? '—')}
+        ${relatorio.sugestaoFaseMotivo ? ` · Critério: ${esc(relatorio.sugestaoFaseMotivo)}` : ''}
+        ${relatorio.tipoManutKaeser && relatorio.tipoManutKaeserSugerido && relatorio.tipoManutKaeser !== relatorio.tipoManutKaeserSugerido
+          ? ` · Efectivo: Tipo ${esc(relatorio.tipoManutKaeser)}`
+          : ''}
+      </span>
+    </div>` : ''}
   </div>
 </div>`
   }
@@ -248,7 +253,7 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
 </section>`
 
   // ── Bloco: Equipamento (não-KAESER — KAESER tem o seu próprio bloco acima) ──
-  if (!isKaeser && maquina) {
+  if (!isKaeserAbcdReport && maquina) {
     html += `
 <section>
   <div class="rpt-section-title">Equipamento</div>
@@ -300,14 +305,14 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
       <span class="rpt-label">Técnico responsável</span>
       <span class="rpt-value">${tecnicoNome}</span>
     </div>
-    ${periodicidadeLabel && isKaeser ? `<div class="rpt-field">
+    ${periodicidadeLabel && isKaeserAbcdReport ? `<div class="rpt-field">
       <span class="rpt-label">Periodicidade</span>
       <span class="rpt-value">${esc(periodicidadeLabel)}</span>
     </div>` : ''}
-    ${(manutencao?.horasTotais != null || manutencao?.horasServico != null) && !isKaeser ? `
+    ${horasContadorRelatorioGeral != null && !isKaeserAbcdReport ? `
     <div class="rpt-field rpt-field--full">
-      <span class="rpt-label">Contadores de horas</span>
-      <span class="rpt-value">${manutencao.horasTotais != null ? `Total: ${manutencao.horasTotais} h` : ''}${manutencao.horasTotais != null && manutencao.horasServico != null ? ' · ' : ''}${manutencao.horasServico != null ? `Serviço: ${manutencao.horasServico} h` : ''}</span>
+      <span class="rpt-label">Horas no contador (acumuladas)</span>
+      <span class="rpt-value">${horasContadorRelatorioGeral} h</span>
     </div>` : ''}
   </div>
 </section>`
@@ -316,7 +321,7 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
   if (checklistItems?.length > 0) {
     const secTitleS = `font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px`
 
-    if (isKaeser) {
+    if (isKaeserAbcdReport) {
       html += `
 <section class="section-can-break">
   <div class="rpt-section-title" style="${secTitleS}">Checklist de verificação — ${checklistItems.length} pontos</div>
@@ -369,19 +374,21 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
   const fotosSafe = fotosArr.map(f => safeDataImageUrl(f)).filter(Boolean).slice(0, MAX_FOTOS)
   html += htmlFotos(fotosSafe)
 
-  // ── Consumíveis e peças ──
-  if (relatorio.pecasUsadas?.length > 0) {
+  // ── Consumíveis e peças (obrigatório p/ equip. com plano por série, ex. KAESER) ──
+  const obrigaPecasHtml = relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
+  const pecasRaw = Array.isArray(relatorio.pecasUsadas) ? relatorio.pecasUsadas : []
+  if (obrigaPecasHtml || pecasRaw.length > 0) {
     const normalizar = (p) => {
       if ('usado' in p) return p
       return { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
     }
-    const pecas     = relatorio.pecasUsadas.map(normalizar)
-    const usadas    = pecas.filter(p => p.usado)
+    const pecas = pecasRaw.map(normalizar)
+    const usadas = pecas.filter(p => p.usado)
     const naoUsadas = pecas.filter(p => !p.usado)
 
     const tipoHeaderLabel = tipoKaeser
-      ? `Consumíveis e peças — Manutenção Tipo ${tipoKaeser}${infoTipoKaeser ? ` · ${infoTipoKaeser.label}` : ''}`
-      : 'Consumíveis e peças'
+      ? `Consumíveis e peças (plano fabricante) — Tipo ${tipoKaeser}${infoTipoKaeser ? ` · ${infoTipoKaeser.label}` : ''}`
+      : (obrigaPecasHtml ? 'Consumíveis e peças (plano fabricante)' : 'Consumíveis e peças')
 
     const thS = `background:${PALETA.azulNavel};color:#fff;padding:4px 6px;text-align:left;font-size:${TIPO.label};text-transform:uppercase;letter-spacing:.04em`
     const tdS = `padding:3px 6px;border-bottom:1px solid ${PALETA.bordaLeve};vertical-align:middle;font-size:${TIPO.pequeno};color:${PALETA.texto}`
@@ -393,21 +400,26 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
       const txtDeco = isUsado ? '' : ';text-decoration:line-through;color:#6b7280'
       const statusIcon = isUsado ? '✓' : '✗'
       const statusColor = isUsado ? PALETA.verde : '#6b7280'
+      const qtd = p.quantidadeUsada ?? p.quantidade
       return `
       <tr class="${rowClass} no-break" style="page-break-inside:avoid${bg}">
         <td class="cell-status" style="${tdS};width:20px;text-align:center;font-size:${TIPO.titulo};font-weight:700;color:${statusColor}">${statusIcon}</td>
         <td class="cell-pos" style="${tdS};width:46px;color:${PALETA.muted};font-family:'Courier New',monospace;font-size:${TIPO.label}">${esc(p.posicao ?? '')}</td>
         <td class="cell-code" style="${tdS};width:118px;font-family:'Courier New',monospace">${esc(p.codigoArtigo ?? '')}</td>
         <td style="${tdS}${txtDeco}">${esc(p.descricao ?? '')}</td>
-        <td class="cell-qty" style="${tdS};width:36px;text-align:right;font-weight:600">${p.quantidade ?? ''}</td>
+        <td class="cell-qty" style="${tdS};width:36px;text-align:right;font-weight:600">${qtd ?? ''}</td>
         <td class="cell-un" style="${tdS};width:34px;color:${PALETA.muted};font-size:${TIPO.label}">${esc(p.unidade ?? '')}</td>
       </tr>`
     }
 
     const grpS = `${tdS};background:${PALETA.cinza} !important;font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${PALETA.muted};padding:4px 6px`
 
+    const tbodyVazio = obrigaPecasHtml
+      ? `<tr><td colspan="6" style="${tdS};font-style:italic;color:${PALETA.muted};padding:10px 8px">Nenhuma linha do plano foi registada nesta intervenção. Edite o relatório na app para associar o tipo A/B/C/D e as peças importadas por número de série.</td></tr>`
+      : `<tr><td colspan="6" style="${tdS};color:${PALETA.muted}">—</td></tr>`
+
     html += `
-<section class="section-can-break${isKaeser ? ' page-break-before' : ''}">
+<section class="section-can-break${isKaeserAbcdReport ? ' page-break-before' : ''}">
   <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">${tipoHeaderLabel}</div>
   <table class="pecas-table" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:${TIPO.pequeno};margin-bottom:4px">
     <thead>
@@ -421,18 +433,21 @@ ${htmlTituloBar('Relatório de Manutenção' + (isKaeser ? ' — Compressor' : '
       </tr>
     </thead>
     <tbody>
+      ${pecas.length === 0 ? tbodyVazio : `
       ${usadas.length > 0 ? `<tr class="pecas-group-row pecas-group-usado"><td colspan="6" style="${grpS};border-left:3px solid ${PALETA.verde};color:${PALETA.verde}">✓ Utilizados — ${usadas.length} artigo${usadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
       ${usadas.map(p => linhaHtml(p, 'row-usado')).join('')}
       ${(() => { pecaIdx = 0; return '' })()}
       ${naoUsadas.length > 0 ? `<tr class="pecas-group-row pecas-group-nao-usado"><td colspan="6" style="${grpS};border-left:3px solid #6b7280">✗ Não utilizados — ${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''}</td></tr>` : ''}
       ${naoUsadas.map(p => linhaHtml(p, 'row-nao-usado')).join('')}
+      `}
     </tbody>
   </table>
+  ${pecas.length > 0 ? `
   <div class="pecas-resumo" style="display:flex;gap:16px;padding:4px 6px;background:${PALETA.cinza};border-top:1.5px solid ${PALETA.cinzaBorda};font-size:${TIPO.pequeno}">
     <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${PALETA.verde};display:inline-block"></span>${usadas.length} artigo${usadas.length !== 1 ? 's' : ''} utilizado${usadas.length !== 1 ? 's' : ''}</span>
     ${naoUsadas.length > 0 ? `<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#6b7280;display:inline-block"></span>${naoUsadas.length} artigo${naoUsadas.length !== 1 ? 's' : ''} não substituído${naoUsadas.length !== 1 ? 's' : ''}</span>` : ''}
     <span style="margin-left:auto;color:${PALETA.muted}">${pecas.length} artigo${pecas.length !== 1 ? 's' : ''} no plano</span>
-  </div>
+  </div>` : ''}
 </section>`
   }
 

@@ -555,13 +555,14 @@ test.describe('R8 — Relatório mensal ISTOBAL', () => {
     expect(tituloDepois).toBeTruthy()
   })
 
-  test('Botão "Imprimir / Exportar" está visível no footer', async ({ page }) => {
+  test('Modal mensal tem Obter PDF e Enviar por email', async ({ page }) => {
     await irParaReparacoes(page)
     await page.locator('button').filter({ hasText: 'Mensal ISTOBAL' }).click()
     await page.waitForTimeout(500)
 
     const modal = page.locator('.modal-mensal-istobal')
-    await expect(modal.locator('.modal-footer button').filter({ hasText: /Imprimir|Exportar/ })).toBeVisible()
+    await expect(modal.locator('.modal-footer button').filter({ hasText: /Obter PDF/ })).toBeVisible()
+    await expect(modal.locator('.modal-footer button').filter({ hasText: /Enviar por email/ })).toBeVisible()
   })
 
 })

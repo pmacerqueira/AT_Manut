@@ -1,17 +1,21 @@
-# .htaccess para public_html/api/
-# Carregar este ficheiro para public_html/api/.htaccess
+# .htaccess para public_html/api/ — AT_Manut
 #
-# NOTA: NÃO usar php_value aqui — o servidor usa PHP CGI/FastCGI.
-#       Os limites PHP estão em .user.ini (mesmo directório).
-
-# ── Desactivar ModSecurity para send-email.php ──────────────────────
-<IfModule mod_security2.c>
-    <Files "send-email.php">
-        SecRuleEngine Off
-    </Files>
-</IfModule>
-
-# ── CORS headers ─────────────────────────────────────────────────────
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
-</IfModule>
+# ⚠️ ERRO 500 EM data.php / log-receiver.php?
+# Em muitos alojamentos partilhados (cPanel + LiteSpeed/Apache) NÃO é permitido usar
+# SecRuleEngine dentro de .htaccess. O servidor devolve 500 para TODA a pasta /api/.
+# SOLUÇÃO: apagar este ficheiro OU deixar só comentários (sem <IfModule mod_security2>).
+# O login volta a funcionar de imediato.
+#
+# Para relatório de frota (send-report.php) bloqueado pelo WAF: pedir ao hosting uma
+# regra de excepção ModSecurity para esse URL, ou usar "ModSecurity™" no cPanel por domínio.
+#
+# NÃO usar php_value aqui — limites PHP em .user.ini (mesmo directório).
+#
+# ── OPCIONAL: só activar se o hosting confirmar por escrito que SecRuleEngine em .htaccess é permitido
+# <IfModule mod_security2.c>
+#     <FilesMatch "^(send-email|send-report)\.php$">
+#         SecRuleEngine Off
+#     </FilesMatch>
+# </IfModule>
+#
+# NÃO acrescentar Access-Control-* aqui: data.php / send-report.php já definem CORS em PHP.

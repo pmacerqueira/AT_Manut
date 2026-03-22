@@ -125,6 +125,12 @@
   flex-shrink: 0;
 }
 
+.modal-pecas-import--readonly {
+  justify-content: flex-start;
+  background: var(--color-bg-secondary);
+  border-bottom-color: var(--color-border);
+}
+
 .import-hint {
   font-size: 0.82rem;
   color: var(--color-text-muted);
@@ -255,6 +261,45 @@
 
 .icon-btn.success { color: var(--color-success-dark) !important; }
 .icon-btn.success:hover { background: var(--color-success-dark) !important; color: var(--color-white) !important; }
+
+.modal-pecas-ficha-hint {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+  padding: 0.5rem 0.65rem;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.peca-ficha-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.35rem;
+  margin-right: 0.4rem;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--color-primary, #3b82f6);
+  vertical-align: middle;
+}
+
+.row-ficha-ref .cell-code {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.row-ficha-ref td:not(.cell-code) {
+  color: var(--color-text-muted);
+}
+
+.cell-actions.muted {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
 
 /* Responsive */
 @media (max-width: 600px) {

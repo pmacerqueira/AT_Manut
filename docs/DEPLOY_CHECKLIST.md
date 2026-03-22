@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-03-17 — v1.14.0
+> Última revisão: 2026-03-22 — v1.16.30
 
 ## Resumo da verificação da base de dados
 
@@ -88,7 +88,14 @@ Se a BD foi criada antes das migrações mais recentes:
 | `servidor-cpanel/log-receiver.php` | `public_html/api/log-receiver.php` | Receptor de logs do frontend |
 | `servidor-cpanel/setup.sql` | — | Executar no phpMyAdmin |
 | `servidor-cpanel/seed_mock_data.sql` | — | Executar após setup |
-| Build React (`dist/`) | `public_html/manut/` | `npm run build` |
+| Build React (`dist/`) | `public_html/manut/` | `npm run build` ou `dist_upload.zip` |
+
+### PDFs técnicos dos equipamentos (`uploads/machine-docs/`)
+
+- O primeiro upload via **Documentação técnica** cria automaticamente `public_html/uploads/machine-docs/` (a partir da pasta pai de `api/`, normalmente `public_html/`).
+- Os PDFs ficam com nome `maq-{id}-{timestamp}-{aleatório}.pdf`; as referências e metadados ficam na coluna JSON **`maquinas.documentos`**.
+- **Actualizar `data.php`** no cPanel sempre que o repositório incluir alterações a `machine_pdf` (upload, `replacePath` para substituir ficheiro antigo, limites de tamanho) ou a `maquinas` (merge em updates parciais, etc.).
+- **Frontend:** importações/substituições e gravação da lista usam `DocumentacaoModal.jsx` + `DataContext.addDocumentoMaquina` (v1.16.28+).
 
 ### Build da aplicação React
 

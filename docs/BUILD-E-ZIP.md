@@ -25,7 +25,10 @@ npm run build:zip
 
 Executa `npm run build` (inclui optimize-images) e depois cria `dist_upload.zip`.
 
-**Além do zip:** se alterou envio de email ou PDF no servidor, fazer upload separado de `servidor-cpanel/send-email.php` (ver `docs/FOTOS-PDF-EMAIL-LIMITES.md`).
+**Além do zip:**
+
+- Se alterou **email ou PDF no servidor**, fazer upload separado de `servidor-cpanel/send-email.php` (ver `docs/FOTOS-PDF-EMAIL-LIMITES.md`).
+- Se alterou **API CRUD ou upload de PDFs técnicos** (`machine_pdf`, `replacePath`, `maquinas`), fazer upload de `servidor-cpanel/api/data.php` (e restantes PHP da pasta `api/` se aplicável) para `public_html/api/`. Ver `docs/DEPLOY_CHECKLIST.md`.
 
 ---
 

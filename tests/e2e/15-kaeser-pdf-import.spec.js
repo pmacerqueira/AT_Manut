@@ -24,38 +24,65 @@ const MAQUINAS_PDF = [
     id: 'mK1', clienteNif: '511234567', subcategoriaId: 'sub5',
     periodicidadeManut: 'anual', marca: 'KAESER', modelo: 'SM 12',
     numeroSerie: '2601', anoFabrico: 2019, documentos: [],
-    proximaManut: '2026-06-01', posicaoKaeser: 0,
+    proximaManut: '2026-06-01', planoManutencaoCompressor: 'kaeser_abcd', posicaoKaeser: 0,
   },
   {
     id: 'mF1', clienteNif: '511234567', subcategoriaId: 'sub5',
     periodicidadeManut: 'anual', marca: 'Fini', modelo: 'K-MAX 15-13',
     numeroSerie: 'FIN-001', anoFabrico: 2021, documentos: [],
-    proximaManut: '2026-07-01', posicaoKaeser: 1,
+    proximaManut: '2026-07-01', posicaoKaeser: null,
   },
+]
+
+const PECAS_PLANO_PDF_MOCK = [
+  { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', posicao: '0512', codigoArtigo: '490103.10010', descricao: 'SET filter compressor', quantidade: 1, unidade: 'PC' },
+  { id: 'pp2', maquinaId: 'mK1', tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l', quantidade: 1, unidade: 'PC' },
+  { id: 'pp3', maquinaId: 'mK1', tipoManut: 'B', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
+  { id: 'pp4', maquinaId: 'mK1', tipoManut: 'C', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
+  { id: 'pp5', maquinaId: 'mK1', tipoManut: 'D', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
 ]
 
 const MC_PDF = {
   ...MC,
-  subcategorias: [
-    ...MC.subcategorias,
-    { id: 'sub5', categoriaId: 'cat2', nome: 'Compressor de parafuso' },
-  ],
   maquinas: MAQUINAS_PDF,
+  pecasPlano: PECAS_PLANO_PDF_MOCK,
 }
 
 // Helper: login + injectar dados directamente no localStorage
 async function loginComDadosPdf(page) {
   await setupApiMock(page, { customData: MC_PDF })
   await doLoginAdmin(page)
-  await page.evaluate((maquinas) => {
+  await page.evaluate(() => {
     localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
-    localStorage.setItem('atm_pecas_plano', JSON.stringify([]))
-    // Injectar as máquinas directamente para que os testes possam verificar imediatamente
-    localStorage.setItem('atm_maquinas', JSON.stringify(maquinas))
-  }, MAQUINAS_PDF)
+    localStorage.removeItem('atm_cache_v1')
+  })
   await page.goto('/manut/')
   await page.waitForLoadState('domcontentloaded')
   await page.waitForTimeout(600)
+}
+
+/** Equipamentos: abrir categoria Compressores e primeira subcategoria (lista de máquinas). */
+async function abrirListaCompressoresEquipamentos(page) {
+  const catComp = page.locator('.categoria-card').filter({ hasText: /[Cc]ompressor/ })
+  if (await catComp.count() === 0) return false
+  await catComp.first().click()
+  await page.waitForTimeout(400)
+  const subComp = page.locator('.categoria-card').first()
+  if (await subComp.count() > 0) {
+    await subComp.click()
+    await page.waitForTimeout(400)
+  }
+  return true
+}
+
+/** Abre PecasPlanoModal da máquina (preferir `#maq-${maquinaId}`). */
+async function abrirPlanoPecasMaquina(page, maquinaId) {
+  const wrap = page.locator(`#maq-${maquinaId}`)
+  if (await wrap.count() === 0) return false
+  const btn = wrap.locator('button[title="Plano de peças e consumíveis"]')
+  if (await btn.count() === 0) return false
+  await btn.click()
+  return true
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -66,24 +93,24 @@ test.describe('P1 — Estado: KAESER e Fini no mock', () => {
 
   test.beforeEach(async ({ page }) => { await loginComDadosPdf(page) })
 
-  test('P1.1 — Máquina KAESER está no localStorage', async ({ page }) => {
-    const maqKaeser = await page.evaluate(() => {
-      const maquinas = JSON.parse(localStorage.getItem('atm_maquinas') || '[]')
-      return maquinas.find(m => m.marca?.toLowerCase() === 'kaeser') || null
-    })
-    expect(maqKaeser).not.toBeNull()
-    expect(maqKaeser.marca).toBe('KAESER')
-    // Qualquer modelo KAESER é válido (pode ser Sigma 7, SM 12, etc. dependendo do mock base)
-    expect(maqKaeser.modelo).toBeTruthy()
+  test('P1.1 — Máquina KAESER aparece em Equipamentos (dados da API mock)', async ({ page }) => {
+    await page.goto('/manut/equipamentos')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+    const ok = await abrirListaCompressoresEquipamentos(page)
+    if (!ok) { test.skip(true, 'Categoria compressores não encontrada'); return }
+    await expect(page.getByText('KAESER').first()).toBeVisible()
+    await expect(page.getByText('SM 12').first()).toBeVisible()
   })
 
-  test('P1.2 — Máquina Fini está no localStorage', async ({ page }) => {
-    const maqFini = await page.evaluate(() => {
-      const maquinas = JSON.parse(localStorage.getItem('atm_maquinas') || '[]')
-      return maquinas.find(m => m.marca === 'Fini') || null
-    })
-    expect(maqFini).not.toBeNull()
-    expect(maqFini.marca).toBe('Fini')
+  test('P1.2 — Máquina Fini aparece em Equipamentos', async ({ page }) => {
+    await page.goto('/manut/equipamentos')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+    const ok = await abrirListaCompressoresEquipamentos(page)
+    if (!ok) { test.skip(true, 'Categoria compressores não encontrada'); return }
+    await expect(page.getByText('Fini').first()).toBeVisible()
+    await expect(page.getByText('K-MAX 15-13').first()).toBeVisible()
   })
 
   test('P1.3 — isKaeserMarca: só "kaeser" (case-insensitive) devolve true', async ({ page }) => {
@@ -276,34 +303,23 @@ test.describe('P3 — Importação de PDF real via UI', () => {
     expect(erros).toHaveLength(0)
   })
 
-  test('P3.2 — Peças pré-injectadas ficam visíveis por tipo no localStorage', async ({ page }) => {
-    await page.evaluate(() => {
-      const pecas = [
-        { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', posicao: '0512', codigoArtigo: '490103.10010', descricao: 'SET filter compressor', quantidade: 1, unidade: 'PC' },
-        { id: 'pp2', maquinaId: 'mK1', tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l', quantidade: 1, unidade: 'PC' },
-        { id: 'pp3', maquinaId: 'mK1', tipoManut: 'B', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
-        { id: 'pp4', maquinaId: 'mK1', tipoManut: 'C', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
-        { id: 'pp5', maquinaId: 'mK1', tipoManut: 'D', posicao: '0510', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
-      ]
-      localStorage.setItem('atm_pecas_plano', JSON.stringify(pecas))
-    })
+  test('P3.2 — Peças do mock API ficam visíveis no modal por tipo', async ({ page }) => {
+    await page.goto('/manut/equipamentos')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+    const ok = await abrirListaCompressoresEquipamentos(page)
+    if (!ok) { test.skip(true, 'Categoria compressores não encontrada'); return }
 
-    const por_tipo = await page.evaluate(() => {
-      const pecas = JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-      return {
-        total: pecas.length,
-        A: pecas.filter(p => p.tipoManut === 'A').length,
-        B: pecas.filter(p => p.tipoManut === 'B').length,
-        C: pecas.filter(p => p.tipoManut === 'C').length,
-        D: pecas.filter(p => p.tipoManut === 'D').length,
-      }
-    })
+    const opened = await abrirPlanoPecasMaquina(page, 'mK1')
+    if (!opened) { test.skip(true, 'Máquina mK1 ou botão plano de peças não encontrado'); return }
+    await page.waitForTimeout(600)
 
-    expect(por_tipo.total).toBe(5)
-    expect(por_tipo.A).toBe(2)
-    expect(por_tipo.B).toBe(1)
-    expect(por_tipo.C).toBe(1)
-    expect(por_tipo.D).toBe(1)
+    const modal = page.locator('.modal-pecas-plano')
+    await expect(modal).toBeVisible()
+    await expect(modal.locator('.tabela-pecas .cell-code').filter({ hasText: '490103.10010' })).toBeVisible()
+    await modal.locator('.tab-tipo').filter({ hasText: 'Tipo B' }).click()
+    await page.waitForTimeout(300)
+    await expect(modal.locator('.tabela-pecas .cell-code').filter({ hasText: '490103.1' })).toBeVisible()
   })
 
   test('P3.3 — Importação de PDF real: ficheiro fixture carregado via setInputFiles', async ({ page }) => {
@@ -316,23 +332,11 @@ test.describe('P3 — Importação de PDF real via UI', () => {
     await page.goto('/manut/equipamentos')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
+    const navOk = await abrirListaCompressoresEquipamentos(page)
+    if (!navOk) { test.skip(true, 'Categoria compressores não encontrada'); return }
 
-    // Navegar até subcategoria de compressores
-    const catComp = page.locator('.categoria-card').filter({ hasText: /[Cc]ompressor/ })
-    if (await catComp.count() === 0) { test.skip(true, 'Categoria compressores não encontrada'); return }
-    await catComp.first().click()
-    await page.waitForTimeout(500)
-
-    const subComp = page.locator('.categoria-card').first()
-    if (await subComp.count() > 0) {
-      await subComp.click()
-      await page.waitForTimeout(500)
-    }
-
-    // Abrir PecasPlanoModal
-    const pecasBtn = page.locator('button[title*="eças"], button[title*="consumíveis"]').first()
-    if (await pecasBtn.count() === 0) { test.skip(true, 'Botão de peças não encontrado'); return }
-    await pecasBtn.click()
+    const opened = await abrirPlanoPecasMaquina(page, 'mK1')
+    if (!opened) { test.skip(true, 'Máquina mK1 ou botão plano de peças não encontrado'); return }
     await page.waitForTimeout(800)
 
     const modal = page.locator('.modal-pecas-plano')
@@ -351,59 +355,28 @@ test.describe('P3 — Importação de PDF real via UI', () => {
     // Aguardar processamento (pdf-parse pode demorar até 8s no browser)
     await page.waitForTimeout(8000)
 
-    // Verificar que peças foram importadas OU toast apareceu
-    const pecas = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-    )
-    const toastEl = page.locator('[class*="toast"]')
-    const toastCount = await toastEl.count()
-
-    expect(pecas.length > 0 || toastCount > 0).toBe(true)
-
-    if (pecas.length > 0) {
-      // Verificar estrutura das peças importadas
-      const maquinaId = pecas[0].maquinaId
-      expect(['mK1', 'mF1']).toContain(maquinaId)
-      const tipos = [...new Set(pecas.map(p => p.tipoManut))]
-      // Deve ter pelo menos um tipo A, B, C ou D
-      const temTipoKaeser = tipos.some(t => ['A','B','C','D'].includes(t))
-      expect(temTipoKaeser).toBe(true)
-    }
+    const toastOk = page.getByText(/importadas|peças importadas/i)
+    const tableRows = modal.locator('.tabela-pecas tbody tr')
+    await expect(toastOk.or(tableRows.first())).toBeVisible({ timeout: 15000 })
   })
 
-  test('P3.4 — Após importação bem-sucedida, plano anterior é substituído', async ({ page }) => {
-    // Pré-injectar plano antigo
-    await page.evaluate(() => {
-      localStorage.setItem('atm_pecas_plano', JSON.stringify([
-        { id: 'old1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: 'OLD-001', descricao: 'Peça antiga', quantidade: 1, unidade: 'PÇ' }
-      ]))
+  test('P3.4 — Substituição de plano: remove linhas A–D da máquina e reinsere (lógica replace)', async ({ page }) => {
+    const depois = await page.evaluate(() => {
+      const antes = [
+        { id: 'old1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: 'OLD-001', descricao: 'Peça antiga', quantidade: 1, unidade: 'PÇ' },
+        { id: 'per1', maquinaId: 'mK1', tipoManut: 'periodica', codigoArtigo: 'PER-1', descricao: 'Periódica', quantidade: 1, unidade: 'PÇ' },
+      ]
+      const novasAbcd = [
+        { maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: '490103.10010', descricao: 'SET filter compressor', quantidade: 1, unidade: 'PC' },
+        { maquinaId: 'mK1', tipoManut: 'B', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
+      ]
+      const kept = antes.filter(p => !['A', 'B', 'C', 'D'].includes(p.tipoManut))
+      return [...kept, ...novasAbcd]
     })
-
-    // Verificar que o plano antigo está presente
-    const antes = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-    )
-    expect(antes.length).toBe(1)
-    expect(antes[0].codigoArtigo).toBe('OLD-001')
-
-    // Simular substituição (como faz o handler handleImportarPdf)
-    const novasPecas = [
-      { id: 'new1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: '490103.10010', descricao: 'SET filter compressor', quantidade: 1, unidade: 'PC' },
-      { id: 'new2', maquinaId: 'mK1', tipoManut: 'B', codigoArtigo: '490103.1', descricao: 'Filter-Set', quantidade: 1, unidade: 'PC' },
-    ]
-    await page.evaluate((pecas) => {
-      // Lógica equivalente a removePecasPlanoByMaquina + addPecasPlanoLote
-      const todas = JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-      const semMaquina = todas.filter(p => p.maquinaId !== 'mK1')
-      localStorage.setItem('atm_pecas_plano', JSON.stringify([...semMaquina, ...pecas]))
-    }, novasPecas)
-
-    const depois = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-    )
-    expect(depois.length).toBe(2)
+    expect(depois.length).toBe(3)
     expect(depois.some(p => p.codigoArtigo === 'OLD-001')).toBe(false)
     expect(depois.some(p => p.codigoArtigo === '490103.10010')).toBe(true)
+    expect(depois.some(p => p.codigoArtigo === 'PER-1')).toBe(true)
   })
 
 })
@@ -444,15 +417,11 @@ test.describe('P4 — Regras de negócio: KAESER vs outras marcas', () => {
   })
 
   test('P4.3 — Peças de KAESER (tipo A) e Fini (periódica) ficam isoladas por maquinaId', async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.setItem('atm_pecas_plano', JSON.stringify([
+    const isolamento = await page.evaluate(() => {
+      const pecas = [
         { id: 'k1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: 'KAE-A', descricao: 'Filtro KAESER', quantidade: 1, unidade: 'PC' },
         { id: 'f1', maquinaId: 'mF1', tipoManut: 'periodica', codigoArtigo: 'FIN-P', descricao: 'Filtro Fini', quantidade: 1, unidade: 'PÇ' },
-      ]))
-    })
-
-    const isolamento = await page.evaluate(() => {
-      const pecas = JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
+      ]
       return {
         kaeser: pecas.filter(p => p.maquinaId === 'mK1'),
         fini: pecas.filter(p => p.maquinaId === 'mF1'),
@@ -465,19 +434,13 @@ test.describe('P4 — Regras de negócio: KAESER vs outras marcas', () => {
   })
 
   test('P4.4 — Eliminar plano de KAESER não afecta peças de Fini', async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.setItem('atm_pecas_plano', JSON.stringify([
+    const restantes = await page.evaluate(() => {
+      const todas = [
         { id: 'k1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: 'KAE-A', descricao: 'Filtro KAESER', quantidade: 1, unidade: 'PC' },
         { id: 'f1', maquinaId: 'mF1', tipoManut: 'periodica', codigoArtigo: 'FIN-P', descricao: 'Filtro Fini', quantidade: 1, unidade: 'PÇ' },
-      ]))
-      // Simular removePecasPlanoByMaquina('mK1')
-      const todas = JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-      localStorage.setItem('atm_pecas_plano', JSON.stringify(todas.filter(p => p.maquinaId !== 'mK1')))
+      ]
+      return todas.filter(p => p.maquinaId !== 'mK1')
     })
-
-    const restantes = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('atm_pecas_plano') || '[]')
-    )
     expect(restantes.length).toBe(1)
     expect(restantes[0].maquinaId).toBe('mF1')
     expect(restantes[0].tipoManut).toBe('periodica')

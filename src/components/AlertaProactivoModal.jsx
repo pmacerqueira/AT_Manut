@@ -198,10 +198,10 @@ export default function AlertaProactivoModal({ isOpen, alertas, onDismiss, onClo
 
         {/* Rodapé */}
         <div className="alerta-footer form-actions">
-          <button type="button" className="btn secondary" onClick={onDismiss}>
+          <button type="button" className="btn secondary alerta-btn-dispensar" onClick={onDismiss}>
             Dispensar hoje
           </button>
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="btn alerta-btn-fechar" onClick={onClose}>
             Fechar
           </button>
         </div>

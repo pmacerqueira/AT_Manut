@@ -12,6 +12,7 @@ import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
+import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
 import { getDeclaracaoCliente } from '../constants/relatorio'
@@ -701,6 +702,8 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                   />
                 </div>
               </div>
+
+              <MaquinaDocumentacaoLinks maquina={maq} />
 
               {/* Secção: Peças / Consumíveis */}
               <div className="exec-section">

@@ -3,15 +3,22 @@ export const STATUS_MANUTENCAO_ABERTA = new Set(['pendente', 'agendada', 'em_pro
 
 const STATUS_PROXIMA = STATUS_MANUTENCAO_ABERTA
 
+/** IDs vindos da API podem ser number ou string — comparação estrita falhava e deixava proximaManut vazio. */
+function nid(v) {
+  if (v == null || v === '') return ''
+  return String(v)
+}
+
 /**
  * Menor data `YYYY-MM-DD` entre manutenções ainda não concluídas para a máquina.
  * Alinha ficha de cliente e campo `maquinas.proximaManut` com a lista «próximas».
  */
 export function minDataManutencaoAberta(maquinaId, listaManutencoes) {
   if (!maquinaId || !Array.isArray(listaManutencoes)) return null
+  const mid = nid(maquinaId)
   let min = null
   for (const m of listaManutencoes) {
-    if (m.maquinaId !== maquinaId) continue
+    if (nid(m.maquinaId) !== mid) continue
     if (!STATUS_PROXIMA.has(m.status)) continue
     const d = m.data
     if (d == null || d === '') continue
@@ -26,8 +33,9 @@ export function minDataManutencaoAberta(maquinaId, listaManutencoes) {
  */
 export function listManutencoesAbertasOrdenadas(maquinaId, listaManutencoes) {
   if (!maquinaId || !Array.isArray(listaManutencoes)) return []
+  const mid = nid(maquinaId)
   return listaManutencoes
-    .filter(m => m.maquinaId === maquinaId && STATUS_PROXIMA.has(m.status))
+    .filter(m => nid(m.maquinaId) === mid && STATUS_PROXIMA.has(m.status))
     .filter(m => m.data != null && m.data !== '')
     .sort((a, b) => {
       const c = String(a.data).localeCompare(String(b.data))

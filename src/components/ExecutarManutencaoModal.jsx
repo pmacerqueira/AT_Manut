@@ -1,6 +1,7 @@
 /**
  * ExecutarManutencaoModal – Modal para executar manutenção.
- * Fluxo: checklist → notas + fotos → técnico (obrigatório) → nome cliente (obrigatório) → assinatura digital (obrigatória).
+ * Fluxo standard: checklist → notas + fotos → técnico → cliente → assinatura → finalizar.
+ * KAESER A/B/C/D (periódica): horas de serviço + tipo → consumíveis (qtd editável) → checklist → resto igual.
  * Fotos: câmara ou galeria; compressão em `utils/comprimirImagemRelatorio.js`.
  */
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
@@ -8,25 +9,47 @@ import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { logger } from '../utils/logger'
-import { TIPOS_DOCUMENTO, SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, INTERVALOS_KAESER, tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../context/DataContext'
+import {
+  SUBCATEGORIAS_COM_CONTADOR_HORAS,
+  INTERVALOS_KAESER,
+  SEQUENCIA_KAESER,
+  tipoKaeserNaPosicao,
+  proximaPosicaoKaeser,
+  descricaoCicloKaeser,
+  isKaeserAbcdMaquina,
+  tipoKaeserSugeridoPorHorasServico,
+} from '../context/DataContext'
+import { KAESER_INTERVALO_HORAS_REF, KAESER_ANUAL_MIN_DIAS, KAESER_DELTA_H_WARNING_ANUAL } from '../constants/kaeserCiclo.js'
+import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
-import { pt } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
+import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown, Plus, HelpCircle } from 'lucide-react'
 import { usePermissions } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { isEmailConfigured } from '../config/emailConfig'
-import { safeHttpUrl } from '../utils/sanitize'
+import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { MAX_FOTOS } from '../config/limits'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
 import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
+import {
+  horasContadorNaFicha,
+  horasContadorNaManutencao,
+  parseHorasContadorForm,
+} from '../utils/horasContadorEquipamento.js'
 
-const STEP_LABELS = ['Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
-const TOTAL_STEPS = 7
+const STEP_LABELS_BASE = ['Confirmação', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
+const STEP_LABELS_KAESER = ['Confirmação', 'Horas e fase KAESER', 'Consumíveis', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
+
+function sanitizarPecasRelatorio(pecasUsadas) {
+  return pecasUsadas.map(p => {
+    const q = Math.max(0, Number(p.quantidadeUsada ?? p.quantidade ?? 0))
+    return { ...p, quantidade: q, quantidadeUsada: q, usado: q > 0 }
+  })
+}
 
 const QUICK_NOTES_DEFAULT = [
   'Equipamento em bom estado geral',
@@ -47,6 +70,14 @@ function getQuickNotes() {
     if (Array.isArray(stored) && stored.length > 0) return stored
   } catch { /* fallback */ }
   return QUICK_NOTES_DEFAULT
+}
+
+/** Observações com texto livre + pelo menos um excerto das notas rápidas (lista configurável). */
+function notasCumpremMinimoObservacoes(notas, quickNotesList) {
+  const t = (notas || '').trim()
+  if (!t) return false
+  const list = Array.isArray(quickNotesList) && quickNotesList.length > 0 ? quickNotesList : QUICK_NOTES_DEFAULT
+  return list.some((q) => typeof q === 'string' && q.trim().length > 0 && t.includes(q))
 }
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false }) {
@@ -82,7 +113,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [form, setForm] = useState({
     checklistRespostas: {},
     notas: '',
-    horasTotais: '',
     horasServico: '',
     tecnico: '',
     nomeAssinante: '',
@@ -109,6 +139,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   /** idle | form | no_intervention | choose_intervention — só para abertura sem `manutencao` explícita. */
   const [execUiPhase, setExecUiPhase] = useState('idle')
   const [opcoesEscolha, setOpcoesEscolha] = useState([])
+  const [kaeserCalcDetalhesOpen, setKaeserCalcDetalhesOpen] = useState(false)
+  const [kaeserPecasDirty, setKaeserPecasDirty] = useState(false)
+  const [confirmaEquipamentoSerie, setConfirmaEquipamentoSerie] = useState(false)
+  const [kaeserSemConsumiveis, setKaeserSemConsumiveis] = useState(false)
 
   const navigate = useNavigate()
   const canvasRef   = useRef(null)
@@ -119,13 +153,71 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   /** Evita repetir bootstrap do formulário para o mesmo `manutencaoAtual.id`. */
   const bootstrappedIdRef = useRef(null)
   const modalRef = useRef(null)
+  /** Última sugestão do motor (para auditoria no relatório). */
+  const kaeserAuditoriaRef = useRef({ tipoSugerido: null, motivo: null })
+  const kaeserWarnAnualHighDeltaRef = useRef(false)
 
   const maq = maquina
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
   const temContadorHoras = maq && SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq.subcategoriaId)
-  const isCompressor = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
+  const isKaeserAbcdMaq = maq ? isKaeserAbcdMaquina(maq) : false
+  const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual && manutencaoAtual.tipo !== 'montagem')
+  const useKaeserPipeline = isKaeserPeriodicExec && !adminEdit
+
+  const fallbackUltimaManutDataKaeser = useMemo(() => {
+    if (!maq?.id) return null
+    const done = manutencoes
+      .filter(mt => mt.maquinaId === maq.id && mt.status === 'concluida')
+      .sort((a, b) => a.data.localeCompare(b.data))
+    return done[0]?.data ?? null
+  }, [maq?.id, manutencoes])
+
+  const conflitoHorasFichaVsUltimoRel = useMemo(() => {
+    if (!maq?.id) return null
+    const last = manutencoes
+      .filter(mt => mt.maquinaId === maq.id && mt.status === 'concluida')
+      .sort((a, b) => b.data.localeCompare(a.data))[0]
+    if (!last) return null
+    const hm = horasContadorNaFicha(maq)
+    const hr = horasContadorNaManutencao(last)
+    if (hm == null || hr == null || Number(hm) === Number(hr)) return null
+    return { last, hm, hr }
+  }, [maq, manutencoes])
+
+  const W = useMemo(() => {
+    if (useKaeserPipeline) {
+      return {
+        total: 10,
+        labels: STEP_LABELS_KAESER,
+        verif: 1,
+        horas: 2,
+        pecas: 3,
+        checklist: 4,
+        notas: 5,
+        fotos: 6,
+        tec: 7,
+        cli: 8,
+        ass: 9,
+        fin: 10,
+      }
+    }
+    return {
+      total: 8,
+      labels: STEP_LABELS_BASE,
+      verif: 1,
+      checklist: 2,
+      notas: 3,
+      fotos: 4,
+      tec: 5,
+      cli: 6,
+      ass: 7,
+      fin: 8,
+      horas: null,
+      pecas: null,
+    }
+  }, [useKaeserPipeline])
 
   useLayoutEffect(() => {
     if (!isOpen) {
@@ -137,6 +229,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setConfirmacaoPendente(null)
       setPreviewLoading(false)
       if (previewPdfUrl) { URL.revokeObjectURL(previewPdfUrl); setPreviewPdfUrl(null) }
+      setKaeserCalcDetalhesOpen(false)
+      setKaeserPecasDirty(false)
+      setConfirmaEquipamentoSerie(false)
+      setKaeserSemConsumiveis(false)
+      kaeserAuditoriaRef.current = { tipoSugerido: null, motivo: null }
+      kaeserWarnAnualHighDeltaRef.current = false
       return
     }
     if (!maq) return
@@ -213,26 +311,58 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     checklistItems.forEach(it => {
       checklistRespostas[it.id] = fontePreFill?.checklistRespostas?.[it.id] ?? ''
     })
-    const isCompressorMaq = maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId)
-    const tipoAutoCiclo = isCompressorMaq && maq.posicaoKaeser != null
+    const tipoAutoCiclo = isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null
       ? tipoKaeserNaPosicao(maq.posicaoKaeser)
       : ''
-    const tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
+    const horasNaManutAberta = m ? horasContadorNaManutencao(m) : null
+    const horasNaFicha = horasContadorNaFicha(maq)
+    const hsBootstrapRaw = horasNaManutAberta ?? horasNaFicha
+    const hsBootstrap = hsBootstrapRaw != null ? Number(hsBootstrapRaw) : NaN
+    const sugBootstrap = isKaeserAbcdMaquina(maq) && Number.isFinite(hsBootstrap) && hsBootstrap >= 0
+      ? sugerirFaseKaeser({
+          maquina: maq,
+          horasServicoAtuais: hsBootstrap,
+          dataExecucao: getHojeAzores(),
+          fallbackUltimaData: fallbackUltimaManutDataKaeser,
+        })
+      : null
+    let tipoManutKaeser = existingRel?.tipoManutKaeser ?? m?.tipoManutKaeser ?? tipoAutoCiclo
+    if (!tipoManutKaeser && sugBootstrap) {
+      tipoManutKaeser = sugBootstrap.tipoPreSelecao
+    }
+    kaeserAuditoriaRef.current = {
+      tipoSugerido: existingRel?.tipoManutKaeserSugerido ?? sugBootstrap?.tipoPreSelecao ?? null,
+      motivo: existingRel?.sugestaoFaseMotivo ?? sugBootstrap?.motivoPrincipal ?? null,
+    }
     const pecasExistentes = existingRel?.pecasUsadas ?? []
-    const normalizarPecas = (lista) => lista.map(p =>
-      'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
-    )
+    const normalizarPecasBootstrap = (lista) => lista.map(p => {
+      if (p.quantidadeUsada != null && p.quantidadeUsada !== '') {
+        const q = Math.max(0, Number(p.quantidadeUsada))
+        return { ...p, quantidadeUsada: q, quantidade: q, usado: q > 0 }
+      }
+      if ('usado' in p) {
+        const q = p.usado ? Math.max(1, Number(p.quantidade ?? 1)) : 0
+        return { ...p, quantidadeUsada: q, quantidade: q, usado: p.usado }
+      }
+      const q = Math.max(0, Number(p.quantidade ?? 0))
+      return { ...p, quantidadeUsada: q > 0 ? q : 1, quantidade: q > 0 ? q : 1, usado: q > 0 }
+    })
     const pecasUsadas = pecasExistentes.length > 0
-      ? normalizarPecas(pecasExistentes)
+      ? normalizarPecasBootstrap(pecasExistentes)
       : (tipoManutKaeser && maq
-          ? (getPecasPlanoByMaquina(maq.id, tipoManutKaeser) ?? []).map(p => ({ ...p, usado: true }))
+          ? (getPecasPlanoByMaquina(maq.id, tipoManutKaeser) ?? []).map(p => ({
+              ...p,
+              quantidadeUsada: 1,
+              quantidade: 1,
+              usado: true,
+            }))
           : [])
     const nomePreenchido = existingRel?.nomeAssinante || cli?.nomeContacto || ''
+    const horasIniciaisUnificadas = horasNaManutAberta ?? horasNaFicha
     setForm({
       checklistRespostas,
       notas: isPreFilled ? '' : (existingRel?.notas ?? '').slice(0, 300),
-      horasTotais: '',
-      horasServico: '',
+      horasServico: horasIniciaisUnificadas != null ? String(horasIniciaisUnificadas) : '',
       tecnico: existingRel?.tecnico ?? '',
       nomeAssinante: nomePreenchido,
       tipoManutKaeser,
@@ -265,7 +395,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         img.src = cli.assinaturaContacto
       }
     })
-  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser])
 
   const confirmarCriarIntervencaoHoje = useCallback(() => {
     if (!maq) return
@@ -419,33 +549,79 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
   // ── Wizard: validação por etapa + navegação ──────────────────────────────
   const validateStep = useCallback((s) => {
-    switch (s) {
-      case 1: {
-        const todasMarcadas = items.length === 0 || items.every(it =>
-          form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
-        )
-        if (!todasMarcadas) {
-          setErroChecklist('Todas as linhas da checklist devem ser verificadas.')
+    const validarChecklistCompleta = () => {
+      const todasMarcadas = items.length === 0 || items.every(it =>
+        form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
+      )
+      if (!todasMarcadas) {
+        setErroChecklist('Todas as linhas da checklist devem ser verificadas.')
+        return false
+      }
+      setErroChecklist('')
+      return true
+    }
+
+    if (s === W.verif) {
+      if (!confirmaEquipamentoSerie) {
+        setErroChecklist('Confirme o número de série do equipamento antes de avançar.')
+        return false
+      }
+      if (temContadorHoras && !useKaeserPipeline) {
+        const hs = String(form.horasServico).trim()
+        if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
+          setErroChecklist('Indique as horas no contador (acumuladas) — leitura actual.')
+          return false
+        }
+      }
+      setErroChecklist('')
+      return true
+    }
+
+    if (useKaeserPipeline) {
+      if (s === W.horas) {
+        const hs = String(form.horasServico).trim()
+        if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
+          setErroChecklist('Indique as horas no contador (acumuladas) do compressor.')
+          return false
+        }
+        if (!form.tipoManutKaeser) {
+          setErroChecklist('Seleccione o tipo de manutenção KAESER (A/B/C/D).')
           return false
         }
         setErroChecklist('')
         return true
       }
-      case 2: {
-        if (!form.notas.trim() && confirmacaoPendente !== 'notas') {
-          setConfirmacaoPendente('notas')
+      if (s === W.pecas) {
+        const pecasSan = sanitizarPecasRelatorio(form.pecasUsadas)
+        const algumUsado = pecasSan.some(p => p.usado && Number(p.quantidadeUsada) > 0)
+        if (!algumUsado && !kaeserSemConsumiveis) {
+          setErroChecklist('Indique consumíveis com quantidade superior a zero ou confirme que não houve materiais nesta intervenção.')
           return false
         }
+        setErroChecklist('')
         return true
       }
-      case 3: {
+      if (s === W.checklist) return validarChecklistCompleta()
+      if (s === W.notas) {
+        if (!form.notas.trim()) {
+          setErroChecklist('As observações são obrigatórias. Utilize uma nota rápida ou descreva o trabalho.')
+          return false
+        }
+        if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
+          setErroChecklist('Inclua pelo menos uma das notas rápidas (toque num chip) para reforçar o relatório.')
+          return false
+        }
+        setErroChecklist('')
+        return true
+      }
+      if (s === W.fotos) {
         if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
           setConfirmacaoPendente('fotos')
           return false
         }
         return true
       }
-      case 4: {
+      if (s === W.tec) {
         if (!form.tecnico) {
           setErroAssinatura('Selecione o técnico que realizou a manutenção.')
           return false
@@ -453,7 +629,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         setErroAssinatura('')
         return true
       }
-      case 5: {
+      if (s === W.cli) {
         if (!form.nomeAssinante.trim()) {
           setErroAssinatura('Indique o nome do cliente que assina o relatório.')
           return false
@@ -461,7 +637,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         setErroAssinatura('')
         return true
       }
-      case 6: {
+      if (s === W.ass) {
         if (!isAdmin && !assinaturaFeita) {
           setErroAssinatura('A assinatura digital do cliente é obrigatória.')
           return false
@@ -469,19 +645,64 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         setErroAssinatura('')
         return true
       }
-      default:
-        return true
+      return true
     }
-  }, [form, items, fotos, assinaturaFeita, confirmacaoPendente, isAdmin])
+
+    if (s === W.checklist) return validarChecklistCompleta()
+    if (s === W.notas) {
+      if (!form.notas.trim()) {
+        setErroChecklist('As observações são obrigatórias. Utilize uma nota rápida ou descreva o trabalho.')
+        return false
+      }
+      if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
+        setErroChecklist('Inclua pelo menos uma das notas rápidas (toque num chip) para reforçar o relatório.')
+        return false
+      }
+      setErroChecklist('')
+      return true
+    }
+    if (s === W.fotos) {
+      if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
+        setConfirmacaoPendente('fotos')
+        return false
+      }
+      return true
+    }
+    if (s === W.tec) {
+      if (!form.tecnico) {
+        setErroAssinatura('Selecione o técnico que realizou a manutenção.')
+        return false
+      }
+      setErroAssinatura('')
+      return true
+    }
+    if (s === W.cli) {
+      if (!form.nomeAssinante.trim()) {
+        setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        return false
+      }
+      setErroAssinatura('')
+      return true
+    }
+    if (s === W.ass) {
+      if (!isAdmin && !assinaturaFeita) {
+        setErroAssinatura('A assinatura digital do cliente é obrigatória.')
+        return false
+      }
+      setErroAssinatura('')
+      return true
+    }
+    return true
+  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes])
 
   const goNext = useCallback(() => {
-    if (step >= TOTAL_STEPS) return
+    if (step >= W.total) return
     if (!validateStep(step)) return
     setStep(s => s + 1)
     setConfirmacaoPendente(null)
     setErroChecklist('')
     setErroAssinatura('')
-  }, [step, validateStep])
+  }, [step, W.total, validateStep])
 
   const goPrev = useCallback(() => {
     setStep(s => Math.max(1, s - 1))
@@ -489,6 +710,58 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroChecklist('')
     setErroAssinatura('')
   }, [])
+
+  const pecasDoPlanoKaeser = useCallback((tipo) => {
+    if (!tipo || !maq) return []
+    return (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({
+      ...p,
+      quantidadeUsada: 1,
+      quantidade: 1,
+      usado: true,
+    }))
+  }, [maq, getPecasPlanoByMaquina])
+
+  /** Altera tipo KAESER e repõe consumíveis do plano; confirma se `pecasDirty` (excepto `skipDirtyConfirm`). */
+  const aplicarTipoKaeserComPecas = useCallback((tipo, opts = {}) => {
+    const skipDirtyConfirm = opts.skipDirtyConfirm === true
+    if (!tipo) {
+      setKaeserPecasDirty(false)
+      setForm(f => ({ ...f, tipoManutKaeser: '', pecasUsadas: [] }))
+      return
+    }
+    if (!skipDirtyConfirm && kaeserPecasDirty && form.tipoManutKaeser && form.tipoManutKaeser !== tipo) {
+      if (!window.confirm('Já alterou consumíveis manualmente. Substituir pelo plano do tipo seleccionado?')) return
+    }
+    setKaeserPecasDirty(false)
+    setForm(f => ({
+      ...f,
+      tipoManutKaeser: tipo,
+      pecasUsadas: pecasDoPlanoKaeser(tipo),
+    }))
+  }, [pecasDoPlanoKaeser, kaeserPecasDirty, form.tipoManutKaeser])
+
+  const kaeserSugestaoLive = useMemo(() => {
+    if (!maq || !isKaeserAbcdMaq) return null
+    const hs = parseInt(String(form.horasServico).trim(), 10)
+    if (!Number.isFinite(hs) || hs < 0) return null
+    return sugerirFaseKaeser({
+      maquina: maq,
+      horasServicoAtuais: hs,
+      dataExecucao: getHojeAzores(),
+      fallbackUltimaData: fallbackUltimaManutDataKaeser,
+    })
+  }, [maq, isKaeserAbcdMaq, form.horasServico, fallbackUltimaManutDataKaeser])
+
+  useEffect(() => {
+    if (!useKaeserPipeline || step !== W.horas) return
+    const s = kaeserSugestaoLive
+    if (!s || s.motivoPrincipal !== 'anual') return
+    const dh = s.detalhes.deltaH
+    if (dh == null || dh <= KAESER_DELTA_H_WARNING_ANUAL) return
+    if (kaeserWarnAnualHighDeltaRef.current) return
+    kaeserWarnAnualHighDeltaRef.current = true
+    showToast('Δh elevado desde a última referência — confirme se a intervenção corresponde ao plano anual.', 'warning')
+  }, [useKaeserPipeline, step, W.horas, kaeserSugestaoLive, showToast])
 
   // ── Submit ───────────────────────────────────────────────────────────────
   /** Gera PDF inline dentro do modal (em vez de abrir janela de impressão). */
@@ -513,6 +786,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         assinaturaDigital: canvasRef.current?.toDataURL('image/png') ?? '',
         dataAssinatura: rel?.dataAssinatura ?? nowISO(),
         dataCriacao: rel?.dataCriacao ?? nowISO(),
+        ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
+        ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
+        ...(isKaeserAbcdMaq && form.tipoManutKaeser
+          ? (() => {
+              const aud = kaeserAuditoriaRef.current
+              const sug = aud.tipoSugerido
+              const motivoGravar = sug && form.tipoManutKaeser !== sug ? 'manual' : (aud.motivo || 'fallback')
+              return {
+                tipoManutKaeserSugerido: sug ?? form.tipoManutKaeser,
+                sugestaoFaseMotivo: motivoGravar,
+              }
+            })()
+          : {}),
       }
       const tecObj = getTecnicoByNome(form.tecnico)
       const blob = await gerarPdfCompacto({
@@ -539,6 +825,32 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroChecklist('')
     setErroAssinatura('')
     if (!manutencaoAtual || !maq) return
+
+    if (!adminEdit) {
+      if (!confirmaEquipamentoSerie) {
+        showToast('Confirme o equipamento (número de série) antes de gravar.', 'warning')
+        return
+      }
+      if (temContadorHoras) {
+        const hs = String(form.horasServico).trim()
+        if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
+          showToast('Indique as horas no contador (acumuladas) do equipamento.', 'warning')
+          return
+        }
+      }
+      if (useKaeserPipeline) {
+        const pecasSan = sanitizarPecasRelatorio(form.pecasUsadas)
+        const algumUsado = pecasSan.some(p => p.usado && Number(p.quantidadeUsada) > 0)
+        if (!algumUsado && !kaeserSemConsumiveis) {
+          showToast('Consumíveis: indique quantidades ou confirme ausência de materiais.', 'warning')
+          return
+        }
+      }
+      if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
+        showToast('Observações: preencha o texto e inclua pelo menos uma nota rápida.', 'warning')
+        return
+      }
+    }
 
     const todasMarcadas = items.length === 0 || items.every(it =>
       form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
@@ -586,7 +898,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       dataAssinatura: semAssinatura ? null : now,
       dataCriacao: rel?.dataCriacao ?? now,
       ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
-      ...(form.pecasUsadas.length > 0 && { pecasUsadas: form.pecasUsadas }),
+      ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
+    }
+    if (isKaeserAbcdMaq && form.tipoManutKaeser && manutencaoAtual?.tipo !== 'montagem') {
+      const aud = kaeserAuditoriaRef.current
+      const sug = aud.tipoSugerido
+      relPayload.tipoManutKaeserSugerido = sug ?? form.tipoManutKaeser
+      relPayload.sugestaoFaseMotivo =
+        sug && form.tipoManutKaeser !== sug ? 'manual' : (aud.motivo || 'fallback')
     }
 
     // Gravar/actualizar o relatório e obter o numeroRelatorio definitivo.
@@ -619,11 +938,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       numeroRelatorioFinal = resultado.numeroRelatorio
     }
 
-    updateManutencao(manutencaoAtual.id, {
+    const manutPatch = {
       status: 'concluida',
       data: hoje,
       tecnico: form.tecnico,
-    })
+    }
+    if (temContadorHoras) {
+      const hCont = parseHorasContadorForm(form.horasServico)
+      if (hCont != null) {
+        manutPatch.horasServico = hCont
+        manutPatch.horasTotais = hCont
+      }
+    }
+    updateManutencao(manutencaoAtual.id, manutPatch)
 
     if (!semAssinatura && maq?.clienteNif) {
       const clienteUpdate = {}
@@ -657,13 +984,37 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       updateMaqData.proximaManut = proximaFormatada
       updateMaqData.ultimaManutencaoData = hoje
     }
-    if (temContadorHoras && (form.horasTotais !== '' || form.horasServico !== '')) {
-      if (form.horasTotais !== '') updateMaqData.horasTotaisAcumuladas = Number(form.horasTotais)
-      if (form.horasServico !== '') updateMaqData.horasServicoAcumuladas = Number(form.horasServico)
+    if (temContadorHoras) {
+      const hCont = parseHorasContadorForm(form.horasServico)
+      if (hCont != null) {
+        updateMaqData.horasServicoAcumuladas = hCont
+        updateMaqData.horasTotaisAcumuladas = hCont
+      }
     }
-    // Avançar posição no ciclo KAESER após concluir manutenção de compressor
-    if (isCompressor && form.tipoManutKaeser && maq.posicaoKaeser != null) {
-      updateMaqData.posicaoKaeser = proximaPosicaoKaeser(maq.posicaoKaeser)
+    // Avançar posição no ciclo A/B/C/D — KAESER parafuso (± secador), periódica
+    if (isKaeserAbcdMaq && form.tipoManutKaeser && manutencaoAtual?.tipo !== 'montagem') {
+      const h = parseInt(String(form.horasServico).trim(), 10)
+      let pos = maq.posicaoKaeser
+      if (pos == null && Number.isFinite(h) && h >= 0) {
+        pos = Math.floor(h / KAESER_INTERVALO_HORAS_REF) % SEQUENCIA_KAESER.length
+      }
+      if (pos == null) {
+        const idx = SEQUENCIA_KAESER.indexOf(form.tipoManutKaeser)
+        pos = idx >= 0 ? idx : 0
+      }
+      if (tipoKaeserNaPosicao(pos) === form.tipoManutKaeser) {
+        updateMaqData.posicaoKaeser = proximaPosicaoKaeser(pos)
+      } else {
+        let found = -1
+        for (let k = 0; k < SEQUENCIA_KAESER.length; k++) {
+          const j = (pos + k) % SEQUENCIA_KAESER.length
+          if (SEQUENCIA_KAESER[j] === form.tipoManutKaeser) {
+            found = j
+            break
+          }
+        }
+        updateMaqData.posicaoKaeser = found >= 0 ? proximaPosicaoKaeser(found) : proximaPosicaoKaeser(pos)
+      }
     }
     // Se for montagem com periodicidade: calcular datas e verificar conflitos antes de confirmar
     if (manutencaoAtual.tipo === 'montagem' && manutencaoAtual.periodicidade) {
@@ -776,7 +1127,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const handleSubmit = (e) => {
     e.preventDefault()
     if (adminEdit) { handleAdminEditSave(); return }
-    if (step < TOTAL_STEPS) { goNext(); return }
+    if (step < W.total) { goNext(); return }
     gravar(false, true)
   }
 
@@ -794,6 +1145,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       showToast('Selecione o técnico responsável.', 'warning')
       return
     }
+    const todasMarcadasAdmin = items.length === 0 || items.every(it =>
+      form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
+    )
+    if (!todasMarcadasAdmin) {
+      showToast('Preencha toda a checklist (Sim/Não).', 'warning')
+      return
+    }
+    if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
+      showToast('Observações: preencha o texto e inclua pelo menos uma nota rápida.', 'warning')
+      return
+    }
+    if (temContadorHoras) {
+      const hs = String(form.horasServico).trim()
+      if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
+        showToast('Indique as horas no contador (acumuladas) do equipamento.', 'warning')
+        return
+      }
+    }
 
     const relPayload = {
       checklistRespostas: form.checklistRespostas,
@@ -802,9 +1171,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       fotos,
       tecnico: form.tecnico,
       nomeAssinante: form.nomeAssinante.trim(),
-      ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
-      ...(form.pecasUsadas.length > 0 && { pecasUsadas: form.pecasUsadas }),
     }
+    if (isKaeserPeriodicExec) {
+      relPayload.tipoManutKaeser = form.tipoManutKaeser || null
+      relPayload.pecasUsadas = sanitizarPecasRelatorio(form.pecasUsadas || [])
+    } else {
+      if (form.tipoManutKaeser) relPayload.tipoManutKaeser = form.tipoManutKaeser
+      if (form.pecasUsadas.length > 0) relPayload.pecasUsadas = sanitizarPecasRelatorio(form.pecasUsadas)
+    }
+    if (rel.tipoManutKaeserSugerido != null) relPayload.tipoManutKaeserSugerido = rel.tipoManutKaeserSugerido
+    if (rel.sugestaoFaseMotivo) relPayload.sugestaoFaseMotivo = rel.sugestaoFaseMotivo
     if (form.limparAssinatura) {
       relPayload.assinadoPeloCliente = false
       relPayload.assinaturaDigital = null
@@ -865,7 +1241,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (agNova !== agAnterior) {
       manutPayload.data = agNova
     }
+    const hContadorAdmin = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
+    if (hContadorAdmin != null) {
+      manutPayload.horasServico = hContadorAdmin
+      manutPayload.horasTotais = hContadorAdmin
+    }
     updateManutencao(manutencaoAtual.id, manutPayload)
+    if (hContadorAdmin != null) {
+      updateMaquina(maq.id, { horasServicoAcumuladas: hContadorAdmin, horasTotaisAcumuladas: hContadorAdmin })
+    }
 
     const dataAgendamentoChanged = agNova !== agAnterior
     const dataExecucaoChanged = execNova !== execAnterior
@@ -1124,17 +1508,65 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         {!adminEdit && (
           <div className="wizard-progress">
             <div className="wizard-progress-bar">
-              <div className="wizard-progress-fill" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
+              <div className="wizard-progress-fill" style={{ width: `${(step / W.total) * 100}%` }} />
             </div>
             <div className="wizard-progress-info">
-              <span className="wizard-progress-step">Passo {step} de {TOTAL_STEPS}</span>
-              <span className="wizard-progress-label">{STEP_LABELS[step - 1]}</span>
+              <span className="wizard-progress-step">Passo {step} de {W.total}</span>
+              <span className="wizard-progress-label">{W.labels[step - 1]}</span>
             </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
         <div className="wizard-body">
+
+          {/* ═══ Passo 1: confirmação de equipamento, data e horas (se contador) ═══ */}
+          {!adminEdit && step === W.verif && maq && (
+            <div className="wizard-step-content" data-testid="exec-passo-verificacao">
+              <p className="wizard-step-hint">
+                Confirme que está a intervir no equipamento correcto (verifique o <strong>número de série</strong> no local).
+                A data da intervenção considerada no relatório é <strong>hoje</strong> nos Açores, salvo data histórica autorizada para Admin.
+              </p>
+              <div className="exec-equip-verify-card">
+                <div><strong>{maq.marca}</strong> {maq.modelo}</div>
+                <div className="exec-equip-serie-destaque">
+                  N.º de série: <span className="exec-equip-serie-valor">{maq.numeroSerie || '—'}</span>
+                </div>
+                <p className="text-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+                  Data da intervenção: <strong>{formatarDataPT(getHojeAzores())}</strong>
+                </p>
+              </div>
+              <label className="exec-equip-confirm-label form-section">
+                <input
+                  type="checkbox"
+                  checked={confirmaEquipamentoSerie}
+                  onChange={e => { setConfirmaEquipamentoSerie(e.target.checked); setErroChecklist('') }}
+                />
+                <span>Confirmo que o equipamento acima é o que estou a manter / inspeccionar nesta visita.</span>
+              </label>
+              {temContadorHoras && !useKaeserPipeline && (
+                <div className="form-section">
+                  <label>
+                    Horas no contador (acumuladas) <span className="req-star">*</span>
+                    <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 400 }}>
+                      Leitura acumulada no equipamento (actualiza a ficha ao concluir).
+                    </span>
+                    <input
+                      className="wizard-input-horas-compact"
+                      type="number"
+                      min={0}
+                      step={1}
+                      required
+                      value={form.horasServico}
+                      onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                      placeholder="Ex: 3050"
+                    />
+                  </label>
+                </div>
+              )}
+              {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+            </div>
+          )}
 
           {/* ═══ Admin: Status e data da manutenção ═══ */}
           {adminEdit && (
@@ -1178,11 +1610,360 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   <span className="form-hint">Data real da intervenção; actualiza PDF, email e «Execução» na lista.</span>
                 </label>
               </div>
+              {temContadorHoras && (
+                <div className="form-section" style={{ marginTop: '0.75rem' }}>
+                  <label>
+                    Horas no contador (acumuladas)
+                    <span className="form-hint" style={{ display: 'block', marginTop: '0.25rem', fontWeight: 400 }}>
+                      Uma única leitura do equipamento; actualiza a intervenção e a ficha ao guardar.
+                    </span>
+                    <input
+                      className="wizard-input-horas-compact"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={form.horasServico}
+                      onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                      placeholder="Ex: 6000"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
-          {/* ═══ STEP 1 — Checklist ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 1) ? 'block' : 'none' }}>
+          {adminEdit && isKaeserPeriodicExec && (
+            <div className="wizard-step-content" style={{ display: 'block' }}>
+              <h3 className="admin-edit-section-title">KAESER — ciclo, tipo e consumíveis do plano</h3>
+              <p className="form-hint" style={{ marginBottom: '0.75rem' }}>
+                As horas do contador estão em <strong>Status e datas</strong> (acima). Abaixo vê a posição no ciclo de 12 anos da ficha, o tipo A/B/C/D desta intervenção e a tabela importada por n.º de série (PDF do fabricante).
+              </p>
+              <div className="form-section" style={{
+                marginBottom: '0.75rem',
+                padding: '0.65rem 0.75rem',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-bg-elevated)',
+              }}
+              >
+                <h4 style={{ margin: '0 0 0.35rem', fontSize: '0.9rem' }}>Ciclo A/B/C/D (ficha do equipamento)</h4>
+                {maq?.posicaoKaeser != null ? (
+                  <p className="form-hint" style={{ margin: 0 }}>
+                    Posição actual: <strong>{descricaoCicloKaeser(maq.posicaoKaeser)}</strong>
+                    {' · '}
+                    Seguinte no ciclo: <strong>{descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}</strong>
+                  </p>
+                ) : (
+                  <p className="form-hint" style={{ margin: 0 }}>
+                    Posição no ciclo de 12 anos ainda não definida na ficha (normal até à primeira execução com plano KAESER).
+                  </p>
+                )}
+                {rel?.tipoManutKaeser ? (
+                  <p className="form-hint" style={{ margin: '0.35rem 0 0' }}>
+                    Tipo <strong>já gravado neste relatório</strong>: {rel.tipoManutKaeser}
+                    {INTERVALOS_KAESER[rel.tipoManutKaeser] ? ` — ${INTERVALOS_KAESER[rel.tipoManutKaeser].label}` : ''}
+                  </p>
+                ) : null}
+              </div>
+              <div className="form-section">
+                <label>
+                  Tipo KAESER (A/B/C/D) — edição
+                  <select
+                    value={form.tipoManutKaeser}
+                    onChange={e => {
+                      const tipo = e.target.value
+                      const novasPecas = tipo && maq
+                        ? (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, quantidadeUsada: 1, quantidade: 1, usado: true }))
+                        : []
+                      setForm(f => ({ ...f, tipoManutKaeser: tipo, pecasUsadas: novasPecas }))
+                    }}
+                  >
+                    <option value="">—</option>
+                    {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
+                      <option key={tipo} value={tipo}>{info.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="form-section kaeser-pecas-table-wrap">
+                <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Consumíveis do plano (por tipo / importação PDF)</h4>
+                {form.pecasUsadas.length === 0 ? (
+                  <div>
+                    <p className="text-muted" style={{ fontSize: '0.88rem', margin: '0 0 0.5rem' }}>
+                      Nenhuma linha carregada. Escolha o tipo acima (as linhas são preenchidas automaticamente) ou use o botão para voltar a carregar do plano deste n.º de série.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn secondary btn-sm"
+                      disabled={!form.tipoManutKaeser || !maq}
+                      onClick={() => {
+                        const tipo = form.tipoManutKaeser
+                        const novasPecas = (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, quantidadeUsada: 1, quantidade: 1, usado: true }))
+                        setForm(f => ({ ...f, pecasUsadas: novasPecas }))
+                        if (novasPecas.length === 0) {
+                          showToast('Não há linhas no plano para este tipo. Configure em Equipamentos → Plano de peças.', 'warning')
+                        }
+                      }}
+                    >
+                      Carregar plano (tipo seleccionado)
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <table className="data-table kaeser-pecas-table">
+                      <thead><tr><th>Cód.</th><th>Descrição</th><th>Qtd</th><th>Un.</th><th /></tr></thead>
+                      <tbody>
+                        {form.pecasUsadas.map((p, idx) => (
+                          <tr key={p.id ?? `adm-${idx}`}>
+                            <td><input className="kaeser-peca-cell" value={p.codigoArtigo ?? ''} onChange={e => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, codigoArtigo: e.target.value } : pp) }))} /></td>
+                            <td><input className="kaeser-peca-cell" value={p.descricao ?? ''} onChange={e => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, descricao: e.target.value } : pp) }))} /></td>
+                            <td style={{ width: '5rem' }}>
+                              <input type="number" min={0} step={0.5} className="kaeser-peca-cell"
+                                value={p.quantidadeUsada ?? p.quantidade ?? 0}
+                                onChange={e => {
+                                  const q = Math.max(0, parseFloat(e.target.value) || 0)
+                                  setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, quantidadeUsada: q, quantidade: q, usado: q > 0 } : pp) }))
+                                }}
+                              />
+                            </td>
+                            <td style={{ width: '4rem' }}>
+                              <select value={p.unidade || 'PÇ'} onChange={e => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, unidade: e.target.value } : pp) }))}>
+                                {['PÇ', 'TER', 'L', 'KG', 'M', 'UN'].map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <button type="button" className="icon-btn danger" aria-label="Remover linha" onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))}><X size={14} /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <button type="button" className="btn secondary btn-sm" style={{ marginTop: '0.5rem' }}
+                      onClick={() => setForm(f => ({ ...f, pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: '', quantidadeUsada: 1, quantidade: 1, unidade: 'PÇ', usado: true, manual: true }] }))}>
+                      <Plus size={14} /> Adicionar linha
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!adminEdit && useKaeserPipeline && step === W.horas && (
+            <div className="wizard-step-content" data-testid="kaeser-passo-horas">
+              <p className="wizard-step-hint">
+                Leia o <strong>contador de horas de serviço</strong>. A app combina <strong>Δh desde a última referência</strong> na ficha com a <strong>janela anual ({KAESER_ANUAL_MIN_DIAS} d)</strong> — sugere o tipo A/B/C/D; pode sempre alterar.
+                <button
+                  type="button"
+                  className="btn-icon-hint kaeser-help-btn"
+                  aria-label="Ajuda: o que ocorrer primeiro (horas ou ano)"
+                  title="Regra: o que ocorrer primeiro — manutenção ao atingir o intervalo de horas do plano, ou pelo menos uma vez por ano se esse intervalo ainda não foi atingido. A sugestão não é obrigatória."
+                  onClick={() => showToast(`O que ocorrer primeiro: intervalo de horas (ex.: Δh ≥ ${KAESER_INTERVALO_HORAS_REF}) ou visita anual (≥ ${KAESER_ANUAL_MIN_DIAS} dias desde a última). Pode alterar o tipo e os consumíveis.`, 'info', 3500)}
+                >
+                  <HelpCircle size={18} />
+                </button>
+              </p>
+              {conflitoHorasFichaVsUltimoRel && (
+                <div className="wizard-confirm" style={{ marginBottom: '0.75rem' }}>
+                  <AlertTriangle size={16} />
+                  <span>
+                    Diferença entre ficha e último relatório: ficha indica <strong>{conflitoHorasFichaVsUltimoRel.hm} h</strong> de serviço;
+                    última manutenção concluída ({conflitoHorasFichaVsUltimoRel.last.data}) registou <strong>{conflitoHorasFichaVsUltimoRel.hr} h</strong>.
+                    Confirme a referência antes de interpretar Δh.
+                  </span>
+                </div>
+              )}
+              <div className="form-section">
+                <label>
+                  Horas no contador (acumuladas) <span className="req-star">*</span>
+                  <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 400 }}>
+                    Valor acumulado no compressor — usado para Δh e para a sugestão de fase A/B/C/D.
+                  </span>
+                  <input
+                    className="wizard-input-horas-compact"
+                    type="number"
+                    min={0}
+                    step={1}
+                    required
+                    value={form.horasServico}
+                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                    onBlur={() => {
+                      const hs = parseInt(String(form.horasServico).trim(), 10)
+                      if (!Number.isFinite(hs) || hs < 0) return
+                      const sug = sugerirFaseKaeser({
+                        maquina: maq,
+                        horasServicoAtuais: hs,
+                        dataExecucao: getHojeAzores(),
+                        fallbackUltimaData: fallbackUltimaManutDataKaeser,
+                      })
+                      kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
+                      setForm(f => ({
+                        ...f,
+                        tipoManutKaeser: f.tipoManutKaeser || sug.tipoPreSelecao,
+                        pecasUsadas: f.tipoManutKaeser ? f.pecasUsadas : pecasDoPlanoKaeser(sug.tipoPreSelecao),
+                      }))
+                    }}
+                    placeholder="Ex: 6200"
+                  />
+                </label>
+              </div>
+              {kaeserSugestaoLive && (
+                <div className="form-section kaeser-sugestao-resumo">
+                  <p className="form-hint" style={{ marginTop: 0 }}>
+                    <strong>Sugestão:</strong>{' '}
+                    {kaeserSugestaoLive.motivoPrincipal === 'ambos' && 'calendário e horas indicam tipos diferentes — escolha abaixo.'}
+                    {kaeserSugestaoLive.motivoPrincipal === 'anual' && `janela anual (≥ ${KAESER_ANUAL_MIN_DIAS} d desde a referência).`}
+                    {kaeserSugestaoLive.motivoPrincipal === 'horas' && `Δh ≥ ${KAESER_INTERVALO_HORAS_REF} h desde a última referência na ficha.`}
+                    {kaeserSugestaoLive.motivoPrincipal === 'fallback' && 'sem critério anual/Δh — fallback pelo contador absoluto.'}
+                    {' '}
+                    <strong>Tipo pré-seleccionado: {kaeserSugestaoLive.tipoPreSelecao}</strong>
+                  </p>
+                  {kaeserSugestaoLive.mostrarDual && kaeserSugestaoLive.tipoSugeridoCalendario && kaeserSugestaoLive.tipoSugeridoHoras && (
+                    <div className="kaeser-dual-sugestao">
+                      <button
+                        type="button"
+                        className="btn secondary btn-sm"
+                        onClick={() => {
+                          const t = kaeserSugestaoLive.tipoSugeridoCalendario
+                          kaeserAuditoriaRef.current = { tipoSugerido: t, motivo: 'anual' }
+                          aplicarTipoKaeserComPecas(t, { skipDirtyConfirm: true })
+                        }}
+                      >
+                        Aplicar sugestão (calendário): Tipo {kaeserSugestaoLive.tipoSugeridoCalendario}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn secondary btn-sm"
+                        onClick={() => {
+                          const t = kaeserSugestaoLive.tipoSugeridoHoras
+                          kaeserAuditoriaRef.current = { tipoSugerido: t, motivo: 'horas' }
+                          aplicarTipoKaeserComPecas(t, { skipDirtyConfirm: true })
+                        }}
+                      >
+                        Aplicar sugestão (horas): Tipo {kaeserSugestaoLive.tipoSugeridoHoras}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-link-checklist"
+                    data-testid="kaeser-toggle-detalhes"
+                    onClick={() => setKaeserCalcDetalhesOpen(o => !o)}
+                  >
+                    {kaeserCalcDetalhesOpen ? 'Ocultar detalhes do cálculo' : 'Detalhes do cálculo'}
+                  </button>
+                  {kaeserCalcDetalhesOpen && (
+                    <ul className="kaeser-calc-detalhes text-muted" style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+                      <li>Data de referência: {kaeserSugestaoLive.detalhes.dataUltimaReferencia ?? '—'}</li>
+                      <li>Dias desde a referência: {kaeserSugestaoLive.detalhes.diasDesdeUltima ?? '—'}</li>
+                      <li>Horas na ficha (última): {kaeserSugestaoLive.detalhes.horasUltima ?? '—'}</li>
+                      <li>Δh (actual − ficha): {kaeserSugestaoLive.detalhes.deltaH ?? '—'}</li>
+                      <li>Limiar horas: {KAESER_INTERVALO_HORAS_REF} h · Limiar anual: {KAESER_ANUAL_MIN_DIAS} d</li>
+                      {kaeserSugestaoLive.tipoSugeridoCalendario && (
+                        <li>Sugestão por calendário (posição ciclo): Tipo {kaeserSugestaoLive.tipoSugeridoCalendario}</li>
+                      )}
+                      {kaeserSugestaoLive.tipoSugeridoHoras && (
+                        <li>Sugestão por Δh: Tipo {kaeserSugestaoLive.tipoSugeridoHoras}</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="form-section">
+                <label>
+                  Tipo de manutenção KAESER (A/B/C/D) <span className="req-star">*</span>
+                  <select
+                    value={form.tipoManutKaeser}
+                    onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
+                      <option key={tipo} value={tipo}>{info.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="form-hint" style={{ marginTop: '0.35rem' }}>
+                  Fallback absoluto (sem Δh fiável):{' '}
+                  <strong>
+                    {(() => {
+                      const hs = parseInt(String(form.horasServico).trim(), 10)
+                      return Number.isFinite(hs) && hs >= 0
+                        ? `Tipo ${tipoKaeserSugeridoPorHorasServico(hs)}`
+                        : '— (preencha as horas de serviço)'
+                    })()}
+                  </strong>
+                  {maq?.posicaoKaeser != null && (
+                    <>
+                      {' '}
+                      <span className="kaeser-ciclo-hint">
+                        · Ciclo na ficha: {descricaoCicloKaeser(maq.posicaoKaeser)}
+                        {' '}· Próximo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+              {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+            </div>
+          )}
+
+          {!adminEdit && useKaeserPipeline && step === W.pecas && (
+            <div className="wizard-step-content">
+              <p className="wizard-step-hint">
+                Lista do plano para o <strong>Tipo {form.tipoManutKaeser || '—'}</strong>. Pré-preenchida com <strong>1 un.</strong> por linha — ajuste as quantidades (0 = não aplicável) ou acrescente artigos extra.
+              </p>
+              <div className="kaeser-pecas-table-wrap">
+                {form.pecasUsadas.length === 0 ? (
+                  <p className="text-muted">Nenhum consumível no plano para este tipo. Adicione linhas manualmente ou configure o plano em Equipamentos.</p>
+                ) : (
+                  <table className="data-table kaeser-pecas-table">
+                    <thead><tr><th>Cód.</th><th>Descrição</th><th>Qtd</th><th>Un.</th><th /></tr></thead>
+                    <tbody>
+                      {form.pecasUsadas.map((p, idx) => (
+                        <tr key={p.id ?? `k-${idx}`}>
+                          <td><input className="kaeser-peca-cell" value={p.codigoArtigo ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, codigoArtigo: e.target.value } : pp) })) }} /></td>
+                          <td><input className="kaeser-peca-cell" value={p.descricao ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, descricao: e.target.value } : pp) })) }} /></td>
+                          <td style={{ width: '5rem' }}>
+                            <input type="number" min={0} step={0.5} className="kaeser-peca-cell"
+                              value={p.quantidadeUsada ?? p.quantidade ?? 0}
+                              onChange={e => {
+                                const q = Math.max(0, parseFloat(e.target.value) || 0)
+                                setKaeserPecasDirty(true)
+                                setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, quantidadeUsada: q, quantidade: q, usado: q > 0 } : pp) }))
+                              }}
+                            />
+                          </td>
+                          <td style={{ width: '4rem' }}>
+                            <select value={p.unidade || 'PÇ'} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, unidade: e.target.value } : pp) })) }}>
+                              {['PÇ', 'TER', 'L', 'KG', 'M', 'UN'].map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </td>
+                          <td>
+                            <button type="button" className="icon-btn danger" aria-label="Remover linha" onClick={() => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) })) }}><X size={14} /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <button type="button" className="btn secondary btn-sm" style={{ marginTop: '0.5rem' }}
+                  onClick={() => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: '', quantidadeUsada: 1, quantidade: 1, unidade: 'PÇ', usado: true, manual: true }] })) }}>
+                  <Plus size={14} /> Adicionar linha
+                </button>
+              </div>
+              <label className="exec-equip-confirm-label form-section" style={{ marginTop: '0.75rem' }}>
+                <input
+                  type="checkbox"
+                  checked={kaeserSemConsumiveis}
+                  onChange={e => setKaeserSemConsumiveis(e.target.checked)}
+                />
+                <span>Confirmo que nesta intervenção não houve substituição nem consumo de materiais do plano (lista vazia ou só inspecção).</span>
+              </label>
+              {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+            </div>
+          )}
+
+          {/* ═══ Checklist ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.checklist) ? 'block' : 'none' }}>
             {adminEdit && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
             {!adminEdit && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
 
@@ -1199,19 +1980,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            {(maq?.documentos ?? []).length > 0 && (
-              <div className="doc-links-inline">
-                <FolderOpen size={14} />
-                {maq.documentos.map(d => {
-                  const tipoLabel = TIPOS_DOCUMENTO.find(t => t.id === d.tipo)?.label ?? d.tipo
-                  return (
-                    <a key={d.id} href={safeHttpUrl(d.url)} target="_blank" rel="noopener noreferrer" className="doc-link-inline" title={d.titulo}>
-                      {tipoLabel}
-                    </a>
-                  )
-                })}
-              </div>
-            )}
+            <MaquinaDocumentacaoLinks maquina={maq} />
 
             {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
             {items.length > 0 && (
@@ -1260,27 +2029,27 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            {temContadorHoras && (
-              <div className="form-row form-section">
+            {temContadorHoras && !adminEdit && !(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem') && (
+              <div className="form-section">
                 <label>
-                  Horas totais (contador)
-                  <input type="number" min={0} step={1} value={form.horasTotais}
-                    onChange={e => setForm(f => ({ ...f, horasTotais: e.target.value }))}
-                    placeholder="Ex: 1250" />
-                </label>
-                <label>
-                  Horas de serviço
-                  <input type="number" min={0} step={1} value={form.horasServico}
+                  Horas no contador (acumuladas)
+                  <input
+                    className="wizard-input-horas-compact"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.horasServico}
                     onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                    placeholder="Ex: 1180" />
+                    placeholder="Ex: 6000"
+                  />
                 </label>
               </div>
             )}
 
-            {isCompressor && manutencaoAtual?.tipo !== 'montagem' && (
+            {(adminEdit || !useKaeserPipeline) && isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem' && (
               <div className="form-section">
                 <label>
-                  Tipo de manutenção (A/B/C/D)
+                  Tipo de manutenção KAESER (A/B/C/D)
                   {maq?.posicaoKaeser != null && (
                     <span className="kaeser-ciclo-hint">
                       Ciclo: {descricaoCicloKaeser(maq.posicaoKaeser)}
@@ -1289,13 +2058,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   )}
                   <select
                     value={form.tipoManutKaeser}
-                    onChange={e => {
-                      const tipo = e.target.value
-                      const novasPecas = tipo && maq
-                        ? (getPecasPlanoByMaquina(maq.id, tipo) ?? []).map(p => ({ ...p, usado: true }))
-                        : []
-                      setForm(f => ({ ...f, tipoManutKaeser: tipo, pecasUsadas: novasPecas }))
-                    }}
+                    onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
                   >
                     <option value="">Periódica (sem plano específico)</option>
                     {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
@@ -1309,7 +2072,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            {(form.pecasUsadas.length > 0 || (isCompressor && form.tipoManutKaeser)) && (
+            {(adminEdit || !useKaeserPipeline) && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser)) && (
               <div className="form-section">
                 <div className="pecas-checklist-header">
                   <h3>Consumíveis e peças</h3>
@@ -1361,10 +2124,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             )}
           </div>
 
-          {/* ═══ STEP 2 — Observações ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 2) ? 'block' : 'none' }}>
+          {/* ═══ Observações ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.notas) ? 'block' : 'none' }}>
             {adminEdit && <h3 className="admin-edit-section-title">Observações</h3>}
-            {!adminEdit && <p className="wizard-step-hint">Adicione notas ou observações relevantes sobre a manutenção.</p>}
+            {!adminEdit && (
+              <p className="wizard-step-hint">
+                As observações são <strong>obrigatórias</strong>. Deve incluir <strong>pelo menos uma nota rápida</strong> (chip abaixo); pode complementar com texto livre.
+              </p>
+            )}
             <label className="form-section">
               Notas importantes <span className="char-count">({form.notas.length}/300)</span>
               <textarea
@@ -1376,12 +2143,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 rows={6}
                 className="textarea-full"
                 maxLength={300}
-                placeholder="Notas relevantes da manutenção..."
+                placeholder="Descreva o trabalho e use as notas rápidas (obrigatório incluir pelo menos uma)…"
               />
             </label>
 
             <div className="quick-notes-section">
-              <span className="quick-notes-label">Notas rápidas — toque para adicionar:</span>
+              <span className="quick-notes-label">Notas rápidas — toque para inserir (pelo menos uma é obrigatória):</span>
               <div className="quick-notes-chips">
                 {quickNotes.map((note, i) => {
                   const isIncluded = form.notas.includes(note)
@@ -1400,24 +2167,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 })}
               </div>
             </div>
-            {confirmacaoPendente === 'notas' && (
-              <div className="wizard-confirm">
-                <AlertTriangle size={16} />
-                <span>Pretende deixar as observações em branco?</span>
-                <div className="wizard-confirm-actions">
-                  <button type="button" className="btn primary btn-sm" onClick={() => { setConfirmacaoPendente(null); setStep(3) }}>
-                    Sim, avançar
-                  </button>
-                  <button type="button" className="btn secondary btn-sm" onClick={() => setConfirmacaoPendente(null)}>
-                    Não
-                  </button>
-                </div>
-              </div>
-            )}
+            {!adminEdit && step === W.notas && erroChecklist && <p className="form-erro">{erroChecklist}</p>}
           </div>
 
-          {/* ═══ STEP 3 — Fotografias ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 3) ? 'block' : 'none' }}>
+          {/* ═══ Fotografias ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.fotos) ? 'block' : 'none' }}>
             {adminEdit && <h3 className="admin-edit-section-title">Fotografias</h3>}
             {!adminEdit && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
             <div className="form-section fotos-section">
@@ -1465,7 +2219,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 <AlertTriangle size={16} />
                 <span>Pretende continuar sem fotografias?</span>
                 <div className="wizard-confirm-actions">
-                  <button type="button" className="btn primary btn-sm" onClick={() => { setConfirmacaoPendente(null); setStep(4) }}>
+                  <button type="button" className="btn primary btn-sm" onClick={() => { setConfirmacaoPendente(null); setStep(W.tec) }}>
                     Sim, avançar
                   </button>
                   <button type="button" className="btn secondary btn-sm" onClick={() => setConfirmacaoPendente(null)}>
@@ -1476,8 +2230,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             )}
           </div>
 
-          {/* ═══ STEP 4 — Técnico ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 4) ? 'block' : 'none' }}>
+          {/* ═══ Técnico ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.tec) ? 'block' : 'none' }}>
             {adminEdit && <h3 className="admin-edit-section-title">Técnico</h3>}
             {!adminEdit && <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
@@ -1493,8 +2247,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </label>
           </div>
 
-          {/* ═══ STEP 5 — Nome do cliente ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 5) ? 'block' : 'none' }}>
+          {/* ═══ Nome do cliente ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.cli) ? 'block' : 'none' }}>
             {adminEdit && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
             {!adminEdit && <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
@@ -1526,8 +2280,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </label>
           </div>
 
-          {/* ═══ STEP 6 — Assinatura ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === 6) ? 'block' : 'none' }}>
+          {/* ═══ Assinatura ═══ */}
+          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.ass) ? 'block' : 'none' }}>
             {adminEdit ? (
               <>
                 <h3 className="admin-edit-section-title">Assinatura digital</h3>
@@ -1603,8 +2357,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             )}
           </div>
 
-          {/* ═══ STEP 7 — Finalizar (hidden in admin edit mode) ═══ */}
-          <div className="wizard-step-content" style={{ display: (!adminEdit && step === 7) ? 'block' : 'none' }}>
+          {/* ═══ Finalizar (hidden in admin edit mode) ═══ */}
+          <div className="wizard-step-content" style={{ display: (!adminEdit && step === W.fin) ? 'block' : 'none' }}>
             <p className="wizard-step-hint">Reveja os dados, pré-visualize o relatório e finalize a manutenção.</p>
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
@@ -1687,12 +2441,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   <ChevronLeft size={16} /> Anterior
                 </button>
               )}
-              {step < TOTAL_STEPS && (
+              {step < W.total && (
                 <button type="button" className="btn primary" onClick={goNext}>
                   Seguinte <ChevronRight size={16} />
                 </button>
               )}
-              {step === TOTAL_STEPS && (
+              {step === W.total && (
                 <>
                   {isAdmin && (
                     <button type="button" className="btn btn-outline-warning" onClick={handleGravarSemAssinatura} disabled={emailEnviando}>

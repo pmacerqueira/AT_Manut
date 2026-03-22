@@ -15,6 +15,8 @@ import {
   checklistMarcarTodos, checklistFillAllSim, signCanvas,
   execWizardSeguinte,
   fillExecucaoModal,
+  confirmExecWizardVerificacaoEquipamento,
+  ensureNotasComFrasePredefinida,
   MC,
 } from './helpers.js'
 
@@ -172,17 +174,15 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
       page.locator('.modal-relatorio-form').first()
     ).toBeVisible({ timeout: 6000 })
 
-    // O modal contém a checklist (prova que está totalmente carregado)
-    await expect(
-      page.locator('.checklist-item-row, .checklist-respostas, .btn-link-checklist').first()
-    ).toBeVisible({ timeout: 4000 })
+    // Primeiro passo: confirmação de equipamento
+    await expect(page.getByTestId('exec-passo-verificacao')).toBeVisible({ timeout: 4000 })
   })
 
   test('Modal mostra checklist de verificação', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
-    // Checklist deve estar visível
+    await confirmExecWizardVerificacaoEquipamento(page)
     await expect(page.locator('.checklist-respostas, .checklist-item-row').first()).toBeVisible({ timeout: 4000 })
   })
 
@@ -190,6 +190,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
+    await confirmExecWizardVerificacaoEquipamento(page)
     await checklistMarcarTodos(page)
 
     // Todos os itens devem ter ".active-sim"
@@ -201,6 +202,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
   test('Submeter sem checklist completo mostra erro', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+    await confirmExecWizardVerificacaoEquipamento(page)
     await expect(page.locator('.checklist-item-row, .checklist-respostas').first()).toBeVisible({ timeout: 8000 })
 
     // O modal pré-preenche a partir da última execução (mt01) — limpar para forçar checklist incompleta
@@ -221,10 +223,13 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
+    await confirmExecWizardVerificacaoEquipamento(page)
     await checklistMarcarTodos(page)
     await checklistFillAllSim(page)
 
     await execWizardSeguinte(page)
+    const notasField = page.locator('.modal textarea.textarea-full').first()
+    await notasField.fill(ensureNotasComFrasePredefinida('Teste assinatura.'))
     await execWizardSeguinte(page)
     await execWizardSeguinte(page)
 
@@ -241,7 +246,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     // Passo assinatura: Admin pode avançar sem desenhar; no passo final «Enviar» exige assinatura
     await execWizardSeguinte(page)
 
-    await expect(page.locator('.wizard-progress-step')).toContainText(/7\s+de\s+7/i, { timeout: 8000 })
+    await expect(page.locator('.wizard-progress-step')).toContainText(/8\s+de\s+8/i, { timeout: 8000 })
 
     await page.locator('.modal-relatorio-form button[type="submit"]').filter({ hasText: /Enviar/i }).click()
     await page.waitForTimeout(400)
@@ -255,12 +260,13 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
   test('Adicionar nota no campo de observações', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+    await confirmExecWizardVerificacaoEquipamento(page)
     await checklistMarcarTodos(page)
     await execWizardSeguinte(page)
 
     const notasField = page.locator('.modal textarea.textarea-full').first()
     await expect(notasField).toBeVisible({ timeout: 5000 })
-    await notasField.fill('Manutenção periódica executada sem anomalias.')
+    await notasField.fill(ensureNotasComFrasePredefinida('Manutenção periódica executada sem anomalias.'))
     await expect(page.locator('.char-count').first()).toContainText(/\d+\/300/)
   })
 
@@ -269,7 +275,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
     await fillExecucaoModal(page, {
-      notas: 'Tudo em conformidade.',
+      notas: 'Revisão periódica concluída.',
       nomeAssinante: 'João da Silva',
     })
 
@@ -283,6 +289,8 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
   test('FLUXO COMPLETO — Botões Sim/Não individuais funcionam', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     const rows = page.locator('.checklist-item-row')
     const count = await rows.count()

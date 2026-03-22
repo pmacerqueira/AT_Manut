@@ -14,7 +14,7 @@ import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { computarProximasDatas } from '../utils/diasUteis'
 import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
-import { EMAIL_CONFIG, isEmailConfigured } from '../config/emailConfig'
+import { EMAIL_CONFIG, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
@@ -284,24 +284,27 @@ export async function enviarRelatorioHtmlEmail({
     return { ok: true, message: `Cliente de email aberto para ${destinatario}.`, isMailto: true }
   }
 
+  const url = getSendReportUrl()
+  let bodyStr = ''
   try {
-    const apiBase = import.meta.env.VITE_API_BASE_URL
-      || (typeof window !== 'undefined' ? window.location.origin : '')
-    const url = apiBase
-      ? `${apiBase.replace(/\/$/, '')}/api/send-report.php`
-      : '/api/send-report.php'
+    bodyStr = JSON.stringify({
+      auth_token: EMAIL_CONFIG.AUTH_TOKEN,
+      destinatario: destinatario.trim(),
+      cc,
+      assunto: assunto || 'Relatório — Navel',
+      corpoHtml: html,
+      ...(pdfBase64 ? { pdf_base64: pdfBase64, pdf_filename: pdfFilename } : {}),
+    })
+    if (bodyStr.length > 6_000_000) {
+      logger.action('emailService', 'sendHtmlEmail', 'Payload email HTML+PDF muito grande', {
+        destinatario, approxChars: bodyStr.length, approxMB: (bodyStr.length / 1e6).toFixed(2), url,
+      })
+    }
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auth_token: EMAIL_CONFIG.AUTH_TOKEN,
-        destinatario: destinatario.trim(),
-        cc,
-        assunto: assunto || 'Relatório — Navel',
-        corpoHtml: html,
-        ...(pdfBase64 ? { pdf_base64: pdfBase64, pdf_filename: pdfFilename } : {}),
-      }),
+      body: bodyStr,
     })
 
     const json = await response.json().catch(() => ({ ok: false, message: `HTTP ${response.status}` }))
@@ -318,10 +321,20 @@ export async function enviarRelatorioHtmlEmail({
     return { ok: false, message: errMsg }
   } catch (err) {
     logger.error('emailService', 'sendHtmlEmail',
-      `Erro de rede: ${err.message}`, { destinatario, errorMessage: err.message })
+      `Erro de rede: ${err.message}`,
+      {
+        destinatario,
+        errorMessage: err.message,
+        url,
+        approxPayloadChars: bodyStr.length || undefined,
+        comAnexoPdf: !!pdfBase64,
+      })
+    const hintServidor = pdfBase64
+      ? ' No servidor: em public_html/api/.htaccess desactive ModSecurity para send-report.php (como send-email) e use post_max_size ≥ 32M em .user.ini — ver servidor-cpanel/api-htaccess.txt e INSTRUCOES_CPANEL.md.'
+      : ''
     return {
       ok: false,
-      message: `Não foi possível contactar o servidor de email. (${err.message})`,
+      message: `Não foi possível contactar o servidor de email. (${err.message})${hintServidor}`,
       isNetworkError: true,
     }
   }

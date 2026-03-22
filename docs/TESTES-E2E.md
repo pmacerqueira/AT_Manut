@@ -1,6 +1,6 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 441 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
+> 442 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
 > Última revisão: 2026-03-17 — v1.14.0
 
 ---
@@ -22,18 +22,18 @@
 | `11-blocos-abc.spec.js` | 40 | Email clientes, config alertas, reagendamento, modal proactivo |
 | `12-v170-features.spec.js` | 42 | Pesquisa global, Leitor QR, Modo campo, Métricas, localStorage |
 | `13-performance.spec.js` | 14 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
-| `14-kaeser-features.spec.js` | 31 | Funcionalidades Kaeser — importação e visualização |
+| `14-kaeser-features.spec.js` | 32 | Funcionalidades Kaeser — importação e visualização |
 | `15-kaeser-pdf-import.spec.js` | 18 | Importação de PDF Kaeser — extracção e validação de dados |
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
 | `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T: modal, validação ficheiro, preview, importação completa, 2ª importação (ignorar) |
-| **Total** | **441** | **100% dos fluxos da aplicação + escalabilidade** |
+| **Total** | **442** | **100% dos fluxos da aplicação + escalabilidade** |
 
 > **Specs 01–09** (127 testes): cobertura base do núcleo da aplicação.
 > **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
 > **Spec 12** (42 testes): funcionalidades v1.7.0 (pesquisa, leitor QR, modo campo, métricas, localStorage).
 > **Spec 13** (14 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
-> **Specs 14–15** (49 testes): importação e funcionalidades Kaeser.
+> **Specs 14–15** (50 testes): importação e funcionalidades Kaeser.
 > **Specs 16–17** (111 testes): módulo Reparações — base + avançado (permissões, responsividade, offline).
 > **Spec 18** (6 testes): importação SAF-T de clientes — modal, validação, preview, importação completa, modo ignorar.
 
@@ -316,6 +316,10 @@ MC = {
 ---
 
 ## Problemas técnicos documentados e resoluções
+
+### Emails durante E2E (send-email / send-report) — bloqueio automático
+**Problema:** O mock só interceptava `data.php`. Em dev, o `emailService` chama URLs absolutas em `navel.pt`, pelo que os testes podiam disparar **correio real** para fichas mock ou clientes (ex.: `geral@mecanicabettencourt.pt`).
+**Solução (dupla):** (1) `stubEmailPhpEndpoints` em `helpers.js` intercepta `send-email.php` / `send-report.php` e, se o body JSON tiver `auth_token`, responde com **`route.fulfill`** (200 JSON mock) — **não há pedido HTTP ao PHP** na maioria dos testes. Testes que registarem `page.route` **depois** de `setupApiMock` prevalecem (LIFO), ex. C16/C17. (2) No servidor, `send-email.php` e `send-report.php` forçam destinatário para **`comercial@navel.pt`** quando `Origin`/`Referer` é localhost — rede de segurança se algum fluxo escapar ao Playwright. Ver `INSTRUCOES_CPANEL.md` (`ATM_DEV_SANDBOX_EMAIL`). O mesmo stub é usado em `tests/offline-sync-test.spec.js`.
 
 ### `route.continue()` vs `route.fallback()` em testes offline (Playwright 1.58)
 **Problema:** Nos testes RA-8, ao adicionar um segundo handler de route para simular escritas offline, usar `route.continue()` para as leituras envia o pedido para a rede real (não para o handler `setupApiMock` registado anteriormente). Isso impede o carregamento de dados mock, e os testes falham porque o select de máquinas fica vazio.

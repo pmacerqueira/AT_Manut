@@ -4,10 +4,13 @@
  * KAESER: importar plano a partir de PDF (explorador de ficheiros).
  */
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useData, SUBCATEGORIAS_COMPRESSOR, isKaeserMarca } from '../context/DataContext'
+import { useData, isKaeserAbcdMaquina, isKaeserMarca } from '../context/DataContext'
+import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { parseKaeserPlanoPdf } from '../utils/parseKaeserPlanoPdf'
+import { logger } from '../utils/logger'
+import { consumiveisRegularRowsFromMaquina, normCodigoConsumivel } from '../utils/kaeserConsumiveisFicha'
 import { Plus, Trash2, Upload, X, Save, ChevronDown, PackageOpen } from 'lucide-react'
 import './PecasPlanoModal.css'
 
@@ -24,7 +27,8 @@ const UNIDADES = ['PÇ', 'TER', 'L', 'KG', 'M', 'UN']
 const PECA_VAZIA = { posicao: '', codigoArtigo: '', descricao: '', quantidade: 1, unidade: 'PÇ' }
 
 export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial = false }) {
-  const { getPecasPlanoByMaquina, addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getSubcategoria } = useData()
+  const { getPecasPlanoByMaquina, addPecaPlano, replacePecasPlanoMaquina, updatePecaPlano, removePecaPlano, getSubcategoria } = useData()
+  const { isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const fileInputRef = useRef(null)
@@ -35,14 +39,23 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
   const [confirmarLimpar, setConfirmarLimpar] = useState(false)
   const [confirmDeletePecaId, setConfirmDeletePecaId] = useState(null)
 
-  const sub          = maquina ? getSubcategoria(maquina.subcategoriaId) : null
-  const isCompressor = maquina && SUBCATEGORIAS_COMPRESSOR.includes(maquina.subcategoriaId)
-  const isKaeser     = maquina && isKaeserMarca(maquina.marca)
+  const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
+  const isKaeserAbcd = maquina && isKaeserAbcdMaquina(maquina)
+  const podeImportarPdfKaeser = isKaeserAbcd && maquina && isKaeserMarca(maquina.marca)
 
-  // Tipos a mostrar: A/B/C/D + Periódica só para KAESER; outras marcas só "periódica" (manual)
-  const tiposVisiveis = isKaeser ? TIPOS_MANUT : TIPOS_MANUT.filter(t => t.id === 'periodica')
+  const tiposVisiveis = isKaeserAbcd ? TIPOS_MANUT : TIPOS_MANUT.filter(t => t.id === 'periodica')
 
-  // Garantir que tipoAtivo é válido (ex.: não-KAESER só tem "periodica")
+  /** Ao abrir o modal o estado do separador persistia entre visitas (componente não desmonta). Repor tab e formulários. */
+  useEffect(() => {
+    if (!isOpen || !maquina) return
+    const def = isKaeserAbcdMaquina(maquina) ? 'A' : 'periodica'
+    setTipoAtivo(def)
+    setEditandoId(null)
+    setFormNova(PECA_VAZIA)
+    setConfirmarLimpar(false)
+    setConfirmDeletePecaId(null)
+  }, [isOpen, maquina?.id])
+
   useEffect(() => {
     if (tiposVisiveis.length > 0 && !tiposVisiveis.some(t => t.id === tipoAtivo)) {
       setTipoAtivo(tiposVisiveis[0].id)
@@ -54,6 +67,20 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
     [maquina, tipoAtivo, getPecasPlanoByMaquina]
   )
 
+  /** Referências preenchidas na ficha (Editar máquina → Consumíveis manutenção regular). */
+  const pecasFicha = useMemo(() => consumiveisRegularRowsFromMaquina(maquina), [maquina])
+
+  /** Periódica + KAESER: ficha em primeiro lugar + linhas extra do plano local (sem duplicar código). */
+  const linhasExibicao = useMemo(() => {
+    if (!maquina) return []
+    if (tipoAtivo === 'periodica' && isKaeserAbcd) {
+      const codigos = new Set(pecasFicha.map(p => normCodigoConsumivel(p.codigoArtigo)))
+      const extra = pecasTipo.filter(p => !codigos.has(normCodigoConsumivel(p.codigoArtigo)))
+      return [...pecasFicha, ...extra]
+    }
+    return pecasTipo
+  }, [maquina, tipoAtivo, isKaeserAbcd, pecasFicha, pecasTipo])
+
   const totalMaquina = useMemo(
     () => maquina ? getPecasPlanoByMaquina(maquina.id).length : 0,
     [maquina, getPecasPlanoByMaquina]
@@ -63,6 +90,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
 
   const handleAddPeca = (e) => {
     e.preventDefault()
+    if (!isAdmin) return
     if (!formNova.codigoArtigo.trim() || !formNova.descricao.trim()) {
       showToast('Código de artigo e descrição são obrigatórios.', 'warning')
       return
@@ -73,6 +101,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
   }
 
   const handleSaveEdit = (id) => {
+    if (!isAdmin) return
     if (!formEdit.codigoArtigo.trim() || !formEdit.descricao.trim()) {
       showToast('Código de artigo e descrição são obrigatórios.', 'warning')
       return
@@ -86,6 +115,11 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
     const file = e.target.files?.[0]
     if (!file || !maquina) return
     e.target.value = ''
+
+    if (!isAdmin) {
+      showToast('A importação do plano a partir de PDF é feita apenas pelo administrador (PC).', 'warning')
+      return
+    }
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       showToast('Seleccione um ficheiro PDF.', 'warning')
@@ -115,29 +149,50 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
         return
       }
 
-      // Substituir plano existente
-      removePecasPlanoByMaquina(maquina.id)
-      addPecasPlanoLote(todas)
+      const kept = getPecasPlanoByMaquina(maquina.id).filter(p => !['A', 'B', 'C', 'D'].includes(p.tipoManut))
+      await replacePecasPlanoMaquina(maquina.id, [...kept, ...todas])
       const porTipo = { A: 0, B: 0, C: 0, D: 0 }
       todas.forEach(p => { porTipo[p.tipoManut] = (porTipo[p.tipoManut] || 0) + 1 })
       showToast(`${todas.length} peças importadas (A: ${porTipo.A}, B: ${porTipo.B}, C: ${porTipo.C}, D: ${porTipo.D}).`, 'success')
     } catch (err) {
-      showToast(`Erro ao ler PDF: ${err?.message || 'desconhecido'}`, 'error')
+      logger.error('PecasPlanoModal', 'importarPdfKaeser', err?.message || 'Falha na importação PDF ou na gravação do plano', {
+        maquinaId: maquina?.id,
+        status: err?.status,
+        stack: err?.stack?.slice(0, 400),
+      })
+      showToast(`Erro na importação (PDF ou gravação): ${err?.message || 'desconhecido'}`, 'error', 4000)
     } finally {
       hideGlobalLoading()
     }
   }
 
-  const handleLimparTipo = () => {
-    pecasTipo.forEach(p => removePecaPlano(p.id))
-    setConfirmarLimpar(false)
-    showToast(`Plano Tipo ${tipoAtivo} limpo.`, 'success')
+  const handleLimparTipo = async () => {
+    if (!isAdmin) return
+    try {
+      const kept = getPecasPlanoByMaquina(maquina.id).filter(p => p.tipoManut !== tipoAtivo)
+      await replacePecasPlanoMaquina(maquina.id, kept)
+      setConfirmarLimpar(false)
+      showToast(`Plano Tipo ${tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo} limpo.`, 'success')
+    } catch (err) {
+      logger.error('PecasPlanoModal', 'limparTipoPlano', err?.message || 'Falha ao gravar plano', {
+        maquinaId: maquina?.id, tipoAtivo, status: err?.status, stack: err?.stack?.slice(0, 400),
+      })
+      showToast(err?.message || 'Não foi possível limpar o plano no servidor.', 'error', 4000)
+    }
   }
 
-  const handleLimparTudo = () => {
-    removePecasPlanoByMaquina(maquina.id)
-    setConfirmarLimpar(false)
-    showToast('Todos os planos desta máquina foram eliminados.', 'success')
+  const handleLimparTudo = async () => {
+    if (!isAdmin) return
+    try {
+      await replacePecasPlanoMaquina(maquina.id, [])
+      setConfirmarLimpar(false)
+      showToast('Todos os planos desta máquina foram eliminados.', 'success')
+    } catch (err) {
+      logger.error('PecasPlanoModal', 'limparTodosPlanos', err?.message || 'Falha ao gravar plano', {
+        maquinaId: maquina?.id, status: err?.status, stack: err?.stack?.slice(0, 400),
+      })
+      showToast(err?.message || 'Não foi possível eliminar os planos no servidor.', 'error', 4000)
+    }
   }
 
   return (
@@ -179,15 +234,27 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
         {modoInicial && totalMaquina === 0 && (
           <div className="modal-pecas-boas-vindas">
             <strong>Equipamento criado!</strong>
-            {isKaeser
-              ? <> Configure o plano de consumíveis deste compressor KAESER. Use <em>"Importar template para esta máquina"</em> para carregar o plano a partir do PDF e ajuste os artigos ao número de série.</>
-              : <> Configure os consumíveis recomendados para as manutenções periódicas deste equipamento. Adicione cada artigo manualmente.</>
+            {isKaeserAbcd
+              ? (isAdmin
+                ? <> Configure o plano de consumíveis deste compressor KAESER (A/B/C/D). Use <em>&quot;Importar template para esta máquina&quot;</em> para carregar o plano a partir do PDF (recomendado no PC) e ajuste os artigos ao número de série.</>
+                : <> O plano A/B/C/D é importado pelo <strong>administrador</strong> a partir do PDF no escritório (PC). Aqui pode consultar as peças quando estiverem disponíveis.</>)
+              : (isAdmin
+                ? <> Configure os consumíveis recomendados para as manutenções periódicas deste equipamento. Adicione cada artigo manualmente.</>
+                : <> Os consumíveis do plano periódico são definidos pelo administrador. Aqui pode consultar a lista.</>)
             }
           </div>
         )}
 
-        {/* Importar plano KAESER a partir de PDF — exclusivo para máquinas KAESER */}
-        {isKaeser && tipoAtivo !== 'periodica' && (
+        {!isAdmin && podeImportarPdfKaeser && tipoAtivo !== 'periodica' && (
+          <div className="modal-pecas-import modal-pecas-import--readonly">
+            <span className="import-hint">
+              A importação do plano a partir de PDF é feita apenas pelo administrador (PC), para evitar falhas em tablets. Os dados ficam na base online e aparecem aqui para consulta.
+            </span>
+          </div>
+        )}
+
+        {/* Importar plano KAESER a partir de PDF — Admin + máquinas KAESER */}
+        {isAdmin && podeImportarPdfKaeser && tipoAtivo !== 'periodica' && (
           <div className="modal-pecas-import">
             <input
               ref={fileInputRef}
@@ -198,7 +265,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
               aria-label="Seleccionar PDF do plano de manutenção"
             />
             <span className="import-hint">
-              Selecione o PDF do plano de manutenção desta máquina (formato KAESER A/B/C/D).
+              Selecione o PDF do plano de manutenção desta máquina (formato KAESER A/B/C/D). Recomendado em PC/desktop.
             </span>
             <button
               type="button"
@@ -212,11 +279,22 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
 
         {/* Tabela de peças */}
         <div className="modal-pecas-table-wrap">
-          {pecasTipo.length === 0 ? (
+          {tipoAtivo === 'periodica' && isKaeserAbcd && (
+            <p className="modal-pecas-ficha-hint">
+              No separador <strong>Periódica</strong>, as referências da ficha aparecem automaticamente quando preenchidas em{' '}
+              <strong>Editar máquina → Consumíveis (manutenção regular)</strong>.
+              {isAdmin ? ' Pode acrescentar mais artigos no plano abaixo.' : ' Consulte a lista abaixo; alterações ao plano são feitas pelo administrador.'}
+            </p>
+          )}
+          {linhasExibicao.length === 0 ? (
             <p className="modal-pecas-vazio">
               Sem peças configuradas para <strong>Tipo {tipoAtivo === 'periodica' ? 'Periódica' : tipoAtivo}</strong>.
-              {isKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template para esta máquina" para carregar o plano a partir de um PDF.'}
-              {!isKaeser && ' Adicione cada consumível manualmente no formulário abaixo.'}
+              {tipoAtivo === 'periodica' && isKaeserAbcd && (isAdmin
+                ? ' Preencha as referências na ficha do equipamento ou adicione linhas ao plano.'
+                : ' As referências da ficha aparecem aqui quando configuradas.')}
+              {isAdmin && podeImportarPdfKaeser && tipoAtivo !== 'periodica' && ' Use "Importar template para esta máquina" para carregar o plano a partir de um PDF.'}
+              {!isKaeserAbcd && isAdmin && ' Adicione cada consumível manualmente no formulário abaixo.'}
+              {!isKaeserAbcd && !isAdmin && ' Consulte a lista abaixo quando o administrador tiver configurado o plano.'}
             </p>
           ) : (
             <table className="tabela-pecas">
@@ -231,93 +309,121 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
                 </tr>
               </thead>
               <tbody>
-                {pecasTipo.map(p => editandoId === p.id ? (
-                  <tr key={p.id} className="row-edit">
-                    <td><input className="input-sm" value={formEdit.posicao} onChange={e => setFormEdit(f => ({ ...f, posicao: e.target.value }))} placeholder="Ex: 0512" style={{ width: '60px' }} /></td>
-                    <td><input className="input-sm" value={formEdit.codigoArtigo} onChange={e => setFormEdit(f => ({ ...f, codigoArtigo: e.target.value }))} required style={{ width: '130px' }} /></td>
-                    <td><input className="input-sm" value={formEdit.descricao} onChange={e => setFormEdit(f => ({ ...f, descricao: e.target.value }))} required style={{ width: '100%' }} /></td>
-                    <td><input className="input-sm" type="number" min={0.01} step={0.01} value={formEdit.quantidade} onChange={e => setFormEdit(f => ({ ...f, quantidade: parseFloat(e.target.value) || 1 }))} style={{ width: '60px' }} /></td>
-                    <td>
-                      <select className="input-sm" value={formEdit.unidade} onChange={e => setFormEdit(f => ({ ...f, unidade: e.target.value }))}>
-                        {UNIDADES.map(u => <option key={u}>{u}</option>)}
-                      </select>
-                    </td>
-                    <td className="cell-actions">
-                      <button className="icon-btn success" onClick={() => handleSaveEdit(p.id)} title="Guardar"><Save size={14} /></button>
-                      <button className="icon-btn" onClick={() => setEditandoId(null)} title="Cancelar"><X size={14} /></button>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={p.id}>
-                    <td className="cell-pos">{p.posicao || '—'}</td>
-                    <td className="cell-code">{p.codigoArtigo}</td>
-                    <td>{p.descricao}</td>
-                    <td className="cell-qty">{p.quantidade}</td>
-                    <td className="cell-un">{p.unidade}</td>
-                    <td className="cell-actions">
-                      <button className="icon-btn secondary" onClick={() => { setEditandoId(p.id); setFormEdit({ posicao: p.posicao || '', codigoArtigo: p.codigoArtigo, descricao: p.descricao, quantidade: p.quantidade, unidade: p.unidade }) }} title="Editar">
-                        <ChevronDown size={14} />
-                      </button>
-                      {confirmDeletePecaId === p.id ? (
-                        <>
-                          <button className="icon-btn danger" onClick={() => { removePecaPlano(p.id); setConfirmDeletePecaId(null); showToast('Peça removida.', 'success') }} title="Confirmar">Sim</button>
-                          <button className="icon-btn secondary" onClick={() => setConfirmDeletePecaId(null)} title="Cancelar">Não</button>
-                        </>
-                      ) : (
-                        <button className="icon-btn danger" onClick={() => setConfirmDeletePecaId(p.id)} title="Remover"><Trash2 size={14} /></button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {linhasExibicao.map((p) => {
+                  if (p.fromFicha) {
+                    return (
+                      <tr key={p.id} className="row-ficha-ref">
+                        <td className="cell-pos">—</td>
+                        <td className="cell-code">{p.codigoArtigo}</td>
+                        <td>
+                          <span className="peca-ficha-badge">Ficha</span>
+                          {p.descricao}
+                        </td>
+                        <td className="cell-qty">{p.quantidade}</td>
+                        <td className="cell-un">{p.unidade}</td>
+                        <td className="cell-actions muted">—</td>
+                      </tr>
+                    )
+                  }
+                  if (isAdmin && editandoId === p.id) {
+                    return (
+                      <tr key={p.id} className="row-edit">
+                        <td><input className="input-sm" value={formEdit.posicao} onChange={e => setFormEdit(f => ({ ...f, posicao: e.target.value }))} placeholder="Ex: 0512" style={{ width: '60px' }} /></td>
+                        <td><input className="input-sm" value={formEdit.codigoArtigo} onChange={e => setFormEdit(f => ({ ...f, codigoArtigo: e.target.value }))} required style={{ width: '130px' }} /></td>
+                        <td><input className="input-sm" value={formEdit.descricao} onChange={e => setFormEdit(f => ({ ...f, descricao: e.target.value }))} required style={{ width: '100%' }} /></td>
+                        <td><input className="input-sm" type="number" min={0.01} step={0.01} value={formEdit.quantidade} onChange={e => setFormEdit(f => ({ ...f, quantidade: parseFloat(e.target.value) || 1 }))} style={{ width: '60px' }} /></td>
+                        <td>
+                          <select className="input-sm" value={formEdit.unidade} onChange={e => setFormEdit(f => ({ ...f, unidade: e.target.value }))}>
+                            {UNIDADES.map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="cell-actions">
+                          <button type="button" className="icon-btn success" onClick={() => handleSaveEdit(p.id)} title="Guardar"><Save size={14} /></button>
+                          <button type="button" className="icon-btn" onClick={() => setEditandoId(null)} title="Cancelar"><X size={14} /></button>
+                        </td>
+                      </tr>
+                    )
+                  }
+                  return (
+                    <tr key={p.id}>
+                      <td className="cell-pos">{p.posicao || '—'}</td>
+                      <td className="cell-code">{p.codigoArtigo}</td>
+                      <td>{p.descricao}</td>
+                      <td className="cell-qty">{p.quantidade}</td>
+                      <td className="cell-un">{p.unidade}</td>
+                      <td className="cell-actions">
+                        {isAdmin ? (
+                          <>
+                            <button type="button" className="icon-btn secondary" onClick={() => { setEditandoId(p.id); setFormEdit({ posicao: p.posicao || '', codigoArtigo: p.codigoArtigo, descricao: p.descricao, quantidade: p.quantidade, unidade: p.unidade }) }} title="Editar">
+                              <ChevronDown size={14} />
+                            </button>
+                            {confirmDeletePecaId === p.id ? (
+                              <>
+                                <button type="button" className="icon-btn danger" onClick={() => { removePecaPlano(p.id); setConfirmDeletePecaId(null); showToast('Peça removida.', 'success') }} title="Confirmar">Sim</button>
+                                <button type="button" className="icon-btn secondary" onClick={() => setConfirmDeletePecaId(null)} title="Cancelar">Não</button>
+                              </>
+                            ) : (
+                              <button type="button" className="icon-btn danger" onClick={() => setConfirmDeletePecaId(p.id)} title="Remover"><Trash2 size={14} /></button>
+                            )}
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
         </div>
 
-        {/* Adicionar nova peça */}
-        <form className="modal-pecas-add-row" onSubmit={handleAddPeca}>
-          <input
-            className="input-sm"
-            placeholder="Posição"
-            value={formNova.posicao}
-            onChange={e => setFormNova(f => ({ ...f, posicao: e.target.value }))}
-            style={{ width: '65px', flexShrink: 0 }}
-          />
-          <input
-            className="input-sm"
-            placeholder="Código artigo *"
-            value={formNova.codigoArtigo}
-            onChange={e => setFormNova(f => ({ ...f, codigoArtigo: e.target.value }))}
-            style={{ width: '135px', flexShrink: 0 }}
-          />
-          <input
-            className="input-sm"
-            placeholder="Descrição *"
-            value={formNova.descricao}
-            onChange={e => setFormNova(f => ({ ...f, descricao: e.target.value }))}
-            style={{ flex: 1 }}
-          />
-          <input
-            className="input-sm"
-            type="number"
-            min={0.01}
-            step={0.01}
-            value={formNova.quantidade}
-            onChange={e => setFormNova(f => ({ ...f, quantidade: parseFloat(e.target.value) || 1 }))}
-            style={{ width: '60px', flexShrink: 0 }}
-          />
-          <select
-            className="input-sm"
-            value={formNova.unidade}
-            onChange={e => setFormNova(f => ({ ...f, unidade: e.target.value }))}
-            style={{ width: '70px', flexShrink: 0 }}
-          >
-            {UNIDADES.map(u => <option key={u}>{u}</option>)}
-          </select>
-          <button type="submit" className="btn btn-sm primary" style={{ flexShrink: 0 }}>
-            <Plus size={14} /> Adicionar
-          </button>
-        </form>
+        {/* Adicionar nova peça — só Admin */}
+        {isAdmin && (
+          <form className="modal-pecas-add-row" onSubmit={handleAddPeca}>
+            <input
+              className="input-sm"
+              placeholder="Posição"
+              value={formNova.posicao}
+              onChange={e => setFormNova(f => ({ ...f, posicao: e.target.value }))}
+              style={{ width: '65px', flexShrink: 0 }}
+            />
+            <input
+              className="input-sm"
+              placeholder="Código artigo *"
+              value={formNova.codigoArtigo}
+              onChange={e => setFormNova(f => ({ ...f, codigoArtigo: e.target.value }))}
+              style={{ width: '135px', flexShrink: 0 }}
+            />
+            <input
+              className="input-sm"
+              placeholder="Descrição *"
+              value={formNova.descricao}
+              onChange={e => setFormNova(f => ({ ...f, descricao: e.target.value }))}
+              style={{ flex: 1 }}
+            />
+            <input
+              className="input-sm"
+              type="number"
+              min={0.01}
+              step={0.01}
+              value={formNova.quantidade}
+              onChange={e => setFormNova(f => ({ ...f, quantidade: parseFloat(e.target.value) || 1 }))}
+              style={{ width: '60px', flexShrink: 0 }}
+            />
+            <select
+              className="input-sm"
+              value={formNova.unidade}
+              onChange={e => setFormNova(f => ({ ...f, unidade: e.target.value }))}
+              style={{ width: '70px', flexShrink: 0 }}
+            >
+              {UNIDADES.map(u => <option key={u}>{u}</option>)}
+            </select>
+            <button type="submit" className="btn btn-sm primary" style={{ flexShrink: 0 }}>
+              <Plus size={14} /> Adicionar
+            </button>
+          </form>
+        )}
 
         {/* Rodapé com acção de limpar */}
         <div className="modal-pecas-footer form-actions">
@@ -330,7 +436,7 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
             </div>
           ) : (
             <>
-              {totalMaquina > 0 && (
+              {isAdmin && totalMaquina > 0 && (
                 <button type="button" className="btn btn-sm btn-outline-muted" onClick={() => setConfirmarLimpar(true)}>
                   <Trash2 size={13} /> Limpar plano…
                 </button>

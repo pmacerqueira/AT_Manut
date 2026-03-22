@@ -6,3 +6,5 @@
  */
 export const MAX_FOTOS = 6
 export const API_TIMEOUT_MS = 15000
+/** Operações maiores na API (ex.: `replace_maquina` + `list` de `pecas_plano` em redes lentas). */
+export const API_TIMEOUT_BULK_MS = 45000

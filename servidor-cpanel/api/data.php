@@ -18,6 +18,7 @@
  *   manutencoes    — CRUD
  *   relatorios     — CRUD + geração de número
  *   tecnicos       — CRUD (admin only para escrita)
+ *   pecasPlano     — plano de consumíveis por máquina (list: todos; escrita: admin; replace_maquina: admin)
  *
  * Acções: list | get | create | update | delete | bulk_create | bulk_restore
  */
@@ -76,6 +77,7 @@ register_shutdown_function(function() {
 // ══ 4. CONFIG + DB ════════════════════════════════════════════════════════════
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/tecnico_horario_restrito.php';
 
 // ══ 5. LER BODY JSON ═════════════════════════════════════════════════════════
 $raw  = file_get_contents('php://input');
@@ -116,6 +118,14 @@ if ($resource === 'auth' && $action === 'login') {
         json_error('Utilizador ou password incorretos.', 401);
     }
 
+    if (($user['role'] ?? '') === 'tecnico' && atm_tecnico_em_horario_restrito()) {
+        json_error(
+            'Acesso da equipa técnica não está permitido neste horário. Contacte a administração se necessário.',
+            403,
+            ['code' => 'TECNICO_HORARIO_RESTRITO']
+        );
+    }
+
     $payload = [
         'sub'      => $user['id'],
         'username' => $user['username'],
@@ -140,6 +150,14 @@ if ($resource === 'auth' && $action === 'login') {
 // Todas as outras rotas requerem token válido
 $authPayload = jwt_decode($token);
 if (!$authPayload) json_error('Sessão expirada. Por favor faça login novamente.', 401);
+
+if (($authPayload['role'] ?? '') === 'tecnico' && atm_tecnico_em_horario_restrito()) {
+    json_error(
+        'Sessão terminada: horário de acesso restrito para a equipa técnica.',
+        403,
+        ['code' => 'TECNICO_HORARIO_RESTRITO']
+    );
+}
 
 // Contexto para logs da API (Admin vê no painel)
 $GLOBALS['_atm_log_user'] = $authPayload['username'] ?? $authPayload['sub'] ?? '-';
@@ -223,7 +241,7 @@ $RESOURCE_MAP = [
     'maquinas' => [
         'table'      => 'maquinas',
         'json_cols'  => ['documentos'],
-        'allowed'    => ['id','cliente_id','cliente_nif','subcategoria_id','marca_id','marca','marca_logo_url','marca_cor_hex','modelo','numero_serie','ano_fabrico','periodicidade','proxima_manut','numero_documento_venda','notas','documentos','ultima_manutencao_data','horas_totais_acumuladas','horas_servico_acumuladas','criado_em'],
+        'allowed'    => ['id','cliente_id','cliente_nif','subcategoria_id','marca_id','marca','marca_logo_url','marca_cor_hex','modelo','numero_serie','ano_fabrico','periodicidade','proxima_manut','numero_documento_venda','notas','documentos','ultima_manutencao_data','horas_totais_acumuladas','horas_servico_acumuladas','posicao_kaeser','plano_manutencao_compressor','ref_kit_manut3000h','ref_kit_manut6000h','ref_correia','ref_filtro_oleo','ref_filtro_separador','ref_filtro_ar','criado_em'],
         'order'      => 'criado_em DESC',
     ],
     'manutencoes' => [
@@ -235,7 +253,7 @@ $RESOURCE_MAP = [
     'relatorios' => [
         'table'      => 'relatorios',
         'json_cols'  => ['checklist_respostas','checklist_snapshot','fotos','pecas_usadas','ultimo_envio','enviado_para_cliente'],
-        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','ultimo_envio','enviado_para_cliente','criado_em'],
+        'allowed'    => ['id','manutencao_id','numero_relatorio','data_criacao','data_assinatura','tecnico','nome_assinante','assinado_pelo_cliente','assinatura_digital','checklist_respostas','checklist_snapshot','notas','fotos','pecas_usadas','tipo_manut_kaeser','tipo_manut_kaeser_sugerido','sugestao_fase_motivo','ultimo_envio','enviado_para_cliente','criado_em'],
         'order'      => 'data_criacao DESC',
     ],
     'reparacoes' => [
@@ -255,6 +273,12 @@ $RESOURCE_MAP = [
         'json_cols'  => [],
         'allowed'    => ['id','nome','telefone','assinatura_digital','ativo','criado_em'],
         'order'      => 'nome ASC',
+    ],
+    'pecasPlano' => [
+        'table'      => 'pecas_plano',
+        'json_cols'  => [],
+        'allowed'    => ['id','maquina_id','tipo_manut','posicao','codigo_artigo','descricao','quantidade','unidade','criado_em'],
+        'order'      => 'maquina_id ASC, tipo_manut ASC, posicao ASC',
     ],
 ];
 
@@ -384,6 +408,88 @@ if ($resource === 'uploads' && $action === 'brand_logo') {
         'url' => $url,
         'path' => $relativePath,
         'mime' => 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext),
+        'bytes' => $size,
+    ]);
+}
+
+// ══ 7d. UPLOADS (apenas Admin) — PDF técnico associado a equipamento ─────────
+if ($resource === 'uploads' && $action === 'machine_pdf') {
+    if (($authPayload['role'] ?? '') !== 'admin') {
+        json_error('Acesso negado. Apenas administradores.', 403);
+    }
+
+    $payload = $body['data'] ?? [];
+    $dataUrl = trim((string)($payload['dataUrl'] ?? ''));
+    $maquinaId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($payload['maquinaId'] ?? ''));
+
+    if ($dataUrl === '' || $maquinaId === '') {
+        json_error('PDF ou identificador do equipamento em falta.', 400);
+    }
+
+    if (!preg_match('#^data:application/pdf;base64,#i', $dataUrl)) {
+        json_error('Formato inválido. Envie um ficheiro PDF.', 400);
+    }
+
+    $commaPos = strpos($dataUrl, ',');
+    if ($commaPos === false) {
+        json_error('Payload PDF inválido.', 400);
+    }
+
+    $base64 = substr($dataUrl, $commaPos + 1);
+    $bin = base64_decode($base64, true);
+    if ($bin === false) {
+        json_error('Falha ao decodificar PDF.', 400);
+    }
+
+    if (strncmp($bin, '%PDF', 4) !== 0) {
+        json_error('O ficheiro não parece ser um PDF válido.', 400);
+    }
+
+    $maxBytes = 8 * 1024 * 1024; // 8 MB (limite seguro para JSON + hosting partilhado)
+    $size = strlen($bin);
+    if ($size <= 0 || $size > $maxBytes) {
+        json_error('PDF inválido ou demasiado grande (máx. 8 MB).', 400);
+    }
+
+    $rand = substr(bin2hex(random_bytes(4)), 0, 8);
+    $filename = 'maq-' . $maquinaId . '-' . date('YmdHis') . '-' . $rand . '.pdf';
+
+    $rootDir = dirname(__DIR__);
+    $uploadDir = $rootDir . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'machine-docs';
+    if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0755, true)) {
+        json_error('Não foi possível preparar pasta de upload.', 500);
+    }
+
+    // Substituição: mesmo ficheiro (nome+tamanho no cliente) — apaga PDF antigo para não acumular lixo
+    $replacePath = trim((string)($payload['replacePath'] ?? ''));
+    if ($replacePath !== '') {
+        $replacePath = '/' . ltrim(str_replace('\\', '/', $replacePath), '/');
+        if (!preg_match('#^/uploads/machine-docs/(maq-' . preg_quote($maquinaId, '#') . '-\d{14}-[a-fA-F0-9]+\.pdf)$#', $replacePath, $rm)) {
+            json_error('Caminho de substituição inválido.', 400);
+        }
+        $basenameOld = $rm[1];
+        $targetOld = $uploadDir . DIRECTORY_SEPARATOR . $basenameOld;
+        $realDir = realpath($uploadDir);
+        $realOld = $targetOld !== '' && is_file($targetOld) ? realpath($targetOld) : false;
+        if ($realDir && $realOld && str_starts_with($realOld, $realDir)) {
+            @unlink($realOld);
+        }
+    }
+
+    $target = $uploadDir . DIRECTORY_SEPARATOR . $filename;
+    if (@file_put_contents($target, $bin, LOCK_EX) === false) {
+        json_error('Falha ao gravar PDF no servidor.', 500);
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'www.navel.pt';
+    $relativePath = '/uploads/machine-docs/' . $filename;
+    $url = $scheme . '://' . $host . $relativePath;
+
+    json_ok([
+        'url' => $url,
+        'path' => $relativePath,
+        'mime' => 'application/pdf',
         'bytes' => $size,
     ]);
 }
@@ -637,8 +743,8 @@ if ($_user_role !== 'admin') {
         $blocked = true;
     }
     // Categorias, subcategorias, checklistItems, marcas, tecnicos: admin only para qualquer escrita
-    if (in_array($resource, ['categorias','subcategorias','checklistItems','marcas','tecnicos'], true)
-        && in_array($action, ['create','update','delete','bulk_create','bulk_restore'], true)) {
+    if (in_array($resource, ['categorias','subcategorias','checklistItems','marcas','tecnicos','pecasPlano'], true)
+        && in_array($action, ['create','update','delete','bulk_create','bulk_restore','replace_maquina'], true)) {
         $blocked = true;
     }
     if ($blocked) {
@@ -726,6 +832,50 @@ switch ($action) {
             }
         }
         json_ok($j);
+    }
+
+    // ── REPLACE_MAQUINA (pecasPlano) — substitui todas as linhas de uma máquina; só Admin ──
+    case 'replace_maquina': {
+        if ($resource !== 'pecasPlano') json_error('Acção inválida para este recurso.', 404);
+        if (($authPayload['role'] ?? '') !== 'admin') json_error('Acesso negado.', 403);
+        $payload = $body['data'] ?? [];
+        $mid = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($payload['maquinaId'] ?? ''));
+        if ($mid === '') json_error('maquinaId em falta.', 422);
+        $items = $payload['items'] ?? [];
+        if (!is_array($items)) json_error('items deve ser array.', 422);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('DELETE FROM `pecas_plano` WHERE maquina_id = ?')->execute([$mid]);
+            $ins = $pdo->prepare(
+                'INSERT INTO `pecas_plano` (`id`,`maquina_id`,`tipo_manut`,`posicao`,`codigo_artigo`,`descricao`,`quantidade`,`unidade`) VALUES (?,?,?,?,?,?,?,?)'
+            );
+            foreach ($items as $row) {
+                if (!is_array($row)) continue;
+                $pid = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($row['id'] ?? ''));
+                if ($pid === '') {
+                    $pid = 'pp' . bin2hex(random_bytes(8));
+                }
+                $tipo = trim((string)($row['tipoManut'] ?? $row['tipo_manut'] ?? 'A'));
+                if ($tipo === '' || strlen($tipo) > 20) {
+                    $tipo = 'A';
+                }
+                $pos = isset($row['posicao']) ? trim((string)$row['posicao']) : '';
+                $cod = trim((string)($row['codigoArtigo'] ?? $row['codigo_artigo'] ?? ''));
+                $desc = trim((string)($row['descricao'] ?? ''));
+                $qRaw = $row['quantidade'] ?? 1;
+                $q = is_numeric($qRaw) ? (float)$qRaw : 1.0;
+                $uni = trim((string)($row['unidade'] ?? 'PÇ'));
+                if ($uni === '' || strlen($uni) > 10) {
+                    $uni = 'PÇ';
+                }
+                $ins->execute([$pid, $mid, $tipo, $pos !== '' ? $pos : null, $cod, $desc, $q, $uni]);
+            }
+            $pdo->commit();
+            json_ok(['maquinaId' => $mid, 'inserted' => count($items)]);
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 
     // ── CREATE ───────────────────────────────────────────────────────────────
@@ -840,7 +990,27 @@ switch ($action) {
         $data = $body['data'] ?? [];
         if (empty($data)) json_error('Dados em falta.');
 
-        if ($resource === 'maquinas') $data = preprocess_maquina($data);
+        // Updates parciais (ex.: só proximaManut após sync da agenda) não devem deixar
+        // preprocess_maquina() assumir periodicidade pela subcategoria nem forçar trimestral,
+        // sobrescrevendo anual/semestral já gravados na BD.
+        if ($resource === 'maquinas') {
+            $stmtEx = $pdo->prepare("SELECT * FROM `maquinas` WHERE id = ?");
+            $stmtEx->execute([$recId]);
+            $rowEx = $stmtEx->fetch();
+            if ($rowEx) {
+                $existingJs = row_to_js($rowEx, $json_cols);
+                $existingJs['periodicidadeManut'] = $existingJs['periodicidade'] ?? $rowEx['periodicidade'] ?? null;
+                $existingJs['clienteNif'] = $existingJs['clienteNif'] ?? $rowEx['cliente_nif'] ?? null;
+                if (empty($existingJs['clienteNif'])) {
+                    $cid = (string)($rowEx['cliente_id'] ?? '');
+                    if ($cid !== '' && isset($cliente_nif_by_id[$cid])) {
+                        $existingJs['clienteNif'] = $cliente_nif_by_id[$cid];
+                    }
+                }
+                $data = array_merge($existingJs, $data);
+            }
+            $data = preprocess_maquina($data);
+        }
 
         $dataSql = normalize_payload_for_sql($data);
         [$cols, $params] = js_to_row($dataSql, $allowed);

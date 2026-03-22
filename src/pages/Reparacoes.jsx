@@ -3,20 +3,28 @@
  * Permite criar, executar e enviar relatório de reparação por email.
  * Inclui reparações geradas automaticamente via email ISTOBAL.
  */
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, Fragment } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import ExecutarReparacaoModal from '../components/ExecutarReparacaoModal'
-import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, Printer, ChevronDown, Package, Clock, ArrowLeft, Pencil } from 'lucide-react'
+import MaquinaDocumentacaoLinks from '../components/MaquinaDocumentacaoLinks'
+import { Hammer, Plus, Trash2, Play, FileText, Mail, Zap, X, AlertCircle, BarChart2, ChevronLeft, ChevronRight, ChevronDown, Package, Clock, ArrowLeft, Pencil, FileDown, Send } from 'lucide-react'
 import { getHojeAzores, formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { MESES_PT } from '../constants/locale'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
+import { blobToRawBase64 } from '../services/emailService'
+import {
+  buildMensalIstobalPayload,
+  findClienteIstobalFaturacao,
+  gerarRelatorioMensalIstobalHtml,
+  gerarRelatorioMensalIstobalPdf,
+} from '../utils/mensalIstobalReport'
 import './Reparacoes.css'
 
 const STATUS_LABELS = {
@@ -74,7 +82,11 @@ export default function Reparacoes() {
   const [filtroClienteNova, setFiltroClienteNova] = useState('')
   const [modalMensal, setModalMensal] = useState(false)
   const [avisoExpandido, setAvisoExpandido] = useState(null) // id da reparação com detalhe expandido
-  const [modoPrint, setModoPrint] = useState(false)
+  const [mensalEmailPane, setMensalEmailPane] = useState(false)
+  const [mensalEmailIstobalCliente, setMensalEmailIstobalCliente] = useState(false)
+  const [mensalEmailAdmin, setMensalEmailAdmin] = useState(true)
+  const [mensalEmailOutro, setMensalEmailOutro] = useState('')
+  const [mensalAcaoLoading, setMensalAcaoLoading] = useState(null) // 'pdf' | 'email' | null
   const [mesMensal, setMesMensal] = useState(() => {
     const d = new Date()
     return { ano: d.getFullYear(), mes: d.getMonth() } // mes 0-11
@@ -122,10 +134,33 @@ export default function Reparacoes() {
     return { ano: na, mes: nm }
   })
 
+  const clienteIstobalFaturacao = useMemo(() => findClienteIstobalFaturacao(clientes), [clientes])
+
+  useEffect(() => {
+    if (!modalMensal) return
+    setMensalEmailIstobalCliente(!!String(clienteIstobalFaturacao?.email ?? '').trim())
+    setMensalEmailAdmin(true)
+    setMensalEmailOutro('')
+    setMensalEmailPane(false)
+  }, [modalMensal, clienteIstobalFaturacao?.email])
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const getMaquina  = useCallback((id) => maquinas.find(m => m.id === id), [maquinas])
   const getCliente  = useCallback((nif) => clientes.find(c => c.nif === nif), [clientes])
+
+  const mensalIstobalPayload = useMemo(
+    () =>
+      buildMensalIstobalPayload(
+        reparacoesMensais,
+        mesMensal,
+        MESES_PT,
+        getMaquina,
+        getCliente,
+        getRelatorioByReparacao
+      ),
+    [reparacoesMensais, mesMensal, getMaquina, getCliente, getRelatorioByReparacao]
+  )
 
   const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
 
@@ -332,6 +367,86 @@ export default function Reparacoes() {
     } finally {
       hideGlobalLoading()
       setEmailEnviando(false)
+    }
+  }
+
+  const fecharModalMensal = () => {
+    setMensalEmailPane(false)
+    setModalMensal(false)
+  }
+
+  const handleMensalPdf = async () => {
+    setMensalAcaoLoading('pdf')
+    try {
+      const blob = await gerarRelatorioMensalIstobalPdf(mensalIstobalPayload)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const fn = `istobal_mensal_${mesMensal.ano}-${String(mesMensal.mes + 1).padStart(2, '0')}.pdf`
+      a.href = url
+      a.download = fn
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 15000)
+      showToast('PDF transferido.', 'success')
+      logger.action('Reparacoes', 'mensalIstobalPdf', 'PDF mensal ISTOBAL', { periodo: mensalIstobalPayload.periodoLabel })
+    } catch (err) {
+      showToast('Erro ao gerar PDF do relatório mensal.', 'error', 4000)
+      logger.error('Reparacoes', 'mensalIstobalPdf', err.message)
+    } finally {
+      setMensalAcaoLoading(null)
+    }
+  }
+
+  const handleMensalEmailSubmit = async (e) => {
+    e.preventDefault()
+    const emailIst = String(clienteIstobalFaturacao?.email ?? '').trim()
+    const dests = new Set()
+    if (mensalEmailIstobalCliente && emailIst) dests.add(emailIst.toLowerCase())
+    if (mensalEmailAdmin) dests.add(EMAIL_ADMIN_REP)
+    mensalEmailOutro.split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean).forEach(em => dests.add(em))
+    if (dests.size === 0) {
+      showToast('Seleccione pelo menos um destinatário ou indique outro email.', 'warning')
+      return
+    }
+    showGlobalLoading()
+    setMensalAcaoLoading('email')
+    try {
+      const { enviarRelatorioHtmlEmail } = await import('../services/emailService')
+      const html = gerarRelatorioMensalIstobalHtml(mensalIstobalPayload, { emailFragment: true })
+      const pdfBlob = await gerarRelatorioMensalIstobalPdf(mensalIstobalPayload)
+      const pdfBase64 = await blobToRawBase64(pdfBlob)
+      const pdfFilename = `istobal_mensal_${mesMensal.ano}-${String(mesMensal.mes + 1).padStart(2, '0')}.pdf`
+      const assunto = `Relatório Mensal ISTOBAL — ${mensalIstobalPayload.periodoLabel} — Navel`
+      let ok = 0
+      for (const dest of dests) {
+        const resultado = await enviarRelatorioHtmlEmail({
+          destinatario: dest,
+          assunto,
+          html,
+          nomeCliente: clienteIstobalFaturacao?.nome ?? 'ISTOBAL',
+          pdfBase64,
+          pdfFilename,
+        })
+        if (resultado.ok) ok++
+        else logger.error('Reparacoes', 'mensalIstobalEmail', resultado.message ?? 'Erro', { dest })
+      }
+      if (ok > 0) {
+        showToast(
+          ok === dests.size
+            ? `Relatório enviado para ${ok} destinatário(s).`
+            : `Enviado para ${ok} de ${dests.size} destinatários.`,
+          ok === dests.size ? 'success' : 'warning'
+        )
+        logger.action('Reparacoes', 'mensalIstobalEmail', 'Email mensal ISTOBAL', { periodo: mensalIstobalPayload.periodoLabel, ok, total: dests.size })
+        setMensalEmailPane(false)
+      } else {
+        showToast('Não foi possível enviar o email.', 'error', 4000)
+      }
+    } catch (err) {
+      showToast('Erro ao enviar: ' + err.message, 'error', 4000)
+      logger.error('Reparacoes', 'mensalIstobalEmail', err.message)
+    } finally {
+      hideGlobalLoading()
+      setMensalAcaoLoading(null)
     }
   }
 
@@ -880,11 +995,17 @@ export default function Reparacoes() {
 
       {/* ── Modal: Relatório Mensal ISTOBAL ──────────────────────────────── */}
       {modalMensal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Relatório Mensal ISTOBAL">
-          <div className="modal modal-mensal-istobal">
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Relatório Mensal ISTOBAL"
+          onClick={mensalAcaoLoading ? undefined : fecharModalMensal}
+        >
+          <div className="modal modal-mensal-istobal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2><BarChart2 size={18} /> Relatório Mensal ISTOBAL</h2>
-              <button type="button" className="icon-btn" onClick={() => setModalMensal(false)}><X size={20} /></button>
+              <button type="button" className="icon-btn" onClick={fecharModalMensal} disabled={!!mensalAcaoLoading} aria-label="Fechar"><X size={20} /></button>
             </div>
             <div className="modal-body">
               {/* Navegação de mês */}
@@ -922,7 +1043,7 @@ export default function Reparacoes() {
               {reparacoesIstobaMensais.length > 0 ? (
                 <div className="mensal-secao">
                   <h3 className="mensal-secao-titulo"><Zap size={14} /> Avisos ISTOBAL — {MESES_PT[mesMensal.mes]}</h3>
-                  <table className="data-table mensal-table">
+                  <table className="data-table mensal-table mensal-table-ist">
                     <thead>
                       <tr>
                         <th>Data</th>
@@ -941,18 +1062,23 @@ export default function Reparacoes() {
                         const rel = getRelatorioByReparacao(r.id)
                         const st  = STATUS_LABELS[r.status] ?? { label: r.status, cls: 'badge-secondary' }
                         const horas = rel?.horasMaoObra ? parseFloat(rel.horasMaoObra) : null
-                        const pecas = rel?.pecasUsadas
-                          ? (typeof rel.pecasUsadas === 'string' ? JSON.parse(rel.pecasUsadas) : rel.pecasUsadas)
-                          : []
-                        const expandido = modoPrint || avisoExpandido === r.id
+                        let pecas = []
+                        try {
+                          pecas = rel?.pecasUsadas
+                            ? (typeof rel.pecasUsadas === 'string' ? JSON.parse(rel.pecasUsadas) : rel.pecasUsadas)
+                            : []
+                          if (!Array.isArray(pecas)) pecas = []
+                        } catch {
+                          pecas = []
+                        }
+                        const expandido = avisoExpandido === r.id
                         return (
-                          <>
+                          <Fragment key={r.id}>
                             <tr
-                              key={r.id}
                               className={[
                                 r.status === 'concluida' ? '' : 'row-em-curso',
                                 pecas.length > 0 ? 'row-expansivel' : ''
-                              ].join(' ')}
+                              ].filter(Boolean).join(' ')}
                               onClick={() => pecas.length > 0 && setAvisoExpandido(avisoExpandido === r.id ? null : r.id)}
                               title={pecas.length > 0 ? 'Clique para ver materiais' : undefined}
                             >
@@ -1005,7 +1131,7 @@ export default function Reparacoes() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         )
                       })}
                     </tbody>
@@ -1053,19 +1179,86 @@ export default function Reparacoes() {
                 </div>
               )}
             </div>
-            <div className="modal-footer">
-              <button type="button" className="btn secondary" onClick={() => setModalMensal(false)}>Fechar</button>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => {
-                  setModoPrint(true)
-                  setTimeout(() => { window.print(); setModoPrint(false) }, 150)
-                }}
-                title="Imprimir relatório mensal para enviar à ISTOBAL"
-              >
-                <Printer size={15} /> Imprimir / Exportar
-              </button>
+            {mensalEmailPane && (
+              <form className="frota-email-panel mensal-email-panel" onSubmit={handleMensalEmailSubmit}>
+                <p className="frota-email-panel-title">Enviar relatório mensal (HTML + PDF em anexo)</p>
+                {clienteIstobalFaturacao?.email?.trim() ? (
+                  <label className="frota-email-check">
+                    <input
+                      type="checkbox"
+                      checked={mensalEmailIstobalCliente}
+                      onChange={e => setMensalEmailIstobalCliente(e.target.checked)}
+                      disabled={mensalAcaoLoading === 'email'}
+                    />
+                    <span>
+                      <strong>{clienteIstobalFaturacao.email}</strong>
+                      <small> — ficha cliente ISTOBAL (faturação)</small>
+                    </span>
+                  </label>
+                ) : (
+                  <p className="mensal-email-sem-ficha">
+                    <em>Nenhum cliente com «ISTOBAL» no nome e email na base de dados. Use o campo «Outro» para enviar à ISTOBAL.</em>
+                  </p>
+                )}
+                <label className="frota-email-check">
+                  <input
+                    type="checkbox"
+                    checked={mensalEmailAdmin}
+                    onChange={e => setMensalEmailAdmin(e.target.checked)}
+                    disabled={mensalAcaoLoading === 'email'}
+                  />
+                  <span>
+                    <strong>{EMAIL_ADMIN_REP}</strong>
+                    <small> — Navel (admin)</small>
+                  </span>
+                </label>
+                <label className="frota-email-check frota-email-outro">
+                  <input type="checkbox" checked={mensalEmailOutro.trim().length > 0} readOnly tabIndex={-1} />
+                  <span className="frota-email-outro-wrap">
+                    <small>Outro(s):</small>
+                    <input
+                      type="text"
+                      className="frota-email-outro-input"
+                      placeholder="ex: lmonteiro.pt@istobal.com"
+                      value={mensalEmailOutro}
+                      onChange={e => setMensalEmailOutro(e.target.value)}
+                      disabled={mensalAcaoLoading === 'email'}
+                    />
+                  </span>
+                </label>
+                <div className="form-actions frota-email-actions">
+                  <button type="button" className="secondary" onClick={() => setMensalEmailPane(false)} disabled={mensalAcaoLoading === 'email'}>Cancelar</button>
+                  <button type="submit" className="primary" disabled={mensalAcaoLoading === 'email'}>
+                    {mensalAcaoLoading === 'email'
+                      ? <><span className="frota-acao-spinner" /> A enviar...</>
+                      : <><Send size={14} /> Enviar email</>}
+                  </button>
+                </div>
+              </form>
+            )}
+            <div className="modal-footer mensal-modal-footer">
+              <button type="button" className="btn secondary" onClick={fecharModalMensal} disabled={!!mensalAcaoLoading}>Fechar</button>
+              <div className="mensal-footer-acoes">
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={handleMensalPdf}
+                  disabled={!!mensalAcaoLoading}
+                  title="Descarregar PDF sem abrir diálogo de impressão"
+                >
+                  {mensalAcaoLoading === 'pdf'
+                    ? <><span className="frota-acao-spinner" /> A gerar...</>
+                    : <><FileDown size={15} /> Obter PDF</>}
+                </button>
+                <button
+                  type="button"
+                  className={`btn secondary${mensalEmailPane ? ' mensal-btn-email-active' : ''}`}
+                  onClick={() => setMensalEmailPane(v => !v)}
+                  disabled={!!mensalAcaoLoading}
+                >
+                  <Mail size={15} /> Enviar por email
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1126,6 +1319,12 @@ function RelatorioReparacaoView({ relatorio: rel, reparacao: rep, maquina: maq, 
             {rel.numeroAviso && <><span className="rel-label">Aviso</span><span>{rel.numeroAviso}</span></>}
             {rep?.descricaoAvaria && <><span className="rel-label">Descrição avaria</span><span>{rep.descricaoAvaria}</span></>}
           </div>
+        </div>
+      )}
+
+      {(maq?.documentos ?? []).length > 0 && (
+        <div className="rel-section">
+          <MaquinaDocumentacaoLinks maquina={maq} />
         </div>
       )}
 

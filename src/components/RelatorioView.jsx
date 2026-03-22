@@ -4,11 +4,13 @@ import { ExternalLink } from 'lucide-react'
 import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
+import { horasContadorNaManutencao } from '../utils/horasContadorEquipamento'
 import './RelatorioView.css'
 
 export default function RelatorioView({ relatorio, manutencao, maquina, cliente, checklistItems = [] }) {
   if (!relatorio) return null
   const items = resolveChecklist(relatorio, checklistItems)
+  const horasContador = horasContadorNaManutencao(manutencao)
 
   const dataCriacaoFormatada = relatorio.dataCriacao
     ? formatDataHoraAzores(relatorio.dataCriacao)
@@ -24,7 +26,7 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
         <p><strong>Equipamento:</strong> {maquina ? `${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}` : '—'}</p>
         {(maquina?.documentos ?? []).length > 0 && (
           <p className="doc-links-relatorio">
-            <strong>Documentação:</strong>{' '}
+            <strong>Documentação técnica:</strong>{' '}
             {maquina.documentos.map((d, i) => {
               const tipoLabel = TIPOS_DOCUMENTO.find(t => t.id === d.tipo)?.label ?? d.tipo
               return (
@@ -48,8 +50,8 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
               : '—'
         }</p>
         <p><strong>Técnico:</strong> {relatorio?.tecnico ?? manutencao?.tecnico ?? '—'}</p>
-        {(manutencao?.horasTotais != null || manutencao?.horasServico != null) && (
-          <p><strong>Contadores:</strong> {manutencao.horasTotais != null && `Total: ${manutencao.horasTotais}h`}{manutencao.horasTotais != null && manutencao.horasServico != null && ' · '}{manutencao.horasServico != null && `Serviço: ${manutencao.horasServico}h`}</p>
+        {horasContador != null && (
+          <p><strong>Horas no contador:</strong> {horasContador} h</p>
         )}
       </section>
 

@@ -9,6 +9,256 @@ Política de continuidade:
 
 ---
 
+## [1.16.30] — 2026-03-22 — Documentação de deploy (PDFs técnicos, data.php) + pacote build
+
+### Alteração
+- **`DOCUMENTACAO.md`:** modelo `maquinas.documentos`, fluxo de upload/substituição, caminho `uploads/machine-docs/`.
+- **`docs/DEPLOY_CHECKLIST.md`**, **`docs/BUILD-E-ZIP.md`**, **`servidor-cpanel/INSTRUCOES_CPANEL.md`**, **`README.md`**, **`DESENVOLVIMENTO.md`:** checklist cPanel, pasta `uploads/machine-docs/`, quando enviar `data.php`.
+
+---
+
+## [1.16.29] — 2026-03-22 — Upload PDF documentação: substituir quando nome e tamanho coincidem
+
+### Contexto
+Reenviar o mesmo ficheiro (mesmo nome e tamanho) criava uma segunda linha na ficha e um segundo ficheiro em `uploads/machine-docs/`, sem apagar o anterior.
+
+### Alteração
+- **`DocumentacaoModal` + `DataContext`:** em cada upload guardam-se `uploadFileName` e `uploadFileSize` no item de `documentos`. Se já existir entrada com o mesmo **tipo + nome + tamanho**, actualiza-se essa linha (mesmo `id`) e envia-se `replacePath` ao servidor.
+- **`data.php` (`machine_pdf`):** parâmetro opcional `replacePath` — validação estrita (`/uploads/machine-docs/maq-{id}-…pdf` + `realpath` dentro da pasta) e `unlink` do PDF antigo antes de gravar o novo.
+- **`apiService.js`:** `apiUploadMachinePdf` aceita `replacePath` opcional.
+
+### Deploy
+- **API:** enviar `servidor-cpanel/api/data.php` actualizado.
+
+---
+
+## [1.16.28] — 2026-03-22 — Documentação técnica: gravação na API (id número vs string)
+
+### Contexto
+Ao importar PDF ou adicionar URL em «Documentação técnica», o toast dizia sucesso mas, ao fechar e reabrir, a lista voltava vazia. A causa era a comparação estrita `m.id !== maquinaId` quando a API devolve `id` numérico e o cliente usa string (ou vice-versa): o estado local não era actualizado e **`persist` / `apiMaquinas.update` não era chamado**. Havia ainda risco de `maqAtual` ficar indefinido se o updater do `setState` não corresse antes do `if (maqAtual)`.
+
+### Alteração
+- **`DataContext.jsx`:** `addDocumentoMaquina` / `removeDocumentoMaquina` — comparação com `String(id)`, `flushSync` ao calcular o próximo estado, `await persist(..., { throwOnFailure: true })` com rollback; retorno `{ ok }`.
+- **`DocumentacaoModal.jsx`:** toast de sucesso só após `ok`; mensagens de erro se falhar gravação ou remoção.
+
+---
+
+## [1.16.27] — 2026-03-22 — Relatórios: plano KAESER + consumíveis obrigatórios; Admin vê ciclo e tabela
+
+### Contexto
+PDF obtido por «Obter PDF» não trazia horas, resumo do plano A/B/C/D nem tabela de consumíveis quando `pecasUsadas` estava vazio. Admin no «Editar relatório» precisava de ver **posição no ciclo**, tipo gravado e **sempre** poder editar / recarregar linhas do plano importado por n.º de série.
+
+### Alteração
+- **`src/utils/relatorioBlocosEquipamento.js`:** `relatorioObrigaBlocoConsumiveisPlano` / `relatorioIncluiResumoPlanoNoPdf` — regra extensível (hoje: `isKaeserAbcdMaquina`, exclui montagem).
+- **`gerarPdfRelatorio.js`:** linha de horas no contador; bloco «Plano de manutenção (fabricante / série)»; secção «Consumíveis e peças» sempre que obrigatória, com texto se lista vazia.
+- **`relatorioHtml.js`:** mesma lógica para email/impressão HTML.
+- **`ExecutarManutencaoModal.jsx`:** Admin KAESER — cartão com ciclo na ficha + tipo já gravado no relatório; área de consumíveis sempre visível; botão «Carregar plano»; gravação Admin envia sempre `pecasUsadas` (e `tipoManutKaeser`) em periódicas KAESER para não omitir o array na API.
+
+---
+
+## [1.16.26] — 2026-03-21 — Editar relatório: um só campo de horas (contador)
+
+### Contexto
+No modal «Editar relatório» (Admin) podiam aparecer **dois** blocos de horas (secção KAESER + checklist), com rótulos que sugeriam «totais» vs «serviço». O modelo de dados é **uma única leitura acumulada** no equipamento (`horasServico` / `horasTotais` espelhados na BD).
+
+### Alteração
+- **`ExecutarManutencaoModal.jsx`:** horas do contador apenas em **Status e datas**; secção KAESER em admin limita-se a tipo A/B/C/D e consumíveis; checklist **não** repete o input para Admin. Bootstrap do formulário usa **horas gravadas na manutenção** quando existem, senão a ficha (`horasContadorNaManutencao` → `horasContadorNaFicha`).
+- **`Manutencoes.jsx`**, **`relatorioHtml.js`:** rótulo unificado «Horas no contador (acumuladas)».
+
+---
+
+## [1.16.25] — 2026-03-21 — API `maquinas` update: não sobrescrever periodicidade em patches
+
+### Contexto
+Pedidos `update` com payload mínimo (ex.: apenas `proximaManut` após `scheduleSyncProximaParaMaquinas`) passavam por `preprocess_maquina()` sem `periodicidade` / `periodicidadeManut`, activando o fallback por subcategoria (muitas vezes trimestral) e o default final `trimestral`, gravando por cima de uma ficha **anual** — PDF/email mostravam «próximas manutenções» com intervalo errado.
+
+### Alteração
+- **`servidor-cpanel/api/data.php` (update `maquinas`):** antes de `preprocess_maquina()`, fundir o registo existente (via `SELECT`) com o payload recebido (`array_merge`); o cliente continua a poder sobrescrever campos enviados explicitamente.
+
+### Deploy
+- **Frontend:** extrair `dist_upload.zip` (conteúdo de `dist/`) para `public_html/manut/` (substituir ficheiros existentes).
+- **API:** enviar **`servidor-cpanel/api/data.php`** para `public_html/api/data.php` (ou caminho equivalente no hosting).
+
+---
+
+## [1.16.24] — 2026-03-22 — Wizard «Executar manutenção»: contraste e layout (tablets / KAESER)
+
+### Contexto
+No passo «Confirmação» (e passos com grelha de horas), em tema escuro o cartão de equipamento usava fundo claro com texto claro; havia scroll horizontal e checkbox com texto espalmado em colunas estreitas (Galaxy Tab / modo campo).
+
+### Alteração
+- **`Manutencoes.css`:** `.exec-equip-verify-card` alinhado a `var(--color-bg-elevated)` + texto legível; série em `var(--color-accent)`; `.exec-equip-confirm-label` com `min-width: 0` e quebra de linha; `.wizard-body` com `overflow-x: hidden`; barra de progresso com `flex-wrap`; `.wizard-step-hint` com quebra de palavra e hint KAESER com `:has(.kaeser-help-btn)` em flex-wrap; `.modal-relatorio-form .form-row` com `minmax(0,1fr)`; placeholders e rótulos no wizard mais legíveis; `.wizard-confirm` sem `min-width` fixo que forçava overflow.
+
+---
+
+## [1.16.23] — 2026-03-22 — Persistência máquinas/PDF: erros visíveis; timeouts; migração plano compressor
+
+### Contexto
+Gravação da ficha do compressor parecia «perder» dados: o `persist()` fazia rollback mas **não relançava** o erro da API, pelo que o modal mostrava sucesso em falhas reais (ex.: coluna em falta no MySQL). Importação PDF do plano KAESER não deixava rasto nos logs em caso de falha. Em produção faltava a coluna **`plano_manutencao_compressor`** em `maquinas`, o que quebrava o `UPDATE` quando o frontend enviava o plano.
+
+### Alteração
+- **`DataContext.jsx`:** `persist(..., { throwOnFailure: true })` nos `await` críticos (`updateMaquina`, `addMaquina`, técnicos, `replacePecasPlanoMaquina`) — toast/fluxo reflectem falhas de servidor; `list` após replace com timeout alargado.
+- **`apiService.js`:** `call()` aceita `timeoutMs` (não vai no JSON); CRUD `list(opts)`; `replace_maquina` e refresh com **`API_TIMEOUT_BULK_MS`** (45s).
+- **`limits.js`:** `API_TIMEOUT_BULK_MS`.
+- **`PecasPlanoModal.jsx`:** `logger.error` na importação PDF e ao limpar planos; toast «PDF ou gravação».
+- **Testes:** `tests/unit/parseKaeserPlanoPdf.test.js` (fixture plano SX6); `scripts/test-parse-kaeser-pdf.js` para validar PDFs locais.
+- **Migração:** `servidor-cpanel/migrations/2026-03-22-maquinas-plano-manutencao-compressor.sql` — `ALTER TABLE maquinas ADD plano_manutencao_compressor`.
+
+### Deploy
+1. **phpMyAdmin:** executar `2026-03-22-maquinas-plano-manutencao-compressor.sql` se a coluna ainda não existir (obrigatório para gravar ficha com plano KAESER).
+2. **FTP/cPanel:** conteúdo de `dist/` (ou extrair `dist_upload.zip`) para `public_html/manut/`.
+3. **API:** enviar `servidor-cpanel/api/data.php` actualizado (se ainda não estiver em produção com `pecasPlano` / allowed completo).
+
+---
+
+## [1.16.22] — 2026-03-22 — Plano de peças na BD; import PDF só Admin; E2E e modal
+
+### Contexto
+O plano KAESER A–D deixou de depender de `localStorage` e passou a sincronizar com **MySQL** (`pecas_plano`). A importação por PDF (parser no browser) ficou **só para administrador**, para reduzir falhas em tablets; técnicos **consultam** o plano vindo da API. Backup/restauro JSON inclui `pecasPlano`.
+
+### Alteração
+- **API:** recurso `pecasPlano` em `data.php` (list para todos autenticados; escrita e `replace_maquina` só Admin). Migração `servidor-cpanel/migrations/2026-03-22-pecas-plano-table.sql`.
+- **Frontend:** `apiService.fetchTodosOsDados` + `DataContext` (`replacePecasPlanoMaquina`, persistência, exportar/restaurar). `PecasPlanoModal` — UI só Admin para importar/editar/limpar; reset do separador ao reabrir o modal.
+- **E2E:** `helpers.js` mock mutável para `pecasPlano`; `14-kaeser-features.spec.js` e `15-kaeser-pdf-import.spec.js` sem `atm_pecas_plano`.
+
+### Deploy
+1. Correr a migração SQL em produção (tabela `pecas_plano`).
+2. Enviar `api/data.php` actualizado.
+3. Publicar o build do frontend em `public_html/manut/` (zip `dist_upload`).
+
+---
+
+## [1.16.21] — 2026-03-22 — KAESER: sugestão de fase (Δh + anual), auditoria no relatório
+
+### Contexto
+O plano «Sugestão de fase KAESER (Δh + janela anual)» substitui a sugestão rígida só por horas absolutas por um motor que combina **365 dias** desde a referência na ficha com **Δh ≥ 3000 h**, mostra **duas sugestões** em conflito, grava **tipo sugerido + motivo** no relatório e reflecte-os no **HTML/PDF**.
+
+### Alteração
+- **`src/constants/kaeserCiclo.js`:** constantes partilhadas (`KAESER_INTERVALO_HORAS_REF`, janela anual, aviso Δh alto) e utilitários do ciclo 12 anos.
+- **`src/utils/sugerirFaseKaeser.js`:** motor puro `sugerirFaseKaeser` + testes em `tests/unit/sugerirFaseKaeser.test.js` (`npm run test:unit`).
+- **`ExecutarManutencaoModal.jsx`:** passo horas com resumo expansível, dual «calendário / horas», ajuda «?», aviso ficha vs último relatório, confirmação ao mudar tipo com consumíveis editados; payload com `tipoManutKaeserSugerido` / `sugestaoFaseMotivo`.
+- **API:** migração `servidor-cpanel/migrations/2026-03-21-relatorios-kaeser-audit.sql`; `data.php` — colunas permitidas em `relatorios`.
+- **`relatorioHtml.js` / `gerarPdfRelatorio.js`:** linha de auditoria no bloco KAESER quando os campos existem.
+- **E2E:** `14-kaeser-features.spec.js` — K4.8 (sugestão dual + detalhes).
+
+### Deploy
+- Aplicar migração SQL em produção antes de persistir os novos campos na BD.
+
+---
+
+## [1.16.20] — 2026-03-21 — Relatório mensal ISTOBAL: PDF + email (como frota)
+
+### Contexto
+O botão «Imprimir / Exportar» abria `window.print()`, o que pendurava o browser à procura de impressoras. Era desejável **PDF directo** e **envio por email** (ficha cliente ISTOBAL + admin + outro), alinhado ao relatório de frota.
+
+### Alteração
+- **`mensalIstobalReport.js`:** `buildMensalIstobalPayload`, `gerarRelatorioMensalIstobalPdf` (jsPDF), `gerarRelatorioMensalIstobalHtml` (fragmento para email), `findClienteIstobalFaturacao` (cliente com «ISTOBAL» no nome e email).
+- **`Reparacoes.jsx`:** rodapé do modal com **Obter PDF** e **Enviar por email** (painel tipo frota); removido print como acção principal.
+- **`Reparacoes.css`:** tabela ISTOBAL com `table-layout: fixed` e larguras de coluna; KPIs e rodapé do modal; alinhamento **H. M.O.**; aviso sem ficha ISTOBAL.
+- **E2E `16-reparacoes.spec.js`:** assert dos novos botões.
+- **Correcção:** `gerarRelatorioFrotaHtml.js` — template partido no ramo email/documento (fechamento de literal antes do bloco cliente/KPI); corrigido com `headBlock` + concatenação.
+
+---
+
+## [1.16.19] — 2026-03-21 — Email frota: Outlook sem texto literal «&lt;html&gt;»
+
+### Contexto
+No Outlook continuava a aparecer a palavra **`<html>`** por cima do logo — o motor HTML do Outlook (Word) trata mal documentos completos (`<!DOCTYPE>`, `<html>`, `<head>`, `<body>`) no corpo da mensagem.
+
+### Alteração
+- **`gerarRelatorioFrotaHtml.js`:** opção **`emailFragment: true`** — gera só um `<div>` raiz com `<style>` + conteúdo, sem wrapper de documento.
+- **`Clientes.jsx`:** envio por email da frota usa `emailFragment: true`; «Abrir HTML» mantém documento completo para pré-visualização no browser.
+
+---
+
+## [1.16.18] — 2026-03-21 — Email relatório frota: Outlook (HTML visível, labels, logo)
+
+### Contexto
+No Outlook, o relatório de frota mostrava **tags HTML** na pré-visualização (`<html>`), **rótulos colados aos valores** (ex.: `CLIENTEAUTO`, `NIF512…`) e **logo partida** (URL relativa no `<img>`).
+
+### Alteração
+- **`gerarRelatorioFrotaHtml.js`:** `resolveLogoSrc()` — URL **absoluta** do logo (`origin` + path ou fallback `https://www.navel.pt/...`). Grelha do cliente: estilos **compatíveis com email** (`display:block` / `inline`, margens) em vez de flex ignorado pelo Outlook; rótulos com **dois pontos e espaço** (`Cliente:`, `NIF:`, …).
+- **`servidor-cpanel/api/send-report.php`:** com anexo PDF, corpo passa a **`multipart/alternative`** (parte `text/plain` derivada do HTML + parte `text/html`) **dentro** do `multipart/mixed`, para snippet legível e melhor escolha da parte HTML no cliente.
+
+### Deploy
+- Frontend: novo build (`dist_upload`) com **v1.16.18**.
+- Servidor: voltar a enviar **`api/send-report.php`** actualizado.
+
+---
+
+## [1.16.17] — 2026-03-21 — Email frota: ignorar VITE_API_BASE_URL localhost no deploy
+
+### Contexto
+Build de produção com `.env` local **`VITE_API_BASE_URL=http://localhost:8080`** embute esse URL no bundle; em **navel.pt** o `fetch` ia para **localhost** → bloqueio **Content-Security-Policy** (`connect-src` sem localhost) e falha de envio HTML+PDF.
+
+### Alteração
+- **`emailConfig.js`:** `safeViteApiBaseUrl()` — em runtime, se a base aponta para localhost/127.0.0.1 e a página **não** está nesse host, ignora-se a variável e usa-se `/api/send-report.php`.
+- **`.env.example`:** aviso explícito contra localhost no build de deploy.
+- **`.env.local`:** removido `VITE_API_BASE_URL` (era a origem do localhost embutido no bundle).
+- **`.env.production`:** `VITE_API_BASE_URL=` vazio para o build de produção não herdar base de ficheiros locais.
+
+---
+
+## [1.16.16.2] — 2026-03-21 — api/.htaccess: SecRuleEngine causa 500 (data.php)
+
+### Contexto
+Em alojamento partilhado, `SecRuleEngine Off` em `public_html/api/.htaccess` é **muitas vezes proibido**; com `mod_security2` activo o Apache aplica o bloco e responde **500** a **toda** a pasta `api/` → login (`data.php`) e logs (`log-receiver.php`) falham.
+
+### Alteração
+- **`api-htaccess.txt`:** bloco ModSecurity **comentado** por omissão; ficheiro passa a ser sobretudo instruções. Quem já tem `.htaccess` activo no servidor deve **remover** o `<IfModule mod_security2.c>…` ou apagar o ficheiro para restaurar o login.
+
+---
+
+## [1.16.16.1] — 2026-03-21 — api/.htaccess: sem CORS duplicado (login)
+
+### Contexto
+Com o `.htaccess` em `public_html/api/` que incluía `Header always set Access-Control-Allow-Methods`, alguns browsers recebiam **cabeçalhos CORS duplicados** (Apache + `data.php`), o que pode impedir o **login** (fetch ao `data.php` falha ou resposta rejeitada).
+
+### Alteração
+- **`api-htaccess.txt`:** removido bloco `mod_headers` / CORS — só fica a excepção ModSecurity para `send-email.php` e `send-report.php`. Quem já colou o ficheiro antigo no servidor deve **editar** o `.htaccess` em `api/` e **apagar** o bloco `<IfModule mod_headers.c> ... </IfModule>`.
+
+---
+
+## [1.16.16] — 2026-03-21 — Frota email: ModSecurity + limites POST (Failed to fetch)
+
+### Contexto
+Continuação de **Failed to fetch** no envio frota com PDF; manutenção (`send-email.php`) OK. Causas prováveis no servidor: **ModSecurity** só desactivado para `send-email.php` no `.htaccess` modelo — `send-report.php` bloqueado; ou **post_max_size** insuficiente para JSON com `pdf_base64` (resposta 413 / corte sem CORS legível).
+
+### Alterações
+- **`api-htaccess.txt`:** `SecRuleEngine Off` para `send-email.php` **e** `send-report.php` (`FilesMatch`).
+- **`api-user-ini.txt`:** `post_max_size` / `upload_max_filesize` = **48M**.
+- **`emailConfig.js`:** em produção no browser, URL **`/api/send-report.php`** (path na raiz do site).
+- **`emailService.js`:** log de tamanho aproximado do payload em falhas de rede; mensagem de erro com lembrete servidor quando há PDF.
+- **`INSTRUCOES_CPANEL.md`:** secção de troubleshooting «Failed to fetch» para frota.
+
+---
+
+## [1.16.15] — 2026-03-21 — Email frota/HTML: URL canónico (Failed to fetch)
+
+### Contexto
+Envio do relatório de frota (HTML + PDF) falhava com **Failed to fetch** nos logs; relatórios de manutenção (send-email.php) funcionavam. Causa provável: `enviarRelatorioHtmlEmail` construía a URL com `VITE_API_BASE_URL || window.location.origin` — em produção sob `https://www.navel.pt/manut` o origin é correcto, mas **builds com `VITE_API_BASE_URL` apontado para outro host** (ex. dev) faziam o pedido para o servidor errado. Não é o caso típico do apóstrofo em JSON (`JSON.stringify` trata `Pico d'Agua Park` correctamente); o cabeçalho Navel no HTML já usa `escapeHtml(EMPRESA.localidade)`.
+
+### Alterações
+- **`emailConfig.js`:** `getSendReportUrl()` — override opcional `VITE_API_BASE_URL`; em `localhost` mantém `/api/send-report.php` no mesmo origin (proxy); caso contrário deriva de `ENDPOINT_URL` (send-email → send-report no mesmo host).
+- **`emailService.js`**, **`EnviarDocumentoModal.jsx`:** usam `getSendReportUrl()`.
+- **`send-report.php`:** CORS `Access-Control-Allow-Headers` alinhado a send-email (`X-Requested-With`).
+- **`.env.example`:** nota sobre deixar `VITE_API_BASE_URL` vazio em produção.
+
+---
+
+## [1.16.14] — 2026-03-20 — Frota: próxima manutenção consistente (agenda + cálculo)
+
+### Contexto
+No relatório de frota (HTML/PDF), alguns equipamentos mostravam «Última» e relatório mas **Próxima / Dias** vazios; estado «Conforme» sem data visível. Causas: (1) só `pendente`/`agendada` eram consideradas — **`em_progresso` ignorado**; (2) sem registo aberto e `proximaManut` desactualizado na BD, **faltava fallback** por periodicidade (regra já usada no PDF de manutenção); (3) `maquinaId` **number vs string** quebrava `minDataManutencaoAberta` e a sincronização de `proximaManut`; (4) **`proximaDataNaFicha` em `Clientes.jsx` não existia** (referência inválida).
+
+### Alterações
+- **`proximaManutAgenda.js`:** comparação de IDs normalizada (`String`) em todas as funções.
+- **`frotaReportHelpers.js`:** `resolveProximaManutParaFrota` — ordem: agenda aberta (incl. `em_progresso`) → `proximaManut` → `computarProximasDatas` a partir da última concluída.
+- **`gerarRelatorioFrota.js`**, **`gerarRelatorioFrotaHtml.js`:** usam o resolver; secção atraso PDF corrige destructuring de `proxDataKey`.
+- **`Clientes.jsx`:** `proximaDataNaFicha` com `useCallback`; KPIs e filtros da ficha alinhados ao mesmo critério; joins máquina/manutenção com `normEntityId`.
+
+---
+
 ## [1.16.13] — 2026-03-21 — Frota: correcções de dados, email HTML+PDF, limpeza
 
 ### Relatório de frota (dados e layout)

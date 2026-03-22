@@ -14,7 +14,7 @@
 
 import { logger } from '../utils/logger'
 import { SESSION } from '../config/storageKeys'
-import { API_TIMEOUT_MS } from '../config/limits'
+import { API_TIMEOUT_MS, API_TIMEOUT_BULK_MS } from '../config/limits'
 
 const ENV_API_URL  = (import.meta.env.VITE_API_URL || '').trim()
 const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim()
@@ -77,7 +77,7 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
     })
   } catch (err) {
     if (err.name === 'AbortError') {
-      const timeoutErr = new Error(`Timeout: API não respondeu em ${API_TIMEOUT_MS / 1000}s (${resource}/${action})`)
+      const timeoutErr = new Error(`Timeout: API não respondeu em ${ms / 1000}s (${resource}/${action})`)
       timeoutErr.status = 408
       logger.error('apiService', 'call', timeoutErr.message, {
         resource, action, status: 408, failureMode: 'timeout', endpoint: API_URL, method: 'POST', stack: timeoutErr.stack,
@@ -96,6 +96,11 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
   if (!json.ok) {
     const msg = json.message ?? 'Erro desconhecido'
     const status = resp.status || 0
+    if (json.code === 'TECNICO_HORARIO_RESTRITO') {
+      try {
+        window.dispatchEvent(new CustomEvent('atm:tecnico-horario-restrito', { detail: { message: msg } }))
+      } catch { /* */ }
+    }
     const failureMode = apiFailureMode(status, msg)
     if (resp.status >= 500) {
       logger.error('apiService', 'call', `API 5xx: ${msg}`, {
@@ -108,6 +113,7 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
     }
     const err = new Error(msg)
     err.status = resp.status
+    if (json.code) err.code = json.code
     throw err
   }
   return json.data ?? null
@@ -162,6 +168,7 @@ export async function apiLogin(username, password) {
     }
     const err = new Error(json.message ?? 'Login falhado')
     err.status = resp.status
+    if (json.code) err.code = json.code
     throw err
   }
   setToken(json.data.token)
@@ -179,7 +186,7 @@ export async function apiCall(resource, action, opts = {}) {
 // ── CRUD genérico ─────────────────────────────────────────────────────────────
 
 const crud = (resource) => ({
-  list:        ()          => call(resource, 'list'),
+  list:        (opts = {}) => call(resource, 'list', opts),
   get:         (id)        => call(resource, 'get', { id }),
   create:      (data)      => call(resource, 'create', { data }),
   update:      (id, data)  => call(resource, 'update', { id, data }),
@@ -202,10 +209,34 @@ export const apiReparacoes          = crud('reparacoes')
 export const apiRelatoriosReparacao = crud('relatoriosReparacao')
 export const apiTecnicos           = crud('tecnicos')
 
+const _pecasPlanoCrud = crud('pecasPlano')
+/** Plano de consumíveis por máquina (MySQL). `replaceMaquina` só Admin no servidor. */
+export const apiPecasPlano = {
+  list:         _pecasPlanoCrud.list,
+  get:          _pecasPlanoCrud.get,
+  create:       _pecasPlanoCrud.create,
+  update:       _pecasPlanoCrud.update,
+  remove:       _pecasPlanoCrud.remove,
+  bulkCreate:   _pecasPlanoCrud.bulkCreate,
+  bulkRestore:  _pecasPlanoCrud.bulkRestore,
+  replaceMaquina: (maquinaId, items) =>
+    call('pecasPlano', 'replace_maquina', {
+      data: { maquinaId, items },
+      timeoutMs: API_TIMEOUT_BULK_MS,
+    }),
+}
+
 export async function apiUploadMarcaLogo({ dataUrl, brandName }) {
   return call('uploads', 'brand_logo', {
     data: { dataUrl, brandName },
   })
+}
+
+/** PDF técnico do equipamento (Admin) — gravado em /uploads/machine-docs/ */
+export async function apiUploadMachinePdf({ dataUrl, maquinaId, replacePath = null }) {
+  const data = { dataUrl, maquinaId }
+  if (replacePath) data.replacePath = replacePath
+  return call('uploads', 'machine_pdf', { data })
 }
 
 /** Logs do servidor (apenas Admin) — agrega logs de todos os utilizadores e dispositivos */
@@ -259,5 +290,15 @@ export async function fetchTodosOsDados() {
     })
     tecnicos = []
   }
-  return { clientes, categorias, subcategorias, checklistItems, maquinas, marcas, tecnicos, manutencoes, relatorios, reparacoes, relatoriosReparacao }
+  let pecasPlano = []
+  try {
+    pecasPlano = await apiPecasPlano.list()
+  } catch (err) {
+    logger.warn('apiService', 'fetchTodosOsDados', 'Falha ao listar pecasPlano (continuar com fallback)', {
+      resource: 'pecasPlano', action: 'list', status: err?.status || 0,
+      failureMode: apiFailureMode(err?.status || 0, err?.message), msg: err?.message, endpoint: API_URL,
+    })
+    pecasPlano = []
+  }
+  return { clientes, categorias, subcategorias, checklistItems, maquinas, marcas, tecnicos, pecasPlano, manutencoes, relatorios, reparacoes, relatoriosReparacao }
 }

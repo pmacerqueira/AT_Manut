@@ -11,14 +11,12 @@
  *  - Relatório HTML: bloco KAESER, sequência ciclo, consumíveis discriminados
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, MC, signCanvas } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, MC, signCanvas, confirmExecWizardVerificacaoEquipamento, execWizardSeguinte } from './helpers.js'
 
 // ── Dados mock KAESER ────────────────────────────────────────────────────────
 
 // MC_KAESER — estende MC com subcategorias de compressor + máquinas KAESER reais
-// Nota: KAESER é exclusivo da categoria Compressores (sub5, sub6, sub10, sub11, sub14, sub15).
-// Outras marcas de compressor (Fini, ECF, IES, LaPadana) usam o mesmo ciclo A/B/C/D
-// mas NÃO têm o formato de relatório KAESER nem o template de importação.
+// Ciclo A/B/C/D, posicaoKaeser, plano por tipo e import PDF: só KAESER em sub5/sub14 (parafuso ± secador).
 const MC_KAESER = {
   ...MC,
   subcategorias: [
@@ -44,6 +42,7 @@ const MC_KAESER = {
       ultimaManutencaoData: '2025-03-01',
       horasTotaisAcumuladas: 3200,
       horasServicoAcumuladas: 3050,
+      planoManutencaoCompressor: 'kaeser_abcd',
       posicaoKaeser: 0,
     },
     // Máquina KAESER BSD 72T (segundo compressor — ciclo diferente)
@@ -58,9 +57,10 @@ const MC_KAESER = {
       anoFabrico: 2022,
       documentos: [],
       proximaManut: '2026-04-10',
+      planoManutencaoCompressor: 'kaeser_abcd',
       posicaoKaeser: 2,
     },
-    // Máquina Fini (compressor NÃO KAESER — deve ter badge "Fini A", não "KAESER A")
+    // Máquina Fini (sem plano A/B/C/D no UI — posicaoKaeser não aplicável)
     {
       id: 'mF1',
       clienteNif: '511234567',
@@ -72,7 +72,7 @@ const MC_KAESER = {
       anoFabrico: 2022,
       documentos: [],
       proximaManut: '2026-05-01',
-      posicaoKaeser: 1,
+      posicaoKaeser: null,
     },
   ],
   manutencoes: [
@@ -86,6 +86,10 @@ const MC_KAESER = {
     { id: 'ck5_1', subcategoriaId: 'sub5', ordem: 1, texto: 'Marcação CE e conformidade (Dir. 2006/42/CE)' },
     { id: 'ck5_2', subcategoriaId: 'sub5', ordem: 2, texto: 'Nível de óleo e drenagem de condensado' },
     { id: 'ck5_3', subcategoriaId: 'sub5', ordem: 3, texto: 'Filtros de ar e separador ar/óleo' },
+  ],
+  pecasPlano: [
+    { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', posicao: '0512', codigoArtigo: '490111.00030', descricao: 'SET filtro compressor', quantidade: 1, unidade: 'PÇ' },
+    { id: 'pp2', maquinaId: 'mK1', tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l', quantidade: 3, unidade: 'PÇ' },
   ],
 }
 
@@ -174,7 +178,7 @@ test.describe('Campo posicaoKaeser no formulário de máquina', () => {
     if (await editBtn.isVisible()) {
       await editBtn.click()
       await page.waitForTimeout(500)
-      const secaoKaeser = page.locator('.form-section').filter({ hasText: 'Ciclo de manutenção KAESER' })
+      const secaoKaeser = page.locator('.form-section').filter({ hasText: /Escolha o plano de manutenção|A\/B\/C\/D/ })
       // Pode não aparecer directamente se subcategoria não for compressor no mock
       const count = await secaoKaeser.count()
       // Apenas verifica que o modal abre sem erro
@@ -304,6 +308,7 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     // Verificar que o select de tipo KAESER existe (para compressores)
     const tipoSection = page.locator('.form-section').filter({ hasText: 'Tipo de manutenção' })
@@ -324,6 +329,7 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     const hint = page.locator('.kaeser-ciclo-hint')
     if (await hint.count() > 0) {
@@ -336,15 +342,6 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
   })
 
   test('K4.4 — Botões "Marcar todos" e "Desmarcar todos" presentes quando há consumíveis', async ({ page }) => {
-    // Injectar pecasPlano para a máquina KAESER no localStorage
-    await page.evaluate(() => {
-      const plano = [
-        { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', posicao: '0512', codigoArtigo: '490111.00030', descricao: 'SET filtro compressor', quantidade: 1, unidade: 'PÇ' },
-        { id: 'pp2', maquinaId: 'mK1', tipoManut: 'A', posicao: '1600', codigoArtigo: '9.0920.10030', descricao: 'SIGMA FLUID MOL 5 l', quantidade: 3, unidade: 'PÇ' },
-      ]
-      localStorage.setItem('atm_pecas_plano', JSON.stringify(plano))
-    })
-
     await page.goto('/manut/manutencoes')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
@@ -354,6 +351,7 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     // Seleccionar tipo A para carregar consumíveis
     const selectTipo = page.locator('select').filter({
@@ -365,6 +363,8 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
         await selectTipo.selectOption({ index: 1 })
       })
       await page.waitForTimeout(400)
+      await execWizardSeguinte(page)
+      await page.waitForTimeout(300)
 
       // Verificar botões de marcar/desmarcar
       const btnMarcar    = page.locator('.btn-marcar')
@@ -380,13 +380,6 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
   })
 
   test('K4.5 — Checkbox de consumível pode ser desmarcado', async ({ page }) => {
-    await page.evaluate(() => {
-      const plano = [
-        { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', posicao: '0512', codigoArtigo: '490111.00030', descricao: 'SET filtro compressor', quantidade: 1, unidade: 'PÇ' },
-      ]
-      localStorage.setItem('atm_pecas_plano', JSON.stringify(plano))
-    })
-
     await page.goto('/manut/manutencoes')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
@@ -396,6 +389,7 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     const selectTipo = page.locator('select').filter({
       has: page.locator('option').filter({ hasText: 'Tipo A' })
@@ -404,6 +398,8 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
     if (await selectTipo.count() > 0) {
       await selectTipo.selectOption({ index: 1 })
       await page.waitForTimeout(400)
+      await execWizardSeguinte(page)
+      await page.waitForTimeout(300)
 
       const checkbox = page.locator('.peca-checkbox').first()
       if (await checkbox.count() > 0) {
@@ -422,14 +418,6 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
   })
 
   test('K4.6 — "Desmarcar todos" desmarca todos os consumíveis', async ({ page }) => {
-    await page.evaluate(() => {
-      const plano = [
-        { id: 'pp1', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: '490111.00030', descricao: 'Filtro A', quantidade: 1, unidade: 'PÇ' },
-        { id: 'pp2', maquinaId: 'mK1', tipoManut: 'A', codigoArtigo: '9.0920.10030', descricao: 'Óleo B', quantidade: 3, unidade: 'PÇ' },
-      ]
-      localStorage.setItem('atm_pecas_plano', JSON.stringify(plano))
-    })
-
     await page.goto('/manut/manutencoes')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
@@ -439,6 +427,7 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     const selectTipo = page.locator('select').filter({
       has: page.locator('option').filter({ hasText: 'Tipo A' })
@@ -447,6 +436,8 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
     if (await selectTipo.count() > 0) {
       await selectTipo.selectOption({ index: 1 })
       await page.waitForTimeout(400)
+      await execWizardSeguinte(page)
+      await page.waitForTimeout(300)
 
       const btnDesmarcar = page.locator('.btn-desmarcar')
       if (await btnDesmarcar.count() > 0) {
@@ -482,6 +473,9 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
 
     await execBtn.click()
     await page.waitForTimeout(800)
+    await confirmExecWizardVerificacaoEquipamento(page)
+    await execWizardSeguinte(page)
+    await page.waitForTimeout(400)
 
     const btnAdicionar = page.locator('.btn-link-checklist').filter({ hasText: 'Adicionar consumível' })
     if (await btnAdicionar.count() > 0) {
@@ -497,6 +491,58 @@ test.describe('ExecutarManutencaoModal — Consumíveis KAESER', () => {
         await expect(newCheckbox).toBeChecked()
       }
     }
+
+    await page.keyboard.press('Escape')
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// K4b — Sugestão de fase (Δh + janela anual) no passo horas
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('ExecutarManutencaoModal — Sugestão Δh + anual (KAESER)', () => {
+  test('K4.8 — Passo horas: sugestão dual e detalhes expansíveis', async ({ page }) => {
+    const MC_KAESER_SUG = {
+      ...MC_KAESER,
+      maquinas: MC_KAESER.maquinas.map((m) =>
+        m.id === 'mK1'
+          ? { ...m, ultimaManutencaoData: '2024-01-01' }
+          : m,
+      ),
+    }
+    await setupApiMock(page, { customData: MC_KAESER_SUG })
+    await doLoginAdmin(page)
+    await page.evaluate(() => {
+      localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
+    })
+    await page.goto('/manut/manutencoes')
+    await page.waitForLoadState('domcontentloaded')
+    await page.waitForTimeout(800)
+
+    const execBtn = page.locator('.btn-executar-manut').first()
+    if (await execBtn.count() === 0) return
+
+    await execBtn.click()
+    await page.waitForTimeout(600)
+    await confirmExecWizardVerificacaoEquipamento(page)
+
+    await expect(page.getByTestId('kaeser-passo-horas')).toBeVisible()
+
+    const hsInput = page.getByPlaceholder('Leitura no equipamento')
+    await hsInput.fill('8050')
+    await hsInput.blur()
+    await page.waitForTimeout(500)
+
+    await expect(page.locator('.kaeser-sugestao-resumo')).toBeVisible()
+    await expect(page.locator('.kaeser-sugestao-resumo')).toContainText(/calendário e horas|Tipo pré-seleccionado/i)
+
+    await expect(page.locator('.kaeser-dual-sugestao button')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: /Aplicar sugestão \(calendário\)/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Aplicar sugestão \(horas\)/ })).toBeVisible()
+
+    await page.getByTestId('kaeser-toggle-detalhes').click()
+    await expect(page.locator('.kaeser-calc-detalhes')).toBeVisible()
+    await expect(page.locator('.kaeser-calc-detalhes')).toContainText('Δh')
 
     await page.keyboard.press('Escape')
   })

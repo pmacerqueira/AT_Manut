@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { STORAGE } from '../config/storageKeys'
+import TecnicoHorarioGuard from './TecnicoHorarioGuard'
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, hydrated } = useAuth()
@@ -30,7 +31,7 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={redirectState} replace />
   }
 
-  return children
+  return <TecnicoHorarioGuard>{children}</TecnicoHorarioGuard>
 }
 
 export function AdminRoute({ children }) {

@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.16.12 · **Última actualização:** 2026-03-21
+**Versão:** 1.16.30 · **Última actualização:** 2026-03-22
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — 441 testes (17 specs) |
+| Testes | Playwright E2E — 442 testes (17 specs) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
 
 ---
@@ -84,7 +84,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── ExecutarReparacaoModal.jsx  # Modal execução reparação (fotos+assinatura+email+peças)
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
-│   │   ├── DocumentacaoModal.jsx       # Documentação de equipamento
+│   │   ├── DocumentacaoModal.jsx       # PDFs/URLs por equipamento (Admin); persistência em maquinas.documentos
 │   │   ├── EnviarEmailModal.jsx        # Envio de email (com painel de destinatários)
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
 │   │   ├── PecasPlanoModal.jsx / .css   # Plano de peças e consumíveis
@@ -239,8 +239,13 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 ```json
 { "id": "m01", "clienteId": "c01", "subcategoriaId": "sc01",
   "marca": "Otis", "modelo": "GeN2", "numeroSerie": "SN001",
-  "ano": "2020", "localizacao": "...", "periodicidadeManut": "anual" }
+  "ano": "2020", "localizacao": "...", "periodicidadeManut": "anual",
+  "documentos": [] }
 ```
+
+**Campo `documentos` (JSON na BD):** lista de PDFs e links técnicos (manual, plano de manutenção, etc.). Cada item inclui `id`, `tipo`, `titulo`, `url`. Nos envios por **Importar PDF (servidor)**, a app grava também `uploadFileName` e `uploadFileSize`; se voltares a carregar o **mesmo tipo + nome + tamanho**, a entrada é **actualizada** (sem duplicar linhas) e o servidor apaga o ficheiro antigo em disco antes de gravar o novo (`replacePath` em `data.php`). A gravação na ficha usa `addDocumentoMaquina` no `DataContext.jsx` com `persist` → `apiMaquinas.update` (comparação de IDs com `String(id)`).
+
+**Armazenamento no servidor:** ficheiros em `public_html/uploads/machine-docs/`, nome `maq-{maquinaId}-{YmdHis}-{hex}.pdf`. Endpoint: `POST data.php` com `r: uploads`, `action: machine_pdf` (só Admin). Ver `docs/DEPLOY_CHECKLIST.md` e `servidor-cpanel/INSTRUCOES_CPANEL.md`.
 
 **Manutenções:**
 ```json

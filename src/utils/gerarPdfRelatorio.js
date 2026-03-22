@@ -10,6 +10,13 @@ import { APP_FOOTER_TEXT } from '../config/version'
 import { resolveChecklist } from './resolveChecklist'
 import { getDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
+import { horasContadorParaRelatorio } from './horasContadorEquipamento'
+import {
+  INTERVALOS_KAESER,
+  descricaoCicloKaeser,
+  proximaPosicaoKaeser,
+} from '../context/DataContext'
+import { relatorioIncluiResumoPlanoNoPdf, relatorioObrigaBlocoConsumiveisPlano } from './relatorioBlocosEquipamento'
 
 /** Normaliza `relatorio.fotos` (array ou JSON string) para lista de URLs/data URLs. */
 function normalizeRelatorioFotos(fotos) {
@@ -265,6 +272,7 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.line(M, y, W - M, y); y += 7
 
   // ── Dados do serviço ──────────────────────────────────────────────────────
+  const horasPdf = horasContadorParaRelatorio(maquina, manutencao, null)
   const dataRows = [
     ['CLIENTE',           cliente?.nome ?? '\u2014'],
     ['EQUIPAMENTO',       equipDesc],
@@ -272,6 +280,9 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
     ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
   ]
+  if (horasPdf != null) {
+    dataRows.push(['HORAS NO CONTADOR (ACUMULADAS)', `${horasPdf} h`])
+  }
 
   pdf.setFontSize(9)
   dataRows.forEach(([label, val], i) => {
@@ -283,6 +294,41 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     pdf.text(wrapped, M + 55, y)
     y += wrapped.length > 1 ? wrapped.length * 5 + 2 : 7.5
   })
+
+  if (relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
+    if (y > 248) { pdf.addPage(); y = 20 }
+    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('PLANO DE MANUTEN\u00c7\u00c3O (FABRICANTE / N.\u00ba DE S\u00c9RIE)', M, y)
+    y += 5
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    const tipoEf = relatorio?.tipoManutKaeser ?? ''
+    const infoTipo = tipoEf && INTERVALOS_KAESER[tipoEf] ? INTERVALOS_KAESER[tipoEf].label : ''
+    const linhasPlano = []
+    if (tipoEf) linhasPlano.push(`Tipo efectivo nesta interven\u00e7\u00e3o: ${tipoEf}${infoTipo ? ` (${infoTipo})` : ''}`)
+    else linhasPlano.push('Tipo efectivo nesta interven\u00e7\u00e3o: \u2014 (n\u00e3o indicado no relat\u00f3rio)')
+    const pos = maquina?.posicaoKaeser
+    if (pos != null) {
+      linhasPlano.push(`Ciclo na ficha (refer\u00eancia): ${descricaoCicloKaeser(pos)}`)
+      linhasPlano.push(`Seguinte no ciclo (12 anos): ${descricaoCicloKaeser(proximaPosicaoKaeser(pos))}`)
+    } else {
+      linhasPlano.push('Posi\u00e7\u00e3o no ciclo A/B/C/D: a definir na ficha / primeira execu\u00e7\u00e3o com plano.')
+    }
+    if (relatorio?.tipoManutKaeserSugerido || relatorio?.sugestaoFaseMotivo) {
+      const sug = relatorio.tipoManutKaeserSugerido ?? ''
+      const mot = relatorio.sugestaoFaseMotivo ?? ''
+      let aud = 'Auditoria de sugest\u00e3o'
+      if (sug) aud += `: sugerido ${sug}`
+      if (mot) aud += ` (${mot})`
+      linhasPlano.push(aud)
+    }
+    linhasPlano.forEach((line) => {
+      const wrapped = pdf.splitTextToSize(line, cW)
+      if (y + wrapped.length * 4 > 270) { pdf.addPage(); y = 20 }
+      pdf.text(wrapped, M, y)
+      y += wrapped.length * 4 + 1
+    })
+    y += 3
+  }
 
   y += 3
   pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3)
@@ -377,38 +423,56 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     }
   }
 
-  // ── Consumíveis e peças ────────────────────────────────────────────────────
-  if (relatorio?.pecasUsadas?.length > 0) {
+  // ── Consumíveis e peças (obrigatório para equipamentos com plano por série, ex. KAESER) ──
+  const obrigaBlocoPecas = relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
+  const pecasRaw = Array.isArray(relatorio?.pecasUsadas) ? relatorio.pecasUsadas : []
+  if (obrigaBlocoPecas || pecasRaw.length > 0) {
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    pdf.text('CONSUM\u00cdVEIS E PE\u00c7AS', M, y); y += 6
+    const subTit = relatorio?.tipoManutKaeser && INTERVALOS_KAESER[relatorio.tipoManutKaeser]
+      ? ` \u2014 Tipo ${relatorio.tipoManutKaeser}`
+      : ''
+    pdf.text(`CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`, M, y); y += 6
 
     const normalizar = (p) => 'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
-    const pecas = relatorio.pecasUsadas.map(normalizar)
-    const usadas = pecas.filter(p => p.usado)
-    const naoUsadas = pecas.filter(p => !p.usado)
+    const pecas = pecasRaw.map(normalizar)
+    if (pecas.length === 0) {
+      pdf.setFontSize(8.5); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(107, 114, 128)
+      const msg = obrigaBlocoPecas
+        ? 'Nenhuma linha do plano foi registada nesta interven\u00e7\u00e3o. Edite o relat\u00f3rio para associar o tipo A/B/C/D e as pe\u00e7as importadas por n.\u00ba de s\u00e9rie.'
+        : 'Sem consum\u00edveis listados.'
+      const wrapped = pdf.splitTextToSize(msg, cW)
+      pdf.text(wrapped, M, y)
+      y += wrapped.length * 4 + 6
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    } else {
+      const usadas = pecas.filter(p => p.usado)
+      const naoUsadas = pecas.filter(p => !p.usado)
 
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
-    pdf.text(`${usadas.length} utilizado(s) \u2022 ${naoUsadas.length} n\u00e3o substitu\u00eddo(s) \u2022 ${pecas.length} no plano`, M, y); y += 5
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
+      pdf.text(`${usadas.length} utilizado(s) \u2022 ${naoUsadas.length} n\u00e3o substitu\u00eddo(s) \u2022 ${pecas.length} no plano`, M, y); y += 5
 
-    pdf.setFontSize(8)
-    pecas.forEach((p, i) => {
-      if (y > 270) { pdf.addPage(); y = 20 }
-      if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 6.5, 'F') }
-      const icon = p.usado ? '\u2713' : '\u2717'
-      const rgb = p.usado ? [22, 163, 74] : [107, 114, 128]
-      pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...rgb)
-      pdf.text(icon, M + 1, y)
-      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-      const desc = `${p.codigoArtigo ? p.codigoArtigo + ' \u2014 ' : ''}${p.descricao ?? ''}`
-      pdf.text(desc, M + 7, y, { maxWidth: cW - 30 })
-      if (p.quantidade) {
-        pdf.setTextColor(107, 114, 128)
-        pdf.text(`${p.quantidade} ${p.unidade ?? ''}`.trim(), W - M - 2, y, { align: 'right' })
-      }
-      y += 6.5
-    })
-    y += 4
+      pdf.setFontSize(8)
+      pecas.forEach((p, i) => {
+        if (y > 270) { pdf.addPage(); y = 20 }
+        if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 6.5, 'F') }
+        const icon = p.usado ? '\u2713' : '\u2717'
+        const rgb = p.usado ? [22, 163, 74] : [107, 114, 128]
+        pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...rgb)
+        pdf.text(icon, M + 1, y)
+        pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+        const posTxt = p.posicao ? `${p.posicao} ` : ''
+        const desc = `${posTxt}${p.codigoArtigo ? p.codigoArtigo + ' \u2014 ' : ''}${p.descricao ?? ''}`
+        pdf.text(desc, M + 7, y, { maxWidth: cW - 30 })
+        const q = p.quantidadeUsada ?? p.quantidade
+        if (q != null && q !== '') {
+          pdf.setTextColor(107, 114, 128)
+          pdf.text(`${q} ${p.unidade ?? ''}`.trim(), W - M - 2, y, { align: 'right' })
+        }
+        y += 6.5
+      })
+      y += 4
+    }
   }
 
   // ── Declaração de aceitação do cliente ──────────────────────────────────────

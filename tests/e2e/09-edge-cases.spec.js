@@ -13,7 +13,7 @@
  *  - Erro de rede durante operação → toast de erro + queue offline
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, signCanvas, checklistMarcarTodos, checklistFillAllSim } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, signCanvas, checklistMarcarTodos, checklistFillAllSim, navegarWizardAteFotos } from './helpers.js'
 import * as path from 'path'
 import * as fs from 'fs'
 
@@ -133,6 +133,7 @@ test.describe('Modal execução — upload de fotos', () => {
     if (await executeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await executeBtn.click()
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
+      await navegarWizardAteFotos(page)
 
       // Secção de fotos deve existir
       await expect(page.locator('.fotos-section, .btn-foto').first()).toBeVisible({ timeout: 4000 })
@@ -149,6 +150,7 @@ test.describe('Modal execução — upload de fotos', () => {
     if (await executeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await executeBtn.click()
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
+      await navegarWizardAteFotos(page)
 
       const fileInput = page.locator('input[type="file"]')
       if (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -181,6 +183,7 @@ test.describe('Modal execução — upload de fotos', () => {
     if (await executeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await executeBtn.click()
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
+      await navegarWizardAteFotos(page)
 
       const fileInput = page.locator('input[type="file"]')
       if (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -218,6 +221,7 @@ test.describe('Modal execução — upload de fotos', () => {
     if (await executeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await executeBtn.click()
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
+      await navegarWizardAteFotos(page)
 
       // O contador deve mostrar 0/6 inicialmente
       const fotosCount = page.locator('.fotos-count, .fotos-label').first()

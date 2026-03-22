@@ -2,7 +2,7 @@
 
 Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **Navel-Açores, Lda**.
 
-**Versão actual:** `v1.14.0` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** `v1.16.30` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 
 ---
 
@@ -87,7 +87,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
-| Testes | Playwright E2E — 441 testes (17 specs) |
+| Testes | Playwright E2E — 442 testes (17 specs) |
 | Imagens | sharp (optimize-images via script prebuild) |
 
 ---
@@ -121,7 +121,7 @@ git push origin master
 git push origin v{versão}
 
 # 3. Upload manual dist_upload.zip para cPanel → public_html/manut/
-# 4. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
+# 4. Upload PHP actualizado: public_html/api/data.php (e send-email.php se mudou)
 ```
 
 Ver [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md) para instruções detalhadas de build e zip.  

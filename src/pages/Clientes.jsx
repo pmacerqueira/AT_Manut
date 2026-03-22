@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR } from '../context/DataContext'
+import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR_PARAFUSO, isKaeserAbcdMaquina } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import PecasPlanoModal from '../components/PecasPlanoModal'
@@ -8,6 +8,7 @@ import DocumentacaoModal from '../components/DocumentacaoModal'
 import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
+import MaquinaDocumentacaoLinks from '../components/MaquinaDocumentacaoLinks'
 import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X, AlertTriangle } from 'lucide-react'
 
 const ExecutarManutencaoModal = lazy(() => import('../components/ExecutarManutencaoModal'))
@@ -22,9 +23,8 @@ import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
 import { enviarRelatorioHtmlEmail, blobToRawBase64 } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
-import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
 import { computarProximasDatas } from '../utils/diasUteis'
-import { maquinaPertenceCliente } from '../utils/frotaReportHelpers'
+import { maquinaPertenceCliente, normEntityId, resolveProximaManutParaFrota } from '../utils/frotaReportHelpers'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
@@ -300,7 +300,11 @@ export default function Clientes() {
     setFrotaAcaoLoading('email')
     try {
       const maqsCliente = getMaquinasDoCliente(cli.nif)
-      const frotaOpts = { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
+      const frotaOpts = {
+        emailFragment: true,
+        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+        ...(modalFrota.options ?? {}),
+      }
       const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')
       const html = gerarRelatorioFrotaHtml(
         cli, maqsCliente, manutencoes,
@@ -346,39 +350,62 @@ export default function Clientes() {
 
   const maquinasCliente = fichaCliente ? getMaquinasDoCliente(fichaCliente.nif) : []
 
+  /** Alinha com relatório de frota: agenda + proximaManut + cálculo a partir da última concluída. */
+  const proximaDataNaFicha = useCallback((maq) => {
+    const mid = normEntityId(maq?.id)
+    const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+    const ultima = manutsM
+      .filter(mt => mt.status === 'concluida')
+      .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
+    const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultima)
+    return dataKey || null
+  }, [manutencoes])
+
   const fichaKpis = useMemo(() => {
     if (!maquinasCliente.length) return null
     const hoje = startOfDay(new Date(getHojeAzores()))
     let emAtraso = 0, conformes = 0, semData = 0
     for (const m of maquinasCliente) {
-      if (!m.proximaManut) { semData++; continue }
-      if (isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)) emAtraso++
+      const mid = normEntityId(m.id)
+      const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+      const ultima = manutsM
+        .filter(mt => mt.status === 'concluida')
+        .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
+      const { dataKey } = resolveProximaManutParaFrota(m, manutsM, ultima)
+      if (!dataKey) { semData++; continue }
+      if (isBefore(startOfDay(parseDateLocal(dataKey)), hoje)) emAtraso++
       else conformes++
     }
     return { total: maquinasCliente.length, emAtraso, conformes, semData }
-  }, [maquinasCliente])
+  }, [maquinasCliente, manutencoes])
 
   const maquinasFiltradas = useMemo(() => {
     if (!fichaCliente || !fichaKpiFilter) return []
     const hoje = startOfDay(new Date(getHojeAzores()))
     return maquinasCliente.filter(maq => {
+      const mid = normEntityId(maq.id)
+      const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+      const ultima = manutsM
+        .filter(mt => mt.status === 'concluida')
+        .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
+      const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultima)
       if (fichaKpiFilter === 'atraso') {
-        return maq.proximaManut && isBefore(startOfDay(parseDateLocal(maq.proximaManut)), hoje)
+        return !!dataKey && isBefore(startOfDay(parseDateLocal(dataKey)), hoje)
       }
       if (fichaKpiFilter === 'conformes') {
-        return maq.proximaManut && !isBefore(startOfDay(parseDateLocal(maq.proximaManut)), hoje)
+        return !!dataKey && !isBefore(startOfDay(parseDateLocal(dataKey)), hoje)
       }
       if (fichaKpiFilter === 'semData') {
-        return !maq.proximaManut
+        return !dataKey
       }
       return false
     })
-  }, [fichaCliente, fichaKpiFilter, maquinasCliente])
+  }, [fichaCliente, fichaKpiFilter, maquinasCliente, manutencoes])
 
   const maquinasComManutencao = useMemo(() => {
     return maquinasFiltradas.map(maq => {
       const pendentes = manutencoes
-        .filter(m => m.maquinaId === maq.id && m.status !== 'concluida')
+        .filter(m => normEntityId(m.maquinaId) === normEntityId(maq.id) && m.status !== 'concluida')
         .sort((a, b) => parseDateLocal(a.data) - parseDateLocal(b.data))
       return { maq, manutPendente: pendentes[0] || null, totalPendentes: pendentes.length }
     })
@@ -417,7 +444,7 @@ export default function Clientes() {
     : []
 
   const getManutencoesDaMaquina = (maquinaId) =>
-    manutencoes.filter(m => m.maquinaId === maquinaId).sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
+    manutencoes.filter(m => normEntityId(m.maquinaId) === normEntityId(maquinaId)).sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
 
   const renderProximaManut = (maq) => {
     const prox = proximaDataNaFicha(maq)
@@ -866,11 +893,9 @@ export default function Clientes() {
                     <div className="maquina-detalhe-header">
                       <h3>{fichaMaquina.marca} {fichaMaquina.modelo} — Nº Série: {fichaMaquina.numeroSerie}</h3>
                       <div className="maquina-detalhe-actions">
+                        <button type="button" className="secondary" onClick={() => setModalDoc(fichaMaquina)}><FolderPlus size={16} /> Documentação técnica</button>
                         {isAdmin && (
-                          <>
-                            <button type="button" className="secondary" onClick={() => { setModalDoc(null); setModalMaquina({ mode: 'edit', maquina: fichaMaquina }); }}><Pencil size={16} /> Editar</button>
-                            <button type="button" className="secondary" onClick={() => setModalDoc(fichaMaquina)}><FolderPlus size={16} /> Documentação</button>
-                          </>
+                          <button type="button" className="secondary" onClick={() => { setModalDoc(null); setModalMaquina({ mode: 'edit', maquina: fichaMaquina }); }}><Pencil size={16} /> Editar</button>
                         )}
                       </div>
                     </div>
@@ -896,6 +921,18 @@ export default function Clientes() {
                         setTimeout(() => URL.revokeObjectURL(url), 30000)
                       }}><FileDown size={14} /> Histórico</button>
                     </div>
+                    {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maquinaAtual.subcategoriaId) && (
+                      <div className="consumiveis-card" style={{ marginBottom: '1rem' }}>
+                        <h4>PDFs e documentação técnica</h4>
+                        <p className="text-muted" style={{ fontSize: '0.9rem', margin: '0 0 0.75rem' }}>
+                          Plano de manutenção, manual do utilizador e outros documentos do fabricante. Estão acessíveis aqui, no botão «Documentação técnica» acima e durante a execução de manutenções e reparações, para consulta ao preencher relatórios.
+                        </p>
+                        <MaquinaDocumentacaoLinks maquina={maquinaAtual} />
+                        {(maquinaAtual.documentos ?? []).length === 0 && (
+                          <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>Ainda não há PDFs associados.{isAdmin ? ' Utilize «Documentação técnica» para importar ou colar URL.' : ''}</p>
+                        )}
+                      </div>
+                    )}
                     <h4>Documentação obrigatória</h4>
                     <div className="doc-table-wrapper">
                       <table className="data-table doc-table">
@@ -1012,8 +1049,7 @@ export default function Clientes() {
           clienteNifLocked={modalMaquina.clienteNif}
           maquina={modalMaquina.maquina}
           onSave={(maqData, modo) => {
-            if (modo === 'add' && maqData && SUBCATEGORIAS_COMPRESSOR.includes(maqData.subcategoriaId)) {
-              // Abrir automaticamente o plano de consumíveis para o novo compressor
+            if (modo === 'add' && maqData && isKaeserAbcdMaquina(maqData)) {
               setModalPecasAuto(maqData)
             }
           }}

@@ -240,7 +240,7 @@
 - **Modo campo** — alto contraste para técnicos ao sol
 - **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
 - **Assinatura do técnico em PDFs** — identificação e assinatura pré-preenchida
-- **441 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
+- **442 testes E2E** — cobertura total de fluxos, perfis, mobile, offline e performance
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 - **Cascatas CRUD completas** — frontend e backend alinhados para integridade de dados
 - **Protecção contra eliminação acidental** — modais de confirmação em operações críticas

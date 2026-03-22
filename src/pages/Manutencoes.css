@@ -138,6 +138,7 @@
   height: 95dvh;
   max-height: 95dvh;
   overflow: hidden;
+  min-width: 0; /* filhos flex podem encolher sem forçar scroll horizontal */
   /* em mobile: ocupa quase todo o ecrã; flex: 1 e width já vêm do .modal base */
 }
 @media (min-width: 768px) {
@@ -542,6 +543,12 @@ body.modo-campo .num-servico {
   .modal-fotos-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
 }
 
+/* Horas no wizard de execução — não esticar em tablet */
+.wizard-input-horas-compact {
+  max-width: 10rem;
+  width: 100%;
+}
+
 /* ── Consumíveis e peças — checklist (ExecutarManutencaoModal) ── */
 .pecas-checklist-header {
   display: flex;
@@ -807,16 +814,24 @@ body.modo-campo .num-servico {
 .wizard-progress-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.5rem;
   font-size: 0.8rem;
+  flex-wrap: wrap;
 }
 .wizard-progress-step {
   color: var(--color-text-muted);
   font-weight: 500;
+  min-width: 0;
 }
 .wizard-progress-label {
   font-weight: 700;
   color: var(--color-accent);
+  text-align: right;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* O <form> dentro do wizard cresce para preencher o espaço restante */
@@ -832,8 +847,12 @@ body.modo-campo .num-servico {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden; /* evita barra horizontal no modal (tablets) */
   -webkit-overflow-scrolling: touch;
   padding: 0.75rem 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   /* scrollbar visível no dark theme */
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.25) transparent;
@@ -850,13 +869,106 @@ body.modo-campo .num-servico {
 
 /* Step content */
 .wizard-step-content {
-  min-height: 80px;
+  min-height: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .wizard-step-hint {
   font-size: 0.85rem;
   color: var(--color-text-muted);
   margin: 0 0 1rem;
-  line-height: 1.4;
+  line-height: 1.45;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+/* Hint com botão de ajuda (KAESER): não forçar largura mínima que dispare scroll horizontal */
+.wizard-step-hint:has(.kaeser-help-btn) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem 0.5rem;
+}
+.wizard-step-hint:has(.kaeser-help-btn) .kaeser-help-btn {
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+/* Grelha 2 colunas no wizard: minmax(0,1fr) evita overflow em ~800px (Tab A11) */
+.modal-relatorio-form .form-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.modal-relatorio-form .form-row label {
+  min-width: 0;
+  max-width: 100%;
+}
+.modal-relatorio-form .form-row input,
+.modal-relatorio-form .form-row select,
+.modal-relatorio-form .form-row textarea {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .modal-relatorio-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Rótulos e placeholders legíveis no wizard (tema escuro + modo campo) */
+.modal-relatorio-form form label {
+  color: var(--color-text);
+}
+.modal-relatorio-form input::placeholder,
+.modal-relatorio-form textarea::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1;
+}
+
+/* KAESER pipeline — tabela de consumíveis */
+.kaeser-pecas-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 0.35rem;
+}
+.kaeser-pecas-table {
+  min-width: 100%;
+}
+.kaeser-pecas-table .kaeser-peca-cell {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.kaeser-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.35rem;
+  padding: 0.15rem;
+  vertical-align: middle;
+  border: none;
+  background: transparent;
+  color: var(--color-accent, #3b82f6);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+}
+.kaeser-help-btn:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+.kaeser-dual-sugestao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.35rem;
+}
+.kaeser-sugestao-resumo {
+  padding: 0.65rem 0.75rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
 }
 
 /* ── Admin edit mode ──────────────────────────────────────────── */
@@ -930,7 +1042,8 @@ body.modo-campo .num-servico {
 }
 .wizard-confirm > span {
   flex: 1;
-  min-width: 150px;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 .wizard-confirm-actions {
   display: flex;
@@ -1741,6 +1854,72 @@ body.modo-campo .exec-sort-btn--active {
 }
 body.modo-campo .th-equip-sort-btn:hover {
   color: #2563eb;
+}
+
+/* ── Wizard execução: confirmação de equipamento ──
+   NUNCA fundo claro com texto do tema escuro (--color-text): usava fallback #f8fafc sem --color-surface-muted. */
+.exec-equip-verify-card {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.65rem 0.85rem;
+  margin: 0.5rem 0 0.75rem;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.exec-equip-verify-card strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+.exec-equip-serie-destaque {
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+  color: var(--color-text);
+}
+.exec-equip-serie-valor {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-accent);
+}
+.exec-equip-verify-card .text-muted,
+.exec-equip-verify-card p.text-muted {
+  color: var(--color-text-muted) !important;
+}
+.exec-equip-confirm-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  line-height: 1.45;
+  max-width: 100%;
+}
+.exec-equip-confirm-label input[type="checkbox"] {
+  margin-top: 0.3rem;
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  min-height: 1.15rem;
+}
+.exec-equip-confirm-label > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+body.modo-campo .exec-equip-verify-card {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+body.modo-campo .exec-equip-confirm-label > span {
+  color: var(--color-text);
 }
 
 /* ── Responsivo: empilhar em mobile ── */

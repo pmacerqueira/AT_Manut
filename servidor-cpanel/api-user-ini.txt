@@ -2,8 +2,9 @@
 ; Carregar este ficheiro para public_html/api/.user.ini
 ; Funciona com PHP CGI/FastCGI (cPanel/LiteSpeed)
 
-post_max_size = 20M
-upload_max_filesize = 20M
+; Frota: HTML + pdf_base64 no JSON pode ultrapassar 8–12 MB facilmente
+post_max_size = 48M
+upload_max_filesize = 48M
 max_input_vars = 5000
 max_execution_time = 120
 memory_limit = 256M

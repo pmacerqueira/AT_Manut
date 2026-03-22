@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { stubEmailPhpEndpoints } from './e2e/helpers.js'
 
 // ── Dados mock para simular respostas da API ──────────────────────────────────
 
@@ -44,6 +45,7 @@ const MOCK_DATA = {
 // ── Helper: interceptar chamadas à API com respostas mock ──────────────────────
 
 async function setupApiMock(page, { failOnFetch = false } = {}) {
+  await stubEmailPhpEndpoints(page)
   await page.route('**/api/data.php', async (route) => {
     const body = route.request().postDataJSON()
 

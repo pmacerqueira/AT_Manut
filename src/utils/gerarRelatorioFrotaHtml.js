@@ -1,12 +1,13 @@
 /**
  * gerarRelatorioFrotaHtml – Versão HTML do relatório de frota.
  * Usado para envio por email (o email precisa de HTML inline).
+ * Opção `emailFragment: true` — só conteúdo dentro de um div (sem documento html/head/body), para o Outlook não mostrar a tag como texto.
  * Para visualização/download PDF, usar gerarRelatorioFrotaPdf.
  */
 import { escapeHtml } from './sanitize'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
-import { normEntityId, dateKeyForFilter } from './frotaReportHelpers'
+import { normEntityId, dateKeyForFilter, resolveProximaManutParaFrota } from './frotaReportHelpers'
 
 const TENDENCIA_HISTORICO_MAX = 5
 const TENDENCIA_EXCELENTE_MIN = 3
@@ -19,13 +20,25 @@ const fmtD = (dateStr) => {
   return `${s[2]}-${s[1]}-${s[0]}`
 }
 
+/** Logo no email precisa de URL absoluta; no browser relativa também funciona. */
+function resolveLogoSrc(logoUrl) {
+  const raw = String(logoUrl ?? `${import.meta.env.BASE_URL}logo-navel.png`).trim()
+  if (/^https?:\/\//i.test(raw)) return raw
+  const path = raw.startsWith('/') ? raw : `/${raw}`
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${path}`
+  }
+  return `https://www.navel.pt${path}`
+}
+
 export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatorios, reparacoes = [], getSubcategoria, getCategoria, options = {}) {
   const esc = escapeHtml
-  const logoSrc = options.logoUrl ?? '/manut/logo-navel.png'
+  const logoSrc = resolveLogoSrc(options.logoUrl)
   const hoje = new Date().toISOString().slice(0, 10)
   const hojeFormatado = formatDataAzores(hoje, true)
   const ano = new Date().getFullYear()
   const periodoCustom = !!options.periodoCustom
+  const emailFragment = !!options.emailFragment
   const periodoLabel = options.periodoLabel || String(ano)
   const pinicio = options.periodoInicio ?? null
   const pfim = options.periodoFim ?? null
@@ -66,21 +79,17 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     const manutsM = manutsByMaq.get(mid) || []
     const repsM = repsByMaq.get(mid) || []
     const ultima = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))[0]
-    const proxima = manutsM
-      .filter(mt => mt.status === 'agendada' || mt.status === 'pendente')
-      .sort((a, b) => a.data.localeCompare(b.data))[0]
-    const proxDataKey = proxima?.data != null
-      ? String(proxima.data).slice(0, 10)
-      : (m.proximaManut ? String(m.proximaManut).slice(0, 10) : '')
+    const resolved = resolveProximaManutParaFrota(m, manutsM, ultima)
+    const proxima = resolved.registo
+    const proxDataKey = resolved.dataKey || ''
     const emAtraso = !!(proxDataKey && proxDataKey < hoje)
     const totalManuts = manutsM.filter(mt => mt.status === 'concluida').length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
     const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
-    const proximaParaDias = proxima?.data ?? m.proximaManut
     let diasAtraso = null
-    if (proximaParaDias) diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proximaParaDias)) / 86400000)
+    if (proxDataKey) diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proxDataKey)) / 86400000)
 
     let estado
     if (!ultima && !proxDataKey) estado = 'instalar'
@@ -158,9 +167,10 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 .secao-titulo.vermelho{background:#b91c1c}
 .secao-titulo.laranja{background:#a16207}
 .cliente-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 12px;padding:8px 10px;background:var(--cinza);border-radius:4px;border:1px solid var(--borda);border-top:3px solid var(--azul);margin-bottom:10px}
-.cliente-field{display:flex;flex-direction:column;gap:1px}
-.cliente-field .c-label{font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
-.cliente-field .c-value{font-size:9pt;font-weight:700;color:var(--texto)}
+/* Outlook ignora flex em muitos blocos — label+valor ficavam colados (ex.: NIF512...) */
+.cliente-field{display:block;margin:0 0 8px 0;padding:0;line-height:1.45}
+.cliente-field .c-label{font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;display:inline}
+.cliente-field .c-value{font-size:9pt;font-weight:700;color:var(--texto);display:inline}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:10px}
 .kpi-card{background:var(--cinza);border:1px solid var(--borda);border-radius:5px;padding:7px 8px;text-align:center}
 .kpi-card.kpi-verde{background:#dcfce7;border-color:#15803d}
@@ -206,19 +216,28 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
 .cell-rel{font-size:8pt}
 `
 
-  let html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">
-<title>Relatório Executivo de Frota — ${esc(cliente.nome)}</title>
-<style>${cssBase(PALETA.azulNavel, 'rgba(26,72,128,0.12)')}${cssFrota}</style>
-</head><body>
-${htmlHeader(logoSrc)}
+  const styleBlock = `<style type="text/css">${cssBase(PALETA.azulNavel, 'rgba(26,72,128,0.12)')}${cssFrota}</style>`
+  /* Outlook (motor Word) mostra por vezes "<html>" como texto se enviarmos documento completo; fragmento evita isso. */
+  const headBlock = `${htmlHeader(logoSrc)}
 ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
+`
+  let html = emailFragment
+    ? `<div class="atm-frota-email-root" style="margin:0;padding:0;background:#fff;color:#111827" lang="pt">${styleBlock}
+${headBlock}`
+    : `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8">
+<title>Relatório Executivo de Frota — ${esc(cliente.nome)}</title>
+${styleBlock}
+</head><body>
+${headBlock}`
+
+  html += `
 <div class="cliente-grid">
-  <div class="cliente-field"><span class="c-label">Cliente</span><span class="c-value">${esc(cliente.nome)}</span></div>
-  <div class="cliente-field"><span class="c-label">NIF</span><span class="c-value">${esc(cliente.nif ?? '—')}</span></div>
-  <div class="cliente-field"><span class="c-label">Localidade</span><span class="c-value">${esc(cliente.localidade ?? '—')}</span></div>
-  <div class="cliente-field"><span class="c-label">Morada</span><span class="c-value">${esc(cliente.morada ?? '—')}</span></div>
-  <div class="cliente-field"><span class="c-label">Telefone</span><span class="c-value">${esc(cliente.telefone ?? '—')}</span></div>
-  <div class="cliente-field"><span class="c-label">Email</span><span class="c-value">${esc(cliente.email ?? '—')}</span></div>
+  <div class="cliente-field"><span class="c-label">Cliente:</span> <span class="c-value">${esc(cliente.nome)}</span></div>
+  <div class="cliente-field"><span class="c-label">NIF:</span> <span class="c-value">${esc(cliente.nif ?? '—')}</span></div>
+  <div class="cliente-field"><span class="c-label">Localidade:</span> <span class="c-value">${esc(cliente.localidade ?? '—')}</span></div>
+  <div class="cliente-field"><span class="c-label">Morada:</span> <span class="c-value">${esc(cliente.morada ?? '—')}</span></div>
+  <div class="cliente-field"><span class="c-label">Telefone:</span> <span class="c-value">${esc(cliente.telefone ?? '—')}</span></div>
+  <div class="cliente-field"><span class="c-label">Email:</span> <span class="c-value">${esc(cliente.email ?? '—')}</span></div>
 </div>
 <div class="kpis">
   <div class="kpi-card"><div class="kpi-numero">${totalEquip}</div><div class="kpi-label">Equipamentos</div></div>
@@ -245,7 +264,7 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
     grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
       const diasStr = diasAtraso != null ? (diasAtraso > 0 ? `<span class="data-atraso">+${diasAtraso}</span>` : diasAtraso === 0 ? 'Hoje' : `<span class="data-ok">${diasAtraso}</span>`) : '—'
       const parClass = idx % 2 === 0 ? 'par' : ''
-      const proximaRaw = proxima?.data ?? m.proximaManut
+      const proximaRaw = proxDataKey || proxima?.data || m.proximaManut
       const subSerie = [sub ? `<span class="eq-sub">${esc(sub.nome)}</span>` : '', m.numeroSerie ? `<span class="eq-serie">S/N: ${esc(m.numeroSerie)}</span>` : ''].filter(Boolean).join(' ')
       html += `<tr class="eq-row ${parClass}">
         <td class="cell-eq eq-cell-stack"><span class="eq-nome">${esc(m.marca)} ${esc(m.modelo)}</span>${subSerie ? `<br/>${subSerie}` : ''}</td>
@@ -312,6 +331,6 @@ ${htmlTituloBar('Relatório Executivo de Frota', 'Período', periodoLabel)}
   <span style="color:${PALETA.muted}">○ Novo — sem histórico</span>
 </div>`
 
-  html += `${htmlFooter('Documento gerado em ' + hojeFormatado)}</body></html>`
+  html += `${htmlFooter('Documento gerado em ' + hojeFormatado)}${emailFragment ? '</div>' : '</body></html>'}`
   return html
 }

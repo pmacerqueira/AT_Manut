@@ -5,12 +5,13 @@
  * Estrutura: clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios.
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios } from '../utils/diasUteis'
 import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
-import { STORAGE } from '../config/storageKeys'
+import { API_TIMEOUT_BULK_MS } from '../config/limits'
 
 const DataContext = createContext(null)
 
@@ -411,8 +412,20 @@ const initialClientes = [
 // Subcategorias com contador de horas (compressores e geradores — elevadores não usam)
 export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub14', 'sub15', 'sub16']
 
-// Subcategorias de compressores de parafuso (suportam ciclo A/B/C/D e plano de consumíveis)
+// Compressores (categoria) — vários tipos
 export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub14', 'sub15']
+
+/** Parafuso e parafuso com secador — aqui podem aplicar-se planos por fases (A/B/C/D, etc.). */
+export const SUBCATEGORIAS_COMPRESSOR_PARAFUSO = ['sub5', 'sub14']
+
+/** Valores de `planoManutencaoCompressor` (expandir quando houver planos Fini, LaPadana, …). */
+export const PLANO_MANUT_COMPRESSOR_NONE = ''
+export const PLANO_MANUT_COMPRESSOR_KAESER_ABCD = 'kaeser_abcd'
+
+export const OPCOES_PLANO_MANUT_COMPRESSOR_PARAFUSO = [
+  { value: PLANO_MANUT_COMPRESSOR_NONE, label: 'Sem plano por fases (manutenção periódica standard)' },
+  { value: PLANO_MANUT_COMPRESSOR_KAESER_ABCD, label: 'KAESER — Plano A/B/C/D (consumíveis por fase · importação PDF)' },
+]
 
 // Marcas habituais por tipo de equipamento (para sugestão no formulário de máquina)
 export const MARCAS_COMPRESSOR = ['KAESER', 'Fini', 'ECF', 'IES', 'LaPadana']
@@ -459,6 +472,20 @@ function shouldRetryMarcaCreateWithId(err) {
 /** Indica se uma máquina é da marca KAESER (relatório e template de consumíveis específicos). */
 export const isKaeserMarca = (marca) => (marca ?? '').toLowerCase() === 'kaeser'
 
+/**
+ * Compressor de parafuso (± secador) com plano KAESER A/B/C/D activo — ciclo, `posicaoKaeser`,
+ * tabs A/B/C/D no plano de peças, fluxo no wizard e relatório dedicado.
+ * Legado: sem `planoManutencaoCompressor` na BD, mantém-se se for KAESER com `posicaoKaeser` definida.
+ */
+export function isKaeserAbcdMaquina(maq) {
+  if (!maq) return false
+  if (!SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq.subcategoriaId)) return false
+  const plano = maq.planoManutencaoCompressor ?? maq.plano_manutencao_compressor ?? ''
+  if (plano === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) return true
+  if (!plano && maq.posicaoKaeser != null && isKaeserMarca(maq.marca)) return true
+  return false
+}
+
 // Intervalos de manutenção KAESER (horas de serviço de referência)
 export const INTERVALOS_KAESER = {
   A: { horas: 3000,  label: 'Tipo A — 3.000h / 1 ano'  },
@@ -467,34 +494,20 @@ export const INTERVALOS_KAESER = {
   D: { horas: 36000, label: 'Tipo D — 36.000h / 12 anos'},
 }
 
-/**
- * Sequência de manutenção KAESER (ciclo de 12 anos / ~36.000h nos Açores).
- * Uma manutenção por ano seguindo esta ordem — independentemente das horas exactas.
- * Posição 0=Ano1 (A), 1=Ano2 (B), 2=Ano3 (A), 3=Ano4 (C), ..., 11=Ano12 (D).
- * Após D o ciclo recomeça em A (posição 0).
- */
-export const SEQUENCIA_KAESER = ['A', 'B', 'A', 'C', 'A', 'B', 'A', 'C', 'A', 'B', 'A', 'D']
-
-/** Devolve o tipo KAESER para a posição dada (0-11, com wrap automático). */
-export function tipoKaeserNaPosicao(posicao) {
-  const pos = ((posicao ?? 0) % SEQUENCIA_KAESER.length + SEQUENCIA_KAESER.length) % SEQUENCIA_KAESER.length
-  return SEQUENCIA_KAESER[pos]
-}
-
-/** Devolve a próxima posição no ciclo (0-11) após concluir a posição actual. */
-export function proximaPosicaoKaeser(posicaoAtual) {
-  return ((posicaoAtual ?? 0) + 1) % SEQUENCIA_KAESER.length
-}
-
-/** Descrição legível da posição no ciclo: "Ano 3 de 12 — Tipo A" */
-export function descricaoCicloKaeser(posicao) {
-  const pos  = ((posicao ?? 0) % SEQUENCIA_KAESER.length + SEQUENCIA_KAESER.length) % SEQUENCIA_KAESER.length
-  const tipo = SEQUENCIA_KAESER[pos]
-  return `Tipo ${tipo} — Ano ${pos + 1} de 12`
-}
+export {
+  SEQUENCIA_KAESER,
+  KAESER_INTERVALO_HORAS_REF,
+  KAESER_ANUAL_MIN_DIAS,
+  KAESER_DELTA_H_WARNING_ANUAL,
+  tipoKaeserNaPosicao,
+  proximaPosicaoKaeser,
+  tipoKaeserSugeridoPorHorasServico,
+  descricaoCicloKaeser,
+} from '../constants/kaeserCiclo.js'
 
 // Tipos de documentação técnica por máquina (cumprimento legal obrigatório)
 export const TIPOS_DOCUMENTO = [
+  { id: 'plano_manutencao', label: 'Plano de manutenção (PDF)' },
   { id: 'manual_utilizador', label: 'Manual do Utilizador' },
   { id: 'declaracao_conformidade_ce', label: 'Declaração de Conformidade CE' },
   { id: 'manual_manutencao', label: 'Manual de Manutenção' },
@@ -508,26 +521,26 @@ export const TIPOS_DOCUMENTO = [
 const initialMaquinas = [
   // Cliente 1 — Mecânica Bettencourt: elevador ligeiros + comp. parafuso KAESER
   { id: 'm01', clienteNif: '511234567', subcategoriaId: 'sub1', periodicidadeManut: 'anual',     marca: 'Cascos',    modelo: 'CS 3.5T',    numeroSerie: 'CAS-CS35-001',  anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-001', proximaManut: '2026-12-10', documentos: [], ultimaManutencaoData: '2025-12-10', horasTotaisAcumuladas: 1340, horasServicoAcumuladas: 1265 },
-  { id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub5', periodicidadeManut: 'anual',     marca: 'KAESER',    modelo: 'ASK 28T',    numeroSerie: '2735',          anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-002', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-03-15', horasTotaisAcumuladas: 3200, horasServicoAcumuladas: 3050, posicaoKaeser: 0 },
+  { id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub5', periodicidadeManut: 'anual',     marca: 'KAESER',    modelo: 'ASK 28T',    numeroSerie: '2735',          anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-002', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-03-15', horasTotaisAcumuladas: 3200, horasServicoAcumuladas: 3050, planoManutencaoCompressor: 'kaeser_abcd', posicaoKaeser: 0 },
   // Cliente 2 — Auto Serviço Ribeira: elevador hidráulico + gerador
   { id: 'm03', clienteNif: '512345678', subcategoriaId: 'sub2', periodicidadeManut: 'anual',     marca: 'Ravaglioli',modelo: 'X132',       numeroSerie: 'RAV-X132-003',  anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-003', proximaManut: '2027-01-08', documentos: [], ultimaManutencaoData: '2026-01-08', horasTotaisAcumuladas: 980, horasServicoAcumuladas: 924 },
   { id: 'm04', clienteNif: '512345678', subcategoriaId: 'sub7', periodicidadeManut: 'semestral', marca: 'Perkins',   modelo: '404D-22',    numeroSerie: 'PRK-404-004',   anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-004', proximaManut: '2026-07-20', documentos: [], ultimaManutencaoData: '2026-01-20', horasTotaisAcumuladas: 830, horasServicoAcumuladas: 790 },
   // Cliente 3 — Oficina Sousa & Filhos: tesoura + comp. parafuso Fini + equilibrador
   { id: 'm05', clienteNif: '513456789', subcategoriaId: 'sub4', periodicidadeManut: 'anual',     marca: 'Space',     modelo: 'TES-5T',     numeroSerie: 'SPA-TES-005',   anoFabrico: 2019, numeroDocumentoVenda: 'FV-2019-005', proximaManut: '2027-01-22', documentos: [], ultimaManutencaoData: '2026-01-22', horasTotaisAcumuladas: 2250, horasServicoAcumuladas: 2110 },
-  { id: 'm06', clienteNif: '513456789', subcategoriaId: 'sub6', periodicidadeManut: 'anual',     marca: 'Fini',      modelo: 'K-MAX 15-13',numeroSerie: 'FIN-KM15-006',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-006', proximaManut: '2026-02-01', documentos: [], ultimaManutencaoData: '2025-11-01', horasTotaisAcumuladas: 870, horasServicoAcumuladas: 820, posicaoKaeser: 1 },
+  { id: 'm06', clienteNif: '513456789', subcategoriaId: 'sub6', periodicidadeManut: 'anual',     marca: 'Fini',      modelo: 'K-MAX 15-13',numeroSerie: 'FIN-KM15-006',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-006', proximaManut: '2026-02-01', documentos: [], ultimaManutencaoData: '2025-11-01', horasTotaisAcumuladas: 870, horasServicoAcumuladas: 820, posicaoKaeser: null },
   { id: 'm07', clienteNif: '513456789', subcategoriaId: 'sub8', periodicidadeManut: 'semestral', marca: 'Corghi',    modelo: 'Artiglio 46',numeroSerie: 'COR-A46-007',   anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-007', proximaManut: '2026-08-05', documentos: [], ultimaManutencaoData: '2026-02-05' },
   // Cliente 4 — Transportes Melo: muda pneus + elev. pesados hidráulico
   { id: 'm08', clienteNif: '514567890', subcategoriaId: 'sub9', periodicidadeManut: 'semestral', marca: 'Hofmann',   modelo: 'Monty 4200', numeroSerie: 'HOF-M4200-008', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-008', proximaManut: '2026-08-12', documentos: [], ultimaManutencaoData: '2026-02-12' },
   { id: 'm09', clienteNif: '514567890', subcategoriaId: 'sub12',periodicidadeManut: 'anual',     marca: 'TwinBusch', modelo: 'TWB-420',    numeroSerie: 'TWB-420-009',   anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-009', proximaManut: '2027-02-12', documentos: [], ultimaManutencaoData: '2026-02-12', horasTotaisAcumuladas: 1100, horasServicoAcumuladas: 1045 },
   // Cliente 5 — Mecânica Faial: elev. pesados eletromec. + comp. portátil ECF
   { id: 'm10', clienteNif: '515678901', subcategoriaId: 'sub13',periodicidadeManut: 'anual',     marca: 'Werther',   modelo: 'W3000 XL',   numeroSerie: 'WER-3000-010',  anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-010', proximaManut: '2026-12-05', documentos: [], ultimaManutencaoData: '2025-12-05' },
-  { id: 'm11', clienteNif: '515678901', subcategoriaId: 'sub10',periodicidadeManut: 'anual',     marca: 'ECF',       modelo: 'EA 55 8',    numeroSerie: 'ECF-EA55-011',  anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-011', proximaManut: '2026-02-10', documentos: [], ultimaManutencaoData: '2025-11-10', horasTotaisAcumuladas: 210, horasServicoAcumuladas: 198, posicaoKaeser: 0 },
+  { id: 'm11', clienteNif: '515678901', subcategoriaId: 'sub10',periodicidadeManut: 'anual',     marca: 'ECF',       modelo: 'EA 55 8',    numeroSerie: 'ECF-EA55-011',  anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-011', proximaManut: '2026-02-10', documentos: [], ultimaManutencaoData: '2025-11-10', horasTotaisAcumuladas: 210, horasServicoAcumuladas: 198, posicaoKaeser: null },
   // Cliente 6 — Auto Pico: comp. IES + comp. KAESER c/ secador
-  { id: 'm12', clienteNif: '516789012', subcategoriaId: 'sub11',periodicidadeManut: 'anual',     marca: 'IES',       modelo: 'IM 11 8',    numeroSerie: 'IES-IM11-012',  anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-012', proximaManut: '2026-05-15', documentos: [], ultimaManutencaoData: '2025-11-15', horasTotaisAcumuladas: 3400, horasServicoAcumuladas: 3210, posicaoKaeser: 4 },
-  { id: 'm13', clienteNif: '516789012', subcategoriaId: 'sub14',periodicidadeManut: 'anual',     marca: 'KAESER',    modelo: 'BSD 72 T',   numeroSerie: 'KAE-BSD72-013', anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-013', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-12-15', horasTotaisAcumuladas: 680, horasServicoAcumuladas: 645, posicaoKaeser: 2 },
+  { id: 'm12', clienteNif: '516789012', subcategoriaId: 'sub11',periodicidadeManut: 'anual',     marca: 'IES',       modelo: 'IM 11 8',    numeroSerie: 'IES-IM11-012',  anoFabrico: 2021, numeroDocumentoVenda: 'FV-2021-012', proximaManut: '2026-05-15', documentos: [], ultimaManutencaoData: '2025-11-15', horasTotaisAcumuladas: 3400, horasServicoAcumuladas: 3210, posicaoKaeser: null },
+  { id: 'm13', clienteNif: '516789012', subcategoriaId: 'sub14',periodicidadeManut: 'anual',     marca: 'KAESER',    modelo: 'BSD 72 T',   numeroSerie: 'KAE-BSD72-013', anoFabrico: 2022, numeroDocumentoVenda: 'FV-2022-013', proximaManut: '2026-03-15', documentos: [], ultimaManutencaoData: '2025-12-15', horasTotaisAcumuladas: 680, horasServicoAcumuladas: 645, planoManutencaoCompressor: 'kaeser_abcd', posicaoKaeser: 2 },
   // Cliente 7 — Serviços Técnicos Açores: comp. LaPadana + Fini
-  { id: 'm14', clienteNif: '517890123', subcategoriaId: 'sub15',periodicidadeManut: 'anual',     marca: 'LaPadana',  modelo: 'VDX 25',     numeroSerie: 'LAP-VDX25-014', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-014', proximaManut: '2026-06-10', documentos: [], ultimaManutencaoData: '2025-12-10', posicaoKaeser: 0 },
-  { id: 'm15', clienteNif: '517890123', subcategoriaId: 'sub5', periodicidadeManut: 'anual',     marca: 'Fini',      modelo: 'Plus 38-270',numeroSerie: 'FIN-P38-015',   anoFabrico: 2024, numeroDocumentoVenda: 'FV-2024-015', proximaManut: '2026-04-20', documentos: [], ultimaManutencaoData: '2025-10-20', horasTotaisAcumuladas: 620, horasServicoAcumuladas: 590, posicaoKaeser: 1 },
+  { id: 'm14', clienteNif: '517890123', subcategoriaId: 'sub15',periodicidadeManut: 'anual',     marca: 'LaPadana',  modelo: 'VDX 25',     numeroSerie: 'LAP-VDX25-014', anoFabrico: 2023, numeroDocumentoVenda: 'FV-2023-014', proximaManut: '2026-06-10', documentos: [], ultimaManutencaoData: '2025-12-10', posicaoKaeser: null },
+  { id: 'm15', clienteNif: '517890123', subcategoriaId: 'sub5', periodicidadeManut: 'anual',     marca: 'Fini',      modelo: 'Plus 38-270',numeroSerie: 'FIN-P38-015',   anoFabrico: 2024, numeroDocumentoVenda: 'FV-2024-015', proximaManut: '2026-04-20', documentos: [], ultimaManutencaoData: '2025-10-20', horasTotaisAcumuladas: 620, horasServicoAcumuladas: 590, posicaoKaeser: null },
   // Cliente 8 — Oficina Graciosa: elevador + compressor
   { id: 'm16', clienteNif: '518901234', subcategoriaId: 'sub1', periodicidadeManut: 'anual',     marca: 'Kroftools', modelo: 'KP-3500',    numeroSerie: 'KRO-KP35-016',  anoFabrico: 2020, numeroDocumentoVenda: 'FV-2020-016', proximaManut: '2026-01-25', documentos: [], ultimaManutencaoData: '2025-01-25' },
   // Cliente 9 — Mecânica Flores: gerador
@@ -624,9 +637,7 @@ export function DataProvider({ children }) {
   const [reparacoes,          setReparacoes]          = useState([])
   const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
   const [tecnicos,            setTecnicos]            = useState([])
-  const [pecasPlano,    setPecasPlano]    = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE.PECAS_PLANO) ?? '[]') } catch { return [] }
-  })
+  const [pecasPlano,    setPecasPlano]    = useState([])
   const [loading,       setLoading]       = useState(true)
 
   // ── Estado de conectividade e sincronização ────────────────────────────────
@@ -651,6 +662,7 @@ export function DataProvider({ children }) {
       setReparacoes(d.reparacoes               ?? [])
       setRelatoriosReparacao(d.relatoriosReparacao ?? [])
       setTecnicos(d.tecnicos                 ?? [])
+      setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
       // Guardar snapshot no cache para uso offline
       saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
@@ -676,6 +688,7 @@ export function DataProvider({ children }) {
           setReparacoes(d.reparacoes               ?? [])
           setRelatoriosReparacao(d.relatoriosReparacao ?? [])
           setTecnicos(d.tecnicos                 ?? [])
+          setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
           logger.info('DataContext', 'fetchTodos', 'Dados carregados do cache local (offline)', {
             cacheAge: Math.round((Date.now() - cache.ts) / 60000) + ' min',
           })
@@ -783,11 +796,13 @@ export function DataProvider({ children }) {
   }, [getIntervaloDiasBySubcategoria])
 
   // ── Helper: chama API em background; se offline, enfileira para sync ────────
-  // Assinatura: persist(apiFn, queueDescriptor, rollback?)
+  // Assinatura: persist(apiFn, queueDescriptor, rollback?, opts?)
   //   apiFn          — função async que chama a API
   //   queueDescriptor — { resource, action, id?, data? } — para enfileirar offline
   //   rollback        — função chamada em erro de servidor (não em erro de rede)
-  const persist = useCallback(async (apiFn, queueDescriptor, rollback) => {
+  //   opts.throwOnFailure — se true, relança o erro após rollback (para await + UI/toast)
+  const persist = useCallback(async (apiFn, queueDescriptor, rollback, opts = {}) => {
+    const throwOnFailure = opts?.throwOnFailure === true
     const offline = !navigator.onLine
 
     if (offline) {
@@ -802,6 +817,11 @@ export function DataProvider({ children }) {
           logger.warn('DataContext', 'persist',
             `Fila offline cheia — operação ${queueDescriptor.resource}/${queueDescriptor.action} não guardada`)
           if (rollback) rollback()
+          if (throwOnFailure) {
+            const qe = new Error('Sem ligação: não foi possível enfileirar a operação.')
+            qe.code = 'OFFLINE_QUEUE_FULL'
+            throw qe
+          }
         }
       }
       return
@@ -817,12 +837,14 @@ export function DataProvider({ children }) {
         if (result.ok) {
           setSyncPending(prev => prev + 1)
           setIsOnline(false)
-        } else if (rollback) {
-          rollback()
+        } else {
+          if (rollback) rollback()
+          if (throwOnFailure) throw err
         }
       } else {
         logger.error('DataContext', 'persist', err.message || 'Falha ao guardar dados', { stack: err.stack?.slice(0, 400) })
         if (rollback) rollback()
+        if (throwOnFailure) throw err
       }
     }
   }, [])
@@ -992,7 +1014,6 @@ export function DataProvider({ children }) {
     setMaquinas([])
     setClientes([])
     setPecasPlano([])
-    try { localStorage.removeItem(STORAGE.PECAS_PLANO) } catch {}
     try {
       const {
         apiRelatoriosReparacao, apiRelatorios, apiManutencoes, apiReparacoes, apiMaquinas, apiClientes,
@@ -1167,7 +1188,8 @@ export function DataProvider({ children }) {
       await persist(
         () => apiTecnicos.create(novo),
         { resource: 'tecnicos', action: 'create', data: novo },
-        () => setTecnicos(prev => prev.filter(x => x.id !== id))
+        () => setTecnicos(prev => prev.filter(x => x.id !== id)),
+        { throwOnFailure: true }
       )
     } catch (err) {
       setTecnicos(prev => prev.filter(x => x.id !== id))
@@ -1186,7 +1208,8 @@ export function DataProvider({ children }) {
       await persist(
         () => apiTecnicos.update(id, data),
         { resource: 'tecnicos', action: 'update', data: { id, ...data } },
-        () => setTecnicos(before)
+        () => setTecnicos(before),
+        { throwOnFailure: true }
       )
     } catch (err) {
       setTecnicos(before)
@@ -1204,7 +1227,8 @@ export function DataProvider({ children }) {
       await persist(
         () => apiTecnicos.delete(id),
         { resource: 'tecnicos', action: 'delete', data: { id } },
-        () => setTecnicos(before)
+        () => setTecnicos(before),
+        { throwOnFailure: true }
       )
     } catch (err) {
       setTecnicos(before)
@@ -1226,7 +1250,8 @@ export function DataProvider({ children }) {
       await persist(
         () => apiMaquinas.create(novo),
         { resource: 'maquinas', action: 'create', data: novo },
-        () => setMaquinas(prev => prev.filter(x => String(x.id) !== String(id)))
+        () => setMaquinas(prev => prev.filter(x => String(x.id) !== String(id))),
+        { throwOnFailure: true }
       )
     } catch (err) {
       logger.error('DataContext', 'addMaquina', err?.message || 'Falha ao criar equipamento', { stack: err?.stack?.slice(0, 300) })
@@ -1235,35 +1260,118 @@ export function DataProvider({ children }) {
     return id
   }, [persist])
 
-  const addDocumentoMaquina = useCallback((maquinaId, doc) => {
-    const id = 'doc' + Date.now()
-    let maqAtual
-    setMaquinas(prev => prev.map(m => {
-      if (m.id !== maquinaId) return m
-      maqAtual = { ...m, documentos: [...(m.documentos ?? []), { ...doc, id }] }
-      return maqAtual
-    }))
-    if (maqAtual) {
-      import('../services/apiService').then(({ apiMaquinas }) =>
-        persist(() => apiMaquinas.update(maquinaId, maqAtual),
-                { resource: 'maquinas', action: 'update', id: maquinaId, data: maqAtual })
+  const addDocumentoMaquina = useCallback(async (maquinaId, doc) => {
+    let nextMaq = null
+    let snapshotDocs = null
+    let docId = null
+    let replacedUpload = false
+
+    flushSync(() => {
+      setMaquinas(prev => {
+        const m = prev.find(x => String(x.id) === String(maquinaId))
+        if (!m) return prev
+        snapshotDocs = (m.documentos ?? []).map(d => ({ ...d }))
+        const docs = [...(m.documentos ?? [])]
+        const sigName = doc.uploadFileName
+        const sigSize = doc.uploadFileSize
+        const hasSig =
+          sigName != null &&
+          String(sigName).trim() !== '' &&
+          typeof sigSize === 'number' &&
+          sigSize >= 0
+
+        if (hasSig) {
+          const idx = docs.findIndex(
+            d =>
+              d.tipo === doc.tipo &&
+              d.uploadFileName === sigName &&
+              Number(d.uploadFileSize) === Number(sigSize)
+          )
+          if (idx !== -1) {
+            docId = docs[idx].id
+            docs[idx] = { ...docs[idx], ...doc, id: docId }
+            replacedUpload = true
+            nextMaq = { ...m, documentos: docs }
+            return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
+          }
+        }
+
+        docId = 'doc' + Date.now()
+        nextMaq = { ...m, documentos: [...docs, { ...doc, id: docId }] }
+        return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
+      })
+    })
+
+    if (!nextMaq || snapshotDocs === null) {
+      logger.warn('DataContext', 'addDocumentoMaquina', 'Equipamento não encontrado no estado (id)', { maquinaId })
+      return { ok: false, docId: null, replaced: false }
+    }
+
+    const { apiMaquinas } = await import('../services/apiService')
+    const rollback = () => {
+      setMaquinas(prev =>
+        prev.map(mm =>
+          String(mm.id) === String(maquinaId)
+            ? { ...mm, documentos: (snapshotDocs ?? []).map(d => ({ ...d })) }
+            : mm
+        )
       )
     }
-    return id
+    try {
+      await persist(
+        () => apiMaquinas.update(maquinaId, nextMaq),
+        { resource: 'maquinas', action: 'update', id: maquinaId, data: nextMaq },
+        rollback,
+        { throwOnFailure: true }
+      )
+      return { ok: true, docId, replaced: replacedUpload }
+    } catch (err) {
+      logger.error('DataContext', 'addDocumentoMaquina', err?.message || 'Falha ao gravar documento na API', {
+        stack: err?.stack?.slice(0, 300),
+      })
+      return { ok: false, docId: null, replaced: false }
+    }
   }, [persist])
 
-  const removeDocumentoMaquina = useCallback((maquinaId, docId) => {
-    let maqAtual
-    setMaquinas(prev => prev.map(m => {
-      if (m.id !== maquinaId) return m
-      maqAtual = { ...m, documentos: (m.documentos ?? []).filter(d => d.id !== docId) }
-      return maqAtual
-    }))
-    if (maqAtual) {
-      import('../services/apiService').then(({ apiMaquinas }) =>
-        persist(() => apiMaquinas.update(maquinaId, maqAtual),
-                { resource: 'maquinas', action: 'update', id: maquinaId, data: maqAtual })
+  const removeDocumentoMaquina = useCallback(async (maquinaId, docId) => {
+    let snapshotMaq = null
+    let nextMaq = null
+    flushSync(() => {
+      setMaquinas(prev => {
+        const m = prev.find(x => String(x.id) === String(maquinaId))
+        if (!m) return prev
+        snapshotMaq = m
+        nextMaq = {
+          ...m,
+          documentos: (m.documentos ?? []).filter(d => String(d.id) !== String(docId)),
+        }
+        return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
+      })
+    })
+    if (!nextMaq || !snapshotMaq) {
+      logger.warn('DataContext', 'removeDocumentoMaquina', 'Equipamento ou documento não encontrado', {
+        maquinaId,
+        docId,
+      })
+      return { ok: false }
+    }
+    const { apiMaquinas } = await import('../services/apiService')
+    const rollback = () => {
+      setMaquinas(prev => prev.map(mm => (String(mm.id) === String(maquinaId) ? snapshotMaq : mm)))
+    }
+    try {
+      await persist(
+        () => apiMaquinas.update(maquinaId, nextMaq),
+        { resource: 'maquinas', action: 'update', id: maquinaId, data: nextMaq },
+        rollback,
+        { throwOnFailure: true }
       )
+      return { ok: true }
+    } catch (err) {
+      logger.error('DataContext', 'removeDocumentoMaquina', err?.message || 'Falha ao remover documento na API', {
+        stack: err?.stack?.slice(0, 300),
+      })
+      return { ok: false }
     }
   }, [persist])
 
@@ -1278,7 +1386,8 @@ export function DataProvider({ children }) {
       await persist(
         () => apiMaquinas.update(id, data),
         { resource: 'maquinas', action: 'update', id, data },
-        () => { if (snapshot) setMaquinas(snapshot) }
+        () => { if (snapshot) setMaquinas(snapshot) },
+        { throwOnFailure: true }
       )
     } catch (err) {
       logger.error('DataContext', 'updateMaquina', err?.message || 'Falha ao atualizar equipamento', { stack: err?.stack?.slice(0, 300) })
@@ -1769,36 +1878,92 @@ export function DataProvider({ children }) {
     return novaCount
   }, [persist, updateMaquina])
 
-  // ── Persistência local de pecasPlano ─────────────────────────────────────────
-  useEffect(() => {
-    localStorage.setItem(STORAGE.PECAS_PLANO, JSON.stringify(pecasPlano))
-  }, [pecasPlano])
-
-  // ── Peças e consumíveis — plano por máquina ───────────────────────────────────
+  // ── Peças e consumíveis — plano por máquina (MySQL via API; leitura: todos; escrita: só Admin no servidor) ──
   const addPecaPlano = useCallback((peca) => {
     const id = 'pp' + Date.now()
     const nova = { ...peca, id }
     setPecasPlano(prev => [...prev, nova])
+    import('../services/apiService').then(({ apiPecasPlano }) => {
+      persist(
+        async () => {
+          await apiPecasPlano.create(nova)
+          const list = await apiPecasPlano.list()
+          setPecasPlano(Array.isArray(list) ? list : [])
+        },
+        { resource: 'pecasPlano', action: 'create', data: nova },
+        () => setPecasPlano(prev => prev.filter(p => p.id !== id))
+      )
+    })
     return id
-  }, [])
+  }, [persist])
 
-  const addPecasPlanoLote = useCallback((pecas) => {
-    const novas = pecas.map((p, i) => ({ ...p, id: 'pp' + (Date.now() + i) }))
-    setPecasPlano(prev => [...prev, ...novas])
-    return novas.map(p => p.id)
-  }, [])
+  /** Importação PDF / substituição em lote — grava na BD (Admin). */
+  const replacePecasPlanoMaquina = useCallback(async (maquinaId, items) => {
+    let snapshot
+    setPecasPlano(prev => {
+      snapshot = prev
+      const rest = prev.filter(p => p.maquinaId !== maquinaId)
+      const incoming = (items || []).map((p, i) => ({
+        ...p,
+        maquinaId,
+        id: p.id && String(p.id).trim() !== '' ? p.id : `pp${Date.now()}_${i}`,
+      }))
+      return [...rest, ...incoming]
+    })
+    const { apiPecasPlano } = await import('../services/apiService')
+    await persist(
+      async () => {
+        await apiPecasPlano.replaceMaquina(maquinaId, items || [])
+        const list = await apiPecasPlano.list({ timeoutMs: API_TIMEOUT_BULK_MS })
+        setPecasPlano(Array.isArray(list) ? list : [])
+      },
+      { resource: 'pecasPlano', action: 'replace_maquina', data: { maquinaId, items: items || [] } },
+      () => { if (snapshot) setPecasPlano(snapshot) },
+      { throwOnFailure: true }
+    )
+  }, [persist])
 
   const updatePecaPlano = useCallback((id, data) => {
-    setPecasPlano(prev => prev.map(p => p.id === id ? { ...p, ...data } : p))
-  }, [])
+    let snapshot
+    setPecasPlano(prev => {
+      snapshot = prev
+      return prev.map(p => p.id === id ? { ...p, ...data } : p)
+    })
+    import('../services/apiService').then(({ apiPecasPlano }) => {
+      persist(
+        async () => {
+          await apiPecasPlano.update(id, data)
+          const list = await apiPecasPlano.list()
+          setPecasPlano(Array.isArray(list) ? list : [])
+        },
+        { resource: 'pecasPlano', action: 'update', id, data },
+        () => { if (snapshot) setPecasPlano(snapshot) }
+      )
+    })
+  }, [persist])
 
   const removePecaPlano = useCallback((id) => {
-    setPecasPlano(prev => prev.filter(p => p.id !== id))
-  }, [])
+    let snapshot
+    setPecasPlano(prev => {
+      snapshot = prev
+      return prev.filter(p => p.id !== id)
+    })
+    import('../services/apiService').then(({ apiPecasPlano }) => {
+      persist(
+        async () => {
+          await apiPecasPlano.remove(id)
+          const list = await apiPecasPlano.list()
+          setPecasPlano(Array.isArray(list) ? list : [])
+        },
+        { resource: 'pecasPlano', action: 'delete', id },
+        () => { if (snapshot) setPecasPlano(snapshot) }
+      )
+    })
+  }, [persist])
 
   const removePecasPlanoByMaquina = useCallback((maquinaId) => {
-    setPecasPlano(prev => prev.filter(p => p.maquinaId !== maquinaId))
-  }, [])
+    return replacePecasPlanoMaquina(maquinaId, [])
+  }, [replacePecasPlanoMaquina])
 
   const getPecasPlanoByMaquina = useCallback((maquinaId, tipoManut = null) => {
     return pecasPlano
@@ -1833,6 +1998,7 @@ export function DataProvider({ children }) {
         maquinas,
         manutencoes,
         relatorios,
+        pecasPlano,
       },
     }
     const json = JSON.stringify(backup, null, 2)
@@ -1844,7 +2010,7 @@ export function DataProvider({ children }) {
     a.download = `atmanut_backup_${ts}.json`
     a.click()
     URL.revokeObjectURL(url)
-  }, [clientes, categorias, subcategorias, checklistItems, marcas, tecnicos, maquinas, manutencoes, relatorios])
+  }, [clientes, categorias, subcategorias, checklistItems, marcas, tecnicos, maquinas, manutencoes, relatorios, pecasPlano])
 
   /**
    * Restaura dados a partir de um objecto de backup.
@@ -1865,11 +2031,12 @@ export function DataProvider({ children }) {
       if (Array.isArray(d.maquinas))       setMaquinas(d.maquinas)
       if (Array.isArray(d.manutencoes))    setManutencoes(d.manutencoes)
       if (Array.isArray(d.relatorios))     setRelatorios(d.relatorios)
+      if (Array.isArray(d.pecasPlano))     setPecasPlano(d.pecasPlano)
 
       // Persiste no servidor (substitui todos os dados)
       const {
         apiClientes, apiCategorias, apiSubcategorias, apiChecklistItems, apiMarcas, apiTecnicos,
-        apiMaquinas, apiManutencoes, apiRelatorios,
+        apiMaquinas, apiManutencoes, apiRelatorios, apiPecasPlano,
       } = await import('../services/apiService')
 
       await Promise.all([
@@ -1882,6 +2049,7 @@ export function DataProvider({ children }) {
         d.maquinas       ? apiMaquinas.bulkRestore(d.maquinas)            : Promise.resolve(),
         d.manutencoes    ? apiManutencoes.bulkRestore(d.manutencoes)      : Promise.resolve(),
         d.relatorios     ? apiRelatorios.bulkRestore(d.relatorios)        : Promise.resolve(),
+        d.pecasPlano     ? apiPecasPlano.bulkRestore(d.pecasPlano)        : Promise.resolve(),
       ])
 
       const dtBackup = backup.exportadoEm ? new Date(backup.exportadoEm).toLocaleString('pt-PT', { timeZone: 'Atlantic/Azores' }) : '—'
@@ -1962,7 +2130,7 @@ export function DataProvider({ children }) {
     recalcularPeriodicasAposExecucao,
     sincronizarProximaManutComAgenda,
     addPecaPlano,
-    addPecasPlanoLote,
+    replacePecasPlanoMaquina,
     updatePecaPlano,
     removePecaPlano,
     removePecasPlanoByMaquina,
@@ -1984,7 +2152,7 @@ export function DataProvider({ children }) {
     addReparacao, updateReparacao, removeReparacao,
     addRelatorioReparacao, updateRelatorioReparacao, getRelatorioByReparacao,
     prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao, sincronizarProximaManutComAgenda,
-    addPecaPlano, addPecasPlanoLote, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
+    addPecaPlano, replacePecasPlanoMaquina, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,
     loading, fetchTodos,
     isOnline, syncPending, isSyncing, processSync,

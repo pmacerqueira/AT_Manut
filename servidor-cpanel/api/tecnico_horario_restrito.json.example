@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "timezone": "Atlantic/Azores",
+  "blocks": [
+    {
+      "days": [0, 6],
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "days": [1, 2, 3, 4, 5],
+      "from": "18:00",
+      "to": "07:30"
+    }
+  ]
+}

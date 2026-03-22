@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
+// Envios: stubEmailPhpEndpoints (helpers.js) responde com JSON mock (sem chamar o PHP real).
+// Camada extra no servidor: send-email.php / send-report.php forçam To→comercial se Origin/Referer for localhost.
+
 export default defineConfig({
   testDir: './tests',
   timeout: 45000,

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useData } from '../context/DataContext'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, SEQUENCIA_KAESER, tipoKaeserNaPosicao, descricaoCicloKaeser } from '../context/DataContext'
+import { useData, SUBCATEGORIAS_COM_CONTADOR_HORAS, SEQUENCIA_KAESER, descricaoCicloKaeser, isKaeserMarca, PLANO_MANUT_COMPRESSOR_KAESER_ABCD, OPCOES_PLANO_MANUT_COMPRESSOR_PARAFUSO } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { ROLES } from '../config/users'
 import { format } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { useToast } from './Toast'
 import { getHojeAzores } from '../utils/datasAzores'
+import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
 import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 
 const isElevadores = (getCategoria, categoriaId) => {
@@ -15,8 +15,31 @@ const isElevadores = (getCategoria, categoriaId) => {
 }
 
 const isCompressorParafuso = (subcategoriaId) => ['sub5', 'sub14'].includes(subcategoriaId)
-const isCompressor = (subcategoriaId) => SUBCATEGORIAS_COMPRESSOR.includes(subcategoriaId)
 const temContadorHoras = (subcategoriaId) => SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(subcategoriaId)
+
+function inicialPlanoManutCompressor(mq) {
+  if (!mq) return ''
+  const p = mq.planoManutencaoCompressor ?? mq.plano_manutencao_compressor ?? ''
+  if (p) return p
+  if (isCompressorParafuso(mq.subcategoriaId) && mq.posicaoKaeser != null && isKaeserMarca(mq.marca)) {
+    return PLANO_MANUT_COMPRESSOR_KAESER_ABCD
+  }
+  return ''
+}
+
+/** Garante `planoManutencaoCompressor` + `posicaoKaeser` coerentes com a subcategoria. */
+function aplicarRegrasPlanoParafuso(f, patch) {
+  const next = { ...f, ...patch }
+  const subId = next.subcategoriaId
+  if (!isCompressorParafuso(subId)) {
+    return { ...next, planoManutencaoCompressor: '', posicaoKaeser: null }
+  }
+  const pl = next.planoManutencaoCompressor ?? ''
+  if (pl === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) {
+    return { ...next, posicaoKaeser: next.posicaoKaeser === undefined ? null : next.posicaoKaeser }
+  }
+  return { ...next, posicaoKaeser: null }
+}
 
 function sortMarcasAZ(items = []) {
   return [...items].sort((a, b) => {
@@ -131,6 +154,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     refFiltroOleo: '',
     refFiltroSeparador: '',
     refFiltroAr: '',
+    planoManutencaoCompressor: '',
     posicaoKaeser: null,
   })
   const subcategoriasFiltradas = form.categoriaId ? getSubcategoriasByCategoria(form.categoriaId) : []
@@ -188,7 +212,8 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: '',
         refFiltroSeparador: '',
         refFiltroAr: '',
-        posicaoKaeser: isCompressorParafuso(subId) ? 0 : null,
+        planoManutencaoCompressor: '',
+        posicaoKaeser: null,
       })
       setShowNovaMarca(false)
       setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
@@ -197,6 +222,7 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
       getCategoria(sub?.categoriaId)
       const periodicidade = maquina.periodicidadeManut ?? (isElevadores(getCategoria, sub?.categoriaId) ? 'anual' : '')
       const matchedMarca = marcas.find(m => (m.nome ?? '').toLowerCase() === (maquina.marca ?? '').toLowerCase())
+      const planoIni = inicialPlanoManutCompressor(maquina)
       setForm({
         id: maquina.id,
         clienteNif: maquina.clienteNif,
@@ -218,7 +244,8 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
         refFiltroOleo: maquina.refFiltroOleo || '',
         refFiltroSeparador: maquina.refFiltroSeparador || '',
         refFiltroAr: maquina.refFiltroAr || '',
-        posicaoKaeser: maquina.posicaoKaeser ?? (isCompressorParafuso(maquina.subcategoriaId) ? 0 : null),
+        planoManutencaoCompressor: planoIni,
+        posicaoKaeser: planoIni === PLANO_MANUT_COMPRESSOR_KAESER_ABCD ? (maquina.posicaoKaeser ?? null) : null,
       })
       setShowNovaMarca(false)
       setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
@@ -259,6 +286,16 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
             marcaCorHex: selected.corHex || payload.marcaCorHex || '',
           }
         }
+      }
+
+      if (!isCompressorParafuso(payload.subcategoriaId)) {
+        payload.planoManutencaoCompressor = ''
+        payload.posicaoKaeser = null
+      } else if (payload.planoManutencaoCompressor === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) {
+        /* posicaoKaeser pode ficar null — definida na 1ª execução com horas no local */
+      } else {
+        payload.planoManutencaoCompressor = ''
+        payload.posicaoKaeser = null
       }
 
       if (mode === 'add') {
@@ -352,8 +389,9 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
             <select required value={form.categoriaId} onChange={e => {
               const catId = e.target.value
               const subs = getSubcategoriasByCategoria(catId)
+              const subId = subs[0]?.id || ''
               const defPeriodicidade = isElevadores(getCategoria, catId) ? 'anual' : ''
-              setForm(f => ({ ...f, categoriaId: catId, subcategoriaId: subs[0]?.id || '', periodicidadeManut: defPeriodicidade }))
+              setForm(f => aplicarRegrasPlanoParafuso(f, { categoriaId: catId, subcategoriaId: subId, periodicidadeManut: defPeriodicidade }))
             }}>
               {categorias.map(c => (
                 <option key={c.id} value={c.id}>{c.nome} ({c.intervaloTipo})</option>
@@ -362,7 +400,10 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           </label>
           <label>
             Subcategoria (tipo de máquina)
-            <select required value={form.subcategoriaId} onChange={e => setForm(f => ({ ...f, subcategoriaId: e.target.value }))}>
+            <select required value={form.subcategoriaId} onChange={e => {
+              const subId = e.target.value
+              setForm(f => aplicarRegrasPlanoParafuso(f, { subcategoriaId: subId }))
+            }}>
               {subcategoriasFiltradas.map(s => (
                 <option key={s.id} value={s.id}>{s.nome}</option>
               ))}
@@ -398,25 +439,49 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
                   const val = e.target.value
                   if (val === '__new__') {
                     setShowNovaMarca(true)
-                    setForm(f => ({ ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }))
+                    setForm(f => {
+                      const next = { ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }
+                      if (!isCompressorParafuso(next.subcategoriaId)) return { ...next, posicaoKaeser: null, planoManutencaoCompressor: '' }
+                      if ((next.planoManutencaoCompressor ?? '') === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) {
+                        return { ...next, posicaoKaeser: next.posicaoKaeser ?? null }
+                      }
+                      return { ...next, posicaoKaeser: null }
+                    })
                     return
                   }
                   if (!val) {
                     setShowNovaMarca(false)
                     setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
-                    setForm(f => ({ ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }))
+                    setForm(f => {
+                      const next = { ...f, marcaId: '', marca: '', marcaLogoUrl: '', marcaCorHex: '' }
+                      if (!isCompressorParafuso(next.subcategoriaId)) return { ...next, posicaoKaeser: null, planoManutencaoCompressor: '' }
+                      if ((next.planoManutencaoCompressor ?? '') === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) {
+                        return { ...next, posicaoKaeser: next.posicaoKaeser ?? null }
+                      }
+                      return { ...next, posicaoKaeser: null }
+                    })
                     return
                   }
                   const selected = findMarcaByOptionValue(val)
                   setShowNovaMarca(false)
                   setNovaMarca({ nome: '', logoUrl: '', corHex: '#1a4880' })
-                  setForm(f => ({
-                    ...f,
-                    marcaId: selected?.id != null && String(selected.id).trim() !== '' ? String(selected.id) : '',
-                    marca: selected?.nome || '',
-                    marcaLogoUrl: selected?.logoUrl || '',
-                    marcaCorHex: selected?.corHex || '',
-                  }))
+                  setForm(f => {
+                    const marcaNome = selected?.nome || ''
+                    const base = {
+                      ...f,
+                      marcaId: selected?.id != null && String(selected.id).trim() !== '' ? String(selected.id) : '',
+                      marca: marcaNome,
+                      marcaLogoUrl: selected?.logoUrl || '',
+                      marcaCorHex: selected?.corHex || '',
+                    }
+                    if (!isCompressorParafuso(base.subcategoriaId)) {
+                      return { ...base, posicaoKaeser: null, planoManutencaoCompressor: '' }
+                    }
+                    if ((base.planoManutencaoCompressor ?? '') === PLANO_MANUT_COMPRESSOR_KAESER_ABCD) {
+                      return { ...base, posicaoKaeser: base.posicaoKaeser ?? null }
+                    }
+                    return { ...base, posicaoKaeser: null }
+                  })
                 }}
               >
                 <option value="">— Selecionar marca —</option>
@@ -523,44 +588,74 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
           {mode === 'edit' && (() => {
             const maqAtual = maquinas.find(x => x.id === form.id)
             if (!maqAtual || !temContadorHoras(maqAtual.subcategoriaId)) return null
-            if (!maqAtual.ultimaManutencaoData && maqAtual.horasTotaisAcumuladas == null && maqAtual.horasServicoAcumuladas == null) return null
+            const horasFicha = horasContadorNaFicha(maqAtual)
+            if (!maqAtual.ultimaManutencaoData && horasFicha == null) return null
             return (
               <div className="form-section horas-acumuladas-section">
-                <h3>Contadores (atualizados à última manutenção)</h3>
+                <h3>Contador (atualizado à última manutenção)</h3>
                 <p className="horas-info">
                   {maqAtual.ultimaManutencaoData && <span>Última manutenção: {format(new Date(maqAtual.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}</span>}
-                  {maqAtual.ultimaManutencaoData && (maqAtual.horasTotaisAcumuladas != null || maqAtual.horasServicoAcumuladas != null) && ' · '}
-                  {maqAtual.horasTotaisAcumuladas != null && <span>Horas totais: {maqAtual.horasTotaisAcumuladas}h</span>}
-                  {maqAtual.horasTotaisAcumuladas != null && maqAtual.horasServicoAcumuladas != null && ' · '}
-                  {maqAtual.horasServicoAcumuladas != null && <span>Horas de serviço: {maqAtual.horasServicoAcumuladas}h</span>}
+                  {maqAtual.ultimaManutencaoData && horasFicha != null && ' · '}
+                  {horasFicha != null && <span>Horas no contador: {horasFicha} h</span>}
                 </p>
               </div>
             )
           })()}
           {isCompressorParafuso(form.subcategoriaId) && (
             <div className="form-section">
-              <h3>Ciclo de manutenção KAESER (A/B/C/D)</h3>
+              <h3>Escolha o plano de manutenção a aplicar</h3>
               <p className="horas-info">
-                Sequência anual: A → B → A → C → A → B → A → C → A → B → A → D (ciclo de 12 anos)
+                Cada fabricante pode ter o seu plano (Fini, LaPadana, IES, ECF, …). Por agora está disponível o plano <strong>KAESER A/B/C/D</strong>,
+                com consumíveis por fase e por número de série — importação a partir do PDF do template no <strong>Plano de peças</strong>.
               </p>
               <label>
-                Posição actual no ciclo (0 = Ano 1 Tipo A, 1 = Ano 2 Tipo B, ...)
+                Plano de manutenção
                 <select
-                  value={form.posicaoKaeser ?? 0}
-                  onChange={e => setForm(f => ({ ...f, posicaoKaeser: Number(e.target.value) }))}
+                  value={form.planoManutencaoCompressor ?? ''}
+                  onChange={e => {
+                    const v = e.target.value
+                    setForm(f => aplicarRegrasPlanoParafuso(f, { planoManutencaoCompressor: v }))
+                  }}
                 >
-                  {SEQUENCIA_KAESER.map((tipo, idx) => (
-                    <option key={idx} value={idx}>
-                      Ano {idx + 1} — Tipo {tipo}
-                      {idx === (form.posicaoKaeser ?? 0) ? ' (actual)' : ''}
-                    </option>
+                  {OPCOES_PLANO_MANUT_COMPRESSOR_PARAFUSO.map(o => (
+                    <option key={o.value || 'none'} value={o.value}>{o.label}</option>
                   ))}
                 </select>
               </label>
-              {form.posicaoKaeser != null && (
-                <p className="horas-info" style={{ marginTop: '0.25rem' }}>
-                  <strong>Próxima manutenção:</strong> {descricaoCicloKaeser((form.posicaoKaeser + 1) % SEQUENCIA_KAESER.length)}
-                </p>
+              {form.planoManutencaoCompressor === PLANO_MANUT_COMPRESSOR_KAESER_ABCD && (
+                <>
+                  <p className="horas-info" style={{ marginTop: '0.75rem' }}>
+                    Ciclo de 12 anos (referência horas de serviço): A → B → A → C → A → B → A → C → A → B → A → D.
+                    A importação PDF preenche os consumíveis das fases A, B, C e D para este número de série.
+                  </p>
+                  <label>
+                    Posição no ciclo A/B/C/D (opcional no cadastro)
+                    <select
+                      value={form.posicaoKaeser == null ? '' : String(form.posicaoKaeser)}
+                      onChange={e => {
+                        const v = e.target.value
+                        setForm(f => ({ ...f, posicaoKaeser: v === '' ? null : Number(v) }))
+                      }}
+                    >
+                      <option value="">A definir na 1ª execução (horas de serviço no compressor)</option>
+                      {SEQUENCIA_KAESER.map((tipo, idx) => (
+                        <option key={idx} value={String(idx)}>
+                          Ano {idx + 1} — Tipo {tipo}
+                          {form.posicaoKaeser != null && idx === form.posicaoKaeser ? ' (actual)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {form.posicaoKaeser != null ? (
+                    <p className="horas-info" style={{ marginTop: '0.25rem' }}>
+                      <strong>Próxima manutenção:</strong> {descricaoCicloKaeser((form.posicaoKaeser + 1) % SEQUENCIA_KAESER.length)}
+                    </p>
+                  ) : (
+                    <p className="horas-info" style={{ marginTop: '0.25rem' }}>
+                      Sem posição fixa: no agendamento não é necessário saber a fase. Na execução, o técnico regista as <strong>horas de serviço</strong> e confirma o tipo A/B/C/D.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -579,6 +674,14 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
                 <label>Refª filtro separador<input value={form.refFiltroSeparador} onChange={e => setForm(f => ({ ...f, refFiltroSeparador: e.target.value }))} placeholder="Ex: 1900 1470 00" /></label>
                 <label>Refª filtro do ar<input value={form.refFiltroAr} onChange={e => setForm(f => ({ ...f, refFiltroAr: e.target.value }))} placeholder="Ex: 1900 1471 00" /></label>
               </div>
+            </div>
+          )}
+          {isCompressorParafuso(form.subcategoriaId) && (
+            <div className="form-section">
+              <h3>PDFs técnicos do equipamento</h3>
+              <p className="horas-info">
+                O plano de manutenção, o manual do utilizador e outros PDFs do fabricante são associados na <strong>ficha completa do equipamento</strong> (Clientes, botão «Documentação técnica») ou na lista de Equipamentos. Todos os utilizadores podem abri-los durante manutenções, montagens e reparações.
+              </p>
             </div>
           )}
           <div className="form-actions">

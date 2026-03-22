@@ -329,13 +329,14 @@ body.modo-campo .icon-btn.secondary:hover {
 
 .mensal-resumo {
   display: flex;
-  gap: 1rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
   margin-bottom: 1.25rem;
 }
 .mensal-stat {
-  flex: 1;
-  min-width: 90px;
+  flex: 1 1 calc(33.333% - 0.5rem);
+  min-width: 100px;
+  max-width: 100%;
   background: var(--color-bg-elevated);
   border-radius: 0.6rem;
   padding: 0.6rem 0.75rem;
@@ -380,7 +381,42 @@ body.modo-campo .icon-btn.secondary:hover {
   font-size: 0.8rem;
 }
 .mensal-table th, .mensal-table td {
-  padding: 0.2rem 0.4rem;
+  padding: 0.35rem 0.45rem;
+  vertical-align: middle;
+}
+/* Colunas estáveis — alinha cabeçalho H. M.O. com valores */
+.mensal-table-ist {
+  table-layout: fixed;
+  width: 100%;
+}
+.mensal-table-ist th:nth-child(1),
+.mensal-table-ist td:nth-child(1) {
+  width: 6.5rem;
+}
+.mensal-table-ist th:nth-child(2),
+.mensal-table-ist td:nth-child(2) {
+  width: 7.5rem;
+}
+.mensal-table-ist th:nth-child(3),
+.mensal-table-ist td:nth-child(3) {
+  width: 18%;
+}
+.mensal-table-ist th:nth-child(4),
+.mensal-table-ist td:nth-child(4) {
+  width: 22%;
+  word-break: break-word;
+}
+.mensal-table-ist th:nth-child(5),
+.mensal-table-ist td:nth-child(5) {
+  width: 7.5rem;
+}
+.mensal-table-ist th:nth-child(6),
+.mensal-table-ist td:nth-child(6) {
+  width: 6.5rem;
+}
+.mensal-table-ist th.th-horas,
+.mensal-table-ist td.td-horas {
+  width: 5.25rem;
 }
 .td-aviso-bold {
   font-weight: 600;
@@ -429,6 +465,8 @@ body.modo-campo .icon-btn.secondary:hover {
   align-items: center;
   gap: 0.35rem;
   justify-content: flex-end;
+  min-height: 1.75rem;
+  text-align: right;
 }
 .chevron-expand {
   color: var(--color-text-muted);
@@ -516,17 +554,48 @@ body.modo-campo .icon-btn.secondary:hover {
   width: 4rem;
 }
 
-/* Print: mostrar apenas o conteúdo do modal mensal */
+/* Impressão do browser (Ctrl+P) — opcional; PDF usa jsPDF */
 @media print {
   body > * { display: none !important; }
   .modal-overlay { display: flex !important; position: static !important; background: none !important; }
   .modal-mensal-istobal { box-shadow: none !important; max-width: 100% !important; width: 100% !important; }
-  .modal-header button, .modal-footer { display: none !important; }
+  .modal-header button,
+  .modal-mensal-istobal .mensal-modal-footer,
+  .modal-mensal-istobal .mensal-email-panel,
+  .modal-mensal-istobal .frota-email-panel { display: none !important; }
   .mensal-nav button { display: none !important; }
   .row-expansivel { cursor: default; }
   .chevron-expand { display: none; }
-  /* Na impressão, expandir todos os materiais automaticamente */
   .row-materiais-detail { display: table-row !important; }
+}
+
+.mensal-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.mensal-footer-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.mensal-btn-email-active {
+  border-color: var(--primary, #3b82f6) !important;
+  color: var(--primary, #3b82f6) !important;
+  background: rgba(59, 130, 246, 0.12) !important;
+}
+.mensal-email-panel {
+  margin: 0 1rem 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+}
+.mensal-email-sem-ficha {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.5rem;
+  line-height: 1.45;
 }
 .mensal-vazio {
   text-align: center;

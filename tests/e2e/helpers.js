@@ -3,6 +3,8 @@
  *
  * Inclui:
  *  - Mock da API REST (intercepção de rede, sem chamadas reais)
+ *  - Intercepção de send-email.php / send-report.php: reescreve destinatários para comercial@navel.pt
+ *    e remove Cc, depois continua para o servidor (Vite proxy / URL absoluta — nunca envia para clientes mock)
  *  - Criação de JWT falso para Admin e ATecnica
  *  - Dados mock (clientes, máquinas, manutenções, relatórios)
  *  - Acções comuns: login, preenchimento de checklist, assinatura canvas
@@ -131,6 +133,9 @@ export const MC = {
     { id: 'tec3', nome: 'Aldevino Costa', ativo: true },
   ],
 
+  /** Plano de consumíveis por máquina (API `pecasPlano`); mutável em `setupApiMock`. */
+  pecasPlano: [],
+
   // ── Reparações ─────────────────────────────────────────────────────────────
   reparacoes: [
     // rep01: pendente — para testar criação e execução
@@ -257,6 +262,83 @@ export const MC = {
 
 // ── Mock API ──────────────────────────────────────────────────────────────────
 
+/** Único destinatário permitido nos E2E (evita emails a fichas mock / clientes reais). */
+const E2E_EMAIL_RECIPIENT = 'comercial@navel.pt'
+
+/**
+ * Altera o JSON POST para só enviar para comercial@navel.pt e limpar Cc.
+ * send-email.php usa `to_email`; send-report.php usa `destinatario` + `cc`.
+ * Tudo o que tiver `auth_token` (payloads AT_Manut) é sanitizado, mesmo com campos vazios.
+ */
+function sanitizeE2eEmailPostData(raw) {
+  if (raw == null || raw === '') return raw
+  try {
+    const body = JSON.parse(raw)
+    if (!body || typeof body !== 'object') return raw
+    if (typeof body.auth_token !== 'string' || !body.auth_token) {
+      return raw
+    }
+    if ('to_email' in body) {
+      body.to_email = E2E_EMAIL_RECIPIENT
+    }
+    if ('destinatario' in body) {
+      body.destinatario = E2E_EMAIL_RECIPIENT
+    }
+    if ('cc' in body) {
+      body.cc = ''
+    }
+    return JSON.stringify(body)
+  } catch {
+    return raw
+  }
+}
+
+/**
+ * Bloqueia envios reais durante E2E: não faz `continue` para o PHP (zero correio de clientes).
+ * Responde 200 JSON mock. Payloads sem `auth_token` continuam para a rede (não são AT_Manut).
+ * Testes que registarem `page.route` **depois** de setupApiMock prevalecem (LIFO) — ex.: C16/C17.
+ */
+export async function stubEmailPhpEndpoints(page) {
+  const handler = async (route) => {
+    const req = route.request()
+    if (req.method() !== 'POST') {
+      await route.continue()
+      return
+    }
+    const raw = req.postData()
+    if (raw == null || raw === '') {
+      await route.continue()
+      return
+    }
+    let bodyStr = raw
+    try {
+      const parsed = sanitizeE2eEmailPostData(raw)
+      if (parsed !== raw) bodyStr = parsed
+      const j = JSON.parse(bodyStr)
+      if (j && typeof j.auth_token === 'string' && j.auth_token) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json; charset=utf-8',
+          body: JSON.stringify({
+            ok: true,
+            message: 'E2E: envio simulado (não foi chamado o servidor de correio).',
+          }),
+        })
+        return
+      }
+    } catch {
+      /* não é JSON AT_Manut */
+    }
+    if (bodyStr !== raw) {
+      await route.continue({ postData: bodyStr })
+    } else {
+      await route.continue()
+    }
+  }
+  await page.route('**/send-email.php**', handler)
+  await page.route('**/send-report.php**', handler)
+}
+
 /**
  * Interceta todas as chamadas a /api/data.php e responde com dados mock.
  * @param {Page}   page
@@ -265,9 +347,11 @@ export const MC = {
  *   customData   — substitui MC parcialmente
  */
 export async function setupApiMock(page, { failFetch = false, customData = {} } = {}) {
+  await stubEmailPhpEndpoints(page)
   const data = { ...MC, ...customData }
   // Estado mutável para clientes (create/update) — permite testes de importação SAF-T
   const clientesMutable = [...(data.clientes ?? [])]
+  const pecasPlanoMutable = [...(data.pecasPlano ?? [])]
 
   await page.route('**/api/data.php', async (route) => {
     const body = route.request().postDataJSON()
@@ -308,7 +392,10 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
 
     // ── list ──
     if (action === 'list') {
-      const rows = resource === 'clientes' ? clientesMutable : (data[resource] ?? [])
+      let rows
+      if (resource === 'clientes') rows = clientesMutable
+      else if (resource === 'pecasPlano') rows = pecasPlanoMutable
+      else rows = data[resource] ?? []
       await route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({ ok: true, data: rows }),
@@ -337,6 +424,67 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
       await route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+
+    // ── pecasPlano — estado mutável (replace_maquina, CRUD, bulk_restore) ──
+    if (resource === 'pecasPlano' && action === 'create') {
+      const novo = body?.data
+      if (novo) pecasPlanoMutable.push(novo)
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: novo ?? {} }),
+      })
+      return
+    }
+    if (resource === 'pecasPlano' && action === 'update') {
+      const merged = body?.data
+      const id = body?.id ?? merged?.id
+      const idx = pecasPlanoMutable.findIndex(p => String(p.id) === String(id))
+      if (idx !== -1 && merged) pecasPlanoMutable[idx] = { ...pecasPlanoMutable[idx], ...merged }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+    if (resource === 'pecasPlano' && action === 'delete') {
+      const id = body?.id
+      const idx = pecasPlanoMutable.findIndex(p => String(p.id) === String(id))
+      if (idx !== -1) pecasPlanoMutable.splice(idx, 1)
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: {} }),
+      })
+      return
+    }
+    if (resource === 'pecasPlano' && action === 'replace_maquina') {
+      const payload = body?.data ?? {}
+      const maquinaId = payload.maquinaId
+      const items = payload.items ?? []
+      const mid = String(maquinaId ?? '')
+      const rest = pecasPlanoMutable.filter(p => String(p.maquinaId) !== mid)
+      const incoming = items.map((p, i) => ({
+        ...p,
+        maquinaId: maquinaId ?? p.maquinaId,
+        id: p.id && String(p.id).trim() !== '' ? p.id : `pp_mock_${Date.now()}_${i}`,
+      }))
+      pecasPlanoMutable.splice(0, pecasPlanoMutable.length, ...rest, ...incoming)
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: { replaced: incoming.length } }),
+      })
+      return
+    }
+    if (resource === 'pecasPlano' && action === 'bulk_restore') {
+      const arr = body?.data
+      if (Array.isArray(arr)) {
+        pecasPlanoMutable.splice(0, pecasPlanoMutable.length, ...arr)
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: { count: pecasPlanoMutable.length } }),
       })
       return
     }
@@ -423,18 +571,40 @@ export async function checklistMarcarTodos(page) {
   }
 }
 
-/** Wizard de execução: «Seguinte» e, se aparecer, confirmação «Sim, avançar» (notas/fotos vazias). */
+/** Wizard de execução: «Seguinte» e, se aparecer, confirmação «Sim, avançar» (fotos vazias). */
 export async function execWizardSeguinte(page) {
   const seguinte = page.locator('.wizard-footer-actions button.btn.primary').filter({ hasText: /Seguinte/ })
   if (await seguinte.isVisible({ timeout: 4000 }).catch(() => false)) {
     await seguinte.click()
     await page.waitForTimeout(250)
   }
-  const simAvancar = page.locator('.wizard-confirm-actions button.btn.primary').filter({ hasText: /Sim, avançar/i })
+  // Confirmação inline no passo Fotografias — o rodapé com «Seguinte» pode interceptar o hit-test; forçar + scroll.
+  const simAvancar = page
+    .locator('.wizard-confirm')
+    .filter({ hasText: /continuar sem fotografias|sem fotografias/i })
+    .getByRole('button', { name: /Sim, avançar/i })
   if (await simAvancar.isVisible({ timeout: 2500 }).catch(() => false)) {
-    await simAvancar.click()
+    await simAvancar.scrollIntoViewIfNeeded()
+    await simAvancar.click({ force: true })
     await page.waitForTimeout(250)
   }
+}
+
+/** Passo 1: confirmar n.º de série (e horas se o passo as pedir). */
+export async function confirmExecWizardVerificacaoEquipamento(page) {
+  const verif = page.locator('[data-testid="exec-passo-verificacao"]')
+  if (await verif.isVisible({ timeout: 4000 }).catch(() => false)) {
+    await verif.locator('input[type="checkbox"]').first().check()
+    await execWizardSeguinte(page)
+  }
+}
+
+/** Alinha com a regra da app: observações com pelo menos uma frase das notas rápidas por defeito. */
+export function ensureNotasComFrasePredefinida(text) {
+  const snippet = 'Equipamento em bom estado geral'
+  const t = (text || '').trim()
+  if (t.includes(snippet)) return t
+  return t ? `${t}\n${snippet}` : snippet
 }
 
 /** Marca todos os itens individualmente como "Sim" (fallback se não houver "Marcar todos"). */
@@ -446,6 +616,18 @@ export async function checklistFillAllSim(page) {
     if (await simBtn.isVisible()) await simBtn.click()
     await page.waitForTimeout(80)
   }
+}
+
+/** Wizard base (ex.: elevador): confirmação → checklist → observações → passo Fotografias. */
+export async function navegarWizardAteFotos(page) {
+  await confirmExecWizardVerificacaoEquipamento(page)
+  await checklistMarcarTodos(page)
+  await checklistFillAllSim(page)
+  await execWizardSeguinte(page)
+  const nf = page.locator('.modal textarea.textarea-full').first()
+  await nf.waitFor({ state: 'visible', timeout: 5000 })
+  await nf.fill(ensureNotasComFrasePredefinida(''))
+  await execWizardSeguinte(page)
 }
 
 // ── Assinatura digital (canvas) ───────────────────────────────────────────────
@@ -485,8 +667,8 @@ export async function signCanvas(page) {
 // ── Preencher formulário de execução de manutenção ────────────────────────────
 
 /**
- * Executa o fluxo completo de preenchimento do modal de execução (wizard 7 passos):
- * checklist → notas → fotos → técnico → nome → assinatura → finalizar
+ * Executa o fluxo completo de preenchimento do modal de execução (wizard 8 passos):
+ * confirmação → checklist → notas → fotos → técnico → nome → assinatura → finalizar
  */
 export async function fillExecucaoModal(page, {
   tecnico       = 'Aurélio Almeida',
@@ -494,14 +676,17 @@ export async function fillExecucaoModal(page, {
   email         = '',
   notas         = '',
 } = {}) {
+  await confirmExecWizardVerificacaoEquipamento(page)
+
   await checklistMarcarTodos(page)
   await checklistFillAllSim(page)
 
   await execWizardSeguinte(page)
 
   const notasField = page.locator('.modal textarea.textarea-full').first()
-  if (notas && await notasField.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await notasField.fill(notas)
+  const notasFinal = ensureNotasComFrasePredefinida(notas)
+  if (await notasField.isVisible({ timeout: 4000 }).catch(() => false)) {
+    await notasField.fill(notasFinal)
   }
   await execWizardSeguinte(page)
   await execWizardSeguinte(page)

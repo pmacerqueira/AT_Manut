@@ -5,9 +5,10 @@
  * O JWT é armazenado em sessionStorage (atm_api_token). Ao fechar a janela, a sessão termina.
  * A sessão é restaurada a partir do payload JWT sem chamada de rede.
  */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { logger, flushLogsToServer } from '../utils/logger'
 import { ROLES } from '../config/users'
+import { STORAGE } from '../config/storageKeys'
 
 const AuthContext = createContext(null)
 
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
   const [session,   setSession]   = useState(null)
   const [hydrated,  setHydrated]  = useState(false)
   const [loginError, setLoginError] = useState(null)
+  const horarioBlockRef = useRef(false)
 
   // Restaurar sessão a partir do JWT existente (sem chamada de rede)
   useEffect(() => {
@@ -74,8 +76,43 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
+  useEffect(() => {
+    if (!session?.user || session.user.role === ROLES.ADMIN) {
+      horarioBlockRef.current = false
+    }
+  }, [session?.user])
+
+  useEffect(() => {
+    const onHorarioRestrito = async (e) => {
+      if (horarioBlockRef.current) return
+      horarioBlockRef.current = true
+      try {
+        localStorage.setItem(
+          STORAGE.LOGIN_NOTICE,
+          JSON.stringify({
+            code: 'TECNICO_HORARIO_RESTRITO',
+            message: e.detail?.message || 'Horário de acesso restrito.',
+          }),
+        )
+      } catch { /* */ }
+      await flushLogsToServer()
+      const { clearToken } = await getApi()
+      clearToken()
+      setSession(null)
+      setLoginError(null)
+      try {
+        sessionStorage.clear()
+      } catch { /* */ }
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+      window.location.href = `${base}/login`
+    }
+    window.addEventListener('atm:tecnico-horario-restrito', onHorarioRestrito)
+    return () => window.removeEventListener('atm:tecnico-horario-restrito', onHorarioRestrito)
+  }, [])
+
   const login = useCallback(async (username, password) => {
     setLoginError(null)
+    horarioBlockRef.current = false
     // ── DEV BYPASS ──
     if (DEV_BYPASS) {
       const devUser = DEV_USERS[username]
@@ -113,9 +150,16 @@ export function AuthProvider({ children }) {
       window.dispatchEvent(new Event('atm:login'))
       return true
     } catch (err) {
+      if (err.code === 'TECNICO_HORARIO_RESTRITO') {
+        setLoginError(err.message || 'Acesso não permitido neste horário.')
+        logger.warn('AuthContext', 'login', `Login bloqueado (horário): ${username}`, { status: err.status })
+        return false
+      }
       const msg = err.status === 401
         ? 'Utilizador ou password incorretos.'
-        : 'Não foi possível contactar o servidor. Verifique a ligação.'
+        : err.status === 403 && err.message
+          ? err.message
+          : 'Não foi possível contactar o servidor. Verifique a ligação.'
       setLoginError(msg)
       logger.warn('AuthContext', 'login', `Tentativa de login falhada: utilizador "${username}" — ${err.message}`)
       return false

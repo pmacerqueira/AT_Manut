@@ -61,9 +61,17 @@ function json_ok($data = null, int $code = 200): void {
     exit;
 }
 
-function json_error(string $message, int $code = 400): void {
+function json_error(string $message, int $code = 400, ?array $extra = null): void {
     http_response_code($code);
-    echo json_encode(['ok' => false, 'message' => $message], JSON_UNESCAPED_UNICODE);
+    $out = ['ok' => false, 'message' => $message];
+    if ($extra) {
+        foreach ($extra as $k => $v) {
+            if ($k !== 'ok' && $k !== 'message') {
+                $out[$k] = $v;
+            }
+        }
+    }
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
     exit;
 }
 

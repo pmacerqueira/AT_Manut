@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
-import { useData, TIPOS_DOCUMENTO, SUBCATEGORIAS_COMPRESSOR, INTERVALOS, tipoKaeserNaPosicao } from '../context/DataContext'
+import { useData, TIPOS_DOCUMENTO, INTERVALOS, tipoKaeserNaPosicao, isKaeserAbcdMaquina } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import MaquinaFormModal from '../components/MaquinaFormModal'
 import DocumentacaoModal from '../components/DocumentacaoModal'
@@ -208,12 +208,12 @@ export default function Equipamentos() {
                             <span className="text-muted equip-num-serie">Nº Série: {m.numeroSerie}</span>
                           </div>
                           <div className="equip-badges-row">
-                            {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
+                            {isKaeserAbcdMaquina(m) && m.posicaoKaeser != null && (
                               <span
-                                className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
-                                title={`Próxima manutenção Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
+                                className="badge kaeser-tipo-badge"
+                                title={`Plano KAESER A/B/C/D — próxima: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
                               >
-                                {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                                KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
                               </span>
                             )}
                             <span className="badge badge-danger">
@@ -327,12 +327,12 @@ export default function Equipamentos() {
                           <span className="text-muted equip-num-serie">Nº Série: {m.numeroSerie}</span>
                         </div>
                         <div className="equip-badges-row">
-                          {SUBCATEGORIAS_COMPRESSOR.includes(m.subcategoriaId) && m.posicaoKaeser != null && (
+                          {isKaeserAbcdMaquina(m) && m.posicaoKaeser != null && (
                             <span
-                              className={`badge kaeser-tipo-badge${m.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
-                              title={`Ciclo de manutenção — próximo: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
+                              className="badge kaeser-tipo-badge"
+                              title={`Plano KAESER A/B/C/D — próxima: Tipo ${tipoKaeserNaPosicao(m.posicaoKaeser)}`}
                             >
-                              {m.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : m.marca} {tipoKaeserNaPosicao(m.posicaoKaeser)}
+                              KAESER {tipoKaeserNaPosicao(m.posicaoKaeser)}
                             </span>
                           )}
                           {m.periodicidadeManut && INTERVALOS[m.periodicidadeManut] && (

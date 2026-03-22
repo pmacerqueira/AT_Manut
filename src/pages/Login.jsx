@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { LogOut } from 'lucide-react'
 import { APP_FOOTER_TEXT } from '../config/version'
+import { STORAGE } from '../config/storageKeys'
 import { ASSETS } from '../constants/assets'
 import './Login.css'
 
@@ -15,6 +16,7 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [horarioNotice, setHorarioNotice] = useState(null)
   const navigate   = useNavigate()
   const location   = useLocation()
   const rawFrom   = location.state?.from?.pathname
@@ -22,6 +24,16 @@ export default function Login() {
   const from    = (typeof rawFrom === 'string' && rawFrom.startsWith('/') && !rawFrom.startsWith('//'))
     ? rawFrom
     : '/'
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE.LOGIN_NOTICE)
+      if (!raw) return
+      localStorage.removeItem(STORAGE.LOGIN_NOTICE)
+      const o = JSON.parse(raw)
+      if (o?.message && typeof o.message === 'string') setHorarioNotice(o.message)
+    } catch { /* */ }
+  }, [])
 
   if (hydrated && isAuthenticated) {
     return <Navigate to="/" replace />
@@ -70,6 +82,7 @@ export default function Login() {
               placeholder="••••••••"
             />
           </label>
+          {horarioNotice && <p className="form-erro" role="alert">{horarioNotice}</p>}
           {loginError && <p className="form-erro">{loginError}</p>}
           <button type="submit" className="login-submit" disabled={loading || !username || !password}>
             {loading ? 'A verificar…' : 'Entrar'}

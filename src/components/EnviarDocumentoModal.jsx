@@ -3,7 +3,7 @@ import { Mail } from 'lucide-react'
 import { escapeHtml, safeHttpUrl } from '../utils/sanitize'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
-import { EMAIL_CONFIG } from '../config/emailConfig'
+import { EMAIL_CONFIG, getSendReportUrl } from '../config/emailConfig'
 import { APP_FOOTER_TEXT } from '../config/version'
 
 const CC_NAVEL = 'comercial@navel.pt'
@@ -45,9 +45,7 @@ export default function EnviarDocumentoModal({ isOpen, onClose, documento, maqui
     setEnviando(true)
     showGlobalLoading()
     try {
-      // URL absoluta em produção (https://www.navel.pt) ou relativa em dev
-      const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-      const url = apiBase ? `${apiBase.replace(/\/$/, '')}/api/send-report.php` : '/api/send-report.php'
+      const url = getSendReportUrl()
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

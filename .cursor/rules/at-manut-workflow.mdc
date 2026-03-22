@@ -203,7 +203,7 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A suite tem **441 testes** (17 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
+A suite tem **442 testes** (17 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
 
 ```powershell
 # Pré-requisito: servidor de desenvolvimento a correr

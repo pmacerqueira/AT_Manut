@@ -9,7 +9,7 @@
  * Fallback: valores abaixo (alterar antes de publicar).
  *
  * Variáveis de ambiente: ATM_DB_HOST, ATM_DB_NAME, ATM_DB_USER, ATM_DB_PASS,
- * ATM_JWT_SECRET, ATM_REPORT_AUTH_TOKEN.
+ * ATM_JWT_SECRET, ATM_REPORT_AUTH_TOKEN, ATM_TECNICO_HORARIO_JSON, ATM_TECNICO_HORARIO_DISABLED.
  */
 
 // ── Base de dados MySQL (cPanel) ──────────────────────────────────────────────
@@ -36,3 +36,5 @@ define('CORS_ORIGINS', [
     'http://localhost:5173',
     'http://localhost:4173',
 ]);
+
+define('ATM_TECNICO_HORARIO_JSON', getenv('ATM_TECNICO_HORARIO_JSON') ?: (__DIR__ . '/tecnico_horario_restrito.json'));

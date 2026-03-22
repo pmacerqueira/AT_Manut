@@ -16,43 +16,52 @@ import {
 } from './helpers.js'
 
 // ── Dados mock com manutenção próxima (para disparar o modal de alertas) ──────
-const MC_COM_ALERTA = {
-  ...MC,
-  clientes: [
-    MC.clientes[0],  // Mecânica Bettencourt (com email)
-    {               // Empresa sem email — para testar badge e aviso no modal
-      id: 'cli2', nif: '522222222', nome: 'Empresa Sem Email Lda',
-      morada: 'Rua do Porto', codigoPostal: '9500-100',
-      localidade: 'Ponta Delgada', telefone: '296000001', email: '',
-    },
-    MC.clientes[1],
-  ],
-  maquinas: [
-    ...MC.maquinas,
-    {
-      id: 'm03', clienteNif: '522222222', subcategoriaId: 'sub1',
-      periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EV-2P',
-      numeroSerie: 'NAV-003', anoFabrico: 2022, documentos: [],
-      proximaManut: '2026-02-28', ultimaManutencaoData: '2025-02-28',
-    },
-  ],
-  manutencoes: [
-    // Reconstruir manualmente — mover mt20 para Abril para não entrar no prazo de 7 dias
-    // (mt20 original fica a 2026-03-01 = exactamente 7 dias → dentro do limite inclusivo)
-    ...MC.manutencoes.map(m => m.id === 'mt20' ? { ...m, data: '2026-04-01' } : m),
-    // Manutenção próxima para Bettencourt (m01) — 6 dias: único pending <7 dias para Bettencourt
-    {
-      id: 'mt_prox1', maquinaId: 'm01', tipo: 'periodica',
-      data: '2026-02-28', tecnico: '',
-      status: 'pendente', observacoes: 'Daqui a 6 dias',
-    },
-    // Manutenção próxima para empresa sem email (m03) — 5 dias
-    {
-      id: 'mt_prox2', maquinaId: 'm03', tipo: 'periodica',
-      data: '2026-02-27', tecnico: '',
-      status: 'pendente', observacoes: 'Daqui a 5 dias',
-    },
-  ],
+// Datas relativas a hoje: `getManutencoesPendentesAlertas` exige m.data >= hojeStr (UTC).
+// Valores fixos em 2026-02 falham quando o calendário real avança (ex.: Mar 2026).
+function addDaysIsoYmd(ymd, deltaDays) {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10)
+}
+
+function getMcComAlerta() {
+  const hojeStr = new Date().toISOString().slice(0, 10)
+  const dProxSemEmail = addDaysIsoYmd(hojeStr, 2)
+  const dProxBettencourt = addDaysIsoYmd(hojeStr, 3)
+  const dMt20Longe = addDaysIsoYmd(hojeStr, 25)
+  return {
+    ...MC,
+    clientes: [
+      MC.clientes[0],  // Mecânica Bettencourt (com email)
+      {               // Empresa sem email — para testar badge e aviso no modal
+        id: 'cli2', nif: '522222222', nome: 'Empresa Sem Email Lda',
+        morada: 'Rua do Porto', codigoPostal: '9500-100',
+        localidade: 'Ponta Delgada', telefone: '296000001', email: '',
+      },
+      MC.clientes[1],
+    ],
+    maquinas: [
+      ...MC.maquinas,
+      {
+        id: 'm04', clienteNif: '522222222', subcategoriaId: 'sub1',
+        periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EV-2P',
+        numeroSerie: 'NAV-004', anoFabrico: 2022, documentos: [],
+        proximaManut: dProxSemEmail, ultimaManutencaoData: addDaysIsoYmd(hojeStr, -365),
+      },
+    ],
+    manutencoes: [
+      ...MC.manutencoes.map(m => m.id === 'mt20' ? { ...m, data: dMt20Longe } : m),
+      {
+        id: 'mt_prox1', maquinaId: 'm01', tipo: 'periodica',
+        data: dProxBettencourt, tecnico: '',
+        status: 'pendente', observacoes: 'Dentro da janela de alerta (mock E2E)',
+      },
+      {
+        id: 'mt_prox2', maquinaId: 'm04', tipo: 'periodica',
+        data: dProxSemEmail, tecnico: '',
+        status: 'pendente', observacoes: 'Dentro da janela de alerta (mock E2E)',
+      },
+    ],
+  }
 }
 
 /**
@@ -60,8 +69,8 @@ const MC_COM_ALERTA = {
  * Usa page.evaluate APÓS login (não addInitScript) para não
  * interferir com navegações subsequentes.
  */
-async function loginAdminComAlertas(page, customData = MC_COM_ALERTA) {
-  await setupApiMock(page, { customData })
+async function loginAdminComAlertas(page, customData) {
+  await setupApiMock(page, { customData: customData ?? getMcComAlerta() })
   await doLoginAdmin(page)
   // Definir config após login (evaluate não repete em navegações)
   await page.evaluate(() => {
@@ -77,8 +86,8 @@ async function loginAdminComAlertas(page, customData = MC_COM_ALERTA) {
 /**
  * Helper: suprimir o modal de alertas para testes que não precisam dele.
  */
-async function loginAdminSemAlertas(page, customData = MC_COM_ALERTA) {
-  await setupApiMock(page, { customData })
+async function loginAdminSemAlertas(page, customData) {
+  await setupApiMock(page, { customData: customData ?? getMcComAlerta() })
   await doLoginAdmin(page)
   await page.evaluate(() => {
     const hoje = new Date().toISOString().slice(0, 10)
@@ -283,47 +292,9 @@ test.describe('Bloco B — Reagendamento de periódicas após execução', () =>
     await btnExecutar.click()
     await page.waitForTimeout(800)
 
-    // 1. Marcar checklist
-    const btnMarcar = page.locator('.btn-link-checklist').first()
-    if (await btnMarcar.isVisible()) await btnMarcar.click()
-    await page.waitForTimeout(300)
+    await fillExecucaoModal(page, { nomeAssinante: 'Pedro Teste', notas: 'Execução de teste Bloco B.' })
 
-    // 2. Seleccionar técnico
-    const sel = page.locator('.assinatura-section select').first()
-    if (await sel.isVisible()) {
-      await sel.selectOption({ index: 1 }).catch(() => {})
-    }
-
-    // 3. Nome do assinante
-    const inputNome = page.locator('input[placeholder*="Nome completo"]').first()
-    if (await inputNome.isVisible()) await inputNome.fill('Pedro Teste')
-
-    // 4. Assinar canvas via evaluate (forçar pixels + eventos React)
-    await page.evaluate(() => {
-      const canvas = document.querySelector('.assinatura-canvas')
-      if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      ctx.beginPath()
-      ctx.strokeStyle = '#000000'
-      ctx.lineWidth = 3
-      ctx.moveTo(20, 30)
-      ctx.lineTo(100, 50)
-      ctx.lineTo(160, 25)
-      ctx.stroke()
-      const fire = (type, x, y) => canvas.dispatchEvent(
-        new MouseEvent(type, { bubbles: true, cancelable: true,
-          clientX: canvas.getBoundingClientRect().left + x,
-          clientY: canvas.getBoundingClientRect().top  + y })
-      )
-      fire('mousedown', 20, 30)
-      fire('mousemove', 100, 50)
-      fire('mousemove', 160, 25)
-      fire('mouseup',   160, 25)
-    })
-    await page.waitForTimeout(500)
-
-    // 5. Submeter o formulário
-    const btnGravar = page.locator('button[type="submit"]').first()
+    const btnGravar = page.locator('.btn-gravar-sucesso').first()
     await btnGravar.waitFor({ state: 'visible', timeout: 8000 })
     await btnGravar.click()
 
@@ -494,7 +465,7 @@ test.describe('Bloco C — Modal de alertas proactivos', () => {
   })
 
   test('C11 — Modal NÃO aparece para ATecnica', async ({ page }) => {
-    await setupApiMock(page, { customData: MC_COM_ALERTA })
+    await setupApiMock(page, { customData: getMcComAlerta() })
     await doLoginTecnico(page)
     await page.evaluate(() => {
       localStorage.removeItem('atm_alertas_dismiss')
@@ -507,7 +478,7 @@ test.describe('Bloco C — Modal de alertas proactivos', () => {
   })
 
   test('C12 — Modal NÃO aparece se já dispensado hoje', async ({ page }) => {
-    await setupApiMock(page, { customData: MC_COM_ALERTA })
+    await setupApiMock(page, { customData: getMcComAlerta() })
     await doLoginAdmin(page)
     await page.evaluate(() => {
       const hoje = new Date().toISOString().slice(0, 10)
@@ -549,14 +520,14 @@ test.describe('Bloco C — Modal de alertas proactivos', () => {
   })
 
   test('C16 — Clicar "Enviar lembrete" → botão muda para "Lembrete já enviado"', async ({ page }) => {
-    // Interceptar o PHP de email
-    await page.route('**/api/send-email.php', async (route) => {
+    await loginAdminComAlertas(page)
+    // Depois de setupApiMock/stubEmailPhpEndpoints: última rota registada tem prioridade (LIFO).
+    await page.route('**/send-email.php**', async (route) => {
       await route.fulfill({
         status: 200, contentType: 'application/json',
         body: JSON.stringify({ ok: true, message: 'Lembrete enviado com sucesso.' }),
       })
     })
-    await loginAdminComAlertas(page)
 
     const grupo = page.locator('.alerta-grupo').filter({ hasText: /Bettencourt/i })
     await grupo.locator('.alerta-btn-email').click()
@@ -568,13 +539,13 @@ test.describe('Bloco C — Modal de alertas proactivos', () => {
   })
 
   test('C17 — Erro no envio mostra feedback de erro visível', async ({ page }) => {
-    await page.route('**/api/send-email.php', async (route) => {
+    await loginAdminComAlertas(page)
+    await page.route('**/send-email.php**', async (route) => {
       await route.fulfill({
         status: 500, contentType: 'application/json',
         body: JSON.stringify({ ok: false, message: 'Falha no servidor de email.' }),
       })
     })
-    await loginAdminComAlertas(page)
 
     const grupo = page.locator('.alerta-grupo').filter({ hasText: /Bettencourt/i })
     await grupo.locator('.alerta-btn-email').click()
@@ -641,7 +612,7 @@ test.describe('Integração — Fluxos combinados A+B+C', () => {
   })
 
   test('I2 — Definir 14 dias de aviso → config persiste', async ({ page }) => {
-    await loginAdminSemAlertas(page, MC_COM_ALERTA)
+    await loginAdminSemAlertas(page, getMcComAlerta())
 
     // Ir a Definições e alterar para 14 dias
     await page.goto('/manut/definicoes')

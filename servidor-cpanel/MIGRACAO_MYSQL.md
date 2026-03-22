@@ -128,6 +128,27 @@ CREATE TABLE IF NOT EXISTS pecas_plano (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
+### 7.3b1 Tabela `maquinas` — coluna `plano_manutencao_compressor` (v1.17+)
+
+Admin escolhe explicitamente o plano por fases na ficha do equipamento (compressor de parafuso ± secador). Por agora só existe o valor `kaeser_abcd`; outras marcas (Fini, LaPadana, …) serão adicionadas quando os planos estiverem definidos.
+
+```sql
+ALTER TABLE maquinas
+  ADD COLUMN plano_manutencao_compressor VARCHAR(32) NULL
+    COMMENT 'Plano por fases: kaeser_abcd, … (NULL ou vazio = sem plano A/B/C/D)';
+```
+
+Opcional — alinhar dados antigos (KAESER parafuso já com posição no ciclo):
+
+```sql
+UPDATE maquinas
+SET plano_manutencao_compressor = 'kaeser_abcd'
+WHERE subcategoria_id IN ('sub5','sub14')
+  AND LOWER(TRIM(marca)) = 'kaeser'
+  AND posicao_kaeser IS NOT NULL
+  AND (plano_manutencao_compressor IS NULL OR plano_manutencao_compressor = '');
+```
+
 ### 7.3b Tabela `maquinas` — coluna `posicao_kaeser` (v1.8.1)
 
 ```sql

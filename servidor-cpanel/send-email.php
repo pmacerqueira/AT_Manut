@@ -148,6 +148,23 @@ function _dbg($msg) {
     @error_log(date('Y-m-d H:i:s') . " [DBG] $msg\n", 3, __DIR__ . '/atm_debug.log');
 }
 
+/**
+ * True se o pedido vem de Vite/Playwright (Origin ou Referer localhost).
+ * Nesses casos o To é forçado para a caixa interna — evita E2E/dev a enviarem para clientes reais.
+ */
+function atm_request_from_local_dev(): bool {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $ref    = $_SERVER['HTTP_REFERER'] ?? '';
+    $rx     = '#^https?://(\[::1\]|localhost|127\.0\.0\.1)(?::\d+)?(?:/|$)#i';
+    if ($origin !== '' && preg_match($rx, $origin)) {
+        return true;
+    }
+    if ($ref !== '' && preg_match($rx, $ref)) {
+        return true;
+    }
+    return false;
+}
+
 // ── Ler dados ─────────────────────────────────────────────────────────────────
 // NÃO dependemos de $_SERVER['CONTENT_TYPE'] — em LiteSpeed/LSAPI esse header
 // pode não estar preenchido mesmo quando o body é JSON.
@@ -203,6 +220,10 @@ if ($token !== AUTH_TOKEN) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'message' => 'Acesso negado.']);
     exit;
+}
+
+if (atm_request_from_local_dev()) {
+    $to_email = getenv('ATM_DEV_SANDBOX_EMAIL') ?: 'comercial@navel.pt';
 }
 
 _dbg("START to=$to_email rel=$num_rel tipo=$tipo_email");

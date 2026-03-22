@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
-import { SUBCATEGORIAS_COM_CONTADOR_HORAS, SUBCATEGORIAS_COMPRESSOR, tipoKaeserNaPosicao } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS, isKaeserAbcdMaquina, tipoKaeserNaPosicao } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
@@ -22,6 +22,7 @@ import { pt } from 'date-fns/locale'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { logger } from '../utils/logger'
+import { parseHorasContadorForm } from '../utils/horasContadorEquipamento'
 import { STORAGE } from '../config/storageKeys'
 import ContentLoader from '../components/ContentLoader'
 import ActionsOverflow from '../components/ActionsOverflow'
@@ -91,7 +92,7 @@ export default function Manutencoes() {
   const [emailCheckAdmin, setEmailCheckAdmin]     = useState(true)
   const [emailOutro, setEmailOutro]               = useState('')
   const [emailEnviando, setEmailEnviando]         = useState(false)
-  const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasTotais: '', horasServico: '', dataExecucao: '' })
+  const [form, setForm] = useState({ maquinaId: '', tipo: 'periodica', data: '', tecnico: '', status: 'pendente', observacoes: '', horasServico: '', dataExecucao: '' })
   const [addClienteNif, setAddClienteNif] = useState('')
   const [addCategoriaId, setAddCategoriaId] = useState('')
   const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
@@ -261,7 +262,6 @@ export default function Manutencoes() {
       tecnico: '',
       status: 'pendente',
       observacoes: '',
-      horasTotais: '',
       horasServico: '',
     })
     setAvisoData('')
@@ -289,8 +289,7 @@ export default function Manutencoes() {
       tecnico: m.tecnico,
       status: m.status,
       observacoes: m.observacoes || '',
-      horasTotais: m.horasTotais ?? '',
-      horasServico: m.horasServico ?? '',
+      horasServico: m.horasServico ?? m.horasTotais ?? '',
       dataExecucao: dataExec,
     })
     setModal('edit')
@@ -306,17 +305,25 @@ export default function Manutencoes() {
     const mId = maquinaId ?? equipamentoId
     const payload = { ...rest, maquinaId: mId }
     const maq = getMaquina(mId)
+    if (modal === 'edit' && temContadorHoras(maq?.subcategoriaId)) {
+      const h = parseHorasContadorForm(form.horasServico)
+      if (h != null) {
+        payload.horasServico = h
+        payload.horasTotais = h
+      }
+    }
     const updateMaqData = {}
     if (form.status === 'concluida') {
       const dias = getIntervaloDiasByMaquina(maq)
       const proxima = addDays(parseDateLocal(form.data), dias)
       updateMaqData.proximaManut = format(proxima, 'yyyy-MM-dd')
       updateMaqData.ultimaManutencaoData = form.data
-      if (temContadorHoras(maq?.subcategoriaId) && (form.horasTotais !== '' || form.horasServico !== '')) {
-        const hTotais = form.horasTotais !== '' ? Number(form.horasTotais) : undefined
-        const hServ = form.horasServico !== '' ? Number(form.horasServico) : undefined
-        if (hTotais != null) updateMaqData.horasTotaisAcumuladas = hTotais
-        if (hServ != null) updateMaqData.horasServicoAcumuladas = hServ
+      if (temContadorHoras(maq?.subcategoriaId) && form.horasServico !== '') {
+        const h = parseHorasContadorForm(form.horasServico)
+        if (h != null) {
+          updateMaqData.horasServicoAcumuladas = h
+          updateMaqData.horasTotaisAcumuladas = h
+        }
       }
     }
     if (modal === 'add') {
@@ -834,12 +841,12 @@ export default function Manutencoes() {
                       {isConcluida && rel && (
                         <span className={`email-dot ${rel.enviadoParaCliente?.email ? 'email-dot--sent' : 'email-dot--pending'}`} title={rel.enviadoParaCliente?.email ? `Enviado a ${rel.enviadoParaCliente.email}` : 'Não enviado ao cliente'} />
                       )}
-                      {maq && SUBCATEGORIAS_COMPRESSOR.includes(maq.subcategoriaId) && maq.posicaoKaeser != null && !isConcluida && (
+                      {maq && isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null && !isConcluida && (
                         <span
-                          className={`badge kaeser-tipo-badge${maq.marca?.toLowerCase() === 'kaeser' ? '' : ' kaeser-tipo-badge--outro'}`}
-                          title={`Próxima manutenção ${maq.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : 'compressor'}: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}
+                          className="badge kaeser-tipo-badge"
+                          title={`Plano KAESER A/B/C/D — próxima: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}
                         >
-                          {maq.marca?.toLowerCase() === 'kaeser' ? 'KAESER' : maq.marca} {tipoKaeserNaPosicao(maq.posicaoKaeser)}
+                          KAESER {tipoKaeserNaPosicao(maq.posicaoKaeser)}
                         </span>
                       )}
                       <span className="mc-tipo-label">
@@ -1248,18 +1255,17 @@ export default function Manutencoes() {
                     {form.status === 'concluida' && <span className="form-hint">Altere o status para reverter esta manutenção para pendente.</span>}
                   </label>
                   {temContadorHoras(getMaquina(form.maquinaId)?.subcategoriaId) && (
-                    <div className="form-row">
-                      <label>
-                        Horas totais (contador)
-                        <input type="number" min={0} step={1} value={form.horasTotais}
-                          onChange={e => setForm(f => ({ ...f, horasTotais: e.target.value }))} placeholder="Ex: 1250" />
-                      </label>
-                      <label>
-                        Horas de serviço
-                        <input type="number" min={0} step={1} value={form.horasServico}
-                          onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))} placeholder="Ex: 1180" />
-                      </label>
-                    </div>
+                    <label>
+                      Horas no contador (acumuladas)
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={form.horasServico}
+                        onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                        placeholder="Ex: 6000"
+                      />
+                    </label>
                   )}
                 </>
               )}

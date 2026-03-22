@@ -13,7 +13,7 @@
  */
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
-import { normEntityId, dateKeyForFilter } from './frotaReportHelpers'
+import { normEntityId, dateKeyForFilter, resolveProximaManutParaFrota } from './frotaReportHelpers'
 
 const AZUL = [30, 58, 95]
 const AZUL_CLARO = [235, 242, 252]
@@ -112,22 +112,18 @@ export async function gerarRelatorioFrotaPdf(
     const repsM = repsByMaq.get(mid) || []
     const concluidas = manutsM.filter(mt => mt.status === 'concluida')
     const ultima = concluidas.sort((a, b) => b.data.localeCompare(a.data))[0]
-    const proxima = manutsM
-      .filter(mt => mt.status === 'agendada' || mt.status === 'pendente')
-      .sort((a, b) => a.data.localeCompare(b.data))[0]
-    const proxDataKey = proxima?.data != null
-      ? String(proxima.data).slice(0, 10)
-      : (m.proximaManut ? String(m.proximaManut).slice(0, 10) : '')
+    const resolved = resolveProximaManutParaFrota(m, manutsM, ultima)
+    const proxima = resolved.registo
+    const proxDataKey = resolved.dataKey || ''
     const emAtraso = !!(proxDataKey && proxDataKey < hoje)
     const totalManuts = concluidas.length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
     const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
-    const proximaParaDias = proxima?.data ?? m.proximaManut
     let diasAtraso = null
-    if (proximaParaDias) {
-      diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proximaParaDias)) / 86400000)
+    if (proxDataKey) {
+      diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proxDataKey)) / 86400000)
     }
 
     let estado
@@ -457,8 +453,7 @@ export async function gerarRelatorioFrotaPdf(
     else { estadoLabel = 'Por instalar'; estadoColor = LARANJA }
 
     const ultimaStr = ultima ? fmtD(ultima.data) : '\u2014'
-    const proximaRaw = proxima?.data ?? m.proximaManut
-    const proximaStr = proximaRaw ? fmtD(proximaRaw) : '\u2014'
+    const proximaStr = proxDataKey ? fmtD(proxDataKey) : '\u2014'
     const proximaColor = proxDataKey && proxDataKey < hoje ? VERMELHO : VERDE
 
     const yMid = y - 3.5 + rowH / 2 + 1.2
@@ -539,10 +534,10 @@ export async function gerarRelatorioFrotaPdf(
 
     linhas.filter(l => l.estado === 'atraso')
       .sort((a, b) => (b.diasAtraso ?? 0) - (a.diasAtraso ?? 0))
-      .forEach(({ m, sub, proxima, diasAtraso }, i) => {
+      .forEach(({ m, sub, proxima, diasAtraso, proxDataKey }, i) => {
         if (y > 272) { pdf.addPage(); y = 18 }
         if (i % 2 === 0) { pdf.setFillColor(254, 242, 242); pdf.rect(M, y - 3.5, CW, 7, 'F') }
-        const dataAtraso = proxima?.data ?? m.proximaManut
+        const dataAtraso = proxDataKey || proxima?.data || m.proximaManut
         let cx = M
         pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...TEXTO)
         pdf.text(truncate(`${m.marca} ${m.modelo}${sub ? ` (${sub.nome})` : ''}`, 42), cx + 1, y); cx += 52

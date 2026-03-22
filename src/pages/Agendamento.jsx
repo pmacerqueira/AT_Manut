@@ -6,7 +6,7 @@
  */
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useData } from '../context/DataContext'
+import { useData, isKaeserAbcdMaquina, isKaeserMarca } from '../context/DataContext'
 import { INTERVALOS } from '../context/DataContext'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
@@ -377,6 +377,21 @@ export default function Agendamento() {
               })}
             </select>
           </label>
+        )}
+
+        {tipo === 'periodica' && maquinaSelecionada && isKaeserAbcdMaquina(maquinaSelecionada) && isKaeserMarca(maquinaSelecionada.marca) && (
+          <div className="agendamento-kaeser-panel card" style={{ padding: '1rem', marginTop: '0.5rem', background: 'var(--color-bg-elevated, #f4f6f9)' }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem' }}>Compressor KAESER — confirmação do equipamento</h3>
+            <p style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>
+              <strong>{maquinaSelecionada.marca}</strong> {maquinaSelecionada.modelo}
+              {maquinaSelecionada.numeroSerie ? <> — <strong>Nº série:</strong> {maquinaSelecionada.numeroSerie}</> : null}
+            </p>
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45 }}>
+              Plano <strong>A/B/C/D</strong>: ao agendar <strong>não</strong> é necessário saber a fase da intervenção nem as horas de serviço
+              (muitas vezes só serão lidas no local). Após escolher a data abaixo e confirmar, a manutenção fica registada.
+              Na <strong>execução</strong>, o técnico regista primeiro as horas de serviço, confirma o tipo A/B/C/D e preenche os consumíveis dessa fase.
+            </p>
+          </div>
         )}
 
         <label>

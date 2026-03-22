@@ -177,7 +177,7 @@ git push origin master
 git push origin v{versão}
 
 # 7. Upload dist_upload.zip para cPanel → public_html/manut/
-# 8. Upload servidor-cpanel/send-email.php para cPanel → public_html/api/
+# 8. Upload PHP em public_html/api/ quando necessário: data.php (CRUD, machine_pdf), send-email.php, etc.
 ```
 
 ---
