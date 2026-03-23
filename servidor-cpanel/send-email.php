@@ -491,6 +491,34 @@ function detect_image_format($bin) {
     return null;
 }
 
+/**
+ * data:image/...;base64,... para <img src> no HTML do email (logo Navel / marca).
+ * Vários clientes ignoram float no cabeçalho; tabela + texto + imagem inline garantem identidade.
+ */
+function atm_email_img_data_uri_from_b64($raw_b64) {
+    $clean = preg_replace('/\s+/', '', (string)$raw_b64);
+    if ($clean === '') {
+        return '';
+    }
+    $bin = @base64_decode($clean, true);
+    if ($bin === false || strlen($bin) < 12) {
+        return '';
+    }
+    $fmt = detect_image_format($bin);
+    if ($fmt && ($fmt['type'] ?? '') === 'JPEG') {
+        $mime = 'image/jpeg';
+    } elseif ($fmt && ($fmt['type'] ?? '') === 'PNG') {
+        $mime = 'image/png';
+    } elseif (strncmp($bin, 'GIF87a', 6) === 0 || strncmp($bin, 'GIF89a', 6) === 0) {
+        $mime = 'image/gif';
+    } elseif (strncmp($bin, 'RIFF', 4) === 0 && strlen($bin) > 12 && substr($bin, 8, 4) === 'WEBP') {
+        $mime = 'image/webp';
+    } else {
+        $mime = 'image/png';
+    }
+    return 'data:' . $mime . ';base64,' . $clean;
+}
+
 // -- Helper: converte imagem binária para JPEG fundo branco (seguro para FPDF) --
 // FPDF não suporta PNG com canal alfa — esta função converte qualquer imagem para JPEG.
 function to_safe_jpeg($bin) {
@@ -1120,14 +1148,30 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
 // -- HTML do email -----------------------------------------------------------
 $esc   = 'htmlspecialchars';
 $tipo_h = $esc($tipo);
+$email_hdr_logo_src = atm_email_img_data_uri_from_b64($navel_logo_b64);
+$email_hdr_logo_html = '';
+if ($email_hdr_logo_src !== '') {
+    $email_hdr_logo_html = '<img src="' . htmlspecialchars($email_hdr_logo_src, ENT_QUOTES, 'UTF-8') . '" alt="NAVEL &ndash; A&Ccedil;ORES" width="128" style="display:block;margin:0 0 12px 0;border:0;max-width:140px;height:auto;">';
+}
 $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0;background:#f3f4f6;">
 <tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
   <tr><td style="background:linear-gradient(135deg,#1e3a5f,#0d6efd);padding:18px 24px;">
-    <span style="color:#fff;font-size:20px;font-weight:800;">NAVEL &ndash; A&Ccedil;ORES</span>
-    <span style="float:right;color:rgba(255,255,255,.7);font-size:11px;line-height:1.8;">Pico d&#39;Agua Park<br>www.navel.pt</span>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      <tr>
+        <td align="left" valign="top" style="vertical-align:top;padding:0;">
+          ' . $email_hdr_logo_html . '
+          <div style="color:#ffffff;font-size:20px;font-weight:800;line-height:1.2;letter-spacing:0.02em;">NAVEL &ndash; A&Ccedil;ORES</div>
+          <div style="color:rgba(255,255,255,0.9);font-size:11px;font-weight:600;margin-top:8px;line-height:1.35;">Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL &ndash; A&Ccedil;ORES), Lda.</div>
+        </td>
+        <td align="right" valign="top" style="vertical-align:top;padding:0 0 0 16px;color:rgba(255,255,255,0.82);font-size:11px;line-height:1.65;white-space:nowrap;">
+          Pico d&#39;Agua Park<br>
+          <a href="https://www.navel.pt" style="color:#ffffff;text-decoration:underline;">www.navel.pt</a>
+        </td>
+      </tr>
+    </table>
   </td></tr>
   <tr><td style="padding:20px 24px 8px;border-bottom:3px solid #0d6efd;">
     <div style="font-size:17px;font-weight:700;color:#1e3a5f;">Relat&oacute;rio de ' . $tipo_h . '</div>

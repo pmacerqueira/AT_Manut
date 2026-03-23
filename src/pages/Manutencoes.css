@@ -270,6 +270,76 @@ body.modo-campo .email-dot--pending {
 .mc-pendente  .mc-strip { background: #f59e0b; }
 .mc-emAtraso  .mc-strip { background: var(--color-danger); }
 
+/* ── Categoria (lista manutenções) — paleta alinhada a relatorioBaseStyles PALETA ──
+   Azul Navel #1a4880 / médio #2d6eb5 · Laranja doc #92400e · Verde #15803d · ISTOBAL #c8102e */
+.manutencoes-table .data-table tbody tr.manut-cat-elevadores {
+  box-shadow: inset 5px 0 0 #2d6eb5;
+  background: rgba(45, 110, 181, 0.14);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-elevadores:hover {
+  background: rgba(45, 110, 181, 0.22);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-compressores {
+  box-shadow: inset 5px 0 0 #c2410c;
+  background: rgba(194, 65, 12, 0.12);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-compressores:hover {
+  background: rgba(194, 65, 12, 0.18);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-geradores {
+  box-shadow: inset 5px 0 0 #15803d;
+  background: rgba(21, 128, 61, 0.12);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-geradores:hover {
+  background: rgba(21, 128, 61, 0.18);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-pneus {
+  box-shadow: inset 5px 0 0 #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-pneus:hover {
+  background: rgba(124, 58, 237, 0.18);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-lavagem {
+  box-shadow: inset 5px 0 0 #c8102e;
+  background: rgba(200, 16, 46, 0.12);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-lavagem:hover {
+  background: rgba(200, 16, 46, 0.18);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-outros {
+  box-shadow: inset 5px 0 0 #64748b;
+  background: rgba(100, 116, 139, 0.1);
+}
+.manutencoes-table .data-table tbody tr.manut-cat-outros:hover {
+  background: rgba(100, 116, 139, 0.16);
+}
+
+.mc.manut-cat-elevadores {
+  background: rgba(45, 110, 181, 0.1);
+  border-color: rgba(45, 110, 181, 0.45);
+}
+.mc.manut-cat-compressores {
+  background: rgba(194, 65, 12, 0.1);
+  border-color: rgba(146, 64, 14, 0.5);
+}
+.mc.manut-cat-geradores {
+  background: rgba(21, 128, 61, 0.1);
+  border-color: rgba(21, 128, 61, 0.45);
+}
+.mc.manut-cat-pneus {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.45);
+}
+.mc.manut-cat-lavagem {
+  background: rgba(200, 16, 46, 0.09);
+  border-color: rgba(200, 16, 46, 0.45);
+}
+.mc.manut-cat-outros {
+  background: rgba(100, 116, 139, 0.09);
+  border-color: rgba(100, 116, 139, 0.38);
+}
+
 .mc-body {
   flex: 1;
   min-width: 0;
@@ -1118,6 +1188,55 @@ body.modo-campo .manutencoes-table .data-table tbody tr:nth-child(even) {
 body.modo-campo .manutencoes-table .data-table tbody tr:hover {
   background: #e0e7f1;
 }
+/* Modo campo: cores por categoria (anula zebra nas linhas com classe manut-cat-*) */
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-elevadores,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-elevadores:nth-child(even) {
+  background: #e8f1fa !important;
+  box-shadow: inset 5px 0 0 #1a4880;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-elevadores:hover {
+  background: #dbeafe !important;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-compressores,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-compressores:nth-child(even) {
+  background: #fff7ed !important;
+  box-shadow: inset 5px 0 0 #92400e;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-compressores:hover {
+  background: #ffedd5 !important;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-geradores,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-geradores:nth-child(even) {
+  background: #ecfdf5 !important;
+  box-shadow: inset 5px 0 0 #15803d;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-geradores:hover {
+  background: #d1fae5 !important;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-pneus,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-pneus:nth-child(even) {
+  background: #f5f3ff !important;
+  box-shadow: inset 5px 0 0 #5b21b6;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-pneus:hover {
+  background: #ede9fe !important;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-lavagem,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-lavagem:nth-child(even) {
+  background: #fff1f2 !important;
+  box-shadow: inset 5px 0 0 #c8102e;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-lavagem:hover {
+  background: #ffe4e6 !important;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-outros,
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-outros:nth-child(even) {
+  background: #f8fafc !important;
+  box-shadow: inset 5px 0 0 #475569;
+}
+body.modo-campo .manutencoes-table .data-table tbody tr.manut-cat-outros:hover {
+  background: #f1f5f9 !important;
+}
 body.modo-campo .dt-compact .icon-btn,
 body.modo-campo .dt-compact .icon-btn.readonly {
   min-width: 2rem !important;
@@ -1153,6 +1272,30 @@ body.modo-campo .mc {
   background: #ffffff;
   border: 2px solid #94a3b8;
   border-radius: 10px;
+}
+body.modo-campo .mc.manut-cat-elevadores {
+  background: #e8f1fa;
+  border-color: #1a4880;
+}
+body.modo-campo .mc.manut-cat-compressores {
+  background: #fff7ed;
+  border-color: #92400e;
+}
+body.modo-campo .mc.manut-cat-geradores {
+  background: #ecfdf5;
+  border-color: #15803d;
+}
+body.modo-campo .mc.manut-cat-pneus {
+  background: #f5f3ff;
+  border-color: #5b21b6;
+}
+body.modo-campo .mc.manut-cat-lavagem {
+  background: #fff1f2;
+  border-color: #c8102e;
+}
+body.modo-campo .mc.manut-cat-outros {
+  background: #f8fafc;
+  border-color: #475569;
 }
 body.modo-campo .mc-body {
   padding: 0.65rem 0.85rem 0;

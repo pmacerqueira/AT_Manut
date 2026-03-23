@@ -28,6 +28,7 @@ import { STORAGE } from '../config/storageKeys'
 import ContentLoader from '../components/ContentLoader'
 import ActionsOverflow from '../components/ActionsOverflow'
 import { useDeferredReady } from '../hooks/useDeferredReady'
+import { manutencoesCategoriaClass } from '../utils/categoriaVisual'
 import './Manutencoes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', em_progresso: 'Em progresso', emAtraso: 'Em atraso', proxima: 'Próxima' }
@@ -816,6 +817,8 @@ export default function Manutencoes() {
           listaParaMostrar.map(m => {
               const maq         = getMaquina(m.maquinaId)
               const sub         = maq ? getSubcategoria(maq.subcategoriaId) : null
+              const catEquip    = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
+              const catClass    = manutencoesCategoriaClass(catEquip?.nome)
               const rel         = getRelatorioByManutencao(m.id)
               const dataExec    = rel?.dataAssinatura || rel?.dataCriacao
               const isConcluida = m.status === 'concluida'
@@ -827,7 +830,7 @@ export default function Manutencoes() {
               const equipSub    = sub?.nome || ''
 
               return (
-                <div key={m.id} className={`mc mc-${st}${bulkMode && selectedIds.has(m.id) ? ' mc-selected' : ''}`}>
+                <div key={m.id} className={`mc mc-${st} ${catClass}${bulkMode && selectedIds.has(m.id) ? ' mc-selected' : ''}`}>
                   {/* Faixa de status lateral */}
                   <div className="mc-strip" />
 
@@ -1036,13 +1039,15 @@ export default function Manutencoes() {
               {listaParaMostrar.map(m => {
                   const maq = getMaquina(m.maquinaId)
                   const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+                  const catEquip = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
+                  const catClass = manutencoesCategoriaClass(catEquip?.nome)
                   const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() || 'N/A' : 'N/A'
                   const rel = getRelatorioByManutencao(m.id)
                   const dataExecucao = rel?.dataAssinatura || rel?.dataCriacao
                   const isConcluida = m.status === 'concluida'
                   const dias = isConcluida ? null : calcDiasAtraso(m.data)
                   return (
-                    <tr key={m.id} className={bulkMode && selectedIds.has(m.id) ? 'bulk-row-selected' : ''}>
+                    <tr key={m.id} className={[catClass, bulkMode && selectedIds.has(m.id) ? 'bulk-row-selected' : ''].filter(Boolean).join(' ')}>
                       {bulkMode && (
                         <td className="col-bulk-check">
                           {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') ? (

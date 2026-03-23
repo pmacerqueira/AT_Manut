@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.16.38] — 2026-03-22 — Lista manutenções: cores alinhadas à declaração + build
+
+### Alteração
+- **`src/utils/categoriaVisual.js`:** tom visual derivado de `declaracaoLegislacaoVariantFromCategoriaNome` (elevadores / compressores) e subtons em «outros» (geradores, pneus, lavagem).
+- **`Manutencoes.css`:** paleta alinhada a `relatorioBaseStyles` / PALETA (azul Navel `#1a4880`, médio `#2d6eb5`, laranja doc `#92400e`, verde `#15803d`, ISTOBAL `#c8102e`).
+
+### Deploy
+- Front: `dist_upload.zip` · Servidor: `send-email.php` (cabeçalho email HTML) — upload separado pelo operador.
+
+---
+
 ## [1.16.37] — 2026-03-22 — Declaração do cliente: variantes + override por categoria
 
 ### Contexto
