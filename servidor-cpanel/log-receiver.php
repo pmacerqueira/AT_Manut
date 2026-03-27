@@ -39,10 +39,21 @@ $_a = ['https://www.navel.pt', 'https://navel.pt', 'http://localhost:5173', 'htt
 header('Access-Control-Allow-Origin: ' . (in_array($_o, $_a, true) ? $_o : 'https://www.navel.pt'));
 header('Vary: Origin');
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
+// GET/HEAD: sondagens do browser/extensões — evita 405 na consola; logs reais vão sempre em POST
+if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+    http_response_code(204);
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: text/plain; charset=utf-8');
+    http_response_code(200);
+    echo "log-receiver: use POST\n";
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['ok' => false, 'message' => 'Metodo nao permitido.']);

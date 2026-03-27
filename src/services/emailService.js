@@ -14,7 +14,7 @@ import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
 import { computarProximasDatas } from '../utils/diasUteis'
 import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
-import { EMAIL_CONFIG, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
+import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { logger } from '../utils/logger'
@@ -207,7 +207,7 @@ export async function enviarRelatorioEmail({
 
       const bodyStr = JSON.stringify(payload)
 
-      const response = await fetch(EMAIL_CONFIG.ENDPOINT_URL, {
+      const response = await fetch(getSendEmailUrl(), {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    bodyStr,
@@ -392,7 +392,7 @@ export async function enviarLembreteEmail({ emailDestinatario, clienteNome, aler
         logo_url:       logoUrl,
       }
 
-      const response = await fetch(EMAIL_CONFIG.ENDPOINT_URL, {
+      const response = await fetch(getSendEmailUrl(), {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),

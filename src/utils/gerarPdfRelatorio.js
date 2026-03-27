@@ -69,6 +69,17 @@ export function addImageFitInBoxMm(pdf, dataUrl, innerX, innerY, maxW, maxH) {
   }
 }
 
+/** http(s) noutro origin — fetch directo viola CSP `connect-src` no navel.pt (ex.: logo KAESER em pt.kaeser.com). */
+function isCrossOriginHttpImageSrc(src) {
+  if (!/^https?:\/\//i.test(src)) return false
+  if (typeof window === 'undefined' || !window.location?.origin) return true
+  try {
+    return new URL(src, window.location.href).origin !== window.location.origin
+  } catch {
+    return true
+  }
+}
+
 export async function loadImageAsDataUrl(src) {
   if (!src) return null
   if (src.startsWith('data:')) return src
@@ -80,28 +91,44 @@ export async function loadImageAsDataUrl(src) {
     reader.readAsDataURL(blob)
   })
 
-  // 1) Tentar fetch directo
+  const buildProxyUrl = (raw) => {
+    const base = (import.meta.env.BASE_URL || '/manut/').replace(/\/?$/, '/')
+    return `${base}../api/image-proxy.php?url=${encodeURIComponent(raw)}`
+  }
+
+  const tryImageProxy = async () => {
+    try {
+      const resp = await fetch(buildProxyUrl(src))
+      if (resp.ok) {
+        const blob = await resp.blob()
+        if (blob.size > 100) return await blobToDataUrl(blob)
+      }
+    } catch (_) { /* proxy indisponível */ }
+    return null
+  }
+
+  // 1) URLs externas: proxy no cPanel primeiro (evita CSP e CORS no browser)
+  if (isCrossOriginHttpImageSrc(src)) {
+    const proxied = await tryImageProxy()
+    if (proxied) return proxied
+  }
+
+  // 2) Fetch directo (mesmo origin ou recurso com CORS aberto)
   try {
     const resp = await fetch(src, { mode: 'cors' })
     if (resp.ok) {
       const blob = await resp.blob()
       if (blob.size > 100) return await blobToDataUrl(blob)
     }
-  } catch (_) { /* CORS bloqueado */ }
+  } catch (_) { /* CORS / rede / CSP */ }
 
-  // 2) Se é URL externo, tentar via proxy no servidor Navel
-  if (/^https?:\/\//i.test(src) && !src.includes(location.host)) {
-    try {
-      const proxyUrl = `${import.meta.env.BASE_URL}../api/image-proxy.php?url=${encodeURIComponent(src)}`
-      const resp = await fetch(proxyUrl)
-      if (resp.ok) {
-        const blob = await resp.blob()
-        if (blob.size > 100) return await blobToDataUrl(blob)
-      }
-    } catch (_) { /* proxy indisponível */ }
+  // 3) Proxy como segundo recurso (legado: hostname em string)
+  if (/^https?:\/\//i.test(src) && typeof location !== 'undefined' && !src.includes(location.host)) {
+    const proxied = await tryImageProxy()
+    if (proxied) return proxied
   }
 
-  // 3) Fallback via Image + canvas (same-origin)
+  // 4) Fallback via Image + canvas (same-origin)
   return new Promise((resolve) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -320,6 +347,9 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     const tipoEf = relatorio?.tipoManutKaeser ?? ''
     const infoTipo = tipoEf && INTERVALOS_KAESER[tipoEf] ? INTERVALOS_KAESER[tipoEf].label : ''
     const linhasPlano = []
+    if (horasPdf != null) {
+      linhasPlano.push(`Horas no contador (acumuladas): ${horasPdf} h`)
+    }
     if (tipoEf) linhasPlano.push(`Tipo efectivo nesta interven\u00e7\u00e3o: ${tipoEf}${infoTipo ? ` (${infoTipo})` : ''}`)
     else linhasPlano.push('Tipo efectivo nesta interven\u00e7\u00e3o: \u2014 (n\u00e3o indicado no relat\u00f3rio)')
     const pos = maquina?.posicaoKaeser

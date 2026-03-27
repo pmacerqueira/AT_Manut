@@ -12,6 +12,7 @@ import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
+import { normEntityId } from '../utils/frotaReportHelpers'
 
 const DataContext = createContext(null)
 
@@ -1560,8 +1561,9 @@ export function DataProvider({ children }) {
       return prev.filter(m => !idsRemover.has(m.id))
     })
     scheduleSyncProximaParaMaquinas(syncIds)
-    const relAlvo = relatorios.find(r => r.manutencaoId === id)
-    setRelatorios(prev => prev.filter(r => r.manutencaoId !== id))
+    const idN = normEntityId(id)
+    const relAlvo = relatorios.find(r => normEntityId(r.manutencaoId) === idN)
+    setRelatorios(prev => prev.filter(r => normEntityId(r.manutencaoId) !== idN))
     logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id, relatorioId: relAlvo?.id })
     import('../services/apiService').then(({ apiManutencoes, apiRelatorios }) => {
       if (relAlvo?.id) {
@@ -1716,7 +1718,8 @@ export function DataProvider({ children }) {
   }, [persist, scheduleSyncProximaParaMaquinas])
 
   const getRelatorioByManutencao = useCallback((manutencaoId) => {
-    return relatorios.find(r => r.manutencaoId === manutencaoId)
+    const nid = normEntityId(manutencaoId)
+    return relatorios.find(r => normEntityId(r.manutencaoId) === nid)
   }, [relatorios])
 
   // ── Reparações ────────────────────────────────────────────────────────────
@@ -1793,7 +1796,8 @@ export function DataProvider({ children }) {
   }, [persist])
 
   const getRelatorioByReparacao = useCallback((reparacaoId) => {
-    return relatoriosReparacao.find(r => r.reparacaoId === reparacaoId)
+    const rid = normEntityId(reparacaoId)
+    return relatoriosReparacao.find(r => normEntityId(r.reparacaoId) === rid)
   }, [relatoriosReparacao])
 
   /**

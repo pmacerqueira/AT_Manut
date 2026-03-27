@@ -1,8 +1,7 @@
 /**
  * apiService.js — Cliente HTTP para a API REST AT_Manut
  *
- * Todas as chamadas são POST com JSON body para:
- *   https://www.navel.pt/api/data.php
+ * Todas as chamadas são POST com JSON body para data.php (ver `config/apiBase.js`).
  *
  * Formato do pedido:
  *   { "_t": token, "r": recurso, "action": acção, "id"?: id, "data"?: dados }
@@ -15,10 +14,9 @@
 import { logger } from '../utils/logger'
 import { SESSION } from '../config/storageKeys'
 import { API_TIMEOUT_MS, API_TIMEOUT_BULK_MS } from '../config/limits'
+import { atmDataPhpUrl } from '../config/apiBase'
 
-const ENV_API_URL  = (import.meta.env.VITE_API_URL || '').trim()
-const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim()
-const API_URL = ENV_API_URL || `${(ENV_API_BASE || 'https://www.navel.pt').replace(/\/+$/, '')}/api/data.php`
+const API_URL = atmDataPhpUrl()
 const TOKEN_KEY = SESSION.API_TOKEN
 
 function apiFailureMode(status, msg = '') {

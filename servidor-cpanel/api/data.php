@@ -32,13 +32,23 @@ $_cors_origin  = $_SERVER['HTTP_ORIGIN'] ?? '';
 $_cors_allowed = ['https://www.navel.pt', 'https://navel.pt', 'http://www.navel.pt', 'http://navel.pt', 'http://localhost:5173', 'http://localhost:4173'];
 header('Access-Control-Allow-Origin: ' . (in_array($_cors_origin, $_cors_allowed, true) ? $_cors_origin : 'https://www.navel.pt'));
 header('Vary: Origin');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
 header('Access-Control-Max-Age: 3600');
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
+// GET/HEAD: evita 405 na consola (prefetch/extension); a API real é sempre POST + JSON
+if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+    http_response_code(204);
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    http_response_code(200);
+    echo '{"ok":false,"message":"Use POST com corpo JSON"}';
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST')    { http_response_code(405); echo '{"ok":false,"message":"Metodo nao permitido"}'; exit; }
 
 // ══ 3. ERROR HANDLERS — PHP, BD, SQL: todos os erros vão para atm_*.log ───────
@@ -103,7 +113,7 @@ if ($resource === 'auth' && $action === 'login') {
 
     try {
         $pdo  = get_pdo();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE username = ? AND ativo = 1 LIMIT 1');
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND ativo = 1 LIMIT 1');
         $stmt->execute([$username]);
         $user = $stmt->fetch();
     } catch (PDOException $e) {
@@ -118,7 +128,9 @@ if ($resource === 'auth' && $action === 'login') {
         json_error('Utilizador ou password incorretos.', 401);
     }
 
-    if (($user['role'] ?? '') === 'tecnico' && atm_tecnico_em_horario_restrito()) {
+    $user['role'] = strtolower(trim((string) ($user['role'] ?? '')));
+
+    if ($user['role'] === 'tecnico' && atm_tecnico_em_horario_restrito()) {
         json_error(
             'Acesso da equipa técnica não está permitido neste horário. Contacte a administração se necessário.',
             403,

@@ -117,14 +117,6 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     return set
   }, [])
 
-  /** Há pelo menos uma intervenção concluída — aí a ficha pode mostrar contador/data actualizados pela última execução. */
-  const temManutencaoConcluidaNaMaq = useMemo(() => {
-    if (!form.id) return false
-    return manutencoes.some(
-      m => String(m.maquinaId) === String(form.id) && m.status === 'concluida',
-    )
-  }, [manutencoes, form.id])
-
   const validarDataManut = useCallback((dateStr) => {
     if (!dateStr) { setAvisoData(''); return true }
     const d = new Date(dateStr + 'T12:00:00')
@@ -166,6 +158,15 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
     planoManutencaoCompressor: '',
     posicaoKaeser: null,
   })
+
+  /** Há pelo menos uma intervenção concluída — aí a ficha pode mostrar contador/data actualizados pela última execução. */
+  const temManutencaoConcluidaNaMaq = useMemo(() => {
+    if (!form.id) return false
+    return manutencoes.some(
+      m => String(m.maquinaId) === String(form.id) && m.status === 'concluida',
+    )
+  }, [manutencoes, form.id])
+
   const subcategoriasFiltradas = form.categoriaId ? getSubcategoriasByCategoria(form.categoriaId) : []
   const [showNovaMarca, setShowNovaMarca] = useState(false)
   const [novaMarca, setNovaMarca] = useState({ nome: '', logoUrl: '', corHex: '#1a4880' })

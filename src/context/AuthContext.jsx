@@ -23,12 +23,14 @@ async function sessionFromToken() {
   if (!isTokenValid()) return null
   const p = decodeTokenPayload()
   if (!p) return null
+  const roleNorm =
+    typeof p.role === 'string' ? p.role.toLowerCase().trim() : p.role
   return {
     user: {
       id:       p.sub,
       username: p.username,
       nome:     p.nome,
-      role:     p.role,
+      role:     roleNorm,
     },
   }
 }
@@ -136,12 +138,16 @@ export function AuthProvider({ children }) {
       const { apiLogin } = await getApi()
       const result = await apiLogin(username, password)
       // apiLogin já guardou o token via setToken()
+      const roleNorm =
+        typeof result.user.role === 'string'
+          ? result.user.role.toLowerCase().trim()
+          : result.user.role
       const sess = {
         user: {
           id:       result.user.id,
           username: result.user.username,
           nome:     result.user.nome,
-          role:     result.user.role,
+          role:     roleNorm,
         },
       }
       setSession(sess)

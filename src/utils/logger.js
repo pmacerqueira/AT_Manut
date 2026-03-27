@@ -35,6 +35,7 @@
  */
 
 import { STORAGE, SESSION } from '../config/storageKeys'
+import { atmLogReceiverUrl } from '../config/apiBase'
 
 // ── Configuração ──────────────────────────────────────────────────────────────
 
@@ -403,7 +404,7 @@ async function _sendToServer(entries) {
       auth_token_b64: toB64(LOG_AUTH_TOKEN),
       entries:        JSON.stringify(entries),
     })
-    await fetch(LOG_ENDPOINT, { method: 'POST', body, keepalive: true })
+    await fetch(atmLogReceiverUrl(), { method: 'POST', body, keepalive: true })
     clearPending()
   } catch (err) {
     // Rede indisponível — os dados ficam no pending para próxima oportunidade

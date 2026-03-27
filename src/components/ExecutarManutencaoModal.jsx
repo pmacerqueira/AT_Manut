@@ -40,6 +40,7 @@ import {
   horasContadorNaManutencao,
   parseHorasContadorForm,
 } from '../utils/horasContadorEquipamento.js'
+import { normEntityId } from '../utils/frotaReportHelpers'
 
 const STEP_LABELS_BASE = ['Confirmação', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
 const STEP_LABELS_KAESER = ['Confirmação', 'Horas e fase KAESER', 'Consumíveis', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
@@ -70,6 +71,21 @@ function getQuickNotes() {
     if (Array.isArray(stored) && stored.length > 0) return stored
   } catch { /* fallback */ }
   return QUICK_NOTES_DEFAULT
+}
+
+/** Respostas da checklist: API pode devolver object ou JSON em string (cache/offline). */
+function normalizarChecklistRespostasMap(raw) {
+  if (raw == null || raw === '') return {}
+  let o = raw
+  if (typeof raw === 'string') {
+    try {
+      o = JSON.parse(raw)
+    } catch {
+      return {}
+    }
+  }
+  if (typeof o !== 'object' || o === null || Array.isArray(o)) return {}
+  return o
 }
 
 /** Observações com texto livre + pelo menos um excerto das notas rápidas (lista configurável). */
@@ -155,6 +171,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const fotoCameraRef = useRef(null)
   /** Evita repetir bootstrap do formulário para o mesmo `manutencaoAtual.id`. */
   const bootstrappedIdRef = useRef(null)
+  /** Re-bootstrap quando o relatório (checklist gravada) aparece ou muda no estado. */
+  const bootstrapRelSigRef = useRef('')
   const modalRef = useRef(null)
   /** Última sugestão do motor (para auditoria no relatório). */
   const kaeserAuditoriaRef = useRef({ tipoSugerido: null, motivo: null })
@@ -238,6 +256,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setOpcoesEscolha([])
       setManutencaoAtual(null)
       bootstrappedIdRef.current = null
+      bootstrapRelSigRef.current = ''
       setStep(1)
       setConfirmacaoPendente(null)
       setPreviewLoading(false)
@@ -298,9 +317,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   useEffect(() => {
     if (!isOpen) return
     if (execUiPhase !== 'form' || !manutencaoAtual || !maq) return
-    const mid = manutencaoAtual.id
-    if (bootstrappedIdRef.current === mid) return
+    const mid = normEntityId(manutencaoAtual.id)
+    const existingRelPeek = getRelatorioByManutencao(manutencaoAtual.id)
+    const chkRawPeek = existingRelPeek?.checklistRespostas
+    const chkKey = typeof chkRawPeek === 'string' ? chkRawPeek : JSON.stringify(chkRawPeek ?? {})
+    const bootstrapSig = `${mid}|${existingRelPeek?.id ?? 'norel'}|${chkKey}`
+
+    if (bootstrappedIdRef.current === mid && bootstrapRelSigRef.current === bootstrapSig) return
     bootstrappedIdRef.current = mid
+    bootstrapRelSigRef.current = bootstrapSig
 
     const m = manutencaoAtual
     const checklistRespostas = {}
@@ -311,19 +336,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     let lastRel = null
     if (!existingRel && maq) {
       const manutsConclMaq = manutencoes
-        .filter(mt => mt.maquinaId === maq.id && mt.status === 'concluida' && mt.tipo === tipoAtual)
-        .sort((a, b) => b.data.localeCompare(a.data))
+        .filter(mt => normEntityId(mt.maquinaId) === normEntityId(maq.id) && mt.status === 'concluida' && mt.tipo === tipoAtual)
+        .sort((a, b) => String(b.data).localeCompare(String(a.data)))
       for (const mt of manutsConclMaq) {
-        const r = todosRelatorios.find(rr => rr.manutencaoId === mt.id)
-        if (r?.checklistRespostas) { lastRel = r; break }
+        const r = todosRelatorios.find(rr => normEntityId(rr.manutencaoId) === normEntityId(mt.id))
+        const mapCh = r ? normalizarChecklistRespostasMap(r.checklistRespostas) : {}
+        if (Object.keys(mapCh).length > 0) {
+          lastRel = r
+          break
+        }
       }
     }
     const fontePreFill = existingRel || lastRel
     const isPreFilled = !existingRel && !!lastRel
     setPreFilledFromLast(isPreFilled)
 
-    checklistItems.forEach(it => {
-      checklistRespostas[it.id] = fontePreFill?.checklistRespostas?.[it.id] ?? ''
+    const prefillMap = normalizarChecklistRespostasMap(fontePreFill?.checklistRespostas)
+    checklistItems.forEach((it) => {
+      checklistRespostas[it.id] = prefillMap[it.id] ?? prefillMap[String(it.id)] ?? ''
     })
     const tipoAutoCiclo = isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null
       ? tipoKaeserNaPosicao(maq.posicaoKaeser)

@@ -61,9 +61,11 @@ export default function Login() {
           <span className="login-sub">Dashboard — Assistência Técnica</span>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
-          <label>
+          <label htmlFor="atm-login-username">
             Utilizador
             <input
+              id="atm-login-username"
+              name="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -72,9 +74,11 @@ export default function Login() {
               autoCapitalize="off"
             />
           </label>
-          <label>
+          <label htmlFor="atm-login-password">
             Palavra-passe
             <input
+              id="atm-login-password"
+              name="password"
               type="password"
               autoComplete="current-password"
               value={password}

@@ -6,14 +6,16 @@
  *
  * Ficheiro PHP a instalar: servidor-cpanel/send-email.php
  *   → Destino no servidor: public_html/api/send-email.php
- *   → URL final: https://www.navel.pt/api/send-email.php
+ *   → URL canónica: https://navel.pt/api/send-email.php (evita 301 www→apex em POST)
  *
  * Ver instruções completas em: servidor-cpanel/INSTRUCOES_CPANEL.md
  */
 
+import { ATM_API_CANONICAL_ORIGIN } from './apiBase'
+
 export const EMAIL_CONFIG = {
-  /** URL do script PHP no cPanel (relatórios de manutenção — FPDF, JSON estruturado). */
-  ENDPOINT_URL: 'https://www.navel.pt/api/send-email.php',
+  /** Referência documental; na app usar `getSendEmailUrl()` (host canónico + dev/proxy). */
+  ENDPOINT_URL: `${ATM_API_CANONICAL_ORIGIN}/api/send-email.php`,
 
   /**
    * Token de autenticação — deve ser idêntico ao definido no PHP
@@ -56,6 +58,23 @@ function safeViteApiBaseUrl() {
   }
 }
 
+/**
+ * URL de send-email.php — sempre host canónico em produção (sem POST através de 301 www→apex).
+ */
+export function getSendEmailUrl() {
+  const fromEnv = safeViteApiBaseUrl()
+  if (fromEnv) {
+    return `${fromEnv}/api/send-email.php`
+  }
+  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+    return `${window.location.origin.replace(/\/$/, '')}/api/send-email.php`
+  }
+  if (typeof window !== 'undefined') {
+    return `${ATM_API_CANONICAL_ORIGIN}/api/send-email.php`
+  }
+  return EMAIL_CONFIG.ENDPOINT_URL
+}
+
 export function getSendReportUrl() {
   const fromEnv = safeViteApiBaseUrl()
   if (fromEnv) {
@@ -65,16 +84,15 @@ export function getSendReportUrl() {
   if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
     return `${window.location.origin.replace(/\/$/, '')}/api/send-report.php`
   }
-  // Produção no browser: path absoluto na raiz do site — mesmo scheme/host que a página
-  // (evita mistura www / navel.pt vs URL fixa) e igual ao send-email no mesmo domínio.
+  // Produção: URL absoluta no host canónico (evita 301 em POST se a página abrir em www).
   if (typeof window !== 'undefined') {
-    return '/api/send-report.php'
+    return `${ATM_API_CANONICAL_ORIGIN}/api/send-report.php`
   }
   const ep = EMAIL_CONFIG.ENDPOINT_URL || ''
   if (/send-email\.php\s*$/i.test(ep)) {
     return ep.replace(/send-email\.php\s*$/i, 'send-report.php')
   }
-  return 'https://www.navel.pt/api/send-report.php'
+  return `${ATM_API_CANONICAL_ORIGIN}/api/send-report.php`
 }
 
 /**

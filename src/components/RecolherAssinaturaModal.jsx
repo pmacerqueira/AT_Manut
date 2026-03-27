@@ -1,18 +1,32 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from './Toast'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import { logger } from '../utils/logger'
 import SignaturePad from './SignaturePad'
-import { PenLine, X, Bookmark } from 'lucide-react'
+import { PenLine, X, Bookmark, Upload } from 'lucide-react'
 import { formatDataAzores } from '../utils/datasAzores'
 import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
+
+const MAX_ASSINATURA_UPLOAD_BYTES = 2.5 * 1024 * 1024
+const MIME_ASSINATURA_OK = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp'])
+
+function assinaturaUploadAceite(file) {
+  const t = (file.type || '').toLowerCase()
+  if (MIME_ASSINATURA_OK.has(t)) return true
+  const n = (file.name || '').toLowerCase()
+  return /\.(png|jpe?g|webp)$/.test(n)
+}
 
 export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, maquina }) {
   const { updateRelatorio, addRelatorio, getRelatorioByManutencao, clientes, updateCliente, getSubcategoria, getCategoria } = useData()
   const { showToast } = useToast()
+  const { isAdmin } = useAuth()
 
+  const assinaturaFileRef = useRef(null)
   const [nomeAssinante, setNomeAssinante] = useState('')
   const [assinaturaDigital, setAssinaturaDigital] = useState(null)
+  const [padInitialOverride, setPadInitialOverride] = useState(null)
   const [erro, setErro] = useState('')
   const [key, setKey] = useState(0)
 
@@ -23,10 +37,46 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
     if (isOpen) {
       setNomeAssinante(cliente?.nomeContacto ?? '')
       setAssinaturaDigital(cliente?.assinaturaContacto ?? null)
+      setPadInitialOverride(null)
       setErro('')
       setKey(k => k + 1)
     }
   }, [isOpen, manutencao?.id, cliente?.nomeContacto, cliente?.assinaturaContacto])
+
+  const handlePadChange = useCallback((sig) => {
+    setAssinaturaDigital(sig)
+    if (sig == null) setPadInitialOverride(null)
+  }, [])
+
+  const handleAssinaturaFileChange = useCallback((e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const type = (file.type || '').toLowerCase()
+    if (!assinaturaUploadAceite(file)) {
+      showToast('Use uma imagem PNG, JPEG ou WebP.', 'warning')
+      return
+    }
+    if (file.size > MAX_ASSINATURA_UPLOAD_BYTES) {
+      showToast('Imagem demasiado grande (máximo 2,5 MB).', 'warning')
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => showToast('Não foi possível ler o ficheiro.', 'error', 4000)
+    reader.onload = () => {
+      const dataUrl = reader.result
+      if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+        showToast('Ficheiro de imagem inválido.', 'warning')
+        return
+      }
+      setPadInitialOverride(dataUrl)
+      setKey(k => k + 1)
+      logger.action('RecolherAssinaturaModal', 'uploadAssinaturaImagem',
+        'Assinatura carregada a partir de ficheiro (Admin)',
+        { bytes: file.size, tipo: type })
+    }
+    reader.readAsDataURL(file)
+  }, [showToast])
 
   const guardarNomeContacto = useCallback(() => {
     const nome = nomeAssinante.trim()
@@ -155,10 +205,40 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         </label>
 
         <div className="recolher-assinatura-pad">
-          <div className="assinatura-canvas-label">
-            Assinatura digital <span className="req-star">*</span>
+          <div className="recolher-assinatura-toolbar">
+            <div className="assinatura-canvas-label">
+              Assinatura digital <span className="req-star">*</span>
+            </div>
+            {isAdmin && (
+              <>
+                <input
+                  ref={assinaturaFileRef}
+                  type="file"
+                  className="fotos-input-hidden"
+                  accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                  onChange={handleAssinaturaFileChange}
+                  aria-label="Carregar imagem de assinatura"
+                />
+                <button
+                  type="button"
+                  className="btn secondary btn-sm recolher-btn-upload-sig"
+                  onClick={() => assinaturaFileRef.current?.click()}
+                >
+                  <Upload size={15} aria-hidden /> Carregar imagem…
+                </button>
+              </>
+            )}
           </div>
-          <SignaturePad key={key} onChange={setAssinaturaDigital} initialImage={cliente?.assinaturaContacto} />
+          {isAdmin && (
+            <p className="form-hint recolher-upload-hint">
+              Como administrador, pode carregar PNG, JPEG ou WebP (ex.: assinatura digitalizada no computador) em vez de desenhar no quadro.
+            </p>
+          )}
+          <SignaturePad
+            key={key}
+            onChange={handlePadChange}
+            initialImage={padInitialOverride ?? cliente?.assinaturaContacto}
+          />
           {assinaturaDigital && (
             <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
               title="Guardar esta assinatura para futuras intervenções deste cliente"

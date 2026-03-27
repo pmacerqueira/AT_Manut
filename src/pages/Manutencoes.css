@@ -802,6 +802,29 @@ body.modo-campo .num-servico {
 .recolher-assinatura-pad {
   margin: 0.75rem 0;
 }
+.recolher-assinatura-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.recolher-assinatura-toolbar .assinatura-canvas-label {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+.recolher-btn-upload-sig {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.recolher-upload-hint {
+  margin: 0 0 0.5rem;
+  max-width: 42rem;
+}
 
 /* ── Badges para histórico e pendente assinatura ──────────────────────────── */
 .badge-historico {

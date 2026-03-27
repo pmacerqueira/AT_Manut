@@ -24,7 +24,13 @@ import { logger } from '../utils/logger'
 import { enviarRelatorioHtmlEmail, blobToRawBase64 } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
 import { computarProximasDatas } from '../utils/diasUteis'
-import { maquinaPertenceCliente, normEntityId, resolveProximaManutParaFrota } from '../utils/frotaReportHelpers'
+import {
+  maquinaPertenceCliente,
+  mergeRelatorioPreferNewer,
+  normEntityId,
+  resolveProximaManutParaFrota,
+  resolveUltimaParaFrota,
+} from '../utils/frotaReportHelpers'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import ContentLoader from '../components/ContentLoader'
@@ -357,16 +363,21 @@ export default function Clientes() {
 
   const maquinasCliente = fichaCliente ? getMaquinasDoCliente(fichaCliente.nif) : []
 
-  /** Alinha com relatório de frota: agenda + proximaManut + cálculo a partir da última concluída. */
+  /** Alinha com relatório de frota: agenda + proximaManut + última execução (incl. ficha/relatórios). */
   const proximaDataNaFicha = useCallback((maq) => {
     const mid = normEntityId(maq?.id)
     const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
-    const ultima = manutsM
-      .filter(mt => mt.status === 'concluida')
-      .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
-    const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultima)
+    const relMap = new Map()
+    for (const r of relatorios ?? []) {
+      const rid = normEntityId(r.manutencaoId)
+      if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+      relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
+    }
+    const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap)
+    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultimaParaProxima)
     return dataKey || null
-  }, [manutencoes])
+  }, [manutencoes, relatorios])
 
   const fichaKpis = useMemo(() => {
     if (!maquinasCliente.length) return null
@@ -375,16 +386,21 @@ export default function Clientes() {
     for (const m of maquinasCliente) {
       const mid = normEntityId(m.id)
       const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
-      const ultima = manutsM
-        .filter(mt => mt.status === 'concluida')
-        .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
-      const { dataKey } = resolveProximaManutParaFrota(m, manutsM, ultima)
+      const relMap = new Map()
+      for (const r of relatorios ?? []) {
+        const rid = normEntityId(r.manutencaoId)
+        if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+        relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
+      }
+      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(m, manutsM, relatorios ?? [], relMap)
+      const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+      const { dataKey } = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
       if (!dataKey) { semData++; continue }
       if (isBefore(startOfDay(parseDateLocal(dataKey)), hoje)) emAtraso++
       else conformes++
     }
     return { total: maquinasCliente.length, emAtraso, conformes, semData }
-  }, [maquinasCliente, manutencoes])
+  }, [maquinasCliente, manutencoes, relatorios])
 
   const maquinasFiltradas = useMemo(() => {
     if (!fichaCliente || !fichaKpiFilter) return []
@@ -392,10 +408,15 @@ export default function Clientes() {
     return maquinasCliente.filter(maq => {
       const mid = normEntityId(maq.id)
       const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
-      const ultima = manutsM
-        .filter(mt => mt.status === 'concluida')
-        .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0]
-      const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultima)
+      const relMap = new Map()
+      for (const r of relatorios ?? []) {
+        const rid = normEntityId(r.manutencaoId)
+        if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+        relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
+      }
+      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap)
+      const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+      const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultimaParaProxima)
       if (fichaKpiFilter === 'atraso') {
         return !!dataKey && isBefore(startOfDay(parseDateLocal(dataKey)), hoje)
       }
@@ -407,7 +428,7 @@ export default function Clientes() {
       }
       return false
     })
-  }, [fichaCliente, fichaKpiFilter, maquinasCliente, manutencoes])
+  }, [fichaCliente, fichaKpiFilter, maquinasCliente, manutencoes, relatorios])
 
   const maquinasComManutencao = useMemo(() => {
     return maquinasFiltradas.map(maq => {

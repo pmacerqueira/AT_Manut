@@ -19,7 +19,58 @@ export function dateKeyForFilter(d) {
   if (d == null || d === '') return ''
   const s = String(d).trim()
   const m = s.match(/^(\d{4}-\d{2}-\d{2})/)
-  return m ? m[1] : (s.length >= 10 ? s.slice(0, 10) : s)
+  if (m) return m[1]
+  const dm = s.match(/^(\d{2})[./-](\d{2})[./-](\d{4})/)
+  if (dm) return `${dm[3]}-${dm[2]}-${dm[1]}`
+  return s.length >= 10 ? s.slice(0, 10) : s
+}
+
+/**
+ * yyyy-mm-dd para ordenar / filtrar relatórios (assinatura, criação ou registo `criadoEm` na BD).
+ * Sem isto, `bestRel` fica vazio quando só `criadoEm` vem preenchido e a coluna «Últ. rel.» passa a «—».
+ * @param {object | null | undefined} r
+ */
+export function reportDateSortKey(r) {
+  if (!r) return ''
+  const raw = r.dataAssinatura ?? r.dataCriacao ?? r.criadoEm ?? r.criado_em ?? ''
+  return dateKeyForFilter(raw)
+}
+
+/**
+ * @param {object | null | undefined} a
+ * @param {object | null | undefined} b
+ * @returns {number} comparador sort: mais recente primeiro
+ */
+function compareRelatorioDesc(a, b) {
+  const da = reportDateSortKey(a)
+  const db = reportDateSortKey(b)
+  if (da !== db) {
+    if (!da) return 1
+    if (!db) return -1
+    return db.localeCompare(da)
+  }
+  const na = String(a?.numeroRelatorio ?? '')
+  const nb = String(b?.numeroRelatorio ?? '')
+  if (na !== nb) return nb.localeCompare(na, undefined, { numeric: true })
+  return String(b?.id ?? '').localeCompare(String(a?.id ?? ''))
+}
+
+/** Mantém o relatório mais recente quando existem várias entradas para a mesma manutenção. */
+export function mergeRelatorioPreferNewer(prev, next) {
+  if (!prev) return next
+  if (!next) return prev
+  return compareRelatorioDesc(prev, next) <= 0 ? prev : next
+}
+
+/**
+ * Relatório mais recente ligado a intervenções deste equipamento (`midSet` = ids de manutenções da máquina).
+ * @param {Set<string>} midSet
+ * @param {object[]} relatorios
+ */
+export function pickNewestRelatorioForMidSet(midSet, relatorios) {
+  const list = (relatorios || []).filter(r => midSet.has(normEntityId(r.manutencaoId)))
+  if (!list.length) return null
+  return [...list].sort(compareRelatorioDesc)[0]
 }
 
 /**
@@ -67,4 +118,65 @@ export function resolveProximaManutParaFrota(maquina, manutsM, ultimaConcluida) 
     }
   }
   return { dataKey: '', registo: null, fonte: null }
+}
+
+/** Status «concluída» tolerante a capitalização e espaços (respostas API legadas). */
+export function isManutencaoConcluida(mt) {
+  return String(mt?.status ?? '').toLowerCase().trim() === 'concluida'
+}
+
+/**
+ * Última execução para colunas «Última» e «Últ. rel.» no relatório de frota.
+ * Cruza manutenções concluídas com data, `maquinas.ultimaManutencaoData` e datas dos relatórios
+ * ligados às intervenções do equipamento — evita «—» quando só falha o campo `data` na linha
+ * ou o join relatório/manutenção está desalinhado com `ultima` vazia.
+ *
+ * @param {object} maquina
+ * @param {object[]} manutsM
+ * @param {object[]} relatorios — relatórios de manutenção (lista global)
+ * @param {Map<string, object>} relMap — manutencaoId → relatorio
+ * @returns {{ dataUltimaKey: string, ultima: object | null, relUltima: object | null }}
+ */
+export function resolveUltimaParaFrota(maquina, manutsM, relatorios, relMap) {
+  const midSet = new Set((manutsM || []).map(mt => normEntityId(mt.id)))
+
+  const concluidas = (manutsM || []).filter(isManutencaoConcluida)
+  const conclComData = concluidas
+    .map(mt => ({ mt, dk: dateKeyForFilter(mt.data) }))
+    .filter(x => x.dk)
+    .sort((a, b) => b.dk.localeCompare(a.dk))
+
+  const bestManut = conclComData[0]?.mt ?? null
+  const bestManutKey = conclComData[0]?.dk ?? ''
+
+  const fichaKey = dateKeyForFilter(maquina?.ultimaManutencaoData)
+
+  const bestRel = pickNewestRelatorioForMidSet(midSet, relatorios)
+  const bestRelKey = reportDateSortKey(bestRel) || ''
+
+  const candidates = [bestManutKey, fichaKey, bestRelKey].filter(Boolean)
+  const dataUltimaKey = candidates.length === 0
+    ? ''
+    : candidates.reduce((a, b) => (a > b ? a : b))
+
+  let ultima = bestManut
+  if (dataUltimaKey && bestManutKey !== dataUltimaKey) {
+    ultima = concluidas.find(mt => dateKeyForFilter(mt.data) === dataUltimaKey) || null
+  }
+  if (!ultima && dataUltimaKey && concluidas.length) {
+    ultima = conclComData.find(x => x.dk === dataUltimaKey)?.mt
+      ?? conclComData[0]?.mt
+      ?? concluidas[0]
+  }
+
+  let relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
+  if (!relUltima && dataUltimaKey) {
+    relUltima = (relatorios || []).find(
+      r => midSet.has(normEntityId(r.manutencaoId))
+        && reportDateSortKey(r) === dataUltimaKey,
+    ) || null
+  }
+  if (!relUltima && bestRel) relUltima = bestRel
+
+  return { dataUltimaKey, ultima, relUltima }
 }

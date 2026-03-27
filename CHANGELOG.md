@@ -9,6 +9,96 @@ Política de continuidade:
 
 ---
 
+## [1.16.46] — 2026-03-27 — Relatório de frota: coluna «Últ. rel.»
+
+### Correcções
+- **`frotaReportHelpers.js`:** `reportDateSortKey` (incl. `criadoEm`), `pickNewestRelatorioForMidSet`, `mergeRelatorioPreferNewer` — o nº do último relatório volta a aparecer quando a «Última» vem da ficha/manutenção mais recente que a data do PDF ou quando faltavam `dataCriacao`/`dataAssinatura` úteis.
+- **`gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `Clientes.jsx`:** construção do `relMap` com merge do relatório mais recente por `manutencaoId`.
+
+### Deploy
+- Front: `dist_upload.zip` (v1.16.46) para `public_html/manut/`.
+
+---
+
+## [1.16.45] — 2026-03-23 — Novo pacote de deploy
+
+### Deploy
+- Front: `dist_upload.zip` (v1.16.45) para `public_html/manut/` — rebuild sem alterações funcionais adicionais.
+
+---
+
+## [1.16.44] — 2026-03-22 — Relatório de frota: coluna «Última» e «Últ. rel.»
+
+### Correcções
+- **`frotaReportHelpers.js`:** `resolveUltimaParaFrota` cruza manutenções concluídas (status normalizado), `maquinas.ultimaManutencaoData` e datas dos **relatórios** — evita «—» na última intervenção quando a «Próxima» já vinha da ficha/agenda.
+- **`gerarRelatorioFrotaHtml.js` + `gerarRelatorioFrota.js`:** colunas **Última** / **Últ. rel.** e estado «Por instalar» alinhados com essa data efectiva; KPIs de manutenções no período com `isManutencaoConcluida`.
+- **`Clientes.jsx`:** KPIs e filtros da ficha de cliente (próxima data / conformidade) usam a mesma lógica que o relatório de frota.
+
+### Deploy
+- Front: `dist_upload.zip` (v1.16.44) para `public_html/manut/`.
+
+---
+
+## [1.16.43] — 2026-03-22 — Recolher assinatura: upload de imagem (Admin)
+
+### Funcionalidade
+- **`RecolherAssinaturaModal.jsx`:** utilizadores **Admin** podem **carregar** uma imagem de assinatura (PNG, JPEG ou WebP, até 2,5 MB) em vez de apenas desenhar no quadro; o técnico mantém o fluxo original.
+- **`Manutencoes.css`:** estilos da barra de ferramentas (rótulo + botão «Carregar imagem…»).
+
+### Deploy
+- Front: `dist_upload.zip` (v1.16.43) para `public_html/manut/`.
+
+---
+
+## [1.16.42] — 2026-03-22 — PDF KAESER: horas no contador
+
+### Correcções
+- **`horasContadorEquipamento.js`:** leitura de horas com fallback **snake_case** (`horas_leitura_contador`, `horas_servico`, `horas_servico_acumuladas`, etc.) para cache/offline ou payloads atípicos — PDF/HTML voltam a mostrar a leitura quando o valor existe.
+- **`gerarPdfRelatorio.js`:** na secção **PLANO DE MANUTENÇÃO (KAESER)**, linha explícita **«Horas no contador (acumuladas)»** quando aplicável.
+
+### Deploy
+- Front: `dist_upload.zip` (v1.16.42). Confirmar migração SQL `horas_leitura_contador` em `relatorios` no MySQL se ainda não aplicada.
+
+---
+
+## [1.16.41] — 2026-03-25 — Email: CSP logos externos + send-email URL
+
+### Correcções
+- **`emailService.js`:** `enviarRelatorioEmail` usava ainda `EMAIL_CONFIG.ENDPOINT_URL` no `fetch` — passa a **`getSendEmailUrl()`** (alinha com lembretes e evita 405 por redirect www).
+- **`gerarPdfRelatorio.js` `loadImageAsDataUrl`:** para URLs **http(s) noutro domínio** (ex. `pt.kaeser.com`), tentar primeiro **`/api/image-proxy.php`** no mesmo site — o `fetch` directo violava **`connect-src`** da CSP do navel-site.
+- **`servidor-cpanel/api/image-proxy.php`:** CORS para `navel.pt` e `www`; paths **sem extensão** permitidos se o conteúdo for imagem (MIME); rejeitar respostas não-imagem.
+
+### Deploy
+- Front: novo build. Servidor: upload de **`public_html/api/image-proxy.php`** se ainda não tiver a versão actualizada.
+
+---
+
+## [1.16.40] — 2026-03-25 — Email relatórios: 405 «Método não permitido» (host canónico)
+
+### Correcção
+- **`emailConfig.js`:** `getSendEmailUrl()` e `getSendReportUrl()` em produção usam `https://navel.pt/api/...` (`ATM_API_CANONICAL_ORIGIN`), alinhado ao redirect www→apex no `.htaccess` do site. O `fetch` POST a `https://www.navel.pt/api/send-email.php` seguia **301** e o corpo podia chegar como **GET** ao PHP → **405** com `Metodo nao permitido`.
+- **`emailService.js`:** `enviarRelatorioEmail` e `enviarLembreteEmail` passam a usar `getSendEmailUrl()`.
+
+### Deploy
+- Novo build front (`dist_upload.zip`); não requer alteração ao `send-email.php` no servidor.
+
+---
+
+## [1.16.39] — 2026-03-23 — Editar máquina (Clientes): correcção crash + API canónica
+
+### Correcções
+- **`MaquinaFormModal.jsx`:** `temManutencaoConcluidaNaMaq` movido para depois de `useState(form)` — elimina `ReferenceError: Cannot access before initialization` ao abrir **Editar** na ficha do equipamento (ErrorBoundary a bloquear a app).
+- **`src/config/apiBase.js` + `apiService.js` + `logger.js`:** em produção, `data.php` e `log-receiver.php` usam `https://navel.pt/...` para evitar **301** www→apex em **POST** (login / logs).
+- **`AuthContext.jsx` + `data.php` + `db.php`:** normalização de `role` no JWT/sessão; login com `LOWER(username)` (deploy PHP em `public_html/api/`).
+
+### Outros
+- **`Login.jsx`:** `id` / `name` / `htmlFor` nos campos (autofill / Issues DevTools).
+
+### Deploy
+- Front: `dist_upload.zip`. PHP: `data.php`, `db.php` se ainda não actualizados no cPanel.
+
+---
+
 ## [1.16.38] — 2026-03-22 — Lista manutenções: cores alinhadas à declaração + build
 
 ### Alteração

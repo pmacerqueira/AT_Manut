@@ -13,7 +13,14 @@
  */
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
-import { normEntityId, dateKeyForFilter, resolveProximaManutParaFrota } from './frotaReportHelpers'
+import {
+  normEntityId,
+  dateKeyForFilter,
+  mergeRelatorioPreferNewer,
+  resolveProximaManutParaFrota,
+  resolveUltimaParaFrota,
+  isManutencaoConcluida,
+} from './frotaReportHelpers'
 
 const AZUL = [30, 58, 95]
 const AZUL_CLARO = [235, 242, 252]
@@ -87,7 +94,7 @@ export async function gerarRelatorioFrotaPdf(
   for (const r of relatorios) {
     const rid = normEntityId(r.manutencaoId)
     if (!rid || !manutsDoCliente.some(mt => normEntityId(mt.id) === rid)) continue
-    relMap.set(rid, r)
+    relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
   }
 
   const manutsByMaq = new Map()
@@ -110,16 +117,15 @@ export async function gerarRelatorioFrotaPdf(
     const mid = normEntityId(m.id)
     const manutsM = manutsByMaq.get(mid) || []
     const repsM = repsByMaq.get(mid) || []
-    const concluidas = manutsM.filter(mt => mt.status === 'concluida')
-    const ultima = concluidas.sort((a, b) => b.data.localeCompare(a.data))[0]
-    const resolved = resolveProximaManutParaFrota(m, manutsM, ultima)
+    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap)
+    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const resolved = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
     const proxima = resolved.registo
     const proxDataKey = resolved.dataKey || ''
     const emAtraso = !!(proxDataKey && proxDataKey < hoje)
-    const totalManuts = concluidas.length
+    const totalManuts = manutsM.filter(isManutencaoConcluida).length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
-    const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
     let diasAtraso = null
     if (proxDataKey) {
@@ -127,11 +133,11 @@ export async function gerarRelatorioFrotaPdf(
     }
 
     let estado
-    if (!ultima && !proxDataKey) estado = 'instalar'
+    if (!dataUltimaKey && !proxDataKey) estado = 'instalar'
     else if (emAtraso) estado = 'atraso'
     else estado = 'conforme'
 
-    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, proxDataKey }
+    return { m, sub, cat, ultima, dataUltimaKey, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, proxDataKey }
   })
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
@@ -141,10 +147,10 @@ export async function gerarRelatorioFrotaPdf(
   const taxaCumprimento = totalEquip > 0 ? Math.round((totalConformes / totalEquip) * 100) : 0
   const totalManutsAno = periodoCustom
     ? manutsDoCliente.filter(mt => {
-        if (mt.status !== 'concluida') return false
+        if (!isManutencaoConcluida(mt)) return false
         return dataDentroPeriodo(dateKeyForFilter(mt.data))
       }).length
-    : manutsDoCliente.filter(mt => mt.status === 'concluida' && mt.data?.startsWith(String(ano))).length
+    : manutsDoCliente.filter(mt => isManutencaoConcluida(mt) && mt.data?.startsWith(String(ano))).length
   const totalRepsAno = periodoCustom
     ? repsDoCliente.filter(r => {
         if (r.status !== 'concluida') return false
@@ -403,7 +409,7 @@ export async function gerarRelatorioFrotaPdf(
   }
 
   const drawEquipRow = (l, rowIdx) => {
-    const { m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estado, proxDataKey } = l
+    const { m, sub, ultima, dataUltimaKey, proxima, diasAtraso, totalManuts, totalReps, relUltima, estado, proxDataKey } = l
 
     const xs = []
     let cxx = M
@@ -452,7 +458,7 @@ export async function gerarRelatorioFrotaPdf(
     else if (estado === 'conforme') { estadoLabel = 'Conforme'; estadoColor = VERDE }
     else { estadoLabel = 'Por instalar'; estadoColor = LARANJA }
 
-    const ultimaStr = ultima ? fmtD(ultima.data) : '\u2014'
+    const ultimaStr = dataUltimaKey ? fmtD(dataUltimaKey) : '\u2014'
     const proximaStr = proxDataKey ? fmtD(proxDataKey) : '\u2014'
     const proximaColor = proxDataKey && proxDataKey < hoje ? VERMELHO : VERDE
 

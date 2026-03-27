@@ -7,7 +7,14 @@
 import { escapeHtml } from './sanitize'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
-import { normEntityId, dateKeyForFilter, resolveProximaManutParaFrota } from './frotaReportHelpers'
+import {
+  normEntityId,
+  dateKeyForFilter,
+  mergeRelatorioPreferNewer,
+  resolveProximaManutParaFrota,
+  resolveUltimaParaFrota,
+  isManutencaoConcluida,
+} from './frotaReportHelpers'
 
 const TENDENCIA_HISTORICO_MAX = 5
 const TENDENCIA_EXCELENTE_MIN = 3
@@ -69,7 +76,7 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
   for (const r of relatorios) {
     const rid = normEntityId(r.manutencaoId)
     if (!rid || !manutsCliente.some(mt => normEntityId(mt.id) === rid)) continue
-    relMap.set(rid, r)
+    relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
   }
 
   const linhas = maquinas.map(m => {
@@ -78,21 +85,21 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     const mid = normEntityId(m.id)
     const manutsM = manutsByMaq.get(mid) || []
     const repsM = repsByMaq.get(mid) || []
-    const ultima = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))[0]
-    const resolved = resolveProximaManutParaFrota(m, manutsM, ultima)
+    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap)
+    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const resolved = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
     const proxima = resolved.registo
     const proxDataKey = resolved.dataKey || ''
     const emAtraso = !!(proxDataKey && proxDataKey < hoje)
-    const totalManuts = manutsM.filter(mt => mt.status === 'concluida').length
+    const totalManuts = manutsM.filter(isManutencaoConcluida).length
     const totalReps = repsM.filter(r => r.status === 'concluida').length
     const repsAbertas = repsM.filter(r => r.status !== 'concluida').length
-    const relUltima = ultima ? relMap.get(normEntityId(ultima.id)) : null
 
     let diasAtraso = null
     if (proxDataKey) diasAtraso = Math.floor((parseDateLocal(hoje) - parseDateLocal(proxDataKey)) / 86400000)
 
     let estado
-    if (!ultima && !proxDataKey) estado = 'instalar'
+    if (!dataUltimaKey && !proxDataKey) estado = 'instalar'
     else if (emAtraso) estado = 'atraso'
     else estado = 'conforme'
 
@@ -102,7 +109,10 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     else { estadoBadge = 'badge-ok'; estadoLabel = 'Conforme' }
 
     // R2: Indicador de tendência
-    const manutsConclM = manutsM.filter(mt => mt.status === 'concluida').sort((a, b) => b.data.localeCompare(a.data))
+    const manutsConclM = manutsM
+      .filter(isManutencaoConcluida)
+      .filter(mt => mt.data != null && mt.data !== '')
+      .sort((a, b) => String(b.data).localeCompare(String(a.data)))
     let tendencia = { nivel: 'neutro', texto: '—', cor: PALETA.muted }
     if (manutsConclM.length >= 2) {
       const relsConcl = manutsConclM.slice(0, TENDENCIA_HISTORICO_MAX).map(mt => relMap.get(normEntityId(mt.id))).filter(Boolean)
@@ -127,7 +137,7 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
       tendencia = { nivel: 'critico', texto: '⚠ Atraso', cor: PALETA.vermelho }
     }
 
-    return { m, sub, cat, ultima, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, estadoBadge, estadoLabel, tendencia, proxDataKey }
+    return { m, sub, cat, ultima, dataUltimaKey, proxima, emAtraso, diasAtraso, totalManuts, totalReps, repsAbertas, relUltima, estado, estadoBadge, estadoLabel, tendencia, proxDataKey }
   })
 
   const totalEquip = maquinas.length
@@ -135,8 +145,8 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
   const totalConformes = linhas.filter(l => l.estado === 'conforme').length
   const taxaCumprimento = totalEquip > 0 ? Math.round((totalConformes / totalEquip) * 100) : 0
   const totalManutsAno = periodoCustom
-    ? manutsCliente.filter(mt => mt.status === 'concluida' && dataDentroPeriodo(dateKeyForFilter(mt.data))).length
-    : manutsCliente.filter(mt => mt.status === 'concluida' && mt.data?.startsWith(String(ano))).length
+    ? manutsCliente.filter(mt => isManutencaoConcluida(mt) && dataDentroPeriodo(dateKeyForFilter(mt.data))).length
+    : manutsCliente.filter(mt => isManutencaoConcluida(mt) && mt.data?.startsWith(String(ano))).length
   const totalRepsAno = periodoCustom
     ? repsCliente.filter(r => r.status === 'concluida' && dataDentroPeriodo(dateKeyForFilter(r.data))).length
     : repsCliente.filter(r => r.status === 'concluida' && r.data?.startsWith(String(ano))).length
@@ -261,14 +271,14 @@ ${headBlock}`
   <th class="cell-center" style="width:11%">Tendência</th>
   <th class="cell-center" style="width:18%">Últ. rel.</th>
 </tr></thead><tbody>`
-    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
+    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, dataUltimaKey, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
       const diasStr = diasAtraso != null ? (diasAtraso > 0 ? `<span class="data-atraso">+${diasAtraso}</span>` : diasAtraso === 0 ? 'Hoje' : `<span class="data-ok">${diasAtraso}</span>`) : '—'
       const parClass = idx % 2 === 0 ? 'par' : ''
       const proximaRaw = proxDataKey || proxima?.data || m.proximaManut
       const subSerie = [sub ? `<span class="eq-sub">${esc(sub.nome)}</span>` : '', m.numeroSerie ? `<span class="eq-serie">S/N: ${esc(m.numeroSerie)}</span>` : ''].filter(Boolean).join(' ')
       html += `<tr class="eq-row ${parClass}">
         <td class="cell-eq eq-cell-stack"><span class="eq-nome">${esc(m.marca)} ${esc(m.modelo)}</span>${subSerie ? `<br/>${subSerie}` : ''}</td>
-        <td class="cell-center">${ultima ? fmtD(ultima.data) : '—'}</td>
+        <td class="cell-center">${dataUltimaKey ? fmtD(dataUltimaKey) : '—'}</td>
         <td class="cell-center">${proximaRaw ? `<span class="${proxDataKey && proxDataKey < hoje ? 'data-atraso' : 'data-ok'}">${fmtD(proximaRaw)}</span>` : '—'}</td>
         <td class="cell-center cell-dias">${diasStr}</td>
         <td class="cell-center cell-muted">${totalManuts || '—'}</td>

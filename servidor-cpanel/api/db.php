@@ -48,6 +48,10 @@ function jwt_decode(?string $token): ?array {
     if (!hash_equals($expected, $sig)) return null;
     $data = json_decode(b64url_decode($payload), true);
     if (!$data || ($data['exp'] ?? 0) < time()) return null;
+    // Alinhar com o front (ROLES.ADMIN = 'admin'): dados legados podem ter 'Admin' na BD
+    if (array_key_exists('role', $data)) {
+        $data['role'] = strtolower(trim((string) $data['role']));
+    }
     return $data;
 }
 

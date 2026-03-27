@@ -3,33 +3,31 @@
  * Na BD mantemos `horas_servico_*` e `horas_totais_*` espelhados na gravação para compatibilidade.
  */
 
+/** Inteiro ≥0 a partir de um valor bruto, ou null. */
+function parseHorasNumeroBruto(raw) {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
 /** @param {object|null|undefined} maquina */
 export function horasContadorNaFicha(maquina) {
   if (!maquina) return null
-  const hs = maquina.horasServicoAcumuladas
-  if (hs != null && hs !== '') {
-    const n = Number(hs)
-    return Number.isFinite(n) ? n : null
-  }
-  const ht = maquina.horasTotaisAcumuladas
-  if (ht != null && ht !== '') {
-    const n = Number(ht)
-    return Number.isFinite(n) ? n : null
-  }
+  const hs = parseHorasNumeroBruto(maquina.horasServicoAcumuladas ?? maquina.horas_servico_acumuladas)
+  if (hs != null) return hs
+  const ht = parseHorasNumeroBruto(maquina.horasTotaisAcumuladas ?? maquina.horas_totais_acumuladas)
+  if (ht != null) return ht
   return null
 }
 
 /** @param {object|null|undefined} manutencao */
 export function horasContadorNaManutencao(manutencao) {
   if (!manutencao) return null
-  if (manutencao.horasServico != null && manutencao.horasServico !== '') {
-    const n = Number(manutencao.horasServico)
-    return Number.isFinite(n) ? n : null
-  }
-  if (manutencao.horasTotais != null && manutencao.horasTotais !== '') {
-    const n = Number(manutencao.horasTotais)
-    return Number.isFinite(n) ? n : null
-  }
+  const hs = parseHorasNumeroBruto(manutencao.horasServico ?? manutencao.horas_servico)
+  if (hs != null) return hs
+  const ht = parseHorasNumeroBruto(manutencao.horasTotais ?? manutencao.horas_totais)
+  if (ht != null) return ht
   return null
 }
 
@@ -49,11 +47,10 @@ export function parseHorasContadorForm(raw) {
  * @param {object|null|undefined} relatorio — opcional; usa `horasLeituraContador` quando existir (BD: horas_leitura_contador).
  */
 export function horasContadorParaRelatorio(maquina, manutencao, form, relatorio = null) {
-  const snap = relatorio?.horasLeituraContador
-  if (snap != null && snap !== '') {
-    const n = Number(snap)
-    if (Number.isFinite(n) && n >= 0) return n
-  }
+  const snap = parseHorasNumeroBruto(
+    relatorio?.horasLeituraContador ?? relatorio?.horas_leitura_contador,
+  )
+  if (snap != null) return snap
   const m = horasContadorNaManutencao(manutencao)
   if (m != null) return m
   const f = parseHorasContadorForm(form?.horasServico)
