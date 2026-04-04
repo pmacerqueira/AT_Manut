@@ -45,6 +45,7 @@ export default function Reparacoes() {
     reparacoes,
     relatoriosReparacao,
     maquinas,
+    marcas,
     clientes,
     addReparacao,
     updateReparacao,
@@ -332,23 +333,43 @@ export default function Reparacoes() {
     showGlobalLoading()
     setEmailEnviando(true)
     try {
-      const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-      const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
+      const { enviarRelatorioEmail } = await import('../services/emailService')
       const itensChecklist = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
       const tecObj = getTecnicoByNome(rep.tecnico || rel?.tecnico)
       const subRep = maq ? getSubcategoria(maq.subcategoriaId) : null
       const catRep = subRep ? getCategoria(subRep.categoriaId ?? subRep.categoria_id) : null
       const categoriaNome = catRep?.nome ?? ''
       const declaracaoClienteDepois = String(catRep?.declaracaoClienteDepois ?? catRep?.declaracao_cliente_depois ?? '').trim()
-      const html = relatorioReparacaoParaHtml(rel, rep, maq, cli, itensChecklist, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
-      const assunto = `Relatório de Reparação ${rel.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
+      let fotos = rel.fotos
+      if (typeof fotos === 'string') {
+        try { fotos = JSON.parse(fotos || '[]') } catch { fotos = [] }
+      }
+      if (!Array.isArray(fotos)) fotos = []
+      let pecasUsadas = rel.pecasUsadas
+      if (typeof pecasUsadas === 'string') {
+        try { pecasUsadas = JSON.parse(pecasUsadas || '[]') } catch { pecasUsadas = [] }
+      }
+      if (!Array.isArray(pecasUsadas)) pecasUsadas = []
+      let checklistRespostas = rel.checklistRespostas
+      if (typeof checklistRespostas === 'string') {
+        try { checklistRespostas = JSON.parse(checklistRespostas || '{}') } catch { checklistRespostas = {} }
+      }
+      if (!checklistRespostas || typeof checklistRespostas !== 'object') checklistRespostas = {}
+      const relN = { ...rel, fotos, pecasUsadas, checklistRespostas }
       let sucesso = 0
       for (const dest of dests) {
-        const resultado = await enviarRelatorioHtmlEmail({
-          destinatario: dest,
-          assunto,
-          html,
-          nomeCliente: cli?.nome ?? '',
+        const resultado = await enviarRelatorioEmail({
+          emailDestinatario: dest,
+          relatorio: relN,
+          maquina: maq,
+          cliente: cli,
+          checklistItems: itensChecklist,
+          subcategoriaNome: subRep?.nome ?? '',
+          tecnicoObj: tecObj,
+          marcas,
+          categoriaNome,
+          declaracaoClienteDepois,
+          reparacao: rep,
         })
         if (resultado.ok) sucesso++
         else logger.error('Reparacoes', 'enviarEmail', resultado.message ?? 'Erro', { dest })

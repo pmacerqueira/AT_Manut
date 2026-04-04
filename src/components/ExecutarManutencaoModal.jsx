@@ -96,6 +96,56 @@ function notasCumpremMinimoObservacoes(notas, quickNotesList) {
   return list.some((q) => typeof q === 'string' && q.trim().length > 0 && t.includes(q))
 }
 
+/** Snapshot estável para comparar se o utilizador alterou o assistente (cancelar com confirmação). */
+function snapshotExecCancelState({
+  form,
+  fotos,
+  emailDestinatario,
+  assinaturaFeita,
+  step,
+  confirmaEquipamentoSerie,
+  adminEdit,
+  hasPreviewPdf,
+  kaeserPecasDirty,
+}) {
+  const cr = form?.checklistRespostas || {}
+  const checklist = Object.keys(cr).sort().reduce((acc, k) => {
+    acc[k] = cr[k]
+    return acc
+  }, {})
+  const pecasNorm = (form?.pecasUsadas || []).map(p => ({
+    id: p.id,
+    codigoArtigo: p.codigoArtigo ?? '',
+    descricao: p.descricao ?? '',
+    quantidadeUsada: Number(p.quantidadeUsada ?? p.quantidade ?? 0),
+    usado: !!p.usado,
+    unidade: p.unidade || 'PÇ',
+  }))
+  const fotosNorm = (fotos || []).map(f => f.id || f.preview || f.name || '').join('|')
+  return JSON.stringify({
+    checklist,
+    notas: form?.notas || '',
+    horasServico: form?.horasServico || '',
+    tecnico: form?.tecnico || '',
+    nomeAssinante: form?.nomeAssinante || '',
+    tipoManutKaeser: form?.tipoManutKaeser || '',
+    pecas: pecasNorm,
+    dataRealizacao: form?.dataRealizacao || '',
+    adminStatus: form?.adminStatus || '',
+    adminDataAgendada: form?.adminDataAgendada || '',
+    adminDataExecucao: form?.adminDataExecucao || '',
+    limparAssinatura: !!form?.limparAssinatura,
+    fotos: fotosNorm,
+    email: emailDestinatario || '',
+    assinaturaFeita: !!assinaturaFeita,
+    step,
+    confirmaEquipamentoSerie: !!confirmaEquipamentoSerie,
+    adminEdit: !!adminEdit,
+    preview: !!hasPreviewPdf,
+    kaeserPecasDirty: !!kaeserPecasDirty,
+  })
+}
+
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false }) {
   const { isAdmin } = usePermissions()
   const {
@@ -174,6 +224,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   /** Re-bootstrap quando o relatório (checklist gravada) aparece ou muda no estado. */
   const bootstrapRelSigRef = useRef('')
   const modalRef = useRef(null)
+  /** Estado inicial do assistente após bootstrap — para confirmar saída só se houve alterações. */
+  const execCancelBaselineRef = useRef('')
   /** Última sugestão do motor (para auditoria no relatório). */
   const kaeserAuditoriaRef = useRef({ tipoSugerido: null, motivo: null })
   const kaeserWarnAnualHighDeltaRef = useRef(false)
@@ -268,6 +320,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setKaeserIntervencaoAnual(false)
       kaeserAuditoriaRef.current = { tipoSugerido: null, motivo: null }
       kaeserWarnAnualHighDeltaRef.current = false
+      execCancelBaselineRef.current = ''
       return
     }
     if (!maq) return
@@ -404,7 +457,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           : [])
     const nomePreenchido = existingRel?.nomeAssinante || cli?.nomeContacto || ''
     const horasIniciaisUnificadas = horasNaManutAberta ?? horasNaFicha
-    setForm({
+    const nextFotos = existingRel?.fotos ?? []
+    const nextForm = {
       checklistRespostas,
       notas: isPreFilled ? '' : (existingRel?.notas ?? '').slice(0, 300),
       horasServico: horasIniciaisUnificadas != null ? String(horasIniciaisUnificadas) : '',
@@ -418,13 +472,27 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       adminDataExecucao: existingRel
         ? ((existingRel.dataAssinatura || existingRel.dataCriacao || '').slice(0, 10) || m?.data || '')
         : (m?.data || ''),
-    })
-    setFotos(existingRel?.fotos ?? [])
+      limparAssinatura: false,
+    }
+    setForm(nextForm)
+    setFotos(nextFotos)
     setErroChecklist('')
     setErroAssinatura('')
     setAssinaturaFeita(false)
     const clienteEmail = cli?.email ?? ''
     setEmailDestinatario(clienteEmail)
+    const assinaturaBaseline = !!(existingRel?.assinaturaDigital || cli?.assinaturaContacto)
+    execCancelBaselineRef.current = snapshotExecCancelState({
+      form: nextForm,
+      fotos: nextFotos,
+      emailDestinatario: clienteEmail,
+      assinaturaFeita: assinaturaBaseline,
+      step: 1,
+      confirmaEquipamentoSerie: false,
+      adminEdit,
+      hasPreviewPdf: false,
+      kaeserPecasDirty: false,
+    })
     requestAnimationFrame(() => {
       const canvas = canvasRef.current
       if (!canvas) return
@@ -474,6 +542,38 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setExecUiPhase('form')
     setOpcoesEscolha([])
   }, [])
+
+  const handleCancelarExecucao = useCallback(() => {
+    const atual = snapshotExecCancelState({
+      form,
+      fotos,
+      emailDestinatario,
+      assinaturaFeita,
+      step,
+      confirmaEquipamentoSerie,
+      adminEdit,
+      hasPreviewPdf: !!previewPdfUrl,
+      kaeserPecasDirty,
+    })
+    const base = execCancelBaselineRef.current
+    if (base && atual !== base) {
+      if (!window.confirm(
+        'Tem a certeza que pretende sair? O progresso e os dados preenchidos neste assistente serão perdidos.',
+      )) return
+    }
+    onClose()
+  }, [
+    form,
+    fotos,
+    emailDestinatario,
+    assinaturaFeita,
+    step,
+    confirmaEquipamentoSerie,
+    adminEdit,
+    previewPdfUrl,
+    kaeserPecasDirty,
+    onClose,
+  ])
 
   useEffect(() => {
     if (modalRef.current) modalRef.current.scrollTop = 0
@@ -1558,10 +1658,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     )
   }
 
+  // Fundo não chama onClose — evita fechar o assistente por clique acidental; usar «Cancelar».
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-assinatura modal-relatorio-form" ref={modalRef} onClick={e => e.stopPropagation()}>
-        <h2>{adminEdit ? 'Editar relatório' : 'Executar manutenção'}</h2>
+    <div className="modal-overlay" role="presentation">
+      <div className="modal modal-assinatura modal-relatorio-form" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="exec-manut-modal-title">
+        <h2 id="exec-manut-modal-title">{adminEdit ? 'Editar relatório' : 'Executar manutenção'}</h2>
         {maq && <p className="modal-hint">{desc}</p>}
         {adminEdit && rel?.numeroRelatorio && (
           <p className="modal-hint" style={{ marginTop: '-0.25rem' }}>Relatório {rel.numeroRelatorio}</p>
@@ -2521,7 +2622,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
         {/* ═══ Rodapé fixo ═══ */}
         <div className="wizard-footer">
-          <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn secondary" onClick={handleCancelarExecucao}>Cancelar</button>
           {adminEdit ? (
             <div className="wizard-footer-actions">
               <button type="button" className="btn btn-gravar-sucesso" onClick={handleAdminEditSave}>

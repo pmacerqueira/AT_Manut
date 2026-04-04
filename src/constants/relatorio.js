@@ -13,6 +13,7 @@
  * - **elevadores:** EN 1493:2022, Dir. Máquinas 2006/42/CE, Reg. (UE) 2023/1230 (quando aplicável), DL 50/2005.
  * - **compressores:** Dir. Máquinas + DL 50/2005; PED 2014/68/UE + enquadramento nacional (DL 32/2015, …).
  * - **outros:** texto genérico.
+ * - **reparação:** para `tipo === 'reparacao'`, blocos próprios (intervenção corretiva / conservação de relatórios de assistência), não o texto de manutenção periódica.
  */
 
 /** @typedef {'elevadores'|'compressores'|'outros'} DeclaracaoLegislacaoId */
@@ -31,6 +32,16 @@ const TEXTO_BASE_DEPOIS_COMPRESSORES =
 const TEXTO_BASE_DEPOIS_OUTROS =
   'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.'
 
+/** Textos canónicos para «… na reparação …» — focam intervenção corretiva / assistência, não manutenção periódica. */
+const TEXTO_REPARACAO_DEPOIS_ELEVADORES =
+  'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este relatório e a documentação técnica exigível (nomeadamente Manual de Utilizador e Declaração de Conformidade CE) pelo período mínimo de dois anos ou pelo prazo aplicável, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.'
+
+const TEXTO_REPARACAO_DEPOIS_COMPRESSORES =
+  'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).'
+
+const TEXTO_REPARACAO_DEPOIS_OUTROS =
+  'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.'
+
 const TIPO_LABEL = {
   montagem:  'montagem',
   periodica: 'manutenção',
@@ -41,6 +52,12 @@ const DEPOIS_POR_VARIANTE = {
   elevadores: TEXTO_BASE_DEPOIS_ELEVADORES,
   compressores: TEXTO_BASE_DEPOIS_COMPRESSORES,
   outros: TEXTO_BASE_DEPOIS_OUTROS,
+}
+
+const DEPOIS_REPARACAO_POR_VARIANTE = {
+  elevadores: TEXTO_REPARACAO_DEPOIS_ELEVADORES,
+  compressores: TEXTO_REPARACAO_DEPOIS_COMPRESSORES,
+  outros: TEXTO_REPARACAO_DEPOIS_OUTROS,
 }
 
 /**
@@ -116,7 +133,10 @@ export function getRelatorioModuloFlagsForCategoria(_nomeCategoria) {
 export function getDeclaracaoCliente(tipo, legislacaoVariante = 'outros') {
   const label = TIPO_LABEL[tipo] || 'manutenção'
   const key = legislacaoVariante in DEPOIS_POR_VARIANTE ? legislacaoVariante : 'outros'
-  const depois = DEPOIS_POR_VARIANTE[key]
+  const depois =
+    tipo === 'reparacao'
+      ? DEPOIS_REPARACAO_POR_VARIANTE[key] || DEPOIS_REPARACAO_POR_VARIANTE.outros
+      : DEPOIS_POR_VARIANTE[key]
   return `${TEXTO_BASE_ANTES} ${label} ${depois}`
 }
 

@@ -9,6 +9,65 @@ Política de continuidade:
 
 ---
 
+## [1.16.53] — 2026-03-28 — Clientes: pesquisa por nome
+
+### Correcções
+- **`Clientes.jsx`:** a pesquisa por várias palavras exige que **todas as palavras com 2+ caracteres** existam no nome (antes, `some` + token de 1 letra como «a» fazia aparecer quase todos os clientes). Continua **case-insensitive**; NIF continua a filtrar pela frase completa.
+
+---
+
+## [1.16.52] — 2026-03-27 — Relatórios de reparação (PDF email + HTML)
+
+### Correcções / alinhamento
+- **`servidor-cpanel/send-email.php`:** PDF gerado no envio de email em reparação — ordem das secções **peças → fotos → notas → checklist** (manutenção mantém ordem canónica); correcção do título «TRABALHO REALIZADO»; peças com `codigo` ou `codigoArtigo`.
+- **`relatorioReparacaoHtml.js`:** mesma ordem de secções; **horas no contador (acumuladas)** na grelha «Dados da Intervenção» quando aplicável.
+
+**Deploy:** enviar também **`send-email.php`** actualizado para o cPanel (além do zip do front).
+
+---
+
+## [1.16.51] — 2026-03-27 — Duplicado de nº de série + zip de deploy plano
+
+### Correcções / qualidade
+- **Equipamentos:** impede criar ou actualizar ficha com o **mesmo nº de série** já usado por outro equipamento do **mesmo cliente** (toast no formulário + validação **422** em `data.php` em create/update/bulk).
+- **Deploy:** `dist_upload.zip` passa a ser gerado com **`scripts/make-deploy-zip.mjs`** (`archiver`): conteúdo de `dist/` na **raíz** do zip, para extrair **directamente** em `public_html/manut/` sem subpasta intermédia.
+
+---
+
+## [1.16.50] — 2026-03-27 — Frota: nº de série + relatório com número
+
+### Correcções
+- **`frotaReportHelpers.js`:** `relatorioLigadoAoEquipamento` e `relatorioVisivelNaFrotaCliente` ligam relatórios ao equipamento pelo **mesmo nº de série** que outra ficha do cliente (duplicados `maquinas.id`). `pickNewestRelatorioParaEquipamento` prefere relatórios com **nº oficial** quando existem rascunhos mais recentes sem número.
+
+---
+
+## [1.16.49] — 2026-03-27 — API: relatórios com `manutencaoMaquinaId` (JOIN)
+
+### Correcções
+- **`servidor-cpanel/api/data.php`:** `list` / `get` / `create` / `update` de **relatorios** devolvem `manutencao_maquina_id` (camelCase no JSON: `manutencaoMaquinaId`) via `LEFT JOIN manutencoes`, para a frota ligar nº e datas ao equipamento sem depender só do alinhamento de ids no cliente.
+- **`frotaReportHelpers.js`:** `pickNewestRelatorioParaEquipamento`, `relatorioLigadoAoEquipamento`, `normRelatorioMaquinaIdJoin`.
+- **`gerarRelatorioFrota*` + `Clientes.jsx`:** `relMap` aceita relatórios cuja manutenção pertence à máquina do JOIN.
+
+**Deploy:** além do zip do front, é necessário **enviar o `data.php` actualizado** para o servidor (`public_html/api/` ou caminho equivalente).
+
+---
+
+## [1.16.48] — 2026-03-27 — Frota: data «Última» alinhada ao relatório
+
+### Correcções
+- **`frotaReportHelpers.js`:** a coluna **Última** usa primeiro a **data do relatório** (assinatura/criação); só sem relatório datado é que entram `manutencoes.data` e `ultimaManutencaoData` — evita que a ficha «ultrapasse» o PDF (ex.: 18-03 na frota vs relatório correcto em 16-01).
+- **`relUltima`:** prioritiza o relatório mais recente do equipamento; `ultimaRegistroParaProxima` alinha o cálculo da **Próxima** com `dataUltimaKey` quando a linha da manutenção difere.
+
+---
+
+## [1.16.47] — 2026-03-27 — Frota: «Últ. rel.» — join com lista global
+
+### Correcções
+- **`frotaReportHelpers.js`:** `midSetParaRelatoriosDaMaquina` usa **todas** as manutenções em memória + `manutsM`, `normRelatorioManutencaoId` / `normManutencaoMaquinaId` (camelCase e snake_case), `numeroRelatorioLegivel`, `enrichRelatorioComNumero` quando o nº vem noutra linha da lista.
+- **`gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `Clientes.jsx`:** `resolveUltimaParaFrota(..., manutencoes)` e coluna/PDF com `numeroRelatorioLegivel`.
+
+---
+
 ## [1.16.46] — 2026-03-27 — Relatório de frota: coluna «Últ. rel.»
 
 ### Correcções

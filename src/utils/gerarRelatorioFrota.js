@@ -17,8 +17,12 @@ import {
   normEntityId,
   dateKeyForFilter,
   mergeRelatorioPreferNewer,
+  normRelatorioManutencaoId,
+  numeroRelatorioLegivel,
+  relatorioVisivelNaFrotaCliente,
   resolveProximaManutParaFrota,
   resolveUltimaParaFrota,
+  ultimaRegistroParaProxima,
   isManutencaoConcluida,
 } from './frotaReportHelpers'
 
@@ -92,8 +96,9 @@ export async function gerarRelatorioFrotaPdf(
   const repsDoCliente = reparacoes.filter(r => maqIds.has(normEntityId(r.maquinaId)))
   const relMap = new Map()
   for (const r of relatorios) {
-    const rid = normEntityId(r.manutencaoId)
-    if (!rid || !manutsDoCliente.some(mt => normEntityId(mt.id) === rid)) continue
+    const rid = normRelatorioManutencaoId(r)
+    if (!rid) continue
+    if (!relatorioVisivelNaFrotaCliente(r, maqIds, manutsDoCliente, manutencoes, maquinas)) continue
     relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
   }
 
@@ -117,8 +122,8 @@ export async function gerarRelatorioFrotaPdf(
     const mid = normEntityId(m.id)
     const manutsM = manutsByMaq.get(mid) || []
     const repsM = repsByMaq.get(mid) || []
-    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap)
-    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap, manutencoes, maquinas)
+    const ultimaParaProxima = ultimaRegistroParaProxima(ultima, dataUltimaKey)
     const resolved = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
     const proxima = resolved.registo
     const proxDataKey = resolved.dataKey || ''
@@ -482,7 +487,7 @@ export async function gerarRelatorioFrotaPdf(
     pdf.text(estadoLabel, xs[6] + colDefs[6].w / 2, yMid, { align: 'center' })
 
     pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED); pdf.setFontSize(6.5)
-    const nr = relUltima?.numeroRelatorio ? String(relUltima.numeroRelatorio) : '\u2014'
+    const nr = numeroRelatorioLegivel(relUltima) || '\u2014'
     pdf.text(nr, xs[7] + colDefs[7].w / 2, yMid, { align: 'center' })
 
     y += rowH

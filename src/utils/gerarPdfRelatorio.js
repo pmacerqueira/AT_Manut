@@ -215,10 +215,27 @@ export function imprimirOuGuardarPdf(html) {
  * Texto seleccionável; com fotografias o tamanho do ficheiro cresce (JPEG em base64).
  * Usado para enviar como anexo de email.
  *
- * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome }} params
+ * @param {{ relatorio, manutencao, maquina, cliente, checklistItems, subcategoriaNome, relatorioKind?, reparacao? }} params
  * @returns {Promise<Blob>}
  */
-export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente, checklistItems: checklistItemsLive = [], subcategoriaNome = '', tecnicoObj = null, proximasManutencoes = [], marcas = [], categoriaNome = '', declaracaoClienteDepois = '' }) {
+export async function gerarPdfCompacto({
+  relatorio,
+  manutencao,
+  maquina,
+  cliente,
+  checklistItems: checklistItemsLive = [],
+  subcategoriaNome = '',
+  tecnicoObj = null,
+  proximasManutencoes = [],
+  marcas = [],
+  categoriaNome = '',
+  declaracaoClienteDepois = '',
+  /** 'manutencao' (defeito) | 'reparacao' — alinha PDF com relatório de reparação (sem próximas; declaração específica). */
+  relatorioKind = 'manutencao',
+  /** Opcional: registo da reparação (data de realização, etc.) quando {@link relatorioKind} é reparacao. */
+  reparacao = null,
+}) {
+  const isReparacao = relatorioKind === 'reparacao'
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { jsPDF } = await import('jspdf')
 
@@ -227,17 +244,28 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   const M    = 14          // margem horizontal
   const cW   = W - 2 * M  // largura do conteúdo (182 mm)
 
-  const tipoServico  = manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'
+  const tipoServico  = isReparacao
+    ? 'Repara\u00e7\u00e3o'
+    : (manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manuten\u00e7\u00e3o Peri\u00f3dica')
   const numRel       = relatorio?.numeroRelatorio ?? 'S/N'
   const equipDesc    = maquina
     ? `${subcategoriaNome ? subcategoriaNome + ' \u2014 ' : ''}${maquina.marca} ${maquina.modelo} (N\u00ba ${maquina.numeroSerie})`
     : '\u2014'
   const dataExecOpts = { dateStyle: 'long', timeStyle: 'short', timeZone: 'Atlantic/Azores' }
+  const dataExecCurta = { dateStyle: 'long', timeZone: 'Atlantic/Azores' }
+  const dataRealizacaoBruta = isReparacao
+    ? (relatorio?.dataRealizacao || reparacao?.data || '')
+    : ''
   const dataAssin    = relatorio?.dataAssinatura
     ? new Date(relatorio.dataAssinatura).toLocaleString('pt-PT', dataExecOpts)
     : (relatorio?.dataCriacao
       ? new Date(relatorio.dataCriacao).toLocaleString('pt-PT', dataExecOpts)
       : '\u2014')
+  const dataRealizacaoFmt = dataRealizacaoBruta
+    ? new Date(
+        String(dataRealizacaoBruta).includes('T') ? dataRealizacaoBruta : `${String(dataRealizacaoBruta).slice(0, 10)}T12:00:00`,
+      ).toLocaleString('pt-PT', dataExecCurta)
+    : dataAssin
 
   // ── Cabeçalho azul com logo ──────────────────────────────────────────────
   const headerH = 30
@@ -305,16 +333,32 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.line(M, y, W - M, y); y += 7
 
   // ── Dados do serviço ──────────────────────────────────────────────────────
-  const horasPdf = horasContadorParaRelatorio(maquina, manutencao, null, relatorio)
-  const dataRows = [
-    ['CLIENTE',           cliente?.nome ?? '\u2014'],
-    ['EQUIPAMENTO',       equipDesc],
-    ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
-    ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
-    ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
-  ]
+  const horasPdf = horasContadorParaRelatorio(maquina, isReparacao ? null : manutencao, null, relatorio)
+  const dataRows = isReparacao
+    ? [
+        ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ['EQUIPAMENTO',       equipDesc],
+        ['DATA DE REALIZA\u00c7\u00c3O', dataRealizacaoFmt],
+        ['T\u00c9CNICO',      relatorio?.tecnico ?? '\u2014'],
+      ]
+    : [
+        ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ['EQUIPAMENTO',       equipDesc],
+        ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
+        ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
+        ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
+      ]
+  if (isReparacao && relatorio?.numeroAviso?.trim()) {
+    dataRows.push(['N.\u00ba AVISO / PEDIDO', relatorio.numeroAviso.trim()])
+  }
   if (horasPdf != null) {
     dataRows.push(['HORAS NO CONTADOR (ACUMULADAS)', `${horasPdf} h`])
+  }
+  if (isReparacao && relatorio?.horasMaoObra != null && relatorio.horasMaoObra !== '') {
+    dataRows.push(['HORAS DE M\u00c3O-DE-OBRA', `${relatorio.horasMaoObra} h`])
+  }
+  if (isReparacao) {
+    dataRows.push(['ASSINADO POR', relatorio?.nomeAssinante ?? '\u2014'])
   }
 
   pdf.setFontSize(9)
@@ -338,7 +382,7 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     y += rowH
   })
 
-  if (relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
+  if (!isReparacao && relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
     if (y > 248) { pdf.addPage(); y = 20 }
     pdf.setFontSize(8.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     pdf.text('PLANO DE MANUTEN\u00c7\u00c3O (FABRICANTE / N.\u00ba DE S\u00c9RIE)', M, y)
@@ -380,14 +424,36 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3)
   pdf.line(M, y, W - M, y); y += 7
 
-  // ── Checklist ─────────────────────────────────────────────────────────────
-  if (checklistItems.length > 0) {
+  const obrigaBlocoPecas = !isReparacao && relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
+  const secaoConsumiveisContador = relatorioIncluiSecaoConsumiveisContador(maquina, manutencao)
+  const pecasRaw = Array.isArray(relatorio?.pecasUsadas) ? relatorio.pecasUsadas : []
+
+  /** Reparação: texto longo fora da grelha; ordem das secções alinhada ao HTML e ao fluxo operacional. */
+  function renderReparacaoNarrativa() {
+    if (!isReparacao) return
+    const bloco = (titulo, textoBruto) => {
+      const texto = String(textoBruto ?? '').trim()
+      if (!texto) return
+      if (y > 235) { pdf.addPage(); y = 20 }
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+      pdf.text(titulo, M, y); y += 6
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      const lines = pdf.splitTextToSize(texto, cW)
+      pdf.text(lines, M, y); y += lines.length * 5 + 7
+    }
+    bloco('AVARIA / PROBLEMA REPORTADO', relatorio?.descricaoAvaria)
+    bloco('TRABALHO REALIZADO', relatorio?.trabalhoRealizado)
+  }
+
+  function renderChecklistSection() {
+    if (checklistItems.length === 0) return
     if (y > 260) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     pdf.text('CHECKLIST DE VERIFICA\u00c7\u00c3O', M, y); y += 6
 
-    const nSim = Object.values(relatorio?.checklistRespostas ?? {}).filter(v => v === 'sim').length
-    const nNao = Object.values(relatorio?.checklistRespostas ?? {}).filter(v => v === 'nao').length
+    const valsCh = Object.values(relatorio?.checklistRespostas ?? {})
+    const nSim = valsCh.filter(v => v === 'sim' || v === 'OK').length
+    const nNao = valsCh.filter(v => v === 'nao' || v === 'NOK').length
     pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
     pdf.text(`${nSim} conforme \u2022 ${nNao} n\u00e3o conforme \u2022 ${checklistItems.length} itens`, M, y); y += 5
 
@@ -396,8 +462,18 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
       if (y > 270) { pdf.addPage(); y = 20 }
       if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 7, 'F') }
       const resp  = relatorio?.checklistRespostas?.[item.id]
-      const badge = resp === 'sim' ? 'SIM' : resp === 'nao' ? 'N\u00c3O' : '\u2014'
-      const rgb   = resp === 'sim' ? [22, 163, 74] : resp === 'nao' ? [220, 38, 38] : [107, 114, 128]
+      const badge = resp === 'sim' || resp === 'OK'
+        ? 'SIM'
+        : resp === 'nao' || resp === 'NOK'
+          ? 'N\u00c3O'
+          : resp === 'N/A'
+            ? 'N/A'
+            : '\u2014'
+      const rgb   = (resp === 'sim' || resp === 'OK')
+        ? [22, 163, 74]
+        : (resp === 'nao' || resp === 'NOK')
+          ? [220, 38, 38]
+          : [107, 114, 128]
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
       pdf.text(String(i + 1) + '.', M + 1, y)
       pdf.setTextColor(55, 65, 81)
@@ -409,8 +485,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     y += 4
   }
 
-  // ── Notas ─────────────────────────────────────────────────────────────────
-  if (relatorio?.notas) {
+  function renderNotasSection() {
+    if (!relatorio?.notas) return
     if (y > 240) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     pdf.text('NOTAS ADICIONAIS', M, y); y += 6
@@ -419,8 +495,7 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     pdf.text(lines, M, y); y += lines.length * 5 + 5
   }
 
-  // ── Fotos — grelha até 4 por linha (A4), proporção preservada, nova página se necessário ──
-  {
+  async function renderFotosSection() {
     const fotosAll = normalizeRelatorioFotos(relatorio?.fotos)
     const nFotosTotal = fotosAll.length
     if (nFotosTotal > 0) {
@@ -452,8 +527,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
         const gap = 2
         const cellW = (cW - (cols - 1) * gap) / cols
         const cellH = cellW * 0.72 + 4
-        const rows = Math.ceil(resolved.length / cols)
-        for (let row = 0; row < rows; row++) {
+        const nRowsF = Math.ceil(resolved.length / cols)
+        for (let row = 0; row < nRowsF; row++) {
           if (y + cellH > 272) { pdf.addPage(); y = 20 }
           const y0 = y
           for (let c = 0; c < cols; c++) {
@@ -469,11 +544,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     }
   }
 
-  // ── Consumíveis e peças (KAESER plano + equipamentos com contador de horas) ──
-  const obrigaBlocoPecas = relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
-  const secaoConsumiveisContador = relatorioIncluiSecaoConsumiveisContador(maquina, manutencao)
-  const pecasRaw = Array.isArray(relatorio?.pecasUsadas) ? relatorio.pecasUsadas : []
-  if (obrigaBlocoPecas || pecasRaw.length > 0 || secaoConsumiveisContador) {
+  function renderPecasSection() {
+    if (!obrigaBlocoPecas && pecasRaw.length === 0 && !secaoConsumiveisContador) return
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     const subTit = relatorio?.tipoManutKaeser && INTERVALOS_KAESER[relatorio.tipoManutKaeser]
@@ -482,8 +554,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     const tituloConsumiveis = obrigaBlocoPecas
       ? `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`
       : (secaoConsumiveisContador
-        ? 'CONSUM\u00cdVEIS E PE\u00c7AS (INTERVEN\u00c7\u00c3O)'
-        : `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`)
+        ? (isReparacao ? 'PE\u00c7AS E MATERIAIS (INTERVEN\u00c7\u00c3O)' : 'CONSUM\u00cdVEIS E PE\u00c7AS (INTERVEN\u00c7\u00c3O)')
+        : (isReparacao ? 'PE\u00c7AS E MATERIAIS UTILIZADOS' : `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`))
     pdf.text(tituloConsumiveis, M, y); y += 6
 
     const normalizar = (p) => 'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
@@ -493,8 +565,12 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
       const msg = obrigaBlocoPecas
         ? 'Nenhuma linha do plano foi registada nesta interven\u00e7\u00e3o. Edite o relat\u00f3rio para associar o tipo A/B/C/D e as pe\u00e7as importadas por n.\u00ba de s\u00e9rie.'
         : (secaoConsumiveisContador
-          ? 'Nenhum consum\u00edvel ou pe\u00e7a foi listado nesta interven\u00e7\u00e3o.'
-          : 'Sem consum\u00edveis listados.')
+          ? (isReparacao
+            ? 'Nenhuma pe\u00e7a ou material foi listado nesta repara\u00e7\u00e3o.'
+            : 'Nenhum consum\u00edvel ou pe\u00e7a foi listado nesta interven\u00e7\u00e3o.')
+          : (isReparacao
+            ? 'Nenhuma pe\u00e7a ou material registado nesta repara\u00e7\u00e3o.'
+            : 'Sem consum\u00edveis listados.'))
       const wrapped = pdf.splitTextToSize(msg, cW)
       pdf.text(wrapped, M, y)
       y += wrapped.length * 4 + 6
@@ -504,7 +580,11 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
       const naoUsadas = pecas.filter(p => !p.usado)
 
       pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
-      pdf.text(`${usadas.length} utilizado(s) \u2022 ${naoUsadas.length} n\u00e3o substitu\u00eddo(s) \u2022 ${pecas.length} no plano`, M, y); y += 5
+      if (isReparacao && !obrigaBlocoPecas) {
+        pdf.text(`${pecas.length} linha(s) registada(s).`, M, y); y += 5
+      } else {
+        pdf.text(`${usadas.length} utilizado(s) \u2022 ${naoUsadas.length} n\u00e3o substitu\u00eddo(s) \u2022 ${pecas.length} no plano`, M, y); y += 5
+      }
 
       pdf.setFontSize(8)
       pecas.forEach((p, i) => {
@@ -516,7 +596,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
         pdf.text(icon, M + 1, y)
         pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
         const posTxt = p.posicao ? `${p.posicao} ` : ''
-        const desc = `${posTxt}${p.codigoArtigo ? p.codigoArtigo + ' \u2014 ' : ''}${p.descricao ?? ''}`
+        const codigoP = p.codigoArtigo ?? p.codigo ?? ''
+        const desc = `${posTxt}${codigoP ? codigoP + ' \u2014 ' : ''}${p.descricao ?? ''}`
         pdf.text(desc, M + 7, y, { maxWidth: cW - 30 })
         const q = p.quantidadeUsada ?? p.quantidade
         if (q != null && q !== '') {
@@ -529,15 +610,27 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     }
   }
 
+  renderReparacaoNarrativa()
+  if (isReparacao) {
+    renderPecasSection()
+    await renderFotosSection()
+    renderNotasSection()
+    renderChecklistSection()
+  } else {
+    renderChecklistSection()
+    renderNotasSection()
+    await renderFotosSection()
+    renderPecasSection()
+  }
+
   // ── Declaração de aceitação do cliente ──────────────────────────────────────
   {
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
-    const declText = resolveDeclaracaoCliente(
-      manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
-      categoriaNome,
-      declaracaoClienteDepois,
-    )
+    const declTipo = isReparacao
+      ? 'reparacao'
+      : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
+    const declText = resolveDeclaracaoCliente(declTipo, categoriaNome, declaracaoClienteDepois)
     const declPad = 6
     const declTextW = cW - declPad * 2
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
@@ -557,8 +650,8 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
     y += declPad + 4
   }
 
-  // ── Próximas manutenções agendadas ──────────────────────────────────────────
-  {
+  // ── Próximas manutenções agendadas (omitir em relatórios de reparação) ─────
+  if (!isReparacao) {
     const proximas = (proximasManutencoes ?? []).filter(pm => pm.data).sort((a, b) => a.data.localeCompare(b.data))
     const periMaqVal = maquina?.periodicidadeManut
     const periLabels = { trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual', mensal: 'Mensal' }
@@ -622,7 +715,7 @@ export async function gerarPdfCompacto({ relatorio, manutencao, maquina, cliente
   pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
   pdf.text('T\u00c9CNICO RESPONS\u00c1VEL', M + 2, y)
   pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
-  pdf.text(relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014', M + 2, y + 5)
+  pdf.text(relatorio?.tecnico ?? (isReparacao ? '\u2014' : manutencao?.tecnico) ?? '\u2014', M + 2, y + 5)
   if (tecnicoObj?.telefone) {
     pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
     pdf.text('Tel: ' + tecnicoObj.telefone, M + 2, y + 10)

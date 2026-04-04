@@ -26,7 +26,7 @@
  * Feriado municipal - Ponta Delgada:
  *   Segunda-feira das Festas do Senhor Santo Cristo dos Milagres (Pascoa + 36 dias)
  */
-import { MESES_PT } from '../constants/locale'
+import { MESES_PT } from '../constants/locale.js'
 
 // ── Utilitários internos ──────────────────────────────────────────────────────
 

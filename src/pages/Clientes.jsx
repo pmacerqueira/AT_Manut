@@ -27,9 +27,13 @@ import { computarProximasDatas } from '../utils/diasUteis'
 import {
   maquinaPertenceCliente,
   mergeRelatorioPreferNewer,
+  midSetParaRelatoriosDaMaquina,
   normEntityId,
+  normRelatorioManutencaoId,
+  relatorioLigadoAoEquipamento,
   resolveProximaManutParaFrota,
   resolveUltimaParaFrota,
+  ultimaRegistroParaProxima,
 } from '../utils/frotaReportHelpers'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
@@ -367,17 +371,19 @@ export default function Clientes() {
   const proximaDataNaFicha = useCallback((maq) => {
     const mid = normEntityId(maq?.id)
     const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+    const midSet = midSetParaRelatoriosDaMaquina(maq, manutencoes, manutsM)
     const relMap = new Map()
     for (const r of relatorios ?? []) {
-      const rid = normEntityId(r.manutencaoId)
-      if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+      const rid = normRelatorioManutencaoId(r)
+      if (!rid) continue
+      if (!relatorioLigadoAoEquipamento(r, midSet, maq, manutencoes, maquinasCliente)) continue
       relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
     }
-    const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap)
-    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap, manutencoes, maquinasCliente)
+    const ultimaParaProxima = ultimaRegistroParaProxima(ultima, dataUltimaKey)
     const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultimaParaProxima)
     return dataKey || null
-  }, [manutencoes, relatorios])
+  }, [manutencoes, relatorios, maquinasCliente])
 
   const fichaKpis = useMemo(() => {
     if (!maquinasCliente.length) return null
@@ -386,14 +392,16 @@ export default function Clientes() {
     for (const m of maquinasCliente) {
       const mid = normEntityId(m.id)
       const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+      const midSet = midSetParaRelatoriosDaMaquina(m, manutencoes, manutsM)
       const relMap = new Map()
       for (const r of relatorios ?? []) {
-        const rid = normEntityId(r.manutencaoId)
-        if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+        const rid = normRelatorioManutencaoId(r)
+        if (!rid) continue
+        if (!relatorioLigadoAoEquipamento(r, midSet, m, manutencoes, maquinasCliente)) continue
         relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
       }
-      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(m, manutsM, relatorios ?? [], relMap)
-      const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(m, manutsM, relatorios ?? [], relMap, manutencoes, maquinasCliente)
+      const ultimaParaProxima = ultimaRegistroParaProxima(ultima, dataUltimaKey)
       const { dataKey } = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
       if (!dataKey) { semData++; continue }
       if (isBefore(startOfDay(parseDateLocal(dataKey)), hoje)) emAtraso++
@@ -408,14 +416,16 @@ export default function Clientes() {
     return maquinasCliente.filter(maq => {
       const mid = normEntityId(maq.id)
       const manutsM = manutencoes.filter(mt => normEntityId(mt.maquinaId) === mid)
+      const midSet = midSetParaRelatoriosDaMaquina(maq, manutencoes, manutsM)
       const relMap = new Map()
       for (const r of relatorios ?? []) {
-        const rid = normEntityId(r.manutencaoId)
-        if (!rid || !manutsM.some(mt => normEntityId(mt.id) === rid)) continue
+        const rid = normRelatorioManutencaoId(r)
+        if (!rid) continue
+        if (!relatorioLigadoAoEquipamento(r, midSet, maq, manutencoes, maquinasCliente)) continue
         relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
       }
-      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap)
-      const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+      const { ultima, dataUltimaKey } = resolveUltimaParaFrota(maq, manutsM, relatorios ?? [], relMap, manutencoes, maquinasCliente)
+      const ultimaParaProxima = ultimaRegistroParaProxima(ultima, dataUltimaKey)
       const { dataKey } = resolveProximaManutParaFrota(maq, manutsM, ultimaParaProxima)
       if (fichaKpiFilter === 'atraso') {
         return !!dataKey && isBefore(startOfDay(parseDateLocal(dataKey)), hoje)
@@ -492,9 +502,13 @@ export default function Clientes() {
     const lista = q
       ? (() => {
           const palavras = q.split(/\s+/).filter(Boolean)
+          // Com `some`, um token de 1 letra (ex.: "a" em "AUTO A") fazia match em quase todos os nomes.
+          const significativas = palavras.filter(p => p.length >= 2)
+          const tokensNome = significativas.length > 0 ? significativas : palavras
           return clientes.filter(c => {
             const nifMatch = (c.nif || '').toLowerCase().includes(q)
-            const nomeMatch = palavras.some(p => (c.nome || '').toLowerCase().includes(p))
+            const hay = (c.nome || '').toLowerCase()
+            const nomeMatch = tokensNome.every(p => hay.includes(p))
             return nifMatch || nomeMatch
           })
         })()

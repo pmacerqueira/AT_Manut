@@ -22,7 +22,7 @@ import './ExecutarReparacaoModal.css'
 export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const { isAdmin } = usePermissions()
   const {
-    clientes, maquinas,
+    clientes, maquinas, marcas,
     updateReparacao,
     updateCliente,
     addRelatorioReparacao,
@@ -52,6 +52,27 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const categoriaNome = cat?.nome ?? ''
   const declaracaoClienteDepois = String(cat?.declaracaoClienteDepois ?? cat?.declaracao_cliente_depois ?? '').trim()
   const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, 'corretiva') : []
+
+  /** Normaliza campos JSON do relatório de reparação para PDF / send-email.php (iguais ao fluxo de manutenção). */
+  const parseRelatorioReparacaoLocal = useCallback((rel) => {
+    if (!rel) return rel
+    let fotos = rel.fotos
+    if (typeof fotos === 'string') {
+      try { fotos = JSON.parse(fotos || '[]') } catch { fotos = [] }
+    }
+    if (!Array.isArray(fotos)) fotos = []
+    let pecasUsadas = rel.pecasUsadas
+    if (typeof pecasUsadas === 'string') {
+      try { pecasUsadas = JSON.parse(pecasUsadas || '[]') } catch { pecasUsadas = [] }
+    }
+    if (!Array.isArray(pecasUsadas)) pecasUsadas = []
+    let checklistRespostas = rel.checklistRespostas
+    if (typeof checklistRespostas === 'string') {
+      try { checklistRespostas = JSON.parse(checklistRespostas || '{}') } catch { checklistRespostas = {} }
+    }
+    if (!checklistRespostas || typeof checklistRespostas !== 'object') checklistRespostas = {}
+    return { ...rel, fotos, pecasUsadas, checklistRespostas }
+  }, [])
 
   // ── Estado do formulário ────────────────────────────────────────────────
 
@@ -313,11 +334,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   //   3. Se cliente tem email: email do cliente            (confirmação ao cliente final)
 
   const enviarEmailsAutomaticos = async (relGerado) => {
-    const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-    const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
-    const tecObj  = getTecnicoByNome(relGerado.tecnico)
-    const html    = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
-    const assunto = `Relatório de Reparação ${relGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`
+    const { enviarRelatorioEmail } = await import('../services/emailService')
+    const tecObj = getTecnicoByNome(relGerado.tecnico)
+    const relN = parseRelatorioReparacaoLocal(relGerado)
 
     const destsSet = new Set()
     destsSet.add(EMAIL_ADMIN)
@@ -328,11 +347,17 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     const falhados  = []
     for (const dest of destsSet) {
       try {
-        const resultado = await enviarRelatorioHtmlEmail({
-          destinatario: dest,
-          assunto,
-          html,
-          nomeCliente: cli?.nome ?? '',
+        const resultado = await enviarRelatorioEmail({
+          emailDestinatario: dest,
+          relatorio: relN,
+          maquina: maq,
+          cliente: cli,
+          checklistItems,
+          tecnicoObj: tecObj,
+          marcas,
+          categoriaNome,
+          declaracaoClienteDepois,
+          reparacao,
         })
         if (resultado.ok) {
           enviados.push(dest)
@@ -461,7 +486,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   // ── Pré-visualizar / PDF ──────────────────────────────────────────────────
 
   const handlePrevisualizar = useCallback(async () => {
-    const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
+    const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
     const dataRealizacao = (isAdmin && form.dataRealizacao) ? form.dataRealizacao : (reparacao?.data ?? getHojeAzores())
     const dataEmissao = (isAdmin && form.dataEmissao) ? form.dataEmissao : getHojeAzores()
     const tempRel = {
@@ -482,26 +507,65 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       numeroRelatorio:    '(pré-visualização)',
     }
     const tecObj = getTecnicoByNome(form.tecnico)
-    const html = relatorioReparacaoParaHtml(tempRel, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
-    if (html) {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    showGlobalLoading()
+    try {
+      const blob = await gerarPdfCompacto({
+        relatorio: tempRel,
+        manutencao: null,
+        maquina: maq,
+        cliente: cli,
+        checklistItems,
+        subcategoriaNome: sub?.nome ?? '',
+        tecnicoObj: tecObj,
+        proximasManutencoes: [],
+        marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
+        relatorioKind: 'reparacao',
+        reparacao,
+      })
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank')
-      setTimeout(() => URL.revokeObjectURL(url), 30000)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (err) {
+      showToast('Erro ao gerar PDF: ' + err.message, 'error', 4000)
+      logger.error('ExecutarReparacaoModal', 'previsualizarPdf', err.message)
+    } finally {
+      hideGlobalLoading()
     }
-  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome])
+  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome, sub?.nome, marcas, categoriaNome, declaracaoClienteDepois, showGlobalLoading, hideGlobalLoading, showToast])
 
   const handleVerPdf = useCallback(async (relGerado) => {
-    const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
+    const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
+    const relN = parseRelatorioReparacaoLocal(relGerado)
     const tecObj = getTecnicoByNome(relGerado.tecnico)
-    const html = relatorioReparacaoParaHtml(relGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
-    if (html) {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    showGlobalLoading()
+    try {
+      const blob = await gerarPdfCompacto({
+        relatorio: relN,
+        manutencao: null,
+        maquina: maq,
+        cliente: cli,
+        checklistItems,
+        subcategoriaNome: sub?.nome ?? '',
+        tecnicoObj: tecObj,
+        proximasManutencoes: [],
+        marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
+        relatorioKind: 'reparacao',
+        reparacao,
+      })
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank')
-      setTimeout(() => URL.revokeObjectURL(url), 30000)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (err) {
+      showToast('Erro ao abrir PDF: ' + err.message, 'error', 4000)
+      logger.error('ExecutarReparacaoModal', 'verPdf', err.message)
+    } finally {
+      hideGlobalLoading()
     }
-  }, [reparacao, maq, cli, checklistItems, getTecnicoByNome])
+  }, [reparacao, maq, cli, checklistItems, getTecnicoByNome, parseRelatorioReparacaoLocal, sub?.nome, marcas, categoriaNome, declaracaoClienteDepois, showGlobalLoading, hideGlobalLoading, showToast])
 
   // ── Envio de email ────────────────────────────────────────────────────────
 
@@ -510,15 +574,20 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     showGlobalLoading()
     setEmailEnviando(true)
     try {
-      const { relatorioReparacaoParaHtml } = await import('../utils/relatorioReparacaoHtml')
-      const { enviarRelatorioHtmlEmail }   = await import('../services/emailService')
+      const { enviarRelatorioEmail } = await import('../services/emailService')
       const tecObj = getTecnicoByNome(relatorioGerado.tecnico)
-      const html = relatorioReparacaoParaHtml(relatorioGerado, reparacao, maq, cli, checklistItems, { tecnicoObj: tecObj, categoriaNome, declaracaoClienteDepois })
-      const resultado = await enviarRelatorioHtmlEmail({
-        destinatario: emailDestinatario.trim(),
-        assunto: `Relatório de Reparação ${relatorioGerado.numeroRelatorio} — ${maq?.marca ?? ''} ${maq?.modelo ?? ''}`,
-        html,
-        nomeCliente: cli?.nome ?? '',
+      const relN = parseRelatorioReparacaoLocal(relatorioGerado)
+      const resultado = await enviarRelatorioEmail({
+        emailDestinatario: emailDestinatario.trim(),
+        relatorio: relN,
+        maquina: maq,
+        cliente: cli,
+        checklistItems,
+        tecnicoObj: tecObj,
+        marcas,
+        categoriaNome,
+        declaracaoClienteDepois,
+        reparacao,
       })
       if (resultado.ok) {
         showToast('Relatório enviado com sucesso!', 'success')

@@ -11,8 +11,12 @@ import {
   normEntityId,
   dateKeyForFilter,
   mergeRelatorioPreferNewer,
+  normRelatorioManutencaoId,
+  numeroRelatorioLegivel,
+  relatorioVisivelNaFrotaCliente,
   resolveProximaManutParaFrota,
   resolveUltimaParaFrota,
+  ultimaRegistroParaProxima,
   isManutencaoConcluida,
 } from './frotaReportHelpers'
 
@@ -74,8 +78,9 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
   })
   const relMap = new Map()
   for (const r of relatorios) {
-    const rid = normEntityId(r.manutencaoId)
-    if (!rid || !manutsCliente.some(mt => normEntityId(mt.id) === rid)) continue
+    const rid = normRelatorioManutencaoId(r)
+    if (!rid) continue
+    if (!relatorioVisivelNaFrotaCliente(r, maqIds, manutsCliente, manutencoes, maquinas)) continue
     relMap.set(rid, mergeRelatorioPreferNewer(relMap.get(rid), r))
   }
 
@@ -85,8 +90,8 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     const mid = normEntityId(m.id)
     const manutsM = manutsByMaq.get(mid) || []
     const repsM = repsByMaq.get(mid) || []
-    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap)
-    const ultimaParaProxima = ultima || (dataUltimaKey ? { data: dataUltimaKey } : null)
+    const { dataUltimaKey, ultima, relUltima } = resolveUltimaParaFrota(m, manutsM, relatorios, relMap, manutencoes, maquinas)
+    const ultimaParaProxima = ultimaRegistroParaProxima(ultima, dataUltimaKey)
     const resolved = resolveProximaManutParaFrota(m, manutsM, ultimaParaProxima)
     const proxima = resolved.registo
     const proxDataKey = resolved.dataKey || ''
@@ -285,7 +290,7 @@ ${headBlock}`
         <td class="cell-center cell-muted">${totalReps || '—'}</td>
         <td class="cell-center"><span class="badge ${estadoBadge}">${esc(estadoLabel)}</span></td>
         <td class="cell-center" style="font-size:7.5pt;font-weight:700;color:${tendencia.cor}">${tendencia.texto}</td>
-        <td class="cell-center cell-rel">${relUltima?.numeroRelatorio ?? '—'}</td>
+        <td class="cell-center cell-rel">${numeroRelatorioLegivel(relUltima) || '—'}</td>
       </tr>`
     })
     html += `</tbody></table>`

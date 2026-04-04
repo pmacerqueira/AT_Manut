@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, ArrowLeft, ArrowUp, ArrowDown, Check, X, MessageSquareText } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, Package, ArrowLeft, ArrowUp, ArrowDown, Check, X, MessageSquareText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { getCanonicalDeclaracaoDepoisSuffix } from '../constants/relatorio'
 import './Categorias.css'
@@ -223,7 +223,9 @@ export default function Categorias() {
     showToast('Subcategoria actualizada.', 'success')
   }
 
-  const canRemoveSubcategoria = (subId) => !maquinas.some(m => m.subcategoriaId === subId)
+  const normSubId = (id) => (id == null || id === '' ? '' : String(id))
+  const canRemoveSubcategoria = (subId) =>
+    !maquinas.some(m => normSubId(m.subcategoriaId ?? m.subcategoria_id) === normSubId(subId))
 
   const handleRemoveSubcategoria = (sub) => {
     if (!canRemoveSubcategoria(sub.id)) {
@@ -242,7 +244,10 @@ export default function Categorias() {
             Voltar atrás
           </button>
           <h1>Categorias e Subcategorias</h1>
-          <p className="page-sub">Tipos de máquinas e checklists de verificação (conformidade legal)</p>
+          <p className="page-sub">
+            Tipos de máquinas e checklists de verificação (conformidade legal). O rótulo «N equip.» por subcategoria conta
+            equipamentos registados; passe o rato para ver também quantos itens tem a checklist legal.
+          </p>
         </div>
         {!addingCategoria && (
           <button type="button" onClick={() => setAddingCategoria(true)}>
@@ -310,6 +315,7 @@ export default function Categorias() {
                       <p className="field-hint text-muted">
                         Sobrepõe o texto legal canónico só para esta categoria. Deixe vazio para usar o modelo da aplicação (elevadores / compressores / outros).
                         O texto aqui é o <strong>sufixo</strong> após «…na manutenção / montagem / reparação » — deve começar tipicamente por «do equipamento…».
+                        Se usar um sufixo longo orientado a manutenção periódica, avalie se o mesmo texto faz sentido após «…na reparação »; casos contrários mantenha vazio e a app aplica modelos distintos (manutenção vs reparação) automaticamente.
                       </p>
                       <textarea
                         rows={6}
@@ -324,10 +330,20 @@ export default function Categorias() {
                           className="secondary btn-sm"
                           onClick={() => setFormCat(f => ({
                             ...f,
-                            declaracaoClienteDepois: getCanonicalDeclaracaoDepoisSuffix(f.nome),
+                            declaracaoClienteDepois: getCanonicalDeclaracaoDepoisSuffix(f.nome, 'periodica'),
                           }))}
                         >
-                          Repor texto canónico (pré-visualização)
+                          Repor canónico (manutenção / montagem)
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary btn-sm"
+                          onClick={() => setFormCat(f => ({
+                            ...f,
+                            declaracaoClienteDepois: getCanonicalDeclaracaoDepoisSuffix(f.nome, 'reparacao'),
+                          }))}
+                        >
+                          Repor canónico (reparação)
                         </button>
                         <button
                           type="button"
@@ -377,6 +393,9 @@ export default function Categorias() {
                   )}
                   {subs.map(sub => {
                     const items = getChecklistBySubcategoria(sub.id)
+                    const equipCount = maquinas.filter(
+                      m => normSubId(m.subcategoriaId ?? m.subcategoria_id) === normSubId(sub.id),
+                    ).length
                     const subExpanded = expandedSub.has(sub.id)
                     const isEditingSub = editingSubcategoria === sub.id
                     return (
@@ -405,7 +424,12 @@ export default function Categorias() {
                               {subExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
                             <span className="subcategoria-nome">{sub.nome}</span>
-                            <span className="badge badge-count"><ListChecks size={12} /> {items.length} itens</span>
+                            <span
+                              className="badge badge-count"
+                              title={`${equipCount} equipamento(s) registados · ${items.length} itens na checklist legal`}
+                            >
+                              <Package size={12} aria-hidden /> {equipCount} equip.
+                            </span>
                             <div className="subcategoria-actions">
                               <button
                                 type="button"

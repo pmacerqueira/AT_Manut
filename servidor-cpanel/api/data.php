@@ -527,6 +527,96 @@ try {
 }
 
 /**
+ * Relatório + maquina_id da manutenção (JOIN read-only).
+ * Permite ao front associar relatórios ao equipamento na frota mesmo com joins frágeis em ids.
+ */
+function atm_fetch_relatorio_row_with_maquina(PDO $pdo, string $relId): ?array {
+    $stmt = $pdo->prepare(
+        'SELECT r.*, m.maquina_id AS manutencao_maquina_id FROM relatorios r ' .
+        'LEFT JOIN manutencoes m ON m.id = r.manutencao_id WHERE r.id = ? LIMIT 1'
+    );
+    $stmt->execute([$relId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row === false ? null : $row;
+}
+
+/** NIF sem espaços — comparação de mesmo cliente. */
+function atm_maquina_nif_compact(?string $s): string {
+    return preg_replace('/\s+/', '', trim((string)$s));
+}
+
+/** Nº de série normalizado para detecção de duplicados por cliente. */
+function atm_maquina_serie_normalizada(?string $s): string {
+    return strtolower(trim((string)$s));
+}
+
+/**
+ * Procura outra máquina do mesmo cliente com o mesmo nº de série.
+ *
+ * @param array<string,mixed>         $data               Payload após preprocess_maquina (camelCase).
+ * @param array<string,string|null> $cliente_nif_by_id  Mapa clientes.id → nif.
+ */
+function atm_find_maquina_duplicada_serie(PDO $pdo, array $data, ?string $excludeId, array $cliente_nif_by_id): ?string {
+    $serie = atm_maquina_serie_normalizada($data['numeroSerie'] ?? $data['numero_serie'] ?? '');
+    if ($serie === '') {
+        return null;
+    }
+    $nifIncoming = atm_maquina_nif_compact($data['clienteNif'] ?? $data['cliente_nif'] ?? '');
+    $cidIncoming = trim((string)($data['clienteId'] ?? $data['cliente_id'] ?? ''));
+
+    $stmt = $pdo->prepare(
+        'SELECT id, cliente_nif, cliente_id FROM maquinas WHERE LOWER(TRIM(COALESCE(numero_serie, \'\'))) = ?'
+    );
+    $stmt->execute([$serie]);
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $rid = (string)($row['id'] ?? '');
+        if ($excludeId !== null && $rid === (string)$excludeId) {
+            continue;
+        }
+        $mNif = atm_maquina_nif_compact($row['cliente_nif'] ?? '');
+        $mCid = trim((string)($row['cliente_id'] ?? ''));
+        $same = false;
+        if ($nifIncoming !== '' && $mNif !== '' && $mNif === $nifIncoming) {
+            $same = true;
+        }
+        if ($cidIncoming !== '' && $mCid !== '' && $mCid === $cidIncoming) {
+            $same = true;
+        }
+        if (!$same && $nifIncoming !== '' && $mCid !== '') {
+            $cn = $cliente_nif_by_id[$mCid] ?? null;
+            if ($cn !== null && atm_maquina_nif_compact((string)$cn) === $nifIncoming) {
+                $same = true;
+            }
+        }
+        if (!$same && $cidIncoming !== '' && $mNif !== '') {
+            $cn = $cliente_nif_by_id[$cidIncoming] ?? null;
+            if ($cn !== null && atm_maquina_nif_compact((string)$cn) === $mNif) {
+                $same = true;
+            }
+        }
+        if ($same) {
+            return $rid;
+        }
+    }
+    return null;
+}
+
+/**
+ * Bloqueia create/update se existir duplicado (mesmo cliente + nº série não vazio).
+ *
+ * @param array<string,string|null> $cliente_nif_by_id
+ */
+function atm_assert_maquina_serie_unica_cliente(PDO $pdo, array $data, ?string $excludeId, array $cliente_nif_by_id): void {
+    $dupId = atm_find_maquina_duplicada_serie($pdo, $data, $excludeId, $cliente_nif_by_id);
+    if ($dupId !== null) {
+        json_error(
+            'Já existe um equipamento deste cliente com o mesmo nº de série. Altere o número ou utilize a ficha existente (ref. interna: ' . $dupId . ').',
+            422
+        );
+    }
+}
+
+/**
  * Devolve colunas físicas existentes numa tabela (compatibilidade com esquemas antigos).
  * Evita SQL errors quando o código já conhece colunas novas mas a BD ainda não foi migrada.
  */
@@ -775,8 +865,16 @@ switch ($action) {
 
     // ── LIST ─────────────────────────────────────────────────────────────────
     case 'list': {
-        $stmt = $pdo->query("SELECT * FROM `$table` ORDER BY $order");
-        $rows = $stmt->fetchAll();
+        if ($resource === 'relatorios') {
+            $stmt = $pdo->query(
+                "SELECT r.*, m.maquina_id AS manutencao_maquina_id FROM `relatorios` r " .
+                "LEFT JOIN `manutencoes` m ON m.id = r.manutencao_id ORDER BY $order"
+            );
+            $rows = $stmt->fetchAll();
+        } else {
+            $stmt = $pdo->query("SELECT * FROM `$table` ORDER BY $order");
+            $rows = $stmt->fetchAll();
+        }
 
         // Auto-correção de schema legado: algumas instalações antigas tinham marcas.id vazio ('').
         // Isso quebra seleção no frontend (valor vazio colide com "Selecionar marca").
@@ -828,9 +926,13 @@ switch ($action) {
     // ── GET ──────────────────────────────────────────────────────────────────
     case 'get': {
         if (!$id) json_error('ID em falta.');
-        $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE id = ?");
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
+        if ($resource === 'relatorios') {
+            $row = atm_fetch_relatorio_row_with_maquina($pdo, (string)$id);
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch();
+        }
         if (!$row) json_error('Registo não encontrado.', 404);
         $j = row_to_js($row, $json_cols);
         if ($resource === 'maquinas') {
@@ -943,6 +1045,7 @@ switch ($action) {
         if ($resource === 'maquinas') {
             $data = preprocess_maquina($data);
             $data = apply_legacy_required_defaults_maquinas($pdo, $data);
+            atm_assert_maquina_serie_unica_cliente($pdo, $data, null, $cliente_nif_by_id);
         }
 
         // Geração de número de relatório de reparação (RP)
@@ -986,6 +1089,18 @@ switch ($action) {
 
         // Devolver o registo criado
         $recId = $data['id'] ?? null;
+        if (!$recId) {
+            $lid = $pdo->lastInsertId();
+            if ($lid) {
+                $recId = (string)$lid;
+            }
+        }
+        if ($resource === 'relatorios' && $recId) {
+            $rowEnr = atm_fetch_relatorio_row_with_maquina($pdo, (string)$recId);
+            if ($rowEnr) {
+                json_ok(row_to_js($rowEnr, $json_cols), 201);
+            }
+        }
         if ($recId) {
             $s2 = $pdo->prepare("SELECT * FROM `$table` WHERE id = ?");
             $s2->execute([$recId]);
@@ -1035,6 +1150,12 @@ switch ($action) {
         $s2 = $pdo->prepare("SELECT * FROM `$table` WHERE id = ?");
         $s2->execute([$recId]);
         $row = $s2->fetch();
+        if ($resource === 'relatorios' && $row) {
+            $rowEnr = atm_fetch_relatorio_row_with_maquina($pdo, (string)$recId);
+            if ($rowEnr) {
+                $row = $rowEnr;
+            }
+        }
         json_ok($row ? row_to_js($row, $json_cols) : null);
     }
 
@@ -1082,7 +1203,10 @@ switch ($action) {
         try {
             $inserted = 0;
             foreach ($records as $data) {
-                if ($resource === 'maquinas') $data = preprocess_maquina($data);
+                if ($resource === 'maquinas') {
+                    $data = preprocess_maquina($data);
+                    atm_assert_maquina_serie_unica_cliente($pdo, $data, null, $cliente_nif_by_id);
+                }
                 // Geração de número de relatório se necessário
                 if ($resource === 'relatorios' && empty($data['numeroRelatorio'])) {
                     $tipo = 'MP';
@@ -1123,7 +1247,10 @@ switch ($action) {
             $pdo->exec("DELETE FROM `$table`");
             $inserted = 0;
             foreach ($records as $data) {
-                if ($resource === 'maquinas') $data = preprocess_maquina($data);
+                if ($resource === 'maquinas') {
+                    $data = preprocess_maquina($data);
+                    atm_assert_maquina_serie_unica_cliente($pdo, $data, null, $cliente_nif_by_id);
+                }
                 $dataSql = normalize_payload_for_sql($data);
                 [$cols, $params] = js_to_row($dataSql, $allowed);
                 if (empty($cols)) continue;

@@ -9,6 +9,7 @@ import { getHojeAzores } from '../utils/datasAzores'
 import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
 import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/documentacaoEquipamentoCopy'
+import { findMaquinaDuplicadaSerieCliente } from '../utils/maquinaSerieCliente'
 
 const isElevadores = (getCategoria, categoriaId) => {
   const cat = getCategoria(categoriaId)
@@ -306,6 +307,20 @@ export default function MaquinaFormModal({ isOpen, onClose, mode, clienteNifLock
       } else {
         payload.planoManutencaoCompressor = ''
         payload.posicaoKaeser = null
+      }
+
+      const nifClienteForm = String(payload.clienteNif ?? clienteNifLocked ?? '').trim()
+      const dupSerie = findMaquinaDuplicadaSerieCliente(maquinas, {
+        numeroSerie: payload.numeroSerie,
+        clienteNif: nifClienteForm,
+        excludeId: mode === 'edit' ? id : null,
+      })
+      if (dupSerie) {
+        showToast(
+          'Já existe um equipamento deste cliente com este nº de série. Não é possível duplicar.',
+          'warning',
+        )
+        return
       }
 
       if (mode === 'add') {

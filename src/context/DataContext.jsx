@@ -789,11 +789,16 @@ export function DataProvider({ children }) {
   const getSubcategoriasByCategoria = useCallback((categoriaId) =>
     subcategorias.filter(s => s.categoriaId === categoriaId).sort((a, b) => a.nome.localeCompare(b.nome)),
   [subcategorias])
-  const getChecklistBySubcategoria = useCallback((subcategoriaId, tipo = 'periodica') =>
-    checklistItems
-      .filter(c => c.subcategoriaId === subcategoriaId && (c.tipo || 'periodica') === tipo)
-      .sort((a, b) => a.ordem - b.ordem),
-  [checklistItems])
+  const getChecklistBySubcategoria = useCallback((subcategoriaId, tipo = 'periodica') => {
+    const sid = subcategoriaId == null || subcategoriaId === '' ? '' : String(subcategoriaId)
+    return checklistItems
+      .filter(c => {
+        const cid = c.subcategoriaId ?? c.subcategoria_id
+        const ckey = cid == null || cid === '' ? '' : String(cid)
+        return ckey === sid && (c.tipo || 'periodica') === tipo
+      })
+      .sort((a, b) => a.ordem - b.ordem)
+  }, [checklistItems])
 
   const getIntervaloDias = useCallback((categoriaId) => {
     const cat = categorias.find(c => c.id === categoriaId)

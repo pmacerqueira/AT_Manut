@@ -6,8 +6,8 @@
  *   send-report.php — recebe HTML pré-renderizado; se `pdf_base64`+`pdf_filename` forem enviados, anexa PDF (multipart)
  *
  * Funções exportadas:
- *   enviarRelatorioEmail       — manutenções (dados → send-email.php → PDF anexo)
- *   enviarRelatorioHtmlEmail   — HTML no corpo (reparações, frota, etc.); PDF opcional via base64
+ *   enviarRelatorioEmail       — manutenções e reparações (`reparacao` → mesmo send-email.php + FPDF)
+ *   enviarRelatorioHtmlEmail   — HTML no corpo (mensal ISTOBAL, frota, etc.); PDF opcional via base64
  *   enviarLembreteEmail        — alertas de manutenção próxima (dados → send-email.php)
  */
 import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
@@ -59,18 +59,59 @@ async function resizirParaThumb(dataUrl, maxW = 160, _qualidadeIgnorada, maxB64C
   })
 }
 
+function parseRelatorioFotosArray(fotos) {
+  if (Array.isArray(fotos)) return fotos
+  if (typeof fotos === 'string' && fotos) {
+    try {
+      const p = JSON.parse(fotos)
+      return Array.isArray(p) ? p : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function parseRelatorioPecasArray(pecas) {
+  if (Array.isArray(pecas)) return pecas
+  if (typeof pecas === 'string' && pecas) {
+    try {
+      const p = JSON.parse(pecas)
+      return Array.isArray(p) ? p : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function parseRelatorioChecklistRespostas(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw
+  if (typeof raw === 'string' && raw) {
+    try {
+      const p = JSON.parse(raw)
+      return p && typeof p === 'object' && !Array.isArray(p) ? p : {}
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
 // ── Envio principal ──────────────────────────────────────────────────────────
 
 /**
- * Envia o relatório de manutenção por email via cPanel (noreply@navel.pt).
+ * Envia relatório de manutenção ou de reparação por email via cPanel (PDF FPDF anexo).
+ * Reparações: passar `reparacao` (registo da BD) e `manutencao` omisso ou null.
  *
  * @param {object} params
+ * @param {object} [params.reparacao] — se definido, fluxo de reparação (tipo serviço, declaração, sem próximas).
  * @returns {Promise<{ ok: boolean, message: string, isMailto?: boolean }>}
  */
 export async function enviarRelatorioEmail({
   emailDestinatario,
   relatorio,
-  manutencao,
+  manutencao = null,
   maquina,
   cliente,
   checklistItems  = [],
@@ -82,25 +123,50 @@ export async function enviarRelatorioEmail({
   categoriaNome    = '',
   /** Sufixo opcional definido na categoria (BD); vazio = canónico */
   declaracaoClienteDepois = '',
+  /** Presente apenas no fluxo de reparação — data na ficha da reparação, etc. */
+  reparacao        = null,
 }) {
   if (!emailDestinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
   }
 
-  const tipoServico = manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica'
+  const isRepair = reparacao != null && typeof reparacao === 'object'
+  if (!isRepair && !manutencao) {
+    return { ok: false, message: 'Dados da manutenção em falta.' }
+  }
+
+  const tipoServico = isRepair
+    ? 'Reparação'
+    : (manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica')
   const numeroRel   = relatorio?.numeroRelatorio ?? 'S/N'
   const equipDesc   = maquina
     ? `${maquina.marca} ${maquina.modelo} (${maquina.numeroSerie})`
     : '—'
-  const dataReal = relatorio?.dataAssinatura
+  let dataReal = relatorio?.dataAssinatura
     ? formatDataHoraAzores(relatorio.dataAssinatura)
     : '—'
+  if (isRepair) {
+    const dr = relatorio?.dataRealizacao || reparacao?.data
+    if (dr) {
+      dataReal = formatDataAzores(String(dr).slice(0, 10), true)
+    } else if (relatorio?.dataAssinatura) {
+      dataReal = formatDataHoraAzores(relatorio.dataAssinatura)
+    } else {
+      dataReal = '—'
+    }
+  }
 
   // ── Envio via PHP no cPanel ──────────────────────────────────────────────────
   if (isEmailConfigured()) {
     try {
+      const relatorioParsed = {
+        ...relatorio,
+        fotos: parseRelatorioFotosArray(relatorio?.fotos),
+        pecasUsadas: parseRelatorioPecasArray(relatorio?.pecasUsadas),
+        checklistRespostas: parseRelatorioChecklistRespostas(relatorio?.checklistRespostas),
+      }
       // Usar snapshot do relatório quando disponível (imutabilidade)
-      const itemsResolvidos = resolveChecklist(relatorio, checklistItems)
+      const itemsResolvidos = resolveChecklist(relatorioParsed, checklistItems)
       const checklistJson = JSON.stringify(
         itemsResolvidos.map(item => ({
           texto: item.texto,
@@ -110,7 +176,7 @@ export async function enviarRelatorioEmail({
 
       // Fotos: 1-2 primeiras com melhor qualidade para o PDF; restantes como thumbnails.
       // CRÍTICO: enviar APENAS o raw base64 sem o prefixo "data:image/jpeg;base64,".
-      const fotosOriginais = relatorio?.fotos ?? []
+      const fotosOriginais = relatorioParsed.fotos
       // Primeiras 2 fotos: 400px, até 12 KB cada (melhor qualidade no PDF); restantes: 160px
       let photosJson = '[]'
       if (fotosOriginais.length > 0) {
@@ -128,28 +194,39 @@ export async function enviarRelatorioEmail({
       }
 
       // Data da próxima manutenção agendada (da ficha da máquina) — texto informativo no email
-      const proximaManutRaw = maquina?.proximaManut ?? ''
+      const proximaManutRaw = isRepair ? '' : (maquina?.proximaManut ?? '')
       const proximaManutFmt = proximaManutRaw
         ? formatDataAzores(proximaManutRaw, true)
         : ''
 
       // Mesma lógica que gerarPdfCompacto / Obter PDF: próximas datas + declaração no PDF anexo
-      const dataExec =
-        relatorio?.dataCriacao?.slice(0, 10) ||
-        relatorio?.dataAssinatura?.slice(0, 10) ||
-        manutencao?.data ||
-        ''
-      const periMaq = maquina?.periodicidadeManut
+      const dataExec = isRepair
+        ? (
+            relatorio?.dataRealizacao ||
+            reparacao?.data ||
+            relatorio?.dataCriacao?.slice(0, 10) ||
+            relatorio?.dataAssinatura?.slice(0, 10) ||
+            ''
+          )
+        : (
+            relatorio?.dataCriacao?.slice(0, 10) ||
+            relatorio?.dataAssinatura?.slice(0, 10) ||
+            manutencao?.data ||
+            ''
+          )
+      const periMaq = isRepair ? '' : maquina?.periodicidadeManut
       const proximasManutencoes =
-        periMaq && dataExec
+        !isRepair && periMaq && dataExec
           ? computarProximasDatas(dataExec, periMaq, {
               tecnico: manutencao?.tecnico || relatorio?.tecnico || '',
             })
           : []
-      const manutencaoTipo = manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'
+      const manutencaoTipo = isRepair
+        ? 'reparacao'
+        : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
       const declaracaoLegislacao = declaracaoLegislacaoVariantFromCategoriaNome(categoriaNome)
       const declaracaoTexto = resolveDeclaracaoCliente(manutencaoTipo, categoriaNome, declaracaoClienteDepois)
-      const pecasUsadas = relatorio?.pecasUsadas ?? []
+      const pecasUsadas = relatorioParsed.pecasUsadas
 
       const { navelLogoB64, brandLogoB64 } = await getHeaderLogosB64ForEmail({ maquina, marcas })
 
@@ -180,7 +257,7 @@ export async function enviarRelatorioEmail({
         tipo_servico:     tipoServico,
         equipamento:      equipDesc,
         data_realizacao:  dataReal,
-        tecnico:          relatorio?.tecnico ?? manutencao?.tecnico ?? '—',
+        tecnico:          relatorio?.tecnico ?? (isRepair ? '—' : manutencao?.tecnico) ?? '—',
         assinado_por:     relatorio?.nomeAssinante ?? '',
         data_assinatura:  relatorio?.dataAssinatura ?? '',
         assinatura_digital: assinaturaB64,
@@ -203,6 +280,17 @@ export async function enviarRelatorioEmail({
         declaracao_legislacao: declaracaoLegislacao,
         /** Texto completo resolvido no browser (override categoria + canónico) — fonte única para FPDF */
         declaracao_texto: declaracaoTexto,
+        ...(isRepair
+          ? {
+              reparacao_numero_aviso: String(relatorio?.numeroAviso ?? '').trim(),
+              reparacao_descricao_avaria: String(relatorio?.descricaoAvaria ?? '').trim(),
+              reparacao_trabalho_realizado: String(relatorio?.trabalhoRealizado ?? '').trim(),
+              reparacao_horas_mao_obra:
+                relatorio?.horasMaoObra != null && relatorio.horasMaoObra !== ''
+                  ? String(relatorio.horasMaoObra)
+                  : '',
+            }
+          : {}),
       }
 
       const bodyStr = JSON.stringify(payload)
@@ -239,7 +327,8 @@ export async function enviarRelatorioEmail({
   }
 
   // ── Fallback: mailto: (endpoint ainda não configurado) ───────────────────
-  const subject = encodeURIComponent(`Relatório de Manutenção N.º ${numeroRel} — ${equipDesc}`)
+  const docLabel = isRepair ? 'Reparação' : 'Manutenção'
+  const subject = encodeURIComponent(`Relatório de ${docLabel} N.º ${numeroRel} — ${equipDesc}`)
   const body    = encodeURIComponent(
     `Exmo(a) Sr(a) ${cliente?.nome ?? ''},\n\n` +
     `Relatório de ${tipoServico} N.º ${numeroRel}.\n\n` +

@@ -7,7 +7,8 @@ Write-Host "Build AT_Manut..." -ForegroundColor Cyan
 npm run build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`nA criar dist_upload.zip..." -ForegroundColor Cyan
-Compress-Archive -Path "dist\*" -DestinationPath "dist_upload.zip" -Force
+Write-Host "`nA criar dist_upload.zip (raiz plana para public_html/manut)..." -ForegroundColor Cyan
+npm run zip
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`nConcluido. dist_upload.zip pronto para public_html/manut/" -ForegroundColor Green

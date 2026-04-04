@@ -5,7 +5,7 @@
  */
 import { formatDataHoraAzores, formatDataAzores } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
-import { resolveChecklist } from './resolveChecklist'
+import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
 import {
@@ -100,6 +100,8 @@ export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, client
   const fotosSafe = fotos.map(f => safeDataImageUrl(f)).filter(Boolean).slice(0, MAX_FOTOS)
 
   // Mapa id → texto legível para lookup rápido
+  const horasContadorRel = horasContadorParaRelatorio(maquina, null, null, relatorio)
+
   const checklistMap = {}
   checklistItems.forEach(it => { checklistMap[it.id] = it.texto ?? it.descricao ?? it.nome ?? it.id })
 
@@ -180,6 +182,7 @@ ${tituloBar}
     <div class="rpt-field"><span class="rpt-label">Cliente</span><span class="rpt-value">${esc(cliente?.nome ?? '—')}</span></div>
     ${relatorio.numeroAviso ? `<div class="rpt-field"><span class="rpt-label">Nº Aviso / Pedido</span><span class="rpt-value">${esc(relatorio.numeroAviso)}</span></div>` : ''}
     ${relatorio.horasMaoObra != null ? `<div class="rpt-field"><span class="rpt-label">Horas de mão de obra</span><span class="rpt-value">${esc(String(relatorio.horasMaoObra))} h</span></div>` : ''}
+    ${horasContadorRel != null ? `<div class="rpt-field"><span class="rpt-label">Horas no contador (acumuladas)</span><span class="rpt-value">${esc(String(horasContadorRel))} h</span></div>` : ''}
     ${cliente?.morada ? `<div class="rpt-field"><span class="rpt-label">Localização</span><span class="rpt-value">${esc(cliente.morada)}${cliente.localidade ? `, ${esc(cliente.localidade)}` : ''}</span></div>` : ''}
     ${maquina?.numeroSerie ? `<div class="rpt-field"><span class="rpt-label">Nº de Série</span><span class="rpt-value">${esc(maquina.numeroSerie)}</span></div>` : ''}
   </div>
@@ -223,6 +226,16 @@ ${temPecas ? `
 </section>
 ` : ''}
 
+${htmlFotos(fotosSafe)}
+
+<!-- Notas -->
+${relatorio.notas ? `
+<section>
+  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Notas / Observações</div>
+  <div class="rpt-text-block" style="background:rgba(26,72,128,0.10);border-left:3px solid ${PALETA.azulNavel};padding:7px 10px;border-radius:0 4px 4px 0;font-size:${TIPO.corpo};color:${PALETA.texto};line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(relatorio.notas)}</div>
+</section>
+` : ''}
+
 <!-- Checklist -->
 ${temChecklist ? `
 <section>
@@ -235,15 +248,6 @@ ${temChecklist ? `
 </section>
 ` : ''}
 
-<!-- Notas -->
-${relatorio.notas ? `
-<section>
-  <div class="rpt-section-title" style="font-size:${TIPO.label};font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${PALETA.azulNavel};border-bottom:1.5px solid ${PALETA.azulNavel};padding-bottom:3px;margin-bottom:6px">Notas / Observações</div>
-  <div class="rpt-text-block" style="background:rgba(26,72,128,0.10);border-left:3px solid ${PALETA.azulNavel};padding:7px 10px;border-radius:0 4px 4px 0;font-size:${TIPO.corpo};color:${PALETA.texto};line-height:1.5;white-space:pre-wrap;word-break:break-word">${esc(relatorio.notas)}</div>
-</section>
-` : ''}
-
-${htmlFotos(fotosSafe)}
 
 <!-- Assinatura e declaração (página do cliente) + rodapé -->
 ${htmlPaginaCliente({

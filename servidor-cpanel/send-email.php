@@ -220,6 +220,10 @@ $proximas_manut_json    = $g('proximas_manutencoes_json');
 $pecas_usadas_json      = $g('pecas_usadas_json');
 $navel_logo_b64         = isset($_data['navel_logo_b64']) ? (string)$_data['navel_logo_b64'] : '';
 $brand_logo_b64         = isset($_data['brand_logo_b64']) ? (string)$_data['brand_logo_b64'] : '';
+$rep_num_aviso          = isset($_data['reparacao_numero_aviso']) ? trim((string)$_data['reparacao_numero_aviso']) : '';
+$rep_desc_avaria        = isset($_data['reparacao_descricao_avaria']) ? trim((string)$_data['reparacao_descricao_avaria']) : '';
+$rep_trabalho           = isset($_data['reparacao_trabalho_realizado']) ? trim((string)$_data['reparacao_trabalho_realizado']) : '';
+$rep_horas_mo           = isset($_data['reparacao_horas_mao_obra']) ? trim((string)$_data['reparacao_horas_mao_obra']) : '';
 
 // Auth
 if ($token !== AUTH_TOKEN) {
@@ -376,8 +380,14 @@ if ($checklist_json) {
     $decoded = json_decode($checklist_json, true);
     if (is_array($decoded)) $checklist = $decoded;
 }
-$nSim = count(array_filter($checklist, function($i) { return ($i['resp'] ?? '') === 'sim'; }));
-$nNao = count(array_filter($checklist, function($i) { return ($i['resp'] ?? '') === 'nao'; }));
+$nSim = count(array_filter($checklist, function ($i) {
+    $r = $i['resp'] ?? '';
+    return $r === 'sim' || $r === 'OK';
+}));
+$nNao = count(array_filter($checklist, function ($i) {
+    $r = $i['resp'] ?? '';
+    return $r === 'nao' || $r === 'NOK';
+}));
 
 // Próximas manutenções + peças (JSON — alinhado com gerarPdfCompacto)
 $proximas_list = [];
@@ -448,7 +458,19 @@ function texto_declaracao_cliente($tipo, $legislacao = 'outros') {
     $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
     $depois_comp = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
     $depois_outros = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
-    if ($legislacao === 'elevadores') {
+    // Textos canónicos para reparação (intervenção corretiva) — alinhados a src/constants/relatorio.js
+    $rep_elev = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este relatório e a documentação técnica exigível (nomeadamente Manual de Utilizador e Declaração de Conformidade CE) pelo período mínimo de dois anos ou pelo prazo aplicável, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $rep_comp = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
+    $rep_out = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
+    if ($tipo === 'reparacao') {
+        if ($legislacao === 'elevadores') {
+            $depois = $rep_elev;
+        } elseif ($legislacao === 'compressores') {
+            $depois = $rep_comp;
+        } else {
+            $depois = $rep_out;
+        }
+    } elseif ($legislacao === 'elevadores') {
         $depois = $depois_elev;
     } elseif ($legislacao === 'compressores') {
         $depois = $depois_comp;
@@ -742,13 +764,23 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->Ln(5);
 
     // Dados do servico (etiquetas em ASCII, valores via f() do POST)
+    $data_row_label = ($manutencao_tipo === 'reparacao') ? 'DATA DE REALIZACAO' : 'DATA EXECUCAO';
     $rows = [
         ['CLIENTE',        f($to_name)],
         ['EQUIPAMENTO',    f($equipamento)],
-        ['DATA EXECUCAO',  f($data_real)],
+        [$data_row_label,  f($data_real)],
         ['TECNICO',        f($tecnico)],
         ['ASSINADO POR',   f($assinado_por)],
     ];
+    if ($manutencao_tipo === 'reparacao') {
+        if ($rep_num_aviso !== '') {
+            $rows[] = ['N. AVISO / PEDIDO', f(mb_substr(strip_tags(str_replace(["\r", "\n", "\0"], ' ', $rep_num_aviso)), 0, 200, 'UTF-8'))];
+        }
+        // Avaria e trabalho: secções com título abaixo (igual ao PDF jsPDF — não na grelha)
+        if ($rep_horas_mo !== '') {
+            $rows[] = ['HORAS MAO-DE-OBRA', f($rep_horas_mo) . ' h'];
+        }
+    }
     $pdf->SetFont('Arial', '', 9);
     foreach ($rows as $i => [$label, $val]) {
         if ($i % 2 === 1) {
@@ -768,175 +800,232 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->Line($M, $pdf->GetY(), $W - $M, $pdf->GetY());
     $pdf->Ln(5);
 
-    // Checklist
-    if (count($checklist) > 0) {
-        $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetTextColor(30, 58, 95);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 7, 'CHECKLIST DE VERIFICACAO', 0, 1);
-        $pdf->SetFont('Arial', '', 8);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 5, $nSim . ' conforme  /  ' . $nNao . ' nao conforme  (' . count($checklist) . ' itens)', 0, 1);
-        $pdf->Ln(1);
-        $pdf->SetFont('Arial', '', 8.5);
-        foreach ($checklist as $i => $item) {
-            $resp  = $item['resp'] ?? '';
-            $badge = $resp === 'sim' ? 'SIM' : ($resp === 'nao' ? 'NAO' : '-');
-            if ($i % 2 === 0) {
-                $pdf->SetFillColor(249, 250, 251);
-                $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
-            }
-            $pdf->SetX($M + 1);
-            $pdf->SetTextColor(107, 114, 128);
-            $pdf->Cell(6, 7, ($i + 1) . '.', 0, 0);
-            $pdf->SetTextColor(55, 65, 81);
-            $pdf->Cell($cW - 20, 7, f(mb_substr($item['texto'] ?? '', 0, 80, 'UTF-8')), 0, 0);
-            if ($resp === 'sim') $pdf->SetTextColor(22, 163, 74);
-            elseif ($resp === 'nao') $pdf->SetTextColor(220, 38, 38);
-            else $pdf->SetTextColor(107, 114, 128);
-            $pdf->SetFont('Arial', 'B', 8.5);
-            $pdf->Cell(14, 7, $badge, 0, 1, 'R');
-            $pdf->SetFont('Arial', '', 8.5);
-        }
-        $pdf->Ln(3);
-    }
-
-    // Notas
-    if ($notas) {
-        if ($pdf->GetY() > 250) $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetTextColor(30, 58, 95);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 7, 'NOTAS ADICIONAIS', 0, 1);
-        $pdf->SetFont('Arial', '', 9);
-        $pdf->SetTextColor(55, 65, 81);
-        $pdf->SetX($M);
-        $pdf->MultiCell($cW, 5.5, f($notas), 0, 'L');
-        $pdf->Ln(3);
-    }
-
-    // Fotos — grelha até 4 por linha (A4), proporção preservada; máx. ATM_MAX_FOTOS_RELATORIO
-    $n_pdf = count($photos);
-    if ($n_pdf > 0) {
-        $cols = 4;
-        $gap = 2;
-        $cellW = ($cW - ($cols - 1) * $gap) / $cols;
-        $cellH = $cellW * 0.72 + 4;
-        if ($pdf->GetY() > 245) {
-            $pdf->AddPage();
-        }
-        $pdf->SetFont('Arial', 'B', 9);
-        $pdf->SetTextColor(30, 58, 95);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 6, f('DOCUMENTACAO FOTOGRAFICA'), 0, 1);
-        $pdf->SetFont('Arial', '', 7.5);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX($M);
-        $sub = $n_fotos . ' fotografia(s) no relatorio';
-        if ($photos_total_for_note > ATM_MAX_FOTOS_RELATORIO) {
-            $sub .= ' (mostradas as primeiras ' . ATM_MAX_FOTOS_RELATORIO . ')';
-        }
-        $pdf->Cell(0, 4, f($sub), 0, 1);
-        $pdf->Ln(1);
-
-        $tmp_list = [];
-        $n_rows = (int)ceil($n_pdf / $cols);
-        for ($row = 0; $row < $n_rows; $row++) {
-            if ($pdf->GetY() + $cellH > 268) {
+    if ($manutencao_tipo === 'reparacao') {
+        if ($rep_desc_avaria !== '') {
+            if ($pdf->GetY() > 240) {
                 $pdf->AddPage();
             }
-            $y0 = $pdf->GetY();
-            for ($c = 0; $c < $cols; $c++) {
-                $idx = $row * $cols + $c;
-                if ($idx >= $n_pdf) {
-                    break;
-                }
-                $p = $photos[$idx];
-                $bin = null;
-                if (strpos($p, 'data:image/') === 0) {
-                    $comma = strpos($p, ',');
-                    if ($comma !== false) {
-                        $bin = base64_decode(substr($p, $comma + 1), true);
-                    }
-                }
-                if ($bin !== false && $bin !== null && strlen($bin) > 100) {
-                    $tmp = to_safe_jpeg($bin);
-                    if ($tmp && file_exists($tmp)) {
-                        $tmp_list[] = $tmp;
-                        try {
-                            $pdf->imageFitContain($tmp, $M + $c * ($cellW + $gap), $y0, $cellW, $cellH - 1);
-                        } catch (Exception $imgErr) {
-                            @error_log(date('Y-m-d H:i:s') . ' IMG-ERR foto: ' . $imgErr->getMessage() . "\n", 3, __DIR__ . '/atm_debug.log');
-                        }
-                    }
-                }
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M);
+            $pdf->Cell(0, 6, 'AVARIA / PROBLEMA REPORTADO', 0, 1);
+            $pdf->SetFont('Arial', '', 9);
+            $pdf->SetTextColor(55, 65, 81);
+            $pdf->SetX($M);
+            $pdf->MultiCell($cW, 5, f(mb_substr(strip_tags(str_replace(["\r", "\0"], '', $rep_desc_avaria)), 0, 5000, 'UTF-8')), 0, 'L');
+            $pdf->Ln(3);
+        }
+        if ($rep_trabalho !== '') {
+            if ($pdf->GetY() > 240) {
+                $pdf->AddPage();
             }
-            $pdf->SetY($y0 + $cellH);
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M);
+            $pdf->Cell(0, 6, 'TRABALHO REALIZADO', 0, 1);
+            $pdf->SetFont('Arial', '', 9);
+            $pdf->SetTextColor(55, 65, 81);
+            $pdf->SetX($M);
+            $pdf->MultiCell($cW, 5, f(mb_substr(strip_tags(str_replace(["\r", "\0"], '', $rep_trabalho)), 0, 5000, 'UTF-8')), 0, 'L');
+            $pdf->Ln(3);
         }
-        foreach ($tmp_list as $tf) {
-            if (is_string($tf) && file_exists($tf)) {
-                @unlink($tf);
-            }
-        }
-        $pdf->Ln(2);
-    } elseif ($n_fotos > 0) {
-        if ($pdf->GetY() > 250) {
-            $pdf->AddPage();
-        }
-        $pdf->SetFont('Arial', '', 8);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 5, $n_fotos . ' fotografia(s) documentadas no sistema.', 0, 1);
-        $pdf->Ln(2);
     }
 
-    // Consumíveis e peças (alinhar com gerarPdfRelatorio.js)
-    if (count($pecas_list) > 0) {
-        if ($pdf->GetY() > 210) $pdf->AddPage();
-        $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetTextColor(30, 58, 95);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 7, 'CONSUMIVEIS E PECAS', 0, 1);
-        $usadas = 0;
-        $nao_us = 0;
-        foreach ($pecas_list as $p) {
-            $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
-            if ($u) $usadas++; else $nao_us++;
-        }
-        $pdf->SetFont('Arial', '', 8);
-        $pdf->SetTextColor(107, 114, 128);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 5, $usadas . ' utilizado(s) / ' . $nao_us . ' nao substituido(s) / ' . count($pecas_list) . ' no plano', 0, 1);
-        $pdf->Ln(1);
-        $pdf->SetFont('Arial', '', 8);
-        foreach ($pecas_list as $i => $p) {
-            if ($pdf->GetY() > 270) $pdf->AddPage();
-            $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
-            if ($i % 2 === 0) {
-                $pdf->SetFillColor(249, 250, 251);
-                $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
-            }
-            $icon = $u ? 'OK' : '--';
-            $pdf->SetX($M + 1);
-            $pdf->SetTextColor($u ? 22 : 107, $u ? 163 : 114, $u ? 74 : 128);
-            $pdf->SetFont('Arial', 'B', 8);
-            $pdf->Cell(8, 7, $icon, 0, 0);
-            $pdf->SetFont('Arial', '', 8);
-            $pdf->SetTextColor(55, 65, 81);
-            $cod = $p['codigoArtigo'] ?? '';
-            $desc = $p['descricao'] ?? '';
-            $lin = ($cod !== '' ? $cod . ' - ' : '') . $desc;
-            $pdf->Cell($cW - 35, 7, f(mb_substr($lin, 0, 120, 'UTF-8')), 0, 0);
-            $qtd = trim(($p['quantidade'] ?? '') . ' ' . ($p['unidade'] ?? ''));
-            if ($qtd !== '') {
+    $atm_section_order = ($manutencao_tipo === 'reparacao')
+        ? ['pecas', 'fotos', 'notas', 'checklist']
+        : ['checklist', 'notas', 'fotos', 'pecas'];
+
+    foreach ($atm_section_order as $atm_sec) {
+        if ($atm_sec === 'checklist') {
+            if (count($checklist) > 0) {
+                $pdf->SetFont('Arial', 'B', 10);
+                $pdf->SetTextColor(30, 58, 95);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 7, 'CHECKLIST DE VERIFICACAO', 0, 1);
+                $pdf->SetFont('Arial', '', 8);
                 $pdf->SetTextColor(107, 114, 128);
-                $pdf->Cell(26, 7, f($qtd), 0, 1, 'R');
-            } else {
-                $pdf->Ln(7);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 5, $nSim . ' conforme  /  ' . $nNao . ' nao conforme  (' . count($checklist) . ' itens)', 0, 1);
+                $pdf->Ln(1);
+                $pdf->SetFont('Arial', '', 8.5);
+                foreach ($checklist as $i => $item) {
+                    $resp  = $item['resp'] ?? '';
+                    if ($resp === 'sim' || $resp === 'OK') {
+                        $badge = 'SIM';
+                    } elseif ($resp === 'nao' || $resp === 'NOK') {
+                        $badge = 'NAO';
+                    } elseif ($resp === 'N/A') {
+                        $badge = 'N/A';
+                    } else {
+                        $badge = '-';
+                    }
+                    if ($i % 2 === 0) {
+                        $pdf->SetFillColor(249, 250, 251);
+                        $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
+                    }
+                    $pdf->SetX($M + 1);
+                    $pdf->SetTextColor(107, 114, 128);
+                    $pdf->Cell(6, 7, ($i + 1) . '.', 0, 0);
+                    $pdf->SetTextColor(55, 65, 81);
+                    $pdf->Cell($cW - 20, 7, f(mb_substr($item['texto'] ?? '', 0, 80, 'UTF-8')), 0, 0);
+                    if ($resp === 'sim' || $resp === 'OK') {
+                        $pdf->SetTextColor(22, 163, 74);
+                    } elseif ($resp === 'nao' || $resp === 'NOK') {
+                        $pdf->SetTextColor(220, 38, 38);
+                    } else {
+                        $pdf->SetTextColor(107, 114, 128);
+                    }
+                    $pdf->SetFont('Arial', 'B', 8.5);
+                    $pdf->Cell(14, 7, $badge, 0, 1, 'R');
+                    $pdf->SetFont('Arial', '', 8.5);
+                }
+                $pdf->Ln(3);
+            }
+        } elseif ($atm_sec === 'notas') {
+            if ($notas) {
+                if ($pdf->GetY() > 250) {
+                    $pdf->AddPage();
+                }
+                $pdf->SetFont('Arial', 'B', 10);
+                $pdf->SetTextColor(30, 58, 95);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 7, 'NOTAS ADICIONAIS', 0, 1);
+                $pdf->SetFont('Arial', '', 9);
+                $pdf->SetTextColor(55, 65, 81);
+                $pdf->SetX($M);
+                $pdf->MultiCell($cW, 5.5, f($notas), 0, 'L');
+                $pdf->Ln(3);
+            }
+        } elseif ($atm_sec === 'fotos') {
+            $n_pdf = count($photos);
+            if ($n_pdf > 0) {
+                $cols = 4;
+                $gap = 2;
+                $cellW = ($cW - ($cols - 1) * $gap) / $cols;
+                $cellH = $cellW * 0.72 + 4;
+                if ($pdf->GetY() > 245) {
+                    $pdf->AddPage();
+                }
+                $pdf->SetFont('Arial', 'B', 9);
+                $pdf->SetTextColor(30, 58, 95);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 6, f('DOCUMENTACAO FOTOGRAFICA'), 0, 1);
+                $pdf->SetFont('Arial', '', 7.5);
+                $pdf->SetTextColor(107, 114, 128);
+                $pdf->SetX($M);
+                $sub = $n_fotos . ' fotografia(s) no relatorio';
+                if ($photos_total_for_note > ATM_MAX_FOTOS_RELATORIO) {
+                    $sub .= ' (mostradas as primeiras ' . ATM_MAX_FOTOS_RELATORIO . ')';
+                }
+                $pdf->Cell(0, 4, f($sub), 0, 1);
+                $pdf->Ln(1);
+
+                $tmp_list = [];
+                $n_rows = (int)ceil($n_pdf / $cols);
+                for ($row = 0; $row < $n_rows; $row++) {
+                    if ($pdf->GetY() + $cellH > 268) {
+                        $pdf->AddPage();
+                    }
+                    $y0 = $pdf->GetY();
+                    for ($c = 0; $c < $cols; $c++) {
+                        $idx = $row * $cols + $c;
+                        if ($idx >= $n_pdf) {
+                            break;
+                        }
+                        $p = $photos[$idx];
+                        $bin = null;
+                        if (strpos($p, 'data:image/') === 0) {
+                            $comma = strpos($p, ',');
+                            if ($comma !== false) {
+                                $bin = base64_decode(substr($p, $comma + 1), true);
+                            }
+                        }
+                        if ($bin !== false && $bin !== null && strlen($bin) > 100) {
+                            $tmp = to_safe_jpeg($bin);
+                            if ($tmp && file_exists($tmp)) {
+                                $tmp_list[] = $tmp;
+                                try {
+                                    $pdf->imageFitContain($tmp, $M + $c * ($cellW + $gap), $y0, $cellW, $cellH - 1);
+                                } catch (Exception $imgErr) {
+                                    @error_log(date('Y-m-d H:i:s') . ' IMG-ERR foto: ' . $imgErr->getMessage() . "\n", 3, __DIR__ . '/atm_debug.log');
+                                }
+                            }
+                        }
+                    }
+                    $pdf->SetY($y0 + $cellH);
+                }
+                foreach ($tmp_list as $tf) {
+                    if (is_string($tf) && file_exists($tf)) {
+                        @unlink($tf);
+                    }
+                }
+                $pdf->Ln(2);
+            } elseif ($n_fotos > 0) {
+                if ($pdf->GetY() > 250) {
+                    $pdf->AddPage();
+                }
+                $pdf->SetFont('Arial', '', 8);
+                $pdf->SetTextColor(107, 114, 128);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 5, $n_fotos . ' fotografia(s) documentadas no sistema.', 0, 1);
+                $pdf->Ln(2);
+            }
+        } elseif ($atm_sec === 'pecas') {
+            if (count($pecas_list) > 0) {
+                if ($pdf->GetY() > 210) {
+                    $pdf->AddPage();
+                }
+                $pdf->SetFont('Arial', 'B', 10);
+                $pdf->SetTextColor(30, 58, 95);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 7, 'CONSUMIVEIS E PECAS', 0, 1);
+                $usadas = 0;
+                $nao_us = 0;
+                foreach ($pecas_list as $p) {
+                    $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
+                    if ($u) {
+                        $usadas++;
+                    } else {
+                        $nao_us++;
+                    }
+                }
+                $pdf->SetFont('Arial', '', 8);
+                $pdf->SetTextColor(107, 114, 128);
+                $pdf->SetX($M);
+                $pdf->Cell(0, 5, $usadas . ' utilizado(s) / ' . $nao_us . ' nao substituido(s) / ' . count($pecas_list) . ' no plano', 0, 1);
+                $pdf->Ln(1);
+                $pdf->SetFont('Arial', '', 8);
+                foreach ($pecas_list as $i => $p) {
+                    if ($pdf->GetY() > 270) {
+                        $pdf->AddPage();
+                    }
+                    $u = isset($p['usado']) ? (bool)$p['usado'] : ((float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0);
+                    if ($i % 2 === 0) {
+                        $pdf->SetFillColor(249, 250, 251);
+                        $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
+                    }
+                    $icon = $u ? 'OK' : '--';
+                    $pdf->SetX($M + 1);
+                    $pdf->SetTextColor($u ? 22 : 107, $u ? 163 : 114, $u ? 74 : 128);
+                    $pdf->SetFont('Arial', 'B', 8);
+                    $pdf->Cell(8, 7, $icon, 0, 0);
+                    $pdf->SetFont('Arial', '', 8);
+                    $pdf->SetTextColor(55, 65, 81);
+                    $cod = $p['codigo'] ?? $p['codigoArtigo'] ?? '';
+                    $desc = $p['descricao'] ?? '';
+                    $lin = ($cod !== '' ? $cod . ' - ' : '') . $desc;
+                    $pdf->Cell($cW - 35, 7, f(mb_substr($lin, 0, 120, 'UTF-8')), 0, 0);
+                    $qtd = trim(($p['quantidade'] ?? '') . ' ' . ($p['unidade'] ?? ''));
+                    if ($qtd !== '') {
+                        $pdf->SetTextColor(107, 114, 128);
+                        $pdf->Cell(26, 7, f($qtd), 0, 1, 'R');
+                    } else {
+                        $pdf->Ln(7);
+                    }
+                }
+                $pdf->Ln(3);
             }
         }
-        $pdf->Ln(3);
     }
 
     // Declaração de aceitação (antes das assinaturas — igual ao PDF do browser)
@@ -965,7 +1054,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         return !empty($pm['data']);
     }));
     $peri_maq = $periodicidade_maquina;
-    if (count($proximas_filtradas) > 0 || $peri_maq !== '') {
+    if ($manutencao_tipo !== 'reparacao' && (count($proximas_filtradas) > 0 || $peri_maq !== '')) {
         if ($pdf->GetY() > 230) $pdf->AddPage();
         if (count($proximas_filtradas) > 0) {
             $pdf->SetFont('Arial', 'B', 9);

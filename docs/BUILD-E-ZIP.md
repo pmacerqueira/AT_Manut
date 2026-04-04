@@ -63,7 +63,7 @@ npm run build
 npm run zip
 ```
 
-> **Nota:** `npm run zip` usa `tar` internamente para criar `dist_upload.zip` a partir de `dist/`.
+> **Nota:** `npm run zip` executa `scripts/make-deploy-zip.mjs` (pacote `archiver`): o zip contém **`index.html`**, **`assets/`**, etc. na **raíz** — ao extrair em `public_html/manut/`, os ficheiros ficam no sítio certo **sem** uma pasta extra (ex.: não fica `dist/index.html`).
 
 ---
 
