@@ -267,7 +267,7 @@ export default function Clientes() {
         cli, maqsCliente, manutencoes,
         relatorios ?? [], reparacoes ?? [],
         getSubcategoria, getCategoria,
-        { logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`, ...(modalFrota.options ?? {}) }
+        { logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`, ...(modalFrota.options ?? {}) }
       )
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -319,7 +319,7 @@ export default function Clientes() {
       const maqsCliente = getMaquinasDoCliente(cli.nif)
       const frotaOpts = {
         emailFragment: true,
-        logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+        logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
         ...(modalFrota.options ?? {}),
       }
       const { gerarRelatorioFrotaHtml } = await import('../utils/gerarRelatorioFrotaHtml')

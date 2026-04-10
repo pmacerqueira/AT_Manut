@@ -11,6 +11,7 @@ import {
   Settings, RefreshCw, Search, QrCode, BarChart2, Hammer, Palette, MoreHorizontal, Sun, Moon,
 } from 'lucide-react'
 import { STORAGE } from '../config/storageKeys'
+import { ASSETS } from '../constants/assets'
 import Breadcrumbs from './Breadcrumbs'
 import OfflineBanner from './OfflineBanner'
 import PesquisaGlobal from './PesquisaGlobal'
@@ -59,7 +60,7 @@ export default function Layout({ children }) {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="logo-card" onClick={closeSidebar} title="Ir para o início">
-            <img src={`${import.meta.env.BASE_URL}logo-navel.png`} alt="Navel" className="logo-img" />
+            <img src={ASSETS.LOGO_NAVEL} alt="NAVEL" className="logo-img" />
           </Link>
         </div>
 

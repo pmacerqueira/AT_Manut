@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from '../components/Toast'
 import { apiUploadMarcaLogo } from '../services/apiService'
+import { ASSETS } from '../constants/assets'
 import './Marcas.css'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
@@ -376,7 +377,7 @@ export default function Marcas() {
         <div className="marcas-preview">
           <div className="rpt-head" style={{ borderColor: preview.color }}>
             <div className="rpt-logos">
-              <img src={`${import.meta.env.BASE_URL}logo-navel.png`} alt="Navel" />
+              <img src={ASSETS.LOGO_NAVEL} alt="NAVEL" />
               {draft.logoUrl
                 ? <img src={draft.logoUrl} alt={draft.nome || 'Marca'} />
                 : <div className="rpt-logo-placeholder">Logo Marca</div>}

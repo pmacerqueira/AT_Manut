@@ -29,7 +29,8 @@ const DIMENSIONS = {
   'icon-192.png': { w: 192, h: 192 },
   'icon-512.png': { w: 512, h: 512 },
   'logo.png': { w: 512, h: 512 },
-  'logo-navel.png': null, // manter dimensões
+  'logo-navel.png': null, // legado; preferir NAVEL_LOGO.jpg (oficial)
+  'NAVEL_LOGO.jpg': null, // logótipo oficial — só comprimir, sem redimensionar
 }
 
 async function findImages(dir, base = '') {

@@ -30,7 +30,7 @@ alwaysApply: true
 O workspace NAVEL contém múltiplos projectos. Após um crash, o Cursor pode reiniciar na pasta raiz sem contexto do projecto activo.
 
 **Protocolo obrigatório:**
-1. **Confirmar projecto** — se o utilizador pede build/zip/deploy, confirmar que se refere ao AT_Manut (não ao app-ftecnicas ou outro). Pistas: "public_html/manut" = AT_Manut; "app-ftecnicas" = outro projecto.
+1. **Confirmar projecto** — se o utilizador pede build/zip/deploy, confirmar que se refere ao AT_Manut (não a `navel-propostas`, `app-stocks-next`, `app-ftecnicas`, etc.). Pistas: "public_html/manut" = AT_Manut; stocks = `app-stocks-next`; propostas = `navel-propostas`.
 2. **Verificar estado** — `git status` + `git log --oneline -5` + `git diff --stat` dentro de `c:\Cursor_Projetos\NAVEL\AT_Manut\`.
 3. **Nunca cruzar projectos** — não executar comandos do AT_Manut na pasta do app-ftecnicas ou vice-versa.
 4. **Consultar regra global** — ver `.cursor/rules/navel-workspace.mdc` na raiz do workspace para mapa completo de projectos.
@@ -87,7 +87,7 @@ Quando o utilizador pedir para **optimizar, corrigir ou preparar um novo build**
 
 ## Autorização de uso de logs
 
-**O utilizador (Pedro Cerqueira / Navel) concede plena autorização** ao assistente para:
+**O utilizador (Pedro Cerqueira — José Gonçalves Cerqueira (NAVEL-AÇORES), Lda.) concede plena autorização** ao assistente para:
 - Ler, analisar e interpretar todos os dados dos logs colados no chat
 - Usar o conteúdo dos logs de forma iterativa e generativa para diagnóstico
 - Correlacionar entradas de log com o código fonte e corrigir proactivamente
@@ -160,10 +160,13 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ## Localizações no disco
 
-| Projeto      | Caminho (workspace NAVEL)        |
-|--------------|----------------------------------|
-| AT_Manut     | `c:\Cursor_Projetos\NAVEL\AT_Manut\` |
-| Website Navel| `c:\Cursor_Projetos\NAVEL\navel-site\` |
+| Projeto           | Caminho (workspace NAVEL)                    |
+|-------------------|----------------------------------------------|
+| AT_Manut          | `c:\Cursor_Projetos\NAVEL\AT_Manut\`         |
+| navel-propostas   | `c:\Cursor_Projetos\NAVEL\navel-propostas\`  |
+| Website Navel     | `c:\Cursor_Projetos\NAVEL\navel-site\`       |
+| app-stocks-next   | `c:\Cursor_Projetos\NAVEL\app-stocks-next\`  |
+| app-ftecnicas     | `c:\Cursor_Projetos\NAVEL\app-ftecnicas\`    |
 
 ## Boas práticas Git
 
@@ -375,7 +378,7 @@ await page.waitForTimeout(500)
 ## Rodapé em relatórios
 
 **Obrigatório:** Todos os relatórios (HTML, PDF, email) devem incluir o rodapé:
-`Navel-Açores, Lda — Todos os direitos reservados · v{APP_VERSION}`
+`José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v{APP_VERSION}`
 
 - Usar `APP_FOOTER_TEXT` de `src/config/version.js` (inclui versão automaticamente)
 - Aplicar em: relatorioHtml.js, gerarPdfRelatorio.js, send-email.php, EnviarDocumentoModal, e qualquer novo relatório

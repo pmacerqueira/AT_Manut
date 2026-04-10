@@ -124,7 +124,7 @@ export async function gerarRelatorioMensalIstobalPdf(payload) {
 
   let logoDataUrl = null
   try {
-    logoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    logoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
   } catch (_) { /* ok */ }
 
   let y = 0
@@ -159,7 +159,7 @@ export async function gerarRelatorioMensalIstobalPdf(payload) {
   pdf.setTextColor(...BRANCO)
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'bold')
-  pdf.text('Jos\u00e9 Gon\u00e7alves Cerqueira (NAVEL \u2013 A\u00c7ORES), Lda.', txR, 9, { align: 'right' })
+  pdf.text(EMPRESA.nome, txR, 9, { align: 'right' })
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'normal')
   pdf.text("Pico d'Agua Park \u2022 www.navel.pt", txR, 15, { align: 'right' })

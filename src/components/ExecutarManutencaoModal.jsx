@@ -1246,7 +1246,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           emailDestinatario: emailDestinatario.trim(),
           relatorio: relFinal, manutencao: manutFinal, maquina: maq, cliente,
           checklistItems: items, subcategoriaNome: sub?.nome || '',
-          logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
           tecnicoObj: tecObj,
           marcas,
           categoriaNome,

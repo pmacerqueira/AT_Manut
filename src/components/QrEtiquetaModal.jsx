@@ -35,7 +35,7 @@ export default function QrEtiquetaModal({ isOpen, onClose, maquina, subcategoria
 
   if (!isOpen || !maquina) return null
 
-  const logoSrc = `${import.meta.env.BASE_URL}logo-navel.png`
+  const logoSrc = `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`
 
   return (
     <div className="modal-overlay qr-modal-overlay" onClick={onClose}>
@@ -111,7 +111,7 @@ export default function QrEtiquetaModal({ isOpen, onClose, maquina, subcategoria
 
             {/* Rodapé */}
             <div className="qr-etiqueta-footer">
-              Navel-Açores, Lda &nbsp;·&nbsp; AT_Manut v{APP_VERSION}
+              José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. &nbsp;·&nbsp; AT_Manut v{APP_VERSION}
             </div>
           </div>
 

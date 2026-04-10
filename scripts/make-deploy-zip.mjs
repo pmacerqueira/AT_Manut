@@ -10,6 +10,7 @@ import archiver from 'archiver'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..')
 const distDir = path.join(root, 'dist')
+const uploadDir = path.join(root, 'dist_upload')
 const zipPath = path.join(root, 'dist_upload.zip')
 
 if (!fs.existsSync(distDir)) {
@@ -42,3 +43,11 @@ await new Promise((resolve, reject) => {
 
   archive.finalize()
 })
+
+// Pasta espelho para FTP/SFTP manual — sempre igual ao último build em dist/
+if (fs.existsSync(uploadDir)) {
+  fs.rmSync(uploadDir, { recursive: true, force: true })
+}
+fs.mkdirSync(uploadDir, { recursive: true })
+fs.cpSync(distDir, uploadDir, { recursive: true, dereference: true })
+console.log('dist_upload/ sincronizado a partir de dist/ (espelho para deploy manual).')

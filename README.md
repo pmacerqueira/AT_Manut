@@ -1,6 +1,6 @@
 # AT_Manut — Navel Manutenções Preventivas e Reparações
 
-Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **Navel-Açores, Lda**.
+Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **José Gonçalves Cerqueira (NAVEL-AÇORES), Lda.**
 
 **Versão actual:** `v1.16.30` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
 

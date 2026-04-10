@@ -5,4 +5,4 @@
 export const APP_VERSION = '1.16.53'
 
 /** Texto do rodapé: empresa + direitos reservados + versão. Usar em Layout, Login e relatórios. */
-export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
+export const APP_FOOTER_TEXT = `José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v${APP_VERSION}`

@@ -143,6 +143,9 @@ register_shutdown_function(function () use ($atm_log_loaded) {
 define('AUTH_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
 define('FROM_EMAIL', 'no-reply@navel.pt');
 define('REPLY_TO',   'comercial@navel.pt');
+/** Alinhar com `src/constants/empresa.js` (frontend) — única fonte de verdade para copy/paste PHP */
+define('ATM_RAZAO_SOCIAL', 'José Gonçalves Cerqueira (NAVEL-AÇORES), Lda.');
+define('ATM_MARCA_CURTA', 'NAVEL-AÇORES');
 
 function _dbg($msg) {
     @error_log(date('Y-m-d H:i:s') . " [DBG] $msg\n", 3, __DIR__ . '/atm_debug.log');
@@ -292,6 +295,8 @@ if ($tipo_email === 'lembrete') {
     }
 
     $subject  = "=?UTF-8?B?" . base64_encode("Lembrete: Manutenções programadas — $to_name_safe") . "?=";
+    $atm_marca_h = htmlspecialchars(ATM_MARCA_CURTA, ENT_QUOTES, 'UTF-8');
+    $atm_razao_h = htmlspecialchars(ATM_RAZAO_SOCIAL, ENT_QUOTES, 'UTF-8');
     $html_body = "<!DOCTYPE html><html lang='pt'><head><meta charset='UTF-8'></head><body style='margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;'>
 <table width='100%' cellpadding='0' cellspacing='0' style='background:#f9fafb;padding:24px 16px;'>
   <tr><td align='center'>
@@ -300,7 +305,7 @@ if ($tipo_email === 'lembrete') {
       <!-- Cabeçalho -->
       <tr>
         <td style='background:#1a4880;padding:22px 28px;'>
-          <p style='margin:0;font-size:1.15em;font-weight:700;color:#fff;'>NAVEL &ndash; AÇORES</p>
+          <p style='margin:0;font-size:1.15em;font-weight:700;color:#fff;'>$atm_marca_h</p>
           <p style='margin:4px 0 0;font-size:0.8em;color:#bfdbfe;'>AT_Manut v$app_ver · Gestão de Manutenções</p>
         </td>
       </tr>
@@ -310,7 +315,7 @@ if ($tipo_email === 'lembrete') {
         <td style='padding:24px 28px 16px;'>
           <p style='margin:0;font-size:1em;color:#111827;'>Exmo(a) Sr(a) <strong>$to_name_safe</strong>,</p>
           <p style='margin:10px 0 0;font-size:0.9em;color:#374151;line-height:1.5;'>
-            Informamos que tem as seguintes manutenções programadas nos próximos dias para os equipamentos Navel
+            Informamos que tem as seguintes manutenções programadas nos próximos dias para os equipamentos $atm_marca_h
             instalados na sua empresa. Por favor confirme a disponibilidade com a nossa equipa técnica.
           </p>
         </td>
@@ -348,7 +353,7 @@ if ($tipo_email === 'lembrete') {
       <!-- Rodapé -->
       <tr>
         <td style='background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px 28px;font-size:0.75em;color:#9ca3af;text-align:center;'>
-          NAVEL &ndash; AÇORES, Lda — Todos os direitos reservados · AT_Manut v$app_ver
+          $atm_razao_h — Todos os direitos reservados · AT_Manut v$app_ver
         </td>
       </tr>
 
@@ -359,7 +364,7 @@ if ($tipo_email === 'lembrete') {
 
     $headers  = "MIME-Version: 1.0\r\n";
     $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: =?UTF-8?B?" . base64_encode('NAVEL – AÇORES') . "?= <" . FROM_EMAIL . ">\r\n";
+    $headers .= "From: =?UTF-8?B?" . base64_encode(ATM_RAZAO_SOCIAL) . "?= <" . FROM_EMAIL . ">\r\n";
     $headers .= "Reply-To: " . REPLY_TO . "\r\n";
     $headers .= "Cc: " . REPLY_TO . "\r\n";   // CC sempre ao admin
     $headers .= "X-Mailer: AT_Manut/$app_ver\r\n";
@@ -455,13 +460,13 @@ function texto_declaracao_cliente($tipo, $legislacao = 'outros') {
     ];
     $mid = $labels[$tipo] ?? 'manutenção';
     $antes = 'Declaro que li e concordo com o que foi relatado pelo técnico na';
-    $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
-    $depois_comp = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
-    $depois_outros = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
+    $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $depois_comp = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
+    $depois_outros = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
     // Textos canónicos para reparação (intervenção corretiva) — alinhados a src/constants/relatorio.js
     $rep_elev = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este relatório e a documentação técnica exigível (nomeadamente Manual de Utilizador e Declaração de Conformidade CE) pelo período mínimo de dois anos ou pelo prazo aplicável, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
-    $rep_comp = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
-    $rep_out = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL e a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
+    $rep_comp = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL-AÇORES e a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
+    $rep_out = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL-AÇORES e a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
     if ($tipo === 'reparacao') {
         if ($legislacao === 'elevadores') {
             $depois = $rep_elev;
@@ -668,7 +673,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             } else {
                 $this->SetFont('Arial', 'B', 13);
                 $this->SetXY($M, 8);
-                $this->Cell(60, 6, 'NAVEL - ACORES', 0, 0);
+                $this->Cell(60, 6, f(ATM_MARCA_CURTA), 0, 0);
                 $logoEndX = $M + 64;
             }
 
@@ -681,7 +686,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $txW = $W - $M * 2;
             $this->SetFont('Arial', 'B', 8);
             $this->SetXY($M, 7);
-            $this->Cell($txW, 4, f('José Gonçalves Cerqueira (NAVEL – AÇORES), Lda.'), 0, 0, 'R');
+            $this->Cell($txW, 4, f(ATM_RAZAO_SOCIAL), 0, 0, 'R');
             $this->SetFont('Arial', '', 7);
             $this->SetXY($M, 13);
             $this->Cell($txW, 4, f("Pico d'Agua Park • www.navel.pt"), 0, 0, 'R');
@@ -704,7 +709,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $this->SetFillColor(30, 58, 95);
             $this->Rect(0, $yF, $W, 14, 'F');
             $this->SetTextColor(160, 180, 210);
-            $footerText = 'NAVEL - ACORES, Lda - Todos os direitos reservados';
+            $footerText = f(ATM_RAZAO_SOCIAL . ' — Todos os direitos reservados');
             if ($this->appVersion) {
                 $footerText .= ' · v' . $this->appVersion;
             }
@@ -741,8 +746,8 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->appVersion = $app_version;
     $pdf->pathLogoNavel = $tmp_logo_navel;
     $pdf->pathLogoBrand = $tmp_logo_brand;
-    $pdf->SetCreator('Navel Manutencoes');
-    $pdf->SetAuthor('NAVEL - ACORES');
+    $pdf->SetCreator('AT_Manut');
+    $pdf->SetAuthor(ATM_RAZAO_SOCIAL);
     $pdf->SetTitle('Relatorio ' . $num_rel);
     $pdf->AliasNbPages('{nb}');
     $pdf->SetAutoPageBreak(true, 18);
@@ -1218,7 +1223,7 @@ $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
   <tr><td bgcolor="#1e3a5f" style="background-color:#1e3a5f;background:linear-gradient(135deg,#1e3a5f,#0d6efd);padding:18px 24px;">
     <!-- Cabeçalho em tabela (sem imagem) — máxima compatibilidade em clientes de email -->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
-      <tr><td align="left" valign="top" style="padding:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;font-weight:bold;">Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL &ndash; A&Ccedil;ORES), Lda.</td></tr>
+      <tr><td align="left" valign="top" style="padding:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;font-weight:bold;">Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL-A&Ccedil;ORES), Lda.</td></tr>
       <tr><td align="left" valign="top" style="padding:0 0 4px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;"><a href="https://www.navel.pt" target="_blank" rel="noopener noreferrer" style="color:#ffffff !important;text-decoration:underline;">Pico d&#39;Agua Park &#8226; www.navel.pt</a></td></tr>
       <tr><td align="left" valign="top" style="padding:0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;">S&atilde;o Miguel&ndash;A&ccedil;ores</td></tr>
     </table>
@@ -1302,7 +1307,7 @@ if ($proxima_manut) {
 }
 
 $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255,255,.65);font-size:10px;text-align:center;line-height:1.9;">'
-       . 'Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL &ndash; A&Ccedil;ORES), Lda.<br>'
+       . 'Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL-A&Ccedil;ORES), Lda.<br>'
        . "Pico d'Agua Park &mdash; www.navel.pt"
        . '</td></tr>'
        . '</table></td></tr></table></body></html>';
@@ -1313,12 +1318,12 @@ $text = "Exmo(a) Sr(a) " . $to_name . ",\r\n\r\n"
       . "Data: " . $data_real . "\r\n"
       . "Tecnico: " . $tecnico . "\r\n"
       . ($pdf_data ? "O relatorio em PDF encontra-se em anexo.\r\n" : "")
-      . "\r\nNAVEL - ACORES - www.navel.pt";
+      . "\r\n" . ATM_MARCA_CURTA . " — www.navel.pt";
 
 // -- MIME --------------------------------------------------------------------
 $outer = '----=_NavelOuter_' . md5(uniqid());
 $inner = '----=_NavelInner_' . md5(uniqid());
-$subj  = '=?UTF-8?B?' . base64_encode('Relatorio N. ' . $num_rel . ' - NAVEL – AÇORES') . '?=';
+$subj  = '=?UTF-8?B?' . base64_encode('Relatorio N. ' . $num_rel . ' — ' . ATM_MARCA_CURTA) . '?=';
 $fname = preg_replace('/[^a-zA-Z0-9._\-]/', '_', 'relatorio_' . $num_rel . '.pdf');
 
 if ($pdf_data) {
@@ -1333,7 +1338,7 @@ if ($pdf_data) {
     $body .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n$html\r\n--$inner--\r\n";
     $hdr   = "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"$inner\"\r\n";
 }
-$hdr .= "From: =?UTF-8?B?" . base64_encode('NAVEL - ACORES') . "?= <" . FROM_EMAIL . ">\r\n"
+$hdr .= "From: =?UTF-8?B?" . base64_encode(ATM_RAZAO_SOCIAL) . "?= <" . FROM_EMAIL . ">\r\n"
       . 'Reply-To: ' . REPLY_TO . "\r\n"
       . 'Cc: ' . REPLY_TO . "\r\n"
       . 'X-Mailer: PHP/' . phpversion() . "\r\n";

@@ -13,6 +13,7 @@
  */
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
+import { EMPRESA } from '../constants/empresa'
 import {
   normEntityId,
   dateKeyForFilter,
@@ -87,7 +88,7 @@ export async function gerarRelatorioFrotaPdf(
   const { loadImageAsDataUrl, addImageFitInBoxMm } = await import('./gerarPdfRelatorio')
   let frotaLogoDataUrl = null
   try {
-    frotaLogoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    frotaLogoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
   } catch (_) { /* sem logo */ }
 
   // ── Pré-filtragem com Maps para O(1) lookup ─────────────────────────────
@@ -209,7 +210,7 @@ export async function gerarRelatorioFrotaPdf(
     const txR = W - M
     pdf.setTextColor(...BRANCO)
     pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
-    pdf.text('Jos\u00e9 Gon\u00e7alves Cerqueira (NAVEL \u2013 A\u00c7ORES), Lda.', txR, 10, { align: 'right' })
+    pdf.text(EMPRESA.nome, txR, 10, { align: 'right' })
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
     pdf.text("Pico d'Agua Park \u2022 www.navel.pt", txR, 17, { align: 'right' })
     pdf.text('S\u00e3o Miguel\u2013A\u00e7ores', txR, 23, { align: 'right' })

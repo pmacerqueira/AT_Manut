@@ -18,6 +18,7 @@ import {
   PALETA,
   TIPO,
 } from './relatorioBaseStyles'
+import { ASSETS } from '../constants/assets'
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value ?? '').trim()
@@ -39,7 +40,7 @@ function hexToRgba(hex, alpha) {
 export function relatorioReparacaoParaHtml(relatorio, reparacao, maquina, cliente, checklistItems = [], options = {}) {
   if (!relatorio) return ''
   const { subcategoriaNome, logoUrl, istobalLogoUrl, tecnicoObj, categoriaNome = '', declaracaoClienteDepois = '' } = options
-  const logoSrc = logoUrl ?? '/manut/logo-navel.png'
+  const logoSrc = logoUrl ?? ASSETS.LOGO_NAVEL
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
   const isIstobalReport = (

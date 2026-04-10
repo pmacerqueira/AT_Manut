@@ -567,7 +567,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
 
     const modal = page.locator('.modal-relatorio-rep')
     await expect(modal).toBeVisible()
-    // Rodapé "Navel-Açores, Lda" adicionado ao RelatorioReparacaoView
+    // Rodapé APP_FOOTER_TEXT (razão social NAVEL-AÇORES) no RelatorioReparacaoView
     await expect(modal.locator('.rel-footer')).toContainText(/Navel/)
   })
 

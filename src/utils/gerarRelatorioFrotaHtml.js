@@ -7,6 +7,7 @@
 import { escapeHtml } from './sanitize'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
+import { ASSETS } from '../constants/assets'
 import {
   normEntityId,
   dateKeyForFilter,
@@ -33,7 +34,7 @@ const fmtD = (dateStr) => {
 
 /** Logo no email precisa de URL absoluta; no browser relativa também funciona. */
 function resolveLogoSrc(logoUrl) {
-  const raw = String(logoUrl ?? `${import.meta.env.BASE_URL}logo-navel.png`).trim()
+  const raw = String(logoUrl ?? ASSETS.LOGO_NAVEL).trim()
   if (/^https?:\/\//i.test(raw)) return raw
   const path = raw.startsWith('/') ? raw : `/${raw}`
   if (typeof window !== 'undefined' && window.location?.origin) {

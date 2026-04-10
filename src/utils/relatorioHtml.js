@@ -21,6 +21,7 @@ import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import { relatorioObrigaBlocoConsumiveisPlano, relatorioIncluiSecaoConsumiveisContador } from './relatorioBlocosEquipamento'
 import { MAX_FOTOS } from '../config/limits'
 import { cssBase, htmlHeader, htmlTituloBar, htmlPaginaCliente, htmlFooter, htmlFotos, PALETA, TIPO } from './relatorioBaseStyles'
+import { ASSETS } from '../constants/assets'
 
 const HISTORIAL_MAX = 5
 const ANOMALIA_TEXTO_MAX = 80
@@ -47,7 +48,7 @@ export function relatorioParaHtml(relatorio, manutencao, maquina, cliente, check
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
   const { subcategoriaNome, ultimoEnvio, logoUrl, istobalLogoUrl, tecnicoObj, proximasManutencoes, historicoRelatorios, form, categoriaNome = '', declaracaoClienteDepois = '' } = options
   const horasContadorRelatorioGeral = horasContadorParaRelatorio(maquina, manutencao, form, relatorio)
-  const logoSrc = logoUrl ?? '/manut/logo-navel.png'
+  const logoSrc = logoUrl ?? ASSETS.LOGO_NAVEL
   const logoIstobalSrc = istobalLogoUrl ?? '/manut/logo-istobal.png'
   const esc = escapeHtml
   const isIstobalReport = (

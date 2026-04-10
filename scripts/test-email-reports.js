@@ -43,7 +43,7 @@ rmSync(bundlePath, { force: true })
 console.log('  Generators loaded.\n')
 
 // ─── 2. Dados mock realistas ─────────────────────────────────────────────────
-const LOGO = 'https://www.navel.pt/manut/logo-navel.png'
+const LOGO = 'https://www.navel.pt/manut/NAVEL_LOGO.jpg'
 
 const CLIENTE = {
   nome: 'Auto Açoreana - Comércio de Automóveis, Lda.',

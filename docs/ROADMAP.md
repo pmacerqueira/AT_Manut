@@ -216,6 +216,16 @@
 | N1 | **Notificações push** (Web Push API) — manutenções a vencer em 3 dias | Alto | Alto | Service Worker necessário; independente do cron |
 | N4 | **Actualização automática multi-tab** — BroadcastChannel API | Baixo | Baixo | Sincronização instantânea entre abas abertas |
 
+### Diferido — ISTOBAL: ingestão via Microsoft Graph (alternativa ao redireccionamento)
+
+**Estado:** hipótese registada; só voltar se regras O365 / `istobal@bot.navel.pt` ou piping deixarem de ser fiáveis.
+
+**Ideia:** worker com **Microsoft Graph** (padrão semelhante ao projecto *navel-propostas*) que, em intervalo configurável (ex.: cron 2–5 min), lê mensagens na pasta **TRABALHO\\ISTOBAL** da caixa O365 e envia para o endpoint já existente **`istobal-webhook.php`** um POST JSON com `from`, `subject`, `body_html`, `received` e header **`X-ATM-Token`** (`ATM_WEBHOOK_TOKEN` em `servidor-cpanel/api/config.php`). Não duplica parsing no worker: o PHP mantém a lógica actual (parse da tabela HTML, `reparacoes`, `origem = istobal_email`, duplicados por `numero_aviso`).
+
+**Referências no repo:** `servidor-cpanel/api/istobal-webhook.php`, `servidor-cpanel/api/parse-istobal-email.php` (piping), `servidor-cpanel/api/ingest-istobal-retro.php` (prova de contrato HTTP). **Nota:** confirmar URL de produção (`/api/` vs prefixo `/manut/`). **Opcional:** registo de `internetMessageId` / id Graph no worker para idempotência extra além da BD.
+
+**Onde corre o worker:** fora do static hosting (cron + Node/Python ou serviço alojado); o cPanel continua a servir só API + BD.
+
 ### Fase 3 — Escalabilidade (horizonte 6-12 meses)
 
 | # | Funcionalidade | Impacto | Esforço | Notas |
@@ -255,6 +265,6 @@
 
 ---
 
-*Última actualização: 2026-03-17 — v1.14.0 (contraste + roadmap actualizado)*
+*Última actualização: 2026-04-08 — backlog: alternativa ISTOBAL via Microsoft Graph (diferido)*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

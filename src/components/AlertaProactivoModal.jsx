@@ -77,7 +77,7 @@ export default function AlertaProactivoModal({ isOpen, alertas, onDismiss, onClo
         emailDestinatario: email,
         clienteNome:       grupo.cliente?.nome ?? '',
         alertas:           grupo.items,
-        logoUrl:           `${import.meta.env.BASE_URL}logo-navel.png`,
+        logoUrl:           `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
       })
       if (resultado.ok) {
         setEnviados(prev => ({ ...prev, [nif]: true }))

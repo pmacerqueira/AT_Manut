@@ -7,6 +7,7 @@
  */
 import { logger } from './logger'
 import { APP_FOOTER_TEXT } from '../config/version'
+import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
@@ -274,7 +275,7 @@ export async function gerarPdfCompacto({
 
   let logoEndX = M
   try {
-    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
     if (logoImg) {
       const lW = 40, lH = 13, pad = 3, r = 3
       const bx = M, by = (headerH - lH - pad * 2) / 2
@@ -313,7 +314,7 @@ export async function gerarPdfCompacto({
   const txR = W - M
   pdf.setTextColor(255, 255, 255)
   pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
-  pdf.text('Jos\u00e9 Gon\u00e7alves Cerqueira (NAVEL \u2013 A\u00c7ORES), Lda.', txR, 10, { align: 'right' })
+  pdf.text(EMPRESA.nome, txR, 10, { align: 'right' })
   pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
   pdf.text("Pico d'Agua Park \u2022 www.navel.pt", txR, 17, { align: 'right' })
   pdf.text('S\u00e3o Miguel\u2013A\u00e7ores', txR, 23, { align: 'right' })
@@ -770,7 +771,7 @@ export async function getHeaderLogosB64ForEmail({ maquina, marcas = [] }) {
   let navelLogoB64 = ''
   let brandLogoB64 = ''
   try {
-    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}logo-navel.png`)
+    const logoImg = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
     if (logoImg) {
       const comma = logoImg.indexOf(',')
       navelLogoB64 = comma >= 0 ? logoImg.substring(comma + 1) : ''

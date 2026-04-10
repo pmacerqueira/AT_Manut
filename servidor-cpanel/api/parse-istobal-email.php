@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php
 /**
  * parse-istobal-email.php — Integração ISTOBAL: Email Piping → Reparação automática
@@ -8,8 +7,14 @@
  * CONFIGURAR NO CPANEL — Email Piping:
  *   1. Em "Email Accounts", ir à conta que recebe os emails ISTOBAL (ex. assist@navel.pt)
  *   2. Em "Email Forwarders" → "Add Forwarder":
- *      - Forwarder address: assist@navel.pt
- *      - Forward to: |/usr/bin/php /home/<user>/public_html/api/parse-istobal-email.php
+ *      - Forward to (recomendado, evita saída acidental e NDR):
+ *        |/usr/bin/php -q /home/<user>/public_html/api/parse-istobal-email.php
+ *      - Em servidores cPanel com EasyApache, o binário pode ser:
+ *        |/opt/cpanel/ea-php81/root/usr/bin/php -q /home/<user>/public_html/api/parse-istobal-email.php
+ *      - NÃO coloques apenas "|/caminho/script.php" sem "php -q": alguns MTA executam o ficheiro
+ *        e qualquer texto antes de <?php ou avisos PHP geram NDR ("mensagem não entregue").
+ *      - CloudLinux CageFS: pipe directo ao .php pode dar "cagefs_enter: Permission denied".
+ *        Usa o wrapper bin/istobal-pipe.sh (ver servidor-cpanel/mailpipe/istobal-pipe.sh).
  *
  * O script:
  *   1. Lê o email completo de STDIN (formato RFC 2822)
@@ -17,7 +22,7 @@
  *   3. Extrai a tabela HTML do corpo do email (formato ISTOBAL)
  *   4. Faz match da máquina pelo nº de série
  *   5. Cria um registo em `reparacoes` com origem = 'istobal_email'
- *   6. Responde com log (para depuração em cron/pipe)
+ *   6. Exit 0 sempre após processar (evita NDR ao remetente em falhas já notificadas por email)
  *
  * FORMATO DO EMAIL ISTOBAL (exemplo):
  *   De: isat@istobal.com
@@ -27,6 +32,19 @@
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL & ~E_NOTICE);
+
+// Pipes de correio: qualquer byte em STDOUT pode fazer o Exim reportar falha de entrega.
+ob_start();
+
+/**
+ * Termina o script sem deixar saída no pipe (evita NDR genéricos do Mailer-Daemon).
+ */
+function atm_pipe_exit(int $code = 0): void {
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    exit($code);
+}
 
 // ── Config e DB ───────────────────────────────────────────────────────────────
 require_once __DIR__ . '/config.php';
@@ -82,7 +100,7 @@ if (empty(trim($rawEmail))) {
         'AT_Manut: Falha ao abrir reparação ISTOBAL',
         "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: email vazio no piping.\nData: " . date('Y-m-d H:i:s')
     );
-    exit(1);
+    atm_pipe_exit(0);
 }
 
 ilog('Email recebido (' . strlen($rawEmail) . ' bytes)');
@@ -148,7 +166,7 @@ $hasIstobalKeyword  = stripos($subjectLine, 'istobal') !== false
 
 if (!$isIstobalDirect && !$isIstobalForward && !$isIstobalInBody && !$hasEsInSubject && !$hasIstobalKeyword) {
     ilog('IGNORADO: Remetente não é isat@istobal.com e email não contém dados ISTOBAL.');
-    exit(0);
+    atm_pipe_exit(0);
 }
 if (!$isIstobalDirect) {
     ilog('Email reencaminhado detectado (não é From: directo). A processar na mesma.');
@@ -160,7 +178,7 @@ $closureKeywords = ['cierre', 'cerrado', 'finalizado', 'finalizacion', 'finaliza
 foreach ($closureKeywords as $kw) {
     if (mb_strpos($subjectNorm, $kw) !== false) {
         ilog("IGNORADO: email de fecho detectado no assunto (keyword='$kw').");
-        exit(0);
+        atm_pipe_exit(0);
     }
 }
 
@@ -173,44 +191,88 @@ if (preg_match('/\b(ES\d+)\b/', $subjectLine, $esm)) {
 
 // ── 4. Extrair corpo HTML ─────────────────────────────────────────────────────
 /**
- * Abordagem: procurar o bloco Content-Type: text/html e extrair o conteúdo.
- * Suporta emails multipart/alternative com partes text/plain e text/html.
+ * Descodifica o corpo de uma parte MIME com base nos cabeçalhos dessa parte.
  */
-function extractHtmlBody($rawEmail) {
-    // Encontrar boundary do multipart
-    preg_match('/Content-Type:\s*multipart\/alternative;\s*boundary="?([^"\r\n;]+)/i', $rawEmail, $bm);
-    if (!$bm) {
-        preg_match('/Content-Type:\s*multipart\/mixed;\s*boundary="?([^"\r\n;]+)/i', $rawEmail, $bm);
+function atm_decode_part_body(string $partHeaders, string $partBody): string {
+    $body = $partBody;
+    if (stripos($partHeaders, 'Content-Transfer-Encoding: quoted-printable') !== false) {
+        $body = quoted_printable_decode($body);
+    } elseif (stripos($partHeaders, 'Content-Transfer-Encoding: base64') !== false) {
+        $body = base64_decode(preg_replace('/\s+/', '', $body));
+    }
+    return $body;
+}
+
+/**
+ * Extrai text/html recursivamente (multipart/mixed, alternative, related, signed).
+ * Mensagens reencaminhadas pelo Exchange/O365 costumam ter multiparts aninhados;
+ * a versão anterior só lia o primeiro boundary e falhava → corpo vazio → NDR.
+ */
+function extractHtmlFromMimeSection(string $section): string {
+    $section = str_replace("\r\n", "\n", $section);
+    $sep = strpos($section, "\n\n");
+    if ($sep === false) {
+        return '';
+    }
+    $headers = substr($section, 0, $sep);
+    $body    = substr($section, $sep + 2);
+
+    if (!preg_match('/^Content-Type:\s*([^\n;]+)/mi', $headers, $cm)) {
+        return '';
+    }
+    $ct = strtolower(trim($cm[1]));
+
+    if (strpos($ct, 'multipart/') === 0) {
+        if (!preg_match('/boundary="?([^"\n;]+)"?/i', $headers, $bm)) {
+            return '';
+        }
+        $boundary = $bm[1];
+        $chunks   = explode('--' . $boundary, $body);
+        foreach ($chunks as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk === '' || $chunk === '--') {
+                continue;
+            }
+            $html = extractHtmlFromMimeSection($chunk);
+            if ($html !== '') {
+                return $html;
+            }
+        }
+        return '';
     }
 
-    if ($bm) {
-        $boundary = trim($bm[1]);
-        $parts    = explode('--' . $boundary, $rawEmail);
-        foreach ($parts as $part) {
-            if (stripos($part, 'Content-Type: text/html') !== false) {
-                // Remover cabeçalhos da parte
-                $bodyStart = strpos($part, "\r\n\r\n");
-                if ($bodyStart === false) $bodyStart = strpos($part, "\n\n");
-                if ($bodyStart !== false) {
-                    $body = substr($part, $bodyStart + 4);
-                    // Descodificar quoted-printable
-                    if (stripos($part, 'Content-Transfer-Encoding: quoted-printable') !== false) {
-                        $body = quoted_printable_decode($body);
-                    } elseif (stripos($part, 'Content-Transfer-Encoding: base64') !== false) {
-                        $body = base64_decode(preg_replace('/\s+/', '', $body));
-                    }
-                    return $body;
-                }
-            }
+    if (strpos($ct, 'text/html') !== 0) {
+        return '';
+    }
+
+    $decoded = atm_decode_part_body($headers, $body);
+    return trim($decoded) !== '' ? $decoded : '';
+}
+
+function extractHtmlBody(string $rawEmail): string {
+    $rawEmail = str_replace("\r\n", "\n", $rawEmail);
+    $pos = strpos($rawEmail, "\n\n");
+    if ($pos === false) {
+        return '';
+    }
+    $topHeaders = substr($rawEmail, 0, $pos);
+    $topBody    = substr($rawEmail, $pos + 2);
+    $html       = extractHtmlFromMimeSection($topHeaders . "\n\n" . $topBody);
+    if ($html !== '') {
+        return $html;
+    }
+
+    // Fallback legado: primeira parte text/html “solta” no raw (alguns formatos raros)
+    if (preg_match('/Content-Type:\s*text\/html[^\n]*\n(?:[^\n]*\n)*?\n(.*)/is', $rawEmail, $m)) {
+        $body = $m[1];
+        if (stripos($rawEmail, 'Content-Transfer-Encoding: quoted-printable') !== false) {
+            $body = quoted_printable_decode($body);
+        }
+        if (trim($body) !== '') {
+            return $body;
         }
     }
 
-    // Fallback: email simples com HTML directo
-    $bodyStart = strpos($rawEmail, "\r\n\r\n");
-    if ($bodyStart === false) $bodyStart = strpos($rawEmail, "\n\n");
-    if ($bodyStart !== false) {
-        return substr($rawEmail, $bodyStart + 4);
-    }
     return '';
 }
 
@@ -221,9 +283,9 @@ if (empty(trim($htmlBody))) {
     ilog('ERROR: Não foi possível extrair corpo HTML.');
     notify_ops(
         'AT_Manut: Falha ao abrir reparação ISTOBAL',
-        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: corpo HTML inválido/indisponível.\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
+        "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo: corpo HTML inválido/indisponível (MIME aninhado ou só text/plain).\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
     );
-    exit(1);
+    atm_pipe_exit(0);
 }
 
 // ── 5. Parsear tabela HTML do email ISTOBAL ───────────────────────────────────
@@ -353,7 +415,7 @@ try {
         'AT_Manut: Falha ao abrir reparação ISTOBAL',
         "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo DB: {$e->getMessage()}\nAssunto: $subjectLine\nAviso: $numeroAviso\nData: " . date('Y-m-d H:i:s')
     );
-    exit(1);
+    atm_pipe_exit(0);
 }
 
 $maquinaId = null;
@@ -412,7 +474,7 @@ if ($numeroAviso) {
                 "AT_Manut: Aviso ISTOBAL repetido após fecho ($numeroAviso)",
                 "Recebido novo email para aviso já concluído.\nNenhuma alteração aplicada.\n\nAviso: $numeroAviso\nReparação: {$exist['id']}\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
             );
-            exit(0);
+            atm_pipe_exit(0);
         }
 
         $resolvedMaquinaId = $maquinaId ?: ($exist['maquina_id'] ?? null);
@@ -429,7 +491,7 @@ if ($numeroAviso) {
             $exist['id'],
         ]);
         ilog("ATUALIZADO: aviso=$numeroAviso (id={$exist['id']}) com dados mais recentes. maquinaId=" . ($resolvedMaquinaId ?: 'NULL'));
-        exit(0);
+        atm_pipe_exit(0);
     }
 }
 
@@ -460,7 +522,7 @@ try {
         "AT_Manut: Falha ao abrir reparação ISTOBAL ($numeroAviso)",
         "Não foi conseguida a abertura de reparação em AT_Manut.\n\nMotivo INSERT: {$e->getMessage()}\nAviso: $numeroAviso\nSérie: $numeroSerie\nModelo: $modeloMaquina\nAssunto: $subjectLine\nData: " . date('Y-m-d H:i:s')
     );
-    exit(1);
+    atm_pipe_exit(0);
 }
 
 // ── 11. Notificação via email para a equipa (opcional) ────────────────────────
@@ -473,4 +535,4 @@ try {
 // mail($to, $subject, $body);
 
 ilog('Script concluído com sucesso.');
-exit(0);
+atm_pipe_exit(0);

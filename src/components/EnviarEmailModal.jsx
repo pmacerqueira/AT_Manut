@@ -62,7 +62,7 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
           emailDestinatario: dest,
           relatorio, manutencao, maquina, cliente, checklistItems,
           subcategoriaNome: sub?.nome || '',
-          logoUrl: `${import.meta.env.BASE_URL}logo-navel.png`,
+          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
           tecnicoObj: tecObj,
           marcas,
           categoriaNome,

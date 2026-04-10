@@ -177,7 +177,7 @@ const handleSubmit = (e) => {
 - Layout em duas colunas: info da máquina + QR code
 - Coluna esquerda: logo Navel, nome da subcategoria, marca/modelo, nº de série, cliente, localização
 - Coluna direita: QR code (400px de resolução para impressão nítida)
-- Rodapé: `Navel-Açores, Lda · AT_Manut v{versão}`
+- Rodapé: `José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. · AT_Manut v{versão}` (preferir `APP_FOOTER_TEXT` de `version.js`)
 - Classe de impressão: `#qr-etiqueta-print` (imprime apenas a etiqueta, sem o modal)
 
 ### QR code gerado
@@ -192,7 +192,7 @@ const handleSubmit = (e) => {
 
 ```js
 import { APP_FOOTER_TEXT } from '../config/version'
-// APP_FOOTER_TEXT = "Navel-Açores, Lda — Todos os direitos reservados · v{APP_VERSION}"
+// APP_FOOTER_TEXT = "José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v{APP_VERSION}"
 ```
 
 Aplicar em: `relatorioHtml.js`, `gerarPdfRelatorio.js`, `gerarHtmlHistoricoMaquina.js`, `send-email.php`, `EnviarDocumentoModal`, e qualquer novo relatório.

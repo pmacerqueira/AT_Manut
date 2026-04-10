@@ -9,6 +9,7 @@
 import { formatDataAzores, formatDataHoraAzores, parseDateLocal } from './datasAzores'
 import { escapeHtml, safeDataImageUrl } from './sanitize'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA, TIPO } from './relatorioBaseStyles'
+import { ASSETS } from '../constants/assets'
 
 /**
  * @param {object} params
@@ -34,7 +35,7 @@ export function gerarHtmlHistoricoMaquina({
   logoUrl,
 }) {
   const esc     = escapeHtml
-  const logoSrc = logoUrl ?? '/manut/logo-navel.png'
+  const logoSrc = logoUrl ?? ASSETS.LOGO_NAVEL
   const hoje    = new Date()
 
   const geradoEm = hoje.toLocaleString('pt-PT', {

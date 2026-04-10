@@ -1,0 +1,12 @@
+# Reduz indexacao; *.log NAO ignorar — diagnostico IA
+node_modules/
+dist
+dist-ssr
+dist_upload.zip
+test-results/
+playwright-report/
+tests/playwright-report/
+tests/screenshots/
+.env
+.env.local
+.env.*.local

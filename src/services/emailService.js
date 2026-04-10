@@ -16,6 +16,7 @@ import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
 import { APP_VERSION } from '../config/version'
+import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
@@ -335,7 +336,7 @@ export async function enviarRelatorioEmail({
     `Equipamento: ${equipDesc}\n` +
     `Data de execução: ${dataReal}\n` +
     `Técnico: ${relatorio?.tecnico ?? '—'}\n\n` +
-    `Com os melhores cumprimentos,\nNAVEL \u2013 AÇORES\nwww.navel.pt`
+    `Com os melhores cumprimentos,\n${EMPRESA.nome}\nwww.navel.pt`
   )
   window.open(`mailto:${emailDestinatario}?subject=${subject}&body=${body}`, '_blank')
 
@@ -376,9 +377,9 @@ export async function enviarRelatorioHtmlEmail({
   }
 
   if (!isEmailConfigured()) {
-    const subject = encodeURIComponent(assunto || 'Relatório — Navel')
+    const subject = encodeURIComponent(assunto || `Relatório — ${EMPRESA.marcaCurta}`)
     const body = encodeURIComponent(
-      `Exmo(a) Sr(a) ${nomeCliente},\n\nSegue em anexo o relatório.\n\nNAVEL \u2013 AÇORES\nwww.navel.pt`
+      `Exmo(a) Sr(a) ${nomeCliente},\n\nSegue em anexo o relatório.\n\n${EMPRESA.nome}\nwww.navel.pt`
     )
     window.open(`mailto:${destinatario}?subject=${subject}&body=${body}`, '_blank')
     return { ok: true, message: `Cliente de email aberto para ${destinatario}.`, isMailto: true }
@@ -391,7 +392,7 @@ export async function enviarRelatorioHtmlEmail({
       auth_token: EMAIL_CONFIG.AUTH_TOKEN,
       destinatario: destinatario.trim(),
       cc,
-      assunto: assunto || 'Relatório — Navel',
+      assunto: assunto || `Relatório — ${EMPRESA.marcaCurta}`,
       corpoHtml: html,
       ...(pdfBase64 ? { pdf_base64: pdfBase64, pdf_filename: pdfFilename } : {}),
     })
@@ -516,7 +517,7 @@ export async function enviarLembreteEmail({ emailDestinatario, clienteNome, aler
       `• ${a.maquina?.marca ?? ''} ${a.maquina?.modelo ?? ''} (S/N: ${a.maquina?.numeroSerie ?? '—'})` +
       ` — Data: ${a.manutencao?.data ?? '?'} (daqui a ${a.diasRestantes} dia(s))`
     ).join('\n') +
-    `\n\nCom os melhores cumprimentos,\nNAVEL \u2013 AÇORES\nwww.navel.pt`
+    `\n\nCom os melhores cumprimentos,\n${EMPRESA.nome}\nwww.navel.pt`
   )
   window.open(`mailto:${emailDestinatario}?subject=${subjectFallback}&body=${bodyFallback}`, '_blank')
   alertas.forEach(a => marcarAlertaEnviado(a.maquina?.id, a.manutencao?.data))

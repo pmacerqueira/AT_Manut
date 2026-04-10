@@ -422,7 +422,7 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 ```js
 // src/config/version.js
 export const APP_VERSION = '1.14.0'
-export const APP_FOOTER_TEXT = `Navel-Açores, Lda — Todos os direitos reservados · v${APP_VERSION}`
+export const APP_FOOTER_TEXT = `José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v${APP_VERSION}`
 ```
 
 **Regra:** Incrementar `APP_VERSION` em cada deployment. Usar `APP_FOOTER_TEXT` em todos os relatórios (manutenções, reparações, PDF e emails).
