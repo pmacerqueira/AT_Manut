@@ -29,6 +29,11 @@ define('JWT_TTL', 28800);
 // Deve ser igual ao valor configurado no HTTP Header do Power Automate
 define('ATM_WEBHOOK_TOKEN', getenv('ATM_WEBHOOK_TOKEN') ?: '35338ce1-8050-4770-aa2f-8d8fb9912215');
 
+// ── Token partilhado com a Área Reservada NAVEL (taxonomy-nodes.php) ─────────
+// Consumido por: navel-site → documentos-api-config.php (campo taxonomy_auth_token).
+// Se alterares aqui, altera lá também. Em alternativa, define a var ambiente ATM_TAXONOMY_TOKEN.
+define('ATM_TAXONOMY_TOKEN', getenv('ATM_TAXONOMY_TOKEN') ?: 'a8f3c19d-4b25-47e6-9f8a-3c2e1d0b7a95');
+
 // ── Origens CORS permitidas ───────────────────────────────────────────────────
 define('CORS_ORIGINS', [
     'https://www.navel.pt',

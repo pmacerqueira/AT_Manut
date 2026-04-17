@@ -19,6 +19,7 @@ credenciais SMTP, não precisa de instalar nada extra.
    - `fpdf.php` (de `servidor-cpanel/api/fpdf.php` — necessário para gerar PDF com assinatura e fotos)
    - `send-report.php` (de `servidor-cpanel/api/send-report.php`)
    - `data.php`, `db.php`, `config.php`, `atm_log.php`, `tecnico_horario_restrito.php` (de `servidor-cpanel/api/`)
+   - `taxonomy-nodes.php` (de `servidor-cpanel/api/`) — endpoint read-only consumido pela Área Reservada NAVEL (navel.pt) para listar categorias/subcategorias
    - Opcional: `tecnico_horario_restrito.json` — copiar de `tecnico_horario_restrito.json.example`, editar e pôr `"enabled": true` para bloquear o perfil técnico (role `tecnico`) nos períodos definidos
    - Pasta `font/` completa (de `servidor-cpanel/api/font/` — fontes usadas pelo FPDF)
 5. Verificar permissões: **clicar no ficheiro → Permissions → 644**
@@ -138,6 +139,27 @@ Quando quiseres publicar a app:
    (criar a pasta `manut/` primeiro)
 
 A app ficará acessível em: **https://www.navel.pt/manut/**
+
+---
+
+## Taxonomia partilhada com a Área Reservada NAVEL (navel.pt)
+
+O endpoint `api/taxonomy-nodes.php` devolve em JSON a árvore de categorias e subcategorias de equipamentos, para que a Área Reservada (`https://navel.pt/area-reservada`) crie automaticamente as pastas `Assistência Técnica/<Categoria>/<Subcategoria>`.
+
+- **URL:** `https://www.navel.pt/api/taxonomy-nodes.php`
+- **Autenticação:** header `Authorization: Bearer <ATM_TAXONOMY_TOKEN>` (definido em `config.php`).
+- **Dependências:** reaproveita `config.php` e `db.php` existentes (não precisa de ficheiros de config extras).
+- **Token por omissão:** `a8f3c19d-4b25-47e6-9f8a-3c2e1d0b7a95` (mesmo valor no `documentos-api.php` do navel-site). Para alterar, mudar `ATM_TAXONOMY_TOKEN` em `config.php` **e** `taxonomy_auth_token` no `documentos-api-config.php` do navel-site, ou definir a env var `ATM_TAXONOMY_TOKEN` no cPanel (Advanced → Environment Variables).
+
+Teste rápido (depois do upload):
+
+```
+curl https://www.navel.pt/api/taxonomy-nodes.php
+# → {"ok":false,"error":"unauthorized"}   (OK — está a exigir token)
+
+curl -H "Authorization: Bearer a8f3c19d-4b25-47e6-9f8a-3c2e1d0b7a95" https://www.navel.pt/api/taxonomy-nodes.php
+# → {"ok":true,"items":[ ... ]}
+```
 
 ---
 
