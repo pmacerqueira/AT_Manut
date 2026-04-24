@@ -17,7 +17,9 @@
 | Crítico — `ingest-istobal-retro.php` na web | Garantia **CLI-only** no PHP (`403` se não for `php-cli`). |
 | Alto — `image-proxy.php` / SSRF | Validação de host (só IPs públicos após DNS), recusa URLs com utilizador/password embutidos, `verify_peer` TLS activo, sem redirects HTTP automáticos (`follow_location` 0). |
 
-**Deploy 2026-04-22 (executado):** enviados `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php`, `config.deploy-secrets.php` (só no servidor; bloqueado por HTTP); apagados `test-email.php` e `clear-cache.php` no remoto. **2026-04-23:** orientação **CiberConceito** (#225838): preferir **`SetEnv` em `public_html/api/.htaccess`** para `ATM_*`; o modelo no Git inclui bloco comentado. **Fallback:** `config.deploy-secrets.php` se `mod_env` não existir ou o painel não expuser variáveis.
+**Deploy 2026-04-22 (executado):** enviados `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php`, `config.deploy-secrets.php` (só no servidor; bloqueado por HTTP); apagados `test-email.php` e `clear-cache.php` no remoto.
+
+**2026-04-24 — Migração de segredos para o `.htaccess` (CiberConceito #225838).** Testámos **em produção** a recomendação original (`SetEnv`) e comprovámos via probe PHP que **mod_env não está carregado** neste plano (LiteSpeed + LSPHP 8.1 + SAPI `litespeed`): `SetEnv` é ignorado silenciosamente. Passámos a usar `RewriteRule ^ - [E=KEY:VALUE]` (mod_rewrite), que injecta os valores directamente em `$_SERVER` e `getenv()` — testado com SHA‑1 de cada variável inclusive a password da BD que tem `' " { } ~ +`. O `.htaccess` em produção é **gerado pelo script** `navel-site/scripts/cpanel-migrate-setenv.mjs` (nunca versionado; o ficheiro no repo contém só o bloco `FilesMatch` de defesa em profundidade e documenta esta arquitectura). O fallback legado `config.deploy-secrets.php` foi renomeado para `config.deploy-secrets.php.disabled-TS` (bloqueado pelo `FilesMatch`) — pronto para rollback se necessário. Confirmado que a API funciona apenas com o método `[E=...]` (login devolve 401 "Utilizador ou password incorretos" — ligação à BD e JWT operacionais).
 
 ---
 

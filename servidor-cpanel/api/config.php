@@ -4,11 +4,14 @@
  *
  * INSTALAR EM: public_html/api/config.php
  *
- * PRODUÇÃO — ordem recomendada (CiberConceito / alojamento partilhado):
- *   1) SetEnv no ficheiro public_html/api/.htaccess (mod_env) — ver modelo no repo.
- *   2) Se o plano expuser variáveis do cPanel ao PHP: Advanced → Environment Variables.
- *   3) Fallback: config.deploy-secrets.php no servidor (gitignored; sem putenv manual
- *      disperso — preferir .htaccess quando possível).
+ * PRODUÇÃO — ordem recomendada (actualizado 2026-04-24, ticket CiberConceito #225838):
+ *   1) RewriteRule ^ - [E=ATM_*:...] no .htaccess — única via fiável em
+ *      LiteSpeed/LSPHP deste alojamento (mod_env não está carregado; `SetEnv`
+ *      é ignorado silenciosamente). Gerido pelo script
+ *      `navel-site/scripts/cpanel-migrate-setenv.mjs`.
+ *   2) Fallback legado: config.deploy-secrets.php (gitignored). Em produção
+ *      está arquivado como `config.deploy-secrets.php.disabled-TS` após a
+ *      validação do método 1 — renomear de volta em caso de rollback.
  *
  * Obrigatórios típicos: ATM_DB_USER, ATM_DB_PASS, ATM_DB_NAME, ATM_JWT_SECRET,
  *   ATM_TAXONOMY_TOKEN, ATM_REPORT_AUTH_TOKEN (send-email, send-report, log-receiver, cron HTTP).

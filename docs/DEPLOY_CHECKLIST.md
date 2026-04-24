@@ -53,10 +53,10 @@ SOURCE seed_mock_data.sql; -- 10 clientes, 23 máquinas, 28 manutenções, 13 re
 ```
 
 ### 2. Configuração
-- **Produção (recomendado pelo alojador CiberConceito, alojamento partilhado):** definir segredos com **`SetEnv`** em **`public_html/api/.htaccess`** (bloco comentado no modelo `servidor-cpanel/api/.htaccess` — descomentar e preencher só no servidor). O `config.php` lê via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`).
-- **Alternativa:** variáveis em cPanel → Advanced → Environment Variables (nem sempre chegam ao PHP neste plano).
-- **Fallback:** **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — **gitignored**, só no servidor.
-- Variáveis: `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN`, `ATM_REPORT_AUTH_TOKEN`, etc. (lista completa no cabeçalho de `config.php`).
+- **Produção (validado 2026-04-24 via probe PHP ao servidor navel.pt):** os segredos são injectados no PHP via **`RewriteRule ^ - [E=KEY:VALUE]`** em **`public_html/api/.htaccess`**. Neste plano (LiteSpeed + LSPHP) o `mod_env` **não** está carregado, pelo que `SetEnv` é ignorado silenciosamente. O `config.php` lê via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`).
+- **Como actualizar em produção:** correr a partir de `navel-site/` o script `node scripts/cpanel-migrate-setenv.mjs` (dry-run; rever lista) e depois com `--yes` (aplica com backup `.htaccess.bak-TS`). O script lê os valores do `config.deploy-secrets.php` que ainda esteja no servidor (ou de uma versão arquivada `.disabled-TS`). Para validar que o método funciona sem depender do fallback, correr `node scripts/cpanel-verify-setenv.mjs --yes` (desativa temporariamente o fallback e faz rollback automático se algo falhar).
+- **Fallback legado:** **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — gitignored, **arquivado** após validação como `config.deploy-secrets.php.disabled-TS` (bloqueado por `FilesMatch`). Renomear de volta se for preciso rollback.
+- Variáveis: `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN`, `ATM_REPORT_AUTH_TOKEN`, etc. (lista completa no cabeçalho de `config.php`). O `ATM_REPORT_AUTH_TOKEN` tem também um mecanismo próprio (`atm_report_auth.secret.php`, já activo no servidor).
 - **Biblioteca NAVEL (opcional):** `ATM_NAVEL_DOC_INTEGRATION_TOKEN` alinhado com `at_integration_bearer` no `documentos-api-config.php` do navel-site; opcional `ATM_NAVEL_DOCUMENTOS_API_URL`, `ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES` (limite de resposta do proxy; omissão 12 MiB). Ver `navel-doc-lib.php` e `navel-site/docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
 - Opcional dev local: `servidor-cpanel/api/config.local.php` (a partir de `config.local.php.example`).
 - Recomendado: `SET GLOBAL max_allowed_packet = 67108864;` (64 MB para fotos em relatórios)

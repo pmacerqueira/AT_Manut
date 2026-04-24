@@ -1,24 +1,22 @@
-# AT_Manut API — defesa em profundidade (Apache 2.4+)
-# Bloqueia ferramentas de diagnóstico se ainda existirem no servidor após deploys antigos.
+# AT_Manut API — defesa em profundidade (Apache 2.4+ / LiteSpeed LSPHP).
 #
-# ── Segredos via ambiente (recomendação CiberConceito, ticket #225838) ────────
-# Em alojamento partilhado, as variáveis definidas em cPanel → Environment Variables
-# por vezes não chegam ao PHP. Usar SetEnv aqui; o config.php lê com atm_env()
-# (getenv, $_ENV, $_SERVER, REDIRECT_*). Descomentar e preencher APENAS no servidor.
-# Não versionar valores reais. Alternativa legacy: config.deploy-secrets.php (gitignored).
+# IMPORTANTE: o .htaccess REAL em produção é gerado pelo migrador
+# `navel-site/scripts/cpanel-migrate-setenv.mjs`, que adiciona no topo um
+# bloco `# BEGIN ATM_ENV` com RewriteRule [E=KEY:VALUE] para cada segredo.
+# NÃO é viável usar `SetEnv` neste alojamento (mod_env não carregado;
+# diagnosticado 2026-04-24 via probe PHP — ticket CiberConceito #225838).
+# NÃO reponhas este ficheiro a partir do repo sem reenvolver o bloco ATM_ENV
+# gerado pelo migrador; caso contrário, a API fica sem ligação à BD.
 #
-# <IfModule mod_env.c>
-#   SetEnv ATM_DB_HOST localhost
-#   SetEnv ATM_DB_NAME teu_bd
-#   SetEnv ATM_DB_USER teu_user
-#   SetEnv ATM_DB_PASS 'segredo-com-espacos-se-necessario'
-#   SetEnv ATM_JWT_SECRET ...
-#   SetEnv ATM_TAXONOMY_TOKEN ...
-#   SetEnv ATM_REPORT_AUTH_TOKEN ...
-#   # Opcionais: ATM_WEBHOOK_TOKEN, ATM_NAVEL_DOCUMENTOS_API_URL,
-#   # ATM_NAVEL_DOC_INTEGRATION_TOKEN, ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES,
-#   # ATM_TECNICO_HORARIO_JSON, ATM_TECNICO_HORARIO_DISABLED
-# </IfModule>
+# Estratégia em produção:
+#   1. `.htaccess` tem `RewriteRule ^ - [E=ATM_*:...]` que injecta os valores
+#      em $_SERVER e getenv() intactos, mesmo com caracteres especiais.
+#   2. `config.php` lê com `atm_env()` (getenv + $_ENV + $_SERVER + REDIRECT_*).
+#   3. O fallback legado `config.deploy-secrets.php` fica arquivado com sufixo
+#      `.disabled-TS` (bloqueado pelo FilesMatch abaixo) — pronto para
+#      rollback se alguma coisa correr mal.
+#
+# Desenvolvimento local: usar `config.local.php` com `putenv('ATM_*=...')`.
 
 <IfModule mod_authz_core.c>
   <FilesMatch "^(test-.*|teste-.*|clear-cache)\.php$">
@@ -27,10 +25,13 @@
   <FilesMatch "^ingest-istobal-retro\.php$">
     Require all denied
   </FilesMatch>
-  <FilesMatch "^config\.deploy-secrets\.php$">
+  <FilesMatch "^config\.deploy-secrets\.php(\.disabled-.*)?$">
     Require all denied
   </FilesMatch>
   <FilesMatch "^atm_report_auth\.secret\.php$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^\.htaccess\.bak-.*$">
     Require all denied
   </FilesMatch>
 </IfModule>

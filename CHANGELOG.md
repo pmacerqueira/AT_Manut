@@ -9,12 +9,23 @@ Política de continuidade:
 
 ---
 
-## [Documentação / deploy] — 2026-04-23 — Segredos cPanel: SetEnv (CiberConceito #225838)
+## [Operação] — 2026-04-24 — Env vars em produção: `RewriteRule [E=…]` (não `SetEnv`)
 
-### Operação / segurança
-- **`servidor-cpanel/api/.htaccess`:** bloco documentado com `SetEnv` para `ATM_*` (preencher só no servidor).
-- **`config.php`, `config.deploy-secrets.php.example`, `DEPLOY_CHECKLIST.md`, `SEGURANCA-REVISAO-NAVEL-PT.md`:** ordem recomendada SetEnv → variáveis cPanel → fallback `config.deploy-secrets.php`.
-- **`navel-site`:** `docs/CPANEL-SEGREDOS-ENV.md` + bloco comentado `SetEnv` em `public/.htaccess` (Supabase / scripts na raiz).
+### Descoberta / diagnóstico
+- **CiberConceito (#225838)** recomendou `SetEnv` em `.htaccess`; aplicámos em produção e a API passou a dar `503 misconfigured`. Um probe PHP isolado (via SFTP, removido após medição) revelou que no alojamento actual o **SAPI é `litespeed`**, **`mod_env` não está carregado** (`apache_get_modules()` → `false`) e portanto `SetEnv` é ignorado silenciosamente. Testámos alternativas — `SetEnvIf` preserva as aspas do valor; `RewriteRule ^ - [E=KEY:VALUE]` (mod_rewrite) expõe os valores intactos em `$_SERVER` e `getenv()`, incluindo a password da BD que tem `' " + { } ~`.
+
+### Operação
+- **`servidor-cpanel/api/.htaccess`** no repo: agora documenta a arquitectura e contém apenas o bloco `FilesMatch` de defesa em profundidade (bloqueia `test-*.php`, `teste-*.php`, `clear-cache.php`, `ingest-istobal-retro.php`, `config.deploy-secrets.php(.disabled-*)`, `atm_report_auth.secret.php`, `.htaccess.bak-*`). O `.htaccess` **real** em produção é gerado pelo script (abaixo) e **não** versionado.
+- **`config.php`** e **`config.deploy-secrets.php.example`**: docstrings actualizadas para a nova arquitectura (método 1 = `[E=…]` no `.htaccess`; método 2 = fallback arquivado com sufixo `.disabled-TS`).
+- **`docs/DEPLOY_CHECKLIST.md`** e **`docs/SEGURANCA-REVISAO-NAVEL-PT.md`:** reflectem a evidência do servidor (LiteSpeed/LSPHP 8.1; `mod_env` off) e a migração executada; instruções operacionais referem os scripts no `navel-site`.
+- **`navel-site/scripts/cpanel-migrate-setenv.mjs`** (novo): SFTP ao `navel.pt`, lê `config.deploy-secrets.php` do servidor, gera `.htaccess` com `RewriteRule ^ - [E=…]` para cada variável ATM_, faz backup `.htaccess.bak-TS` e upload; `--dry` por defeito, `--yes` aplica, `--remove-fallback` renomeia o fallback para `.disabled-TS`.
+- **`navel-site/scripts/cpanel-verify-setenv.mjs`** (novo): renomeia o fallback, faz 2 POSTs ao `/api/data.php` (login inválido + pedido sem token), classifica as respostas e, só se ambos forem 4xx esperados, deixa o fallback arquivado definitivamente — rollback automático em qualquer 5xx.
+- **`navel-site/scripts/cpanel-rollback-htaccess.mjs`** (novo): repõe o `.htaccess` à versão do repo com backup `.htaccess.bak-TS` (usar só se preciso reverter).
+
+### Estado do servidor (2026-04-24)
+- `.htaccess` em `/home/navel/public_html/api/` tem bloco `# BEGIN ATM_ENV` gerado com 8 `RewriteRule [E=ATM_*:…]` + bloco `FilesMatch`. Login na API devolve 401 "Utilizador ou password incorretos" (BD liga; `ATM_JWT_SECRET` lê).
+- `config.deploy-secrets.php` foi renomeado para `config.deploy-secrets.php.disabled-20260424-181827` (bloqueado por `FilesMatch`; disponível para rollback com renomeação inversa).
+- Backups `.htaccess.bak-*` mantidos, também bloqueados por `FilesMatch`.
 
 ---
 
