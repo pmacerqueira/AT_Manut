@@ -22,13 +22,13 @@
    - `servidor-cpanel/api/atm_report_auth.secret.php` — leva este ficheiro para o servidor.
    - `.env.local` — passa a ter a linha `VITE_ATM_REPORT_AUTH_TOKEN=...` para o build da app.
 
-2. **No servidor** (`public_html/api/`), o PHP lê o segredo por esta ordem:
+2. **No servidor** (`public_html/api/`), o PHP lê o segredo por esta ordem (actualizada 2026-04-24 — ver **[`CPANEL-RUNBOOK-SEGREDOS.md`](CPANEL-RUNBOOK-SEGREDOS.md)**):
 
-   - Variáveis do **cPanel** (Environment Variables), **ou**
-   - `config.deploy-secrets.php` (ficheiro que só existe no servidor), **ou**
-   - **`atm_report_auth.secret.php`** (o ficheiro que o comando acima gera — recomendado para quem não quer mexer no painel).
+   - Bloco `# BEGIN ATM_ENV` no **`.htaccess`** da pasta `api/` (directivas `RewriteRule ^ - [E=ATM_REPORT_AUTH_TOKEN:…]`), gerado pelo script `cpanel-migrate-setenv.mjs` em `navel-site/scripts/`, **ou**
+   - **`atm_report_auth.secret.php`** (ficheiro dedicado que o comando `gen:report-auth` acima gera — **recomendado para quem não quer mexer no `.htaccess`**), **ou**
+   - `config.deploy-secrets.php` (**legado** — arquivado em produção como `config.deploy-secrets.php.disabled-TS`; só reactivar em rollback de emergência).
 
-   O Apache está configurado para **não permitir** abrir pelo browser ficheiros como `config.deploy-secrets.php` e `atm_report_auth.secret.php` (regra no `.htaccess` da pasta `api/`).
+   O painel do cPanel em *Environment Variables* **não** é uma opção neste plano — o LiteSpeed + LSPHP ignora essas variáveis (ticket CiberConceito #225838). O Apache/LiteSpeed está configurado para **não permitir** abrir pelo browser ficheiros como `config.deploy-secrets.php*`, `atm_report_auth.secret.php` e `.htaccess.bak-*` (bloco `FilesMatch` no `.htaccess` da pasta `api/`).
 
 3. **Publicar a app** (PWA em `manut/`):
 
@@ -76,6 +76,7 @@ Se o técnico **faz login** mas volta ao ecrã de login em **1–2 segundos** e 
 
 ## Documentação relacionada
 
+- [`CPANEL-RUNBOOK-SEGREDOS.md`](CPANEL-RUNBOOK-SEGREDOS.md) — runbook técnico de todos os segredos `ATM_*` (BD, JWT, tokens) no servidor LiteSpeed.
 - [`DEPLOY_CHECKLIST.md`](DEPLOY_CHECKLIST.md) — deploy completo.
 - [`INDEX.md`](INDEX.md) — índice de toda a documentação.
 - `servidor-cpanel/INSTRUCOES_CPANEL.md` — email, limites POST, sandbox em localhost.

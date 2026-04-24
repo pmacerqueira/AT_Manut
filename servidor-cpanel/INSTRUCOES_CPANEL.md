@@ -5,6 +5,7 @@
 A pasta **`public_html/api/`** pertence ao **AT_Manut** (REST + email). A raiz **`public_html/`** é o site **`navel-site`**; **`public_html/manut/`** é a PWA.
 
 - **Checklist completo, deploy PWA (`deploy:at-manut`) e variáveis:** [`docs/DEPLOY_CHECKLIST.md`](../docs/DEPLOY_CHECKLIST.md)
+- **Segredos da API (passwords, tokens, JWT) — runbook de operação:** [`docs/CPANEL-RUNBOOK-SEGREDOS.md`](../docs/CPANEL-RUNBOOK-SEGREDOS.md)
 - **Segredo email/relatório/logs (passo a passo simples):** [`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](../docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md)
 - Este ficheiro foca **email** (`send-email.php`, `send-report.php`), limites POST e tópicos relacionados.
 
@@ -61,7 +62,7 @@ public_html/
 
 O token impede que terceiros utilizem o endpoint para enviar spam.
 
-**a) No servidor** — definir **`ATM_REPORT_AUTH_TOKEN`** (recomendado: cPanel → Environment Variables ou `putenv` em `config.deploy-secrets.php`). Os scripts **`send-email.php`**, **`send-report.php`**, **`log-receiver.php`** e o cron **via HTTP** leem o valor via `atm_report_auth.php`; **não** há token por omissão no código — sem variável, respondem **503** `misconfigured`.
+**a) No servidor** — definir **`ATM_REPORT_AUTH_TOKEN`**. Em produção actual (LiteSpeed + LSPHP, `mod_env` indisponível — ver **[`docs/CPANEL-RUNBOOK-SEGREDOS.md`](../docs/CPANEL-RUNBOOK-SEGREDOS.md)**): o valor é injectado via `RewriteRule [E=ATM_REPORT_AUTH_TOKEN:…]` no `.htaccess` da pasta `api/`, ou em paralelo pelo ficheiro dedicado **`atm_report_auth.secret.php`** (mecanismo simples gerado por `npm run gen:report-auth`, ver **[`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](../docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md)**). O painel cPanel → Environment Variables **não** é usado neste plano — esse caminho é ignorado pelo LSPHP. Os scripts `send-email.php`, `send-report.php`, `log-receiver.php` e o cron HTTP leem via `atm_report_auth.php`; **não** há token por omissão no código — sem variável, respondem **503** `misconfigured`.
 
 **b) Na app React** — definir **`VITE_ATM_REPORT_AUTH_TOKEN`** no `.env` local e **no ambiente de build** (o valor é embutido por `npm run build`). Deve coincidir com `ATM_REPORT_AUTH_TOKEN` no servidor. Ver `src/config/emailConfig.js` e `.env.example`. **Não** commitar o `.env` com segredos.
 
@@ -127,8 +128,8 @@ A API valida **login** e **cada pedido** com JWT: fora do horário permitido, o 
    - `"timezone"`: normalmente `"Atlantic/Azores"`
    - `"blocks"`: lista de períodos. Em cada bloco, `"days"` usa **0 = domingo … 6 = sábado**. Horas `"from"` / `"to"` no formato `HH:mm`. Se `from` > `to`, o intervalo **atravessa meia-noite**. **NAVEL:** no bloco nocturno dos dias úteis use **`to: "07:59"`** (não `08:00`): a comparação no PHP é inclusiva, e com `08:00` o minuto das 08:00 ainda contava como bloqueado. Expediente útil: **08:00–17:59**; a partir das **18:00** bloqueado. Fins de semana: dia completo (`00:00`–`23:59`).
 3. Fazer **deploy** de `config.php` actualizado (define o caminho do JSON) e `data.php`, `db.php`, `tecnico_horario_restrito.php`.
-4. **Desligar de emergência** sem apagar o ficheiro: no cPanel → *Environment Variables* → `ATM_TECNICO_HORARIO_DISABLED` = `1`.
-5. Caminho alternativo do JSON: variável `ATM_TECNICO_HORARIO_JSON` (caminho absoluto no servidor).
+4. **Desligar de emergência** sem apagar o ficheiro: adicionar `ATM_TECNICO_HORARIO_DISABLED=1` ao bloco `# BEGIN ATM_ENV` do `.htaccess` (ver **[`docs/CPANEL-RUNBOOK-SEGREDOS.md`](../docs/CPANEL-RUNBOOK-SEGREDOS.md)** §4). Forma rápida: editar directamente no File Manager do cPanel adicionando `RewriteRule ^ - [E=ATM_TECNICO_HORARIO_DISABLED:1]` dentro do bloco `<IfModule mod_rewrite.c>`.
+5. Caminho alternativo do JSON: variável `ATM_TECNICO_HORARIO_JSON` (caminho absoluto no servidor) — injectada pelo mesmo mecanismo.
 
 Na app React, `src/config/tecnicoHorarioRestrito.js` deve ter **`enabled` igual ao JSON do servidor**. Se o servidor **não** tiver horário activo (`tecnico_horario_restrito.json` em falta ou `"enabled": false`), mantém **`enabled: false` no JS** — caso contrário o `TecnicoHorarioGuard` pode expulsar o técnico logo após o login (login e API ok, mas o browser acha que está “fora de horas”). A segurança efectiva é sempre na API.
 

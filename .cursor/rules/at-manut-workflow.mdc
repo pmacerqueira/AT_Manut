@@ -72,6 +72,29 @@ Credenciais: **`navel-site/.env.cpanel`** (nunca no Git). O upload incremental u
 
 Se não quiseres CLI, o ZIP (`build:zip`) + File Manager continua válido como alternativa.
 
+### Segredos (`ATM_*`) em produção — `.htaccess` com `RewriteRule [E=…]`
+
+**Alojamento é LiteSpeed + LSPHP** (não Apache): `mod_env` **não** está
+carregado → directivas `SetEnv` e o painel "Environment Variables" do
+cPanel são **ignorados silenciosamente** (confirmado em 2026-04-24,
+ticket CiberConceito #225838). A API lê segredos do bloco
+`# BEGIN ATM_ENV` em `/home/navel/public_html/api/.htaccess` com linhas
+`RewriteRule ^ - [E=ATM_KEY:VALUE]` — automaticamente em
+`$_SERVER`, `$_ENV` e `getenv()`.
+
+**Ao actualizar segredos (rotação de password, novo token, nova
+variável) nunca editar o `.htaccess` à mão fora do runbook.** Usar:
+
+```powershell
+cd c:\Cursor_Projetos\NAVEL\navel-site
+node scripts/cpanel-migrate-setenv.mjs --yes --remove-fallback  # gera + backup
+node scripts/cpanel-verify-setenv.mjs --yes                     # valida + rollback auto
+node scripts/cpanel-audit-crosssite.mjs                         # auditoria final
+```
+
+Documento canónico: **[`docs/CPANEL-RUNBOOK-SEGREDOS.md`](mdc:docs/CPANEL-RUNBOOK-SEGREDOS.md)**
+(flow completo, fallback legado, troubleshooting e rollback manual).
+
 ---
 
 ## Fluxo obrigatório: "optimizar e preparar build"

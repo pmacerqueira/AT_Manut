@@ -55,7 +55,7 @@ Os **maiores riscos** encontrados nesta revisão são: (1) **scripts de diagnós
 
 3. **Segredos por omissão em `servidor-cpanel/api/config.php` (repositório)**  
    Há fallbacks para base de dados, `JWT_SECRET`, tokens de webhook e taxonomia. **Se o servidor usar estes valores** e o repositório for ou tiver sido público, trata-se de **credenciais fracas ou comprometidas**.  
-   **Recomendação:** no cPanel → **Environment Variables**, definir **todos** os segredos; no ficheiro em produção, **não** depender dos defaults do Git. Rodar **rotação** de passwords e tokens se alguma vez houve exposição.
+   **Recomendação:** em produção (LiteSpeed + LSPHP), definir todos os segredos via **`RewriteRule [E=KEY:VALUE]`** no `.htaccess` de `public_html/api/` — automatizado por `navel-site/scripts/cpanel-migrate-setenv.mjs` (ver [`CPANEL-RUNBOOK-SEGREDOS.md`](CPANEL-RUNBOOK-SEGREDOS.md)). No ficheiro em produção, **não** depender dos defaults do Git. Rodar **rotação** de passwords e tokens se alguma vez houve exposição.
 
 ### Alto
 
@@ -106,7 +106,7 @@ Os **maiores riscos** encontrados nesta revisão são: (1) **scripts de diagnós
 |------------|--------|--------|
 | **Imediato** | **Deploy** para `public_html/api/`: `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php` (substituir). | Usar o fluxo habitual (ex. `navel-site` `cpanel-deploy.mjs` por ficheiro). |
 | **Imediato** | No **cPanel → File Manager → `public_html/api/`**, **apagar** se ainda existirem: `test-email.php`, `teste-webhook.php`, `clear-cache.php`, `teste-istobal-post.php`. | O `.htaccess` novo já bloqueia estes nomes, mas apagar remove código morto e confusão. |
-| **Imediato** | **cPanel → Environment Variables:** garantir `ATM_DB_USER`, `ATM_DB_PASS`, `ATM_DB_NAME`, `ATM_JWT_SECRET` (≥32 caracteres), `ATM_TAXONOMY_TOKEN`, **`ATM_REPORT_AUTH_TOKEN`**. | Sem `ATM_REPORT_AUTH_TOKEN`, `send-email` / `send-report` / `log-receiver` e cron **HTTP** respondem **503** `misconfigured`. |
+| **Imediato** | **`.htaccess` com `RewriteRule [E=…]`** em `/home/navel/public_html/api/` garantir `ATM_DB_USER`, `ATM_DB_PASS`, `ATM_DB_NAME`, `ATM_JWT_SECRET` (≥32 caracteres), `ATM_TAXONOMY_TOKEN`, **`ATM_REPORT_AUTH_TOKEN`**. O painel cPanel → *Environment Variables* **não** funciona neste plano (LSPHP). Usar `navel-site/scripts/cpanel-migrate-setenv.mjs` — ver **[`CPANEL-RUNBOOK-SEGREDOS.md`](CPANEL-RUNBOOK-SEGREDOS.md)**. | Sem `ATM_REPORT_AUTH_TOKEN`, `send-email` / `send-report` / `log-receiver` e cron **HTTP** respondem **503** `misconfigured`. |
 | **Imediato** | **Build AT_Manut:** definir **`VITE_ATM_REPORT_AUTH_TOKEN`** igual ao servidor (fica no bundle). | Ver `docs/DEPLOY_CHECKLIST.md` e `.env.example`. |
 | **Curto prazo** | **Rodar** passwords BD / `JWT_SECRET` / tokens se os valores antigos estiveram no Git público ou partilhados. | Especialmente após esta alteração de `config.php`. |
 | **Curto prazo** | **`npm audit` no AT_Manut** (`jspdf`, `dompurify`) e testar PDFs na app. | Médio na revisão original; ainda pendente. |

@@ -9,6 +9,22 @@ Política de continuidade:
 
 ---
 
+## [Documentação] — 2026-04-24 — Consolidação dos procedimentos de segredos
+
+### Novo
+- **`docs/CPANEL-RUNBOOK-SEGREDOS.md`** (canónico): runbook completo de operação dos segredos `ATM_*` no servidor LiteSpeed/LSPHP. Inclui contexto técnico (porquê `RewriteRule [E=…]` em vez de `SetEnv`), arquitectura em produção, inventário dos 4 scripts em `navel-site/scripts/`, fluxos operacionais passo-a-passo (rodar password, adicionar variável, deploy do `config.php`, rollback de emergência), lista canónica das variáveis e respectivos consumidores, troubleshooting de sintomas típicos, cruzamento com a área reservada do navel-site, checklist anual de rotação de segredos.
+
+### Actualizado
+- **`docs/INDEX.md`:** entrada canónica do novo runbook.
+- **`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`:** ordem de leitura de segredos (método primário = `[E=…]` no `.htaccess`; fallback dedicado = `atm_report_auth.secret.php`; legado arquivado = `config.deploy-secrets.php.disabled-TS`). Removida menção a "cPanel → Environment Variables" (não aplicável a LSPHP).
+- **`docs/SEGURANCA-REVISAO-NAVEL-PT.md`:** tabela "Imediato" e achado crítico #3 actualizados com o mecanismo efectivo (`RewriteRule [E=KEY:VALUE]` via `cpanel-migrate-setenv.mjs`).
+- **`servidor-cpanel/INSTRUCOES_CPANEL.md`:** passo 2 (token) e secção de horário restrito refeitas; links para o runbook canónico.
+- **`.cursor/rules/at-manut-workflow.mdc`:** nova secção "Segredos (`ATM_*`) em produção" com o fluxo de rotação e ponteiro para o runbook — garante que qualquer futuro agente siga o procedimento.
+- **`navel-site/docs/CPANEL-SEGREDOS-ENV.md`:** aponta para o runbook canónico (tema único, fonte única); adiciona secção sobre `cpanel-audit-crosssite.mjs` (auditoria).
+- **`navel-site/scripts/cpanel-audit-crosssite.mjs`** (novo): valida `.htaccess` raiz + `/api/` e smoke-tests HTTPS dos 10 endpoints críticos dos dois projectos (documentos-api, área reservada, onedrive-callback, keep-alive-supabase, taxonomy-nodes, navel-documentos-upload, data.php).
+
+---
+
 ## [Operação] — 2026-04-24 — Env vars em produção: `RewriteRule [E=…]` (não `SetEnv`)
 
 ### Descoberta / diagnóstico

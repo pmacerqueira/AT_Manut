@@ -15,6 +15,7 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 | Ficheiro | Conteúdo |
 |----------|----------|
 | **[`docs/DEPLOY_CHECKLIST.md`](DEPLOY_CHECKLIST.md)** | **Canónico:** BD, env vars, deploy PWA + API, integrações, pós-deploy |
+| **[`docs/CPANEL-RUNBOOK-SEGREDOS.md`](CPANEL-RUNBOOK-SEGREDOS.md)** | **Canónico:** operação de segredos `ATM_*` em produção (LiteSpeed + LSPHP, `RewriteRule [E=…]`, scripts de migração/validação/rollback) |
 | [`docs/BUILD-E-ZIP.md`](BUILD-E-ZIP.md) | Gerar `dist_upload.zip` (alternativa manual ao SFTP) |
 | [`docs/CPIANEL-NAVEL-SHARED-HOSTING.md`](CPIANEL-NAVEL-SHARED-HOSTING.md) | Mapa dono/caminho no mesmo `public_html` (navel-site vs AT_Manut) |
 | [`servidor-cpanel/INSTRUCOES_CPANEL.md`](../servidor-cpanel/INSTRUCOES_CPANEL.md) | Endpoints de email (`send-email.php`, `send-report.php`), limites POST, horário técnico |
