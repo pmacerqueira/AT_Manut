@@ -9,6 +9,16 @@ Política de continuidade:
 
 ---
 
+## [1.16.68] — 2026-04-22 — Sincronizar agenda: refresh de clientes e fichas no estado
+
+### Correcção
+- **`sincronizarAgendaCompleta` (`DataContext`):** após o fetch e o recálculo das manutenções, o estado React não repunha clientes, máquinas, relatórios, etc. — só `manutencoes` e cache. Passa a alinhar o estado ao pacote do servidor (como `fetchTodos`) e `maquinas` com `proximaManut` coerente com a agenda recalculada; actualiza `lastBulkFetchOkAtRef` e `saveCache` coerente.
+
+### Operação
+- Deploy: `npm run build:zip`; `navel-site` → `npm run deploy:at-manut -- --yes`.
+
+---
+
 ## [1.16.67] — 2026-04-24 — Gravar no último passo: toast + ecrã Fechar (deploy PWA)
 
 ### Correcção

@@ -2055,10 +2055,29 @@ export function DataProvider({ children }) {
       }
       await Promise.all(updates)
 
+      const maquinasMerged = maqs.map(m => ({
+        ...m,
+        proximaManut: minDataManutencaoAberta(m.id, acc) ?? m.proximaManut ?? null,
+      }))
+
+      setClientes(d.clientes ?? [])
+      setCategorias(d.categorias ?? [])
+      setSubcategorias(d.subcategorias ?? [])
+      setChecklistItems(d.checklistItems ?? [])
+      setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
+      setMaquinas(maquinasMerged)
+      setRelatorios(prev => mergeRelatoriosMantendoEnvio(prev, d.relatorios ?? []))
+      setReparacoes(d.reparacoes ?? [])
+      setRelatoriosReparacao(d.relatoriosReparacao ?? [])
+      setTecnicos(d.tecnicos ?? [])
+      setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
+
+      lastBulkFetchOkAtRef.current = Date.now()
+
       saveCache({
         ...d,
         manutencoes: acc,
-        maquinas: maqs.map(m => ({ ...m, proximaManut: minDataManutencaoAberta(m.id, acc) })),
+        maquinas: maquinasMerged,
       })
 
       logger.action('DataContext', 'sincronizarAgendaCompleta', 'Agenda e fichas sincronizadas', {
