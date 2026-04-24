@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.16.67] — 2026-04-24 — Gravar no último passo: toast + ecrã Fechar (deploy PWA)
+
+### Correcção
+- **`ExecutarManutencaoModal`:** com relatório ainda não enviado ao cliente, `podeUsarDatasFormularioRel` deixava `usarDataHistorica` indefinido e `gravar` falhava antes do toast — **«Gravar»** no passo final não mostrava «Dados gravados com sucesso.» nem o ecrã de conclusão. Corrigido o cálculo de `usarDataHistorica` / `isHistoricoPassado`.
+- Ecrã final distinto para **gravar sem enviar email** (título e texto alinhados à acção).
+
+### Operação
+- Deploy: `npm run build:zip`; `navel-site` → `npm run deploy:at-manut -- --yes`.
+
+---
+
 ## [1.16.66] — 2026-04-24 — Preservar assinatura do cliente ao editar relatório (deploy PWA)
 
 ### Correcção

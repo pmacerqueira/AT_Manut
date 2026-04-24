@@ -197,6 +197,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [signatureClearedByUser, setSignatureClearedByUser] = useState(false)
   const [manutAgendadas, setManutAgendadas] = useState(0)
   const [concluido, setConcluido] = useState(false)
+  /** 'executada' | 'gravado_sem_email' — texto do ecrã após concluir (último passo). */
+  const [conclusaoVariant, setConclusaoVariant] = useState('executada')
   const [conflitosAgendamento, setConflitosAgendamento] = useState(null)
   const [emailDestinatario, setEmailDestinatario] = useState('')
   const [emailEnviando, setEmailEnviando] = useState(false)
@@ -326,6 +328,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       kaeserWarnAnualHighDeltaRef.current = false
       execCancelBaselineRef.current = ''
       setSignatureClearedByUser(false)
+      setConclusaoVariant('executada')
       return
     }
     if (!maq) return
@@ -1071,11 +1074,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     let hoje
     let now
+    /** Só definido no ramo sem datas do formulário de relatório — necessário mais abaixo para `isHistoricoPassado`. */
+    let usarDataHistorica = false
     if (podeUsarDatasFormularioRel) {
       hoje = exFormGravar
       now = `${exFormGravar}T12:00:00.000Z`
     } else {
-      const usarDataHistorica = form.dataRealizacao && (isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores()))
+      usarDataHistorica = !!(form.dataRealizacao && (isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores())))
       hoje = usarDataHistorica ? form.dataRealizacao : getHojeAzores()
       now = usarDataHistorica
         ? `${form.dataRealizacao}T12:00:00.000Z`
@@ -1190,7 +1195,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     )
 
     const proximaFormatada = format(proxima, 'yyyy-MM-dd')
-    const isHistoricoPassado = usarDataHistorica && form.dataRealizacao < getHojeAzores()
+    const isHistoricoPassado = podeUsarDatasFormularioRel
+      ? (exFormGravar < getHojeAzores())
+      : Boolean(usarDataHistorica && form.dataRealizacao && form.dataRealizacao < getHojeAzores())
 
     const updateMaqData = {}
     if (isHistoricoPassado) {
@@ -1254,6 +1261,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         // Sem conflitos: confirmar imediatamente
         const n = confirmarManutencoesPeriodicas(resultado.novas)
         setManutAgendadas(n)
+        setConclusaoVariant('executada')
         showToast('Dados gravados com sucesso.', 'success', 5000)
         setConcluido(true)
       }
@@ -1278,6 +1286,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     if (semAssinatura) {
+      setConclusaoVariant('executada')
       showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
       return
@@ -1285,6 +1294,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     // Gravar sem enviar email — concluir processo técnico sem envio
     if (!enviarEmailAoGravar) {
+      setConclusaoVariant('gravado_sem_email')
       showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
       return
@@ -1328,6 +1338,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
     }
 
+    setConclusaoVariant('executada')
     showToast('Dados gravados com sucesso.', 'success', 5000)
     const relAtualizado = { ...relPayload, manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal }
     enviarEmail(relAtualizado, { ...manutencaoAtual, status: 'concluida', data: hoje, tecnico: form.tecnico })
@@ -1580,15 +1591,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   if (concluido) {
     const relFinal = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
     const foiSemAssinatura = relFinal && !relFinal.assinadoPeloCliente
+    const tituloConclusao = conclusaoVariant === 'gravado_sem_email'
+      ? 'Dados gravados com sucesso'
+      : 'Manutenção executada!'
+    const textoConclusao = conclusaoVariant === 'gravado_sem_email'
+      ? 'O relatório foi guardado; o email ao cliente não foi enviado. Pode enviar o comprovativo mais tarde a partir da lista de manutenções.'
+      : foiSemAssinatura
+        ? 'Relatório gravado. Pendente de assinatura do cliente.'
+        : 'Relatório gerado e assinado com sucesso.'
     return (
       <div className="modal-overlay">
         <div className="modal modal-assinatura" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', padding: '2rem' }}>
           <CheckCircle2 size={48} color="var(--color-success, #22c55e)" style={{ marginBottom: '0.75rem' }} />
-          <h2 style={{ marginBottom: '0.5rem' }}>Manutenção executada!</h2>
+          <h2 style={{ marginBottom: '0.5rem' }}>{tituloConclusao}</h2>
           <p style={{ marginBottom: '0.5rem', color: 'var(--color-text-muted)' }}>
-            {foiSemAssinatura
-              ? 'Relatório gravado. Pendente de assinatura do cliente.'
-              : 'Relatório gerado e assinado com sucesso.'}
+            {textoConclusao}
           </p>
           <p className="modal-hint">Pode fechar quando terminar.</p>
           <button type="button" className="btn primary" style={{ marginTop: '1rem' }} onClick={onClose}>
@@ -1616,6 +1633,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const count = confirmarManutencoesPeriodicas(novasAjustadas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
+      setConclusaoVariant('executada')
       showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
     }
@@ -1645,6 +1663,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const count = confirmarManutencoesPeriodicas(novasAjustadas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
+      setConclusaoVariant('executada')
       showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
     }
@@ -1653,6 +1672,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const count = confirmarManutencoesPeriodicas(novas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
+      setConclusaoVariant('executada')
       showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
     }
