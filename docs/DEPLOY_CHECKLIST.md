@@ -53,7 +53,10 @@ SOURCE seed_mock_data.sql; -- 10 clientes, 23 máquinas, 28 manutenções, 13 re
 ```
 
 ### 2. Configuração
-- **Produção (preferido):** `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN` (ver `servidor-cpanel/api/config.php`). Leitura via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`). Muitos planos cPanel **não** expõem variáveis ao PHP: usar então **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — **gitignored**, só no servidor.
+- **Produção (recomendado pelo alojador CiberConceito, alojamento partilhado):** definir segredos com **`SetEnv`** em **`public_html/api/.htaccess`** (bloco comentado no modelo `servidor-cpanel/api/.htaccess` — descomentar e preencher só no servidor). O `config.php` lê via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`).
+- **Alternativa:** variáveis em cPanel → Advanced → Environment Variables (nem sempre chegam ao PHP neste plano).
+- **Fallback:** **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — **gitignored**, só no servidor.
+- Variáveis: `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN`, `ATM_REPORT_AUTH_TOKEN`, etc. (lista completa no cabeçalho de `config.php`).
 - **Biblioteca NAVEL (opcional):** `ATM_NAVEL_DOC_INTEGRATION_TOKEN` alinhado com `at_integration_bearer` no `documentos-api-config.php` do navel-site; opcional `ATM_NAVEL_DOCUMENTOS_API_URL`, `ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES` (limite de resposta do proxy; omissão 12 MiB). Ver `navel-doc-lib.php` e `navel-site/docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
 - Opcional dev local: `servidor-cpanel/api/config.local.php` (a partir de `config.local.php.example`).
 - Recomendado: `SET GLOBAL max_allowed_packet = 67108864;` (64 MB para fotos em relatórios)

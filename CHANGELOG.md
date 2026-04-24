@@ -9,6 +9,15 @@ Política de continuidade:
 
 ---
 
+## [Documentação / deploy] — 2026-04-23 — Segredos cPanel: SetEnv (CiberConceito #225838)
+
+### Operação / segurança
+- **`servidor-cpanel/api/.htaccess`:** bloco documentado com `SetEnv` para `ATM_*` (preencher só no servidor).
+- **`config.php`, `config.deploy-secrets.php.example`, `DEPLOY_CHECKLIST.md`, `SEGURANCA-REVISAO-NAVEL-PT.md`:** ordem recomendada SetEnv → variáveis cPanel → fallback `config.deploy-secrets.php`.
+- **`navel-site`:** `docs/CPANEL-SEGREDOS-ENV.md` + bloco comentado `SetEnv` em `public/.htaccess` (Supabase / scripts na raiz).
+
+---
+
 ## [1.16.70] — 2026-04-22 — Recalcular periódicas: sem duplicar com atrasadas antigas
 
 ### Correcção

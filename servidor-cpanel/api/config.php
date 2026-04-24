@@ -4,16 +4,19 @@
  *
  * INSTALAR EM: public_html/api/config.php
  *
- * PRODUÇÃO (obrigatório): definir no cPanel → Advanced → Environment Variables:
- *   ATM_DB_USER, ATM_DB_PASS, ATM_DB_NAME
- *   ATM_JWT_SECRET
- *   ATM_TAXONOMY_TOKEN
- *   ATM_REPORT_AUTH_TOKEN (send-email.php, send-report.php, log-receiver.php; cron via HTTP)
+ * PRODUÇÃO — ordem recomendada (CiberConceito / alojamento partilhado):
+ *   1) SetEnv no ficheiro public_html/api/.htaccess (mod_env) — ver modelo no repo.
+ *   2) Se o plano expuser variáveis do cPanel ao PHP: Advanced → Environment Variables.
+ *   3) Fallback: config.deploy-secrets.php no servidor (gitignored; sem putenv manual
+ *      disperso — preferir .htaccess quando possível).
+ *
+ * Obrigatórios típicos: ATM_DB_USER, ATM_DB_PASS, ATM_DB_NAME, ATM_JWT_SECRET,
+ *   ATM_TAXONOMY_TOKEN, ATM_REPORT_AUTH_TOKEN (send-email, send-report, log-receiver, cron HTTP).
  * Opcionais: ATM_DB_HOST (omissão: localhost), ATM_WEBHOOK_TOKEN, ATM_NAVEL_*,
  *   ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES (proxy documentos; omissão 12 MiB),
  *   ATM_TECNICO_HORARIO_JSON, ATM_TECNICO_HORARIO_DISABLED
  *
- * Leitura: usa atm_env() — getenv() + $_ENV + $_SERVER + REDIRECT_* (alguns planos cPanel).
+ * Leitura: atm_env() — getenv() + $_ENV + $_SERVER + REDIRECT_*.
  *
  * DESENVOLVIMENTO LOCAL: copiar config.local.php.example → config.local.php (gitignored)
  * com putenv('...') para cada variável, OU exportar as variáveis no shell.
@@ -53,8 +56,8 @@ if (is_file(__DIR__ . '/config.local.php')) {
 }
 
 /**
- * Produção cPanel: muitos planos não expõem "Environment Variables" ao PHP via getenv().
- * Se existir este ficheiro no servidor (upload manual ou deploy), deve conter só putenv().
+ * Fallback quando SetEnv (.htaccess) e variáveis do painel não estão disponíveis.
+ * Deve conter sobretudo putenv('ATM_*=...') — último recurso; preferir .htaccess.
  * NUNCA versionar — ver .gitignore e docs/SEGURANCA-REVISAO-NAVEL-PT.md.
  */
 if (is_file(__DIR__ . '/config.deploy-secrets.php')) {

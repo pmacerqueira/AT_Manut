@@ -1,5 +1,24 @@
 # AT_Manut API — defesa em profundidade (Apache 2.4+)
 # Bloqueia ferramentas de diagnóstico se ainda existirem no servidor após deploys antigos.
+#
+# ── Segredos via ambiente (recomendação CiberConceito, ticket #225838) ────────
+# Em alojamento partilhado, as variáveis definidas em cPanel → Environment Variables
+# por vezes não chegam ao PHP. Usar SetEnv aqui; o config.php lê com atm_env()
+# (getenv, $_ENV, $_SERVER, REDIRECT_*). Descomentar e preencher APENAS no servidor.
+# Não versionar valores reais. Alternativa legacy: config.deploy-secrets.php (gitignored).
+#
+# <IfModule mod_env.c>
+#   SetEnv ATM_DB_HOST localhost
+#   SetEnv ATM_DB_NAME teu_bd
+#   SetEnv ATM_DB_USER teu_user
+#   SetEnv ATM_DB_PASS 'segredo-com-espacos-se-necessario'
+#   SetEnv ATM_JWT_SECRET ...
+#   SetEnv ATM_TAXONOMY_TOKEN ...
+#   SetEnv ATM_REPORT_AUTH_TOKEN ...
+#   # Opcionais: ATM_WEBHOOK_TOKEN, ATM_NAVEL_DOCUMENTOS_API_URL,
+#   # ATM_NAVEL_DOC_INTEGRATION_TOKEN, ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES,
+#   # ATM_TECNICO_HORARIO_JSON, ATM_TECNICO_HORARIO_DISABLED
+# </IfModule>
 
 <IfModule mod_authz_core.c>
   <FilesMatch "^(test-.*|teste-.*|clear-cache)\.php$">

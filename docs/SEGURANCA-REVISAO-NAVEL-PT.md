@@ -17,7 +17,7 @@
 | Crítico — `ingest-istobal-retro.php` na web | Garantia **CLI-only** no PHP (`403` se não for `php-cli`). |
 | Alto — `image-proxy.php` / SSRF | Validação de host (só IPs públicos após DNS), recusa URLs com utilizador/password embutidos, `verify_peer` TLS activo, sem redirects HTTP automáticos (`follow_location` 0). |
 
-**Deploy 2026-04-22 (executado):** enviados `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php`, `config.deploy-secrets.php` (só no servidor; bloqueado por HTTP); apagados `test-email.php` e `clear-cache.php` no remoto. Muitos alojamentos **não** encaminham “Environment Variables” do cPanel para `getenv()` no PHP — nesse caso usar **`config.deploy-secrets.php`** (ver `config.deploy-secrets.php.example`) ou MultiPHP INI / `SetEnv` no `.htaccess`, conforme o hosting.
+**Deploy 2026-04-22 (executado):** enviados `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php`, `config.deploy-secrets.php` (só no servidor; bloqueado por HTTP); apagados `test-email.php` e `clear-cache.php` no remoto. **2026-04-23:** orientação **CiberConceito** (#225838): preferir **`SetEnv` em `public_html/api/.htaccess`** para `ATM_*`; o modelo no Git inclui bloco comentado. **Fallback:** `config.deploy-secrets.php` se `mod_env` não existir ou o painel não expuser variáveis.
 
 ---
 
