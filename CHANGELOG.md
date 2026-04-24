@@ -9,6 +9,13 @@ Política de continuidade:
 
 ---
 
+## [1.16.70] — 2026-04-22 — Recalcular periódicas: sem duplicar com atrasadas antigas
+
+### Correcção
+- **`recalcularPeriodicasAposExecucao` e `sincronizarAgendaCompleta`:** ao reconstruir a grelha futura, só se removiam linhas periódicas em aberto com `data >` à data de execução — **permaneciam** agendamentos/atrasos de anos anteriores e acumulavam com as novas linhas. Passa a remover **toda** a cadeia periódica em aberto (`pendente` / `agendada` / `em_progresso`, tipo ≠ montagem) antes de criar a nova sequência; `proximaManut` na ficha continua a vir de `minDataManutencaoAberta` após o recálculo.
+
+---
+
 ## [1.16.69] — 2026-04-22 — Sincronizar agenda: não recriar periódicas antigas nem ignorar concluídas recentes
 
 ### Correcção

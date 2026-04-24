@@ -7,7 +7,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios } from '../utils/diasUteis'
-import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
+import { minDataManutencaoAberta, STATUS_MANUTENCAO_ABERTA } from '../utils/proximaManutAgenda'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
@@ -19,6 +19,16 @@ const DataContext = createContext(null)
 
 /** Horizonte de geração de periódicas na sincronização / pós-execução (~3 anos). */
 const THREE_YEARS_MS = 3 * 365.25 * 24 * 3600 * 1000
+
+/**
+ * Linhas de agenda que pertencem à cadeia periódica e ainda estão abertas.
+ * Exclui montagem — não é limpa no recálculo pós-periódica / sincronização global.
+ */
+function isSlotCadeiaPeriodicaAberta(m, maquinaId) {
+  if (normEntityId(m.maquinaId) !== normEntityId(maquinaId)) return false
+  if (!STATUS_MANUTENCAO_ABERTA.has(m.status)) return false
+  return m.tipo !== 'montagem'
+}
 
 /**
  * Ao substituir relatórios vindos da API, preserva `enviadoParaCliente` / `ultimoEnvio`
@@ -1815,7 +1825,8 @@ export function DataProvider({ children }) {
    * Bloco B — Recalcular manutenções periódicas futuras após execução de uma periódica.
    *
    * Faz tudo atomicamente dentro do setManutencoes:
-   *  1. Remove as futuras pendentes/agendadas da máquina (posterior à data de execução)
+   *  1. Remove **toda** a cadeia periódica em aberto (pendente/agendada/em_progresso, exceto montagem),
+   *     incluindo atrasadas de anos anteriores — evita duplicar com a nova grelha.
    *  2. Gera novas a partir da data de execução real, para 3 anos
    *
    * @returns {number} número de novas manutenções criadas
@@ -1835,12 +1846,7 @@ export function DataProvider({ children }) {
     let novaCount = 0
 
     setManutencoes(prev => {
-      // 1. Identificar futuras pendentes/agendadas desta máquina a remover
-      const aRemover = prev.filter(m =>
-        m.maquinaId === maquinaId &&
-        (m.status === 'pendente' || m.status === 'agendada') &&
-        m.data > dataExecucao
-      )
+      const aRemover = prev.filter(m => isSlotCadeiaPeriodicaAberta(m, maquinaId))
       const idsRemover = new Set(aRemover.map(m => m.id))
       const semFuturas = prev.filter(m => !idsRemover.has(m.id))
 
@@ -1925,6 +1931,7 @@ export function DataProvider({ children }) {
    * com base na última execução: **o mais recente** entre `ultimaManutencaoData` na ficha
    * e a data da última manutenção `concluida` na agenda (evita âncora antiga na ficha).
    * Só cria linhas com data **≥ hoje** (Açores); horizonte = max(última exec + 3 anos, hoje + 3 anos).
+   * Antes de gerar, remove toda a cadeia periódica em aberto da máquina (incl. atrasos antigos), não só datas posteriores à última execução.
    * Actualiza `proximaManut` em cada ficha quando difere da agenda.
    */
   const sincronizarAgendaCompleta = useCallback(async () => {
@@ -1954,8 +1961,6 @@ export function DataProvider({ children }) {
         p = cat?.intervaloTipo
         return p && INTERVALOS[p] ? p : null
       }
-      const isPeriodicSlot = (m) => m.tipo !== 'montagem'
-
       const idsDeleted = []
       const rowsCreated = []
       let recalculadas = 0
@@ -1975,12 +1980,7 @@ export function DataProvider({ children }) {
 
         recalculadas += 1
 
-        const aRemover = acc.filter(m =>
-          sameMid(m, maq.id) &&
-          (m.status === 'pendente' || m.status === 'agendada') &&
-          m.data > dataExec &&
-          isPeriodicSlot(m)
-        )
+        const aRemover = acc.filter(m => isSlotCadeiaPeriodicaAberta(m, maq.id))
         const idsRemover = new Set(aRemover.map(m => m.id))
         acc = acc.filter(m => !idsRemover.has(m.id))
         for (const id of idsRemover) idsDeleted.push(id)
