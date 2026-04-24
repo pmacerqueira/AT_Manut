@@ -634,6 +634,8 @@ export function DataProvider({ children }) {
   const [manutencoes,   setManutencoes]   = useState([])
   const manutencoesRef = useRef([])
   manutencoesRef.current = manutencoes
+  /** Evita cliques repetidos em «Sincronizar agenda completa». */
+  const agendaCompletaBusyRef = useRef(false)
   const [relatorios,          setRelatorios]          = useState([])
   const [reparacoes,          setReparacoes]          = useState([])
   const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
@@ -1910,6 +1912,174 @@ export function DataProvider({ children }) {
     return novaCount
   }, [persist, updateMaquina])
 
+  /**
+   * Recarrega dados do servidor e, para cada equipamento com periodicidade conhecida,
+   * regenera manutenções periódicas futuras (pendente/agendada, exceto montagem)
+   * com base na última execução (campo da ficha ou última concluída na agenda).
+   * Actualiza `proximaManut` em cada ficha quando difere da agenda.
+   */
+  const sincronizarAgendaCompleta = useCallback(async () => {
+    if (agendaCompletaBusyRef.current) {
+      return { ok: false, reason: 'busy' }
+    }
+    const { isTokenValid, fetchTodosOsDados, apiManutencoes } = await import('../services/apiService')
+    if (!isTokenValid()) return { ok: false, reason: 'auth' }
+    if (!navigator.onLine) return { ok: false, reason: 'offline' }
+
+    agendaCompletaBusyRef.current = true
+    try {
+      const d = await fetchTodosOsDados()
+      const maqs = d.maquinas ?? []
+      const categoriasD = d.categorias ?? []
+      const subcategoriasD = d.subcategorias ?? []
+      let acc = (d.manutencoes ?? []).map(m => ({ ...m }))
+
+      const sameMid = (m, mid) => normEntityId(m.maquinaId) === normEntityId(mid)
+      const periodicidadeEfetiva = (maq) => {
+        let p = maq.periodicidadeManut
+        if (p && INTERVALOS[p]) return p
+        const sub = subcategoriasD.find(s => String(s.id) === String(maq.subcategoriaId))
+        const cat = sub ? categoriasD.find(c => String(c.id) === String(sub.categoriaId)) : null
+        p = cat?.intervaloTipo
+        return p && INTERVALOS[p] ? p : null
+      }
+      const isPeriodicSlot = (m) => m.tipo !== 'montagem'
+
+      const idsDeleted = []
+      const rowsCreated = []
+      let recalculadas = 0
+
+      for (const maq of maqs) {
+        const periodicidade = periodicidadeEfetiva(maq)
+        if (!periodicidade) continue
+
+        let dataExec = maq.ultimaManutencaoData ? String(maq.ultimaManutencaoData).slice(0, 10) : null
+        if (!dataExec) {
+          const concl = acc.filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
+          if (concl.length === 0) continue
+          concl.sort((a, b) => b.data.localeCompare(a.data))
+          dataExec = concl[0].data
+        }
+        if (!dataExec) continue
+
+        recalculadas += 1
+
+        const aRemover = acc.filter(m =>
+          sameMid(m, maq.id) &&
+          (m.status === 'pendente' || m.status === 'agendada') &&
+          m.data > dataExec &&
+          isPeriodicSlot(m)
+        )
+        const idsRemover = new Set(aRemover.map(m => m.id))
+        acc = acc.filter(m => !idsRemover.has(m.id))
+        for (const id of idsRemover) idsDeleted.push(id)
+
+        const diasOcupados = new Set(
+          acc.filter(m => m.status === 'agendada' || m.status === 'pendente').map(m => m.data)
+        )
+
+        const conclConc = acc
+          .filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
+          .sort((a, b) => b.data.localeCompare(a.data))
+        const tecnico = conclConc[0]?.tecnico || ''
+
+        const intervaloDias = INTERVALOS[periodicidade].dias
+        const dataBaseMs = new Date(dataExec + 'T12:00:00').getTime()
+        const limiteMs = dataBaseMs + 3 * 365.25 * 24 * 3600 * 1000
+        const anoInicio = new Date(dataExec).getFullYear()
+        const anoFim = new Date(limiteMs).getFullYear()
+        const feriadosSet = buildFeriadosSet(anoInicio, anoFim)
+
+        const baseId = Date.now() + Math.floor(Math.random() * 1e6)
+        const novas = []
+        let dcur = new Date(dataExec + 'T12:00:00')
+        while (true) {
+          dcur = new Date(dcur.getTime() + intervaloDias * 24 * 3600 * 1000)
+          if (dcur.getTime() > limiteMs) break
+          const { data: dAjustada } = encontrarDiaLivre(dcur, feriadosSet, diasOcupados)
+          const iso = `${dAjustada.getFullYear()}-${String(dAjustada.getMonth() + 1).padStart(2, '0')}-${String(dAjustada.getDate()).padStart(2, '0')}`
+          novas.push({
+            id: `mp${baseId}_${novas.length}_${Math.random().toString(36).slice(2, 8)}`,
+            maquinaId: maq.id,
+            tipo: 'periodica',
+            periodicidade,
+            data: iso,
+            tecnico,
+            status: 'agendada',
+            observacoes: 'Reagendamento automático (sincronização completa da agenda).',
+            criadoEm: new Date().toISOString(),
+          })
+          diasOcupados.add(iso)
+        }
+        acc = [...acc, ...novas]
+        rowsCreated.push(...novas)
+      }
+
+      const uniqueDeletes = [...new Set(idsDeleted)]
+
+      try {
+        for (const rid of uniqueDeletes) {
+          await persist(
+            () => apiManutencoes.remove(rid),
+            { resource: 'manutencoes', action: 'delete', id: rid },
+            undefined,
+            { throwOnFailure: true },
+          )
+        }
+        if (rowsCreated.length > 0) {
+          await persist(
+            () => apiManutencoes.bulkCreate(rowsCreated),
+            { resource: 'manutencoes', action: 'bulk_create', data: rowsCreated },
+            undefined,
+            { throwOnFailure: true },
+          )
+        }
+      } catch (persistErr) {
+        logger.error('DataContext', 'sincronizarAgendaCompleta', persistErr?.message || 'Persistência falhou', {
+          stack: persistErr?.stack?.slice(0, 400),
+        })
+        await fetchTodos({ source: 'manual', force: true })
+        return { ok: false, error: persistErr?.message || 'Erro ao guardar na API' }
+      }
+
+      setManutencoes(acc)
+
+      const updates = []
+      for (const maq of maqs) {
+        const proxima = minDataManutencaoAberta(maq.id, acc)
+        const oldV = maq.proximaManut ?? null
+        const newV = proxima ?? null
+        if (String(oldV ?? '') !== String(newV ?? '')) {
+          updates.push(updateMaquina(maq.id, { proximaManut: proxima }))
+        }
+      }
+      await Promise.all(updates)
+
+      saveCache({
+        ...d,
+        manutencoes: acc,
+        maquinas: maqs.map(m => ({ ...m, proximaManut: minDataManutencaoAberta(m.id, acc) })),
+      })
+
+      logger.action('DataContext', 'sincronizarAgendaCompleta', 'Agenda e fichas sincronizadas', {
+        recalculadas,
+        removidas: uniqueDeletes.length,
+        criadas: rowsCreated.length,
+        proximaAtualizadas: updates.length,
+      })
+
+      return {
+        ok: true,
+        recalculadas,
+        removidas: uniqueDeletes.length,
+        criadas: rowsCreated.length,
+        proximaAtualizadas: updates.length,
+      }
+    } finally {
+      agendaCompletaBusyRef.current = false
+    }
+  }, [fetchTodos, persist, updateMaquina])
+
   // ── Peças e consumíveis — plano por máquina (MySQL via API; leitura: todos; escrita: só Admin no servidor) ──
   const addPecaPlano = useCallback((peca) => {
     const id = 'pp' + Date.now()
@@ -2097,6 +2267,7 @@ export function DataProvider({ children }) {
   const value = useMemo(() => ({
     loading,
     refreshData,
+    sincronizarAgendaCompleta,
     isOnline,
     syncPending,
     isSyncing,
@@ -2185,7 +2356,7 @@ export function DataProvider({ children }) {
     addRelatorio, updateRelatorio, getRelatorioByManutencao,
     addReparacao, updateReparacao, removeReparacao,
     addRelatorioReparacao, updateRelatorioReparacao, getRelatorioByReparacao,
-    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao, sincronizarProximaManutComAgenda,
+    prepararManutencoesPeriodicas, confirmarManutencoesPeriodicas, recalcularPeriodicasAposExecucao, sincronizarAgendaCompleta, sincronizarProximaManutComAgenda,
     addPecaPlano, replacePecasPlanoMaquina, updatePecaPlano, removePecaPlano, removePecasPlanoByMaquina, getPecasPlanoByMaquina,
     exportarDados, restaurarDados,
     loading, refreshData,

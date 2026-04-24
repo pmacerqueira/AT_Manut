@@ -9,6 +9,113 @@ Política de continuidade:
 
 ---
 
+## [1.16.65] — 2026-04-24 — Deploy cPanel (PWA + API) para testes no terreno
+
+### Frontend (PWA)
+- **Tablet / responsivo:** cabeçalho do Dashboard — em ≤1024px o espaçador deixava o título e «Sincronizar agenda» na ordem errada (regra global `order` em `.page-header > div`); o espaçador passa a estar oculto neste breakpoint (`Dashboard.css`).
+- Inclui o conjunto de alterações já em working tree (sincronização de agenda, modais, biblioteca/taxonomia NAVEL no cliente, etc.) compiladas com **`APP_VERSION` 1.16.65**.
+
+### Operação
+- **Produção:** `npm run build:zip` em AT_Manut; deploy de `dist/` via `navel-site` → `deploy:at-manut -- --yes`.
+- **API (`public_html/api/`):** upload dos PHP alterados ou novos (ex.: `data.php`, `config.php`, taxonomia, documentos NAVEL, `atm_report_auth.php`, `.htaccess`, `send-email.php`, `log-receiver.php`, `cron-alertas.php`, …) com `cpanel-deploy.mjs --file=… --remote={CPANEL_REMOTE_ROOT}/api --yes`.
+
+---
+
+## [1.16.62] — 2026-04-22 — `tecnico_horario_restrito.json` canónico + deploy cPanel
+
+### Operação
+- **`servidor-cpanel/api/tecnico_horario_restrito.json`:** ficheiro no repo alinhado ao `.example` — `enabled: true`, Açores, fins de semana fechados, noite útil **18:00→07:59** (para o expediente **começar às 08:00** com a lógica inclusiva do PHP).
+- **`src/config/tecnicoHorarioRestrito.js`:** mesmos blocos quando `enabled: true` no futuro.
+- **Documentação:** `INSTRUCOES_CPANEL.md`, `DEPLOY_CHECKLIST.md`, `MEMORIA-SEGREDO-EMAIL-E-LOGS.md`.
+- **Deploy:** enviado para `public_html/api/tecnico_horario_restrito.json`.
+
+---
+
+## [1.16.61] — 2026-04-22 — Horário técnico: expediente 08:00–18:00 (Açores) + toast no login
+
+### UX / política
+- **Expediente** por defeito nos blocos (exemplo e front quando `enabled`): dias úteis **08:00–18:00** `Atlantic/Azores`; fins de semana fechado (bloco nocturno 18:00→08:00).
+- **Login / fim de sessão por horário:** toast de aviso com `TECNICO_HORARIO_EXPEDIENTE_TOAST`; mensagens JSON em `data.php` alinhadas; `loginErrorCode` no `AuthContext` para o ecrã de login.
+- **`tecnico_horario_restrito.json.example`:** `to: "08:00"` no bloco semanal.
+
+---
+
+## [1.16.60] — 2026-04-22 — Horário técnico: guard no browser alinhado ao servidor
+
+### Correcção
+- **`src/config/tecnicoHorarioRestrito.js`:** `enabled` por omissão **false**, para não expulsar técnicos quando a API **não** tem `tecnico_horario_restrito.json` activo (sintoma: login aparenta funcionar e a sessão cai logo). Activar no JS **só** quando o JSON no servidor tiver `"enabled": true` e os blocos forem os mesmos.
+- **Documentação:** `servidor-cpanel/INSTRUCOES_CPANEL.md`, `docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`.
+
+---
+
+## [1.16.59] — 2026-04-22 — Memória utilizador + `atm_report_auth.secret.php` + `gen:report-auth`
+
+### Operação / segurança
+- **`atm_report_auth.php`:** carrega opcionalmente `atm_report_auth.secret.php` (só no servidor; gitignored).
+- **`.htaccess` (api):** nega HTTP a `atm_report_auth.secret.php` (como `config.deploy-secrets.php`).
+- **`npm run gen:report-auth`:** gera token forte e preenche `.env.local` + `atm_report_auth.secret.php` localmente (nunca no Git).
+- **Documentação:** [`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md), entradas em `INDEX.md` e `DEPLOY_CHECKLIST.md`.
+
+---
+
+## [1.16.58] — 2026-04-22 — ATM_REPORT_AUTH_TOKEN (PHP + PWA, sem defaults)
+
+### Segurança / robustez
+- **`servidor-cpanel/api/atm_report_auth.php`:** lê `ATM_REPORT_AUTH_TOKEN` via `getenv` / `$_ENV` / `$_SERVER` / `REDIRECT_*` e carrega `config.local.php` + `config.deploy-secrets.php` para alinhar com o mesmo mecanismo que `config.php`.
+- **Sem token em texto claro no repositório:** `send-email.php`, `send-report.php`, `log-receiver.php`, `cron-alertas.php` (HTTP) devolvem **503** `misconfigured` se o segredo não estiver definido; cron **CLI** não exige query string.
+- **Frontend:** `VITE_ATM_REPORT_AUTH_TOKEN` em `emailConfig.js` (build); `logger.js` reutiliza o mesmo valor e **não** envia flush se o token estiver vazio.
+
+### Operação
+- **Deploy:** publicar `atm_report_auth.php` e os PHP alterados; garantir `ATM_REPORT_AUTH_TOKEN` no servidor **antes** de trocar ficheiros (evita janela 503). Rebuild da PWA com `VITE_ATM_REPORT_AUTH_TOKEN` definido.
+- **`.env.example`**, exemplos `config.*.php.example`, `docs/DEPLOY_CHECKLIST.md`, `docs/SEGURANCA-REVISAO-NAVEL-PT.md` actualizados.
+
+---
+
+## [1.16.57] — 2026-04-23 — config.php: atm_env() (cPanel / PHP-FPM)
+
+### Operação
+- **`servidor-cpanel/api/config.php`:** leitura de variáveis via `atm_env()` — `getenv()`, `$_ENV`, `$_SERVER` e prefixo `REDIRECT_`, para alinhar com alojamentos onde o painel não preenche só `getenv()`. Deploy quando conveniente.
+
+---
+
+## [1.16.56] — 2026-04-22 — Dependências: jsPDF / DOMPurify / Vite (npm audit)
+
+### Segurança / manutenção
+- **`npm audit fix`:** 0 vulnerabilidades; **jspdf** 4.2.1 (transitive **dompurify** 3.4.1), **vite** 7.3.2 e restantes correcções transitivas.
+- **Build** de produção e **`npm run test:unit`** passam; smoke **jsPDF** em Node (PDF válido `%PDF-`).
+
+---
+
+## [1.16.55] — 2026-04-22 — Endurecimento de segurança (API PHP)
+
+### Segurança
+- **`servidor-cpanel/api/config.php`:** removidos fallbacks de segredos no repositório; validação em pedidos HTTP (503 se faltarem `ATM_JWT_SECRET`, credenciais BD ou `ATM_TAXONOMY_TOKEN`). Suporte a `config.local.php` (gitignored) para desenvolvimento.
+- **`servidor-cpanel/api/image-proxy.php`:** mitigação SSRF (host → só IPs públicos), TLS com verificação de certificado, sem credenciais na URL.
+- **`servidor-cpanel/api/.htaccess`:** nega acesso HTTP a padrões `test-*` / `teste-*` / `clear-cache.php` e a `ingest-istobal-retro.php`.
+- **Removidos** do repo: `test-email.php`, `teste-webhook.php`, `clear-cache.php`, `teste-istobal-post.php`.
+- **`ingest-istobal-retro.php`:** só executável em CLI.
+
+### Documentação
+- `docs/SEGURANCA-REVISAO-NAVEL-PT.md` (estado pós-correcção e tabela de próximos passos), `docs/DEPLOY_CHECKLIST.md`, `.env.example`.
+
+### Deploy
+- Publicar `config.php`, `image-proxy.php`, `.htaccess`, `ingest-istobal-retro.php`; apagar no servidor os PHP de teste antigos.
+- Se `getenv()` no servidor não receber as vars do cPanel: `config.deploy-secrets.php` no servidor (não Git), carregado por `config.php`; `.htaccess` bloqueia URL directa a esse ficheiro.
+
+---
+
+## [1.16.54] — 2026-04-17 — Fase C: Biblioteca NAVEL na ficha do equipamento
+
+### Funcionalidade
+- **Biblioteca NAVEL** na ficha do equipamento (`Clientes` → ficha): lista de documentos da área reservada associados ao `machineId` (MySQL), pesquisa global, associação de documentos existentes, remoção de vínculo, upload para a pasta `Assistencia Tecnica/<categoria>/<subcategoria>/` com tipo de documento e ligação automática ao equipamento.
+- **API `data.php`:** recurso `documentosBiblioteca` (`search`, `machine_links_get`, `machine_links_set`, `upload_folder_for_maquina`) com proxy servidor → `documentos-api.php` (Bearer `ATM_NAVEL_DOC_INTEGRATION_TOKEN`).
+- **Novos scripts PHP:** `navel-doc-lib.php`, `navel-documentos-upload.php` (multipart), `navel-documentos-download.php` (stream). **`config.php`:** `ATM_NAVEL_DOCUMENTOS_API_URL`, `ATM_NAVEL_DOC_INTEGRATION_TOKEN`.
+
+### Deploy
+- cPanel: definir **`ATM_NAVEL_DOC_INTEGRATION_TOKEN`** (igual a `at_integration_bearer` no `documentos-api-config.php` do navel-site) e enviar os PHP da pasta `api/` actualizados.
+
+---
+
 ## [1.16.53] — 2026-03-28 — Clientes: pesquisa por nome
 
 ### Correcções

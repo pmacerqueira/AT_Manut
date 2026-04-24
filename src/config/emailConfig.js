@@ -13,16 +13,18 @@
 
 import { ATM_API_CANONICAL_ORIGIN } from './apiBase'
 
+/** Mesmo segredo que `ATM_REPORT_AUTH_TOKEN` no servidor (obrigatório no build de produção). */
+const AUTH_FROM_ENV = (import.meta.env.VITE_ATM_REPORT_AUTH_TOKEN || '').trim()
+
 export const EMAIL_CONFIG = {
   /** Referência documental; na app usar `getSendEmailUrl()` (host canónico + dev/proxy). */
   ENDPOINT_URL: `${ATM_API_CANONICAL_ORIGIN}/api/send-email.php`,
 
   /**
-   * Token de autenticação — deve ser idêntico ao definido no PHP
-   * (variável AUTH_TOKEN em send-email.php, linha ~52).
-   * Alterar para uma string secreta própria antes de publicar.
+   * Token de autenticação — idêntico a `ATM_REPORT_AUTH_TOKEN` nos PHP (send-email, send-report, log-receiver).
+   * Definir em `.env` local: `VITE_ATM_REPORT_AUTH_TOKEN=...` e no pipeline de build para deploy.
    */
-  AUTH_TOKEN: 'Navel2026$Api!Key#xZ99',
+  AUTH_TOKEN: AUTH_FROM_ENV,
 
   /** Endereço de resposta visível pelo cliente (remetente visível: no-reply@navel.pt). */
   REPLY_TO: 'comercial@navel.pt',
@@ -95,9 +97,5 @@ export function getSendReportUrl() {
   return `${ATM_API_CANONICAL_ORIGIN}/api/send-report.php`
 }
 
-/**
- * Devolve true se o token ainda está no valor de placeholder
- * (endpoint ainda não configurado).
- */
-export const isEmailConfigured = () =>
-  EMAIL_CONFIG.AUTH_TOKEN !== 'NAVEL_MANUT_TOKEN_ALTERAR_AQUI'
+/** True quando o token de envio de email / relatório está definido no bundle. */
+export const isEmailConfigured = () => EMAIL_CONFIG.AUTH_TOKEN.length > 0

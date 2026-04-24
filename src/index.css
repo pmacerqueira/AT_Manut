@@ -303,6 +303,19 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   margin-bottom: 1.25rem;
 }
 .page-header button { white-space: nowrap; flex-shrink: 0; }
+
+.atm-sync-spin {
+  display: inline-block;
+  animation: atm-sync-rotate 0.85s linear infinite;
+}
+@keyframes atm-sync-rotate {
+  to { transform: rotate(360deg); }
+}
+.agenda-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 .page-header-actions {
   display: flex;
   gap: 0.5rem;

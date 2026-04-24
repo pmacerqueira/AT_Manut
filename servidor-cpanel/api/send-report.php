@@ -10,8 +10,15 @@
  * Segurança: exige auth_token no body; CORS restrito; sanitização de corpo e assunto.
  */
 
-// Token de autenticação — deve ser idêntico ao em emailConfig.js e send-email.php
-define('REPORT_AUTH_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
+require_once __DIR__ . '/atm_report_auth.php';
+$__reportTok = atm_report_auth_token();
+if ($__reportTok === '') {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'code' => 'misconfigured', 'message' => 'ATM_REPORT_AUTH_TOKEN em falta no servidor.']);
+    exit;
+}
+define('REPORT_AUTH_TOKEN', $__reportTok);
 
 /**
  * True se o pedido vem de Vite/Playwright (Origin ou Referer localhost).

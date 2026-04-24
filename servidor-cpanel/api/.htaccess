@@ -1,0 +1,17 @@
+# AT_Manut API — defesa em profundidade (Apache 2.4+)
+# Bloqueia ferramentas de diagnóstico se ainda existirem no servidor após deploys antigos.
+
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(test-.*|teste-.*|clear-cache)\.php$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^ingest-istobal-retro\.php$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^config\.deploy-secrets\.php$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^atm_report_auth\.secret\.php$">
+    Require all denied
+  </FilesMatch>
+</IfModule>

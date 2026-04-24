@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/atm-taxonomy-normalize.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -60,19 +61,6 @@ if ($requiredToken !== '') {
     }
 }
 
-// ── Helpers locais ────────────────────────────────────────────────────────────
-$slugify = static function (string $value): string {
-    $value = trim($value);
-    if ($value === '') return '';
-    $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
-    if (is_string($converted) && $converted !== '') {
-        $value = $converted;
-    }
-    $value = preg_replace('/[^A-Za-z0-9\- ]+/', '', $value) ?? '';
-    $value = preg_replace('/\s+/', ' ', $value) ?? '';
-    return trim($value);
-};
-
 // ── Consulta à BD ────────────────────────────────────────────────────────────
 try {
     $pdo = get_pdo();
@@ -93,13 +81,13 @@ try {
         $id = (string) ($row['id'] ?? '');
         $name = trim((string) ($row['nome'] ?? ''));
         if ($id === '' || $name === '') continue;
-        $slug = $slugify($name);
+        $slug = atm_taxonomy_ascii_name($name);
         if ($slug === '') continue;
-        $categoryById[$id] = ['id' => $id, 'name' => $name, 'slug' => $slug];
+        $categoryById[$id] = ['id' => $id, 'slug' => $slug];
         $nodes[] = [
             'id'         => $id,
             'code'       => $id,
-            'name'       => $name,
+            'name'       => $slug,
             'slug'       => $slug,
             'path'       => $slug,
             'parentId'   => '',
@@ -117,12 +105,12 @@ try {
         if ($id === '' || $name === '' || $parentId === '') continue;
         $parent = $categoryById[$parentId] ?? null;
         if ($parent === null) continue;
-        $slug = $slugify($name);
+        $slug = atm_taxonomy_ascii_name($name);
         if ($slug === '') continue;
         $nodes[] = [
             'id'         => $id,
             'code'       => $id,
-            'name'       => $name,
+            'name'       => $slug,
             'slug'       => $slug,
             'path'       => $parent['slug'] . '/' . $slug,
             'parentId'   => $parentId,

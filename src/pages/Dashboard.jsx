@@ -11,7 +11,6 @@ import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, 
 // Search e Play mantidos para uso no day-panel
 import {
   format,
-  isBefore,
   addDays,
   startOfMonth,
   endOfMonth,
@@ -21,12 +20,19 @@ import {
   subMonths,
   isSameMonth,
   isSameDay,
+  differenceInCalendarDays,
+  startOfDay,
 } from 'date-fns'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
+import {
+  filterManutencoesEmAtraso,
+  filterManutencoesProximasProximosMeses,
+} from '../utils/kpis'
 import RelatorioView from '../components/RelatorioView'
 import AlertaProactivoModal from '../components/AlertaProactivoModal'
 import { getManutencoesPendentesAlertas, getDiasAviso, isAlertsModalDismissedToday, dismissAlertsModalToday } from '../config/alertasConfig'
 import ContentLoader from '../components/ContentLoader'
+import AgendaCompletaRefreshButton from '../components/AgendaCompletaRefreshButton'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Dashboard.css'
 import { pt } from 'date-fns/locale'
@@ -62,26 +68,18 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
-  const pendentes = useMemo(() =>
-    manutencoes.filter(m => m.status === 'pendente' || m.status === 'agendada'),
-  [manutencoes])
-
   const executadas = useMemo(() =>
     manutencoes.filter(m => m.status === 'concluida'),
   [manutencoes])
 
-  const emAtraso = useMemo(() =>
-    pendentes.filter(m => isBefore(parseDateLocal(m.data), new Date())),
-  [pendentes])
+  const manutEmAtraso = useMemo(() =>
+    [...filterManutencoesEmAtraso(manutencoes)].sort((a, b) => a.data.localeCompare(b.data)),
+  [manutencoes])
 
-  const proximas = useMemo(() =>
-    pendentes.filter(m => !isBefore(parseDateLocal(m.data), new Date())),
-  [pendentes])
-
-  const proximasSeisMeses = useMemo(() => {
-    const limite = addMonths(new Date(), 6)
-    return proximas.filter(m => !isBefore(parseDateLocal(m.data), new Date()) && isBefore(parseDateLocal(m.data), limite))
-  }, [proximas])
+  const proximasSeisMeses = useMemo(
+    () => filterManutencoesProximasProximosMeses(manutencoes, 6),
+    [manutencoes],
+  )
 
   // Reparações pendentes (não concluídas)
   const reparacoesPendentes = useMemo(() =>
@@ -102,19 +100,14 @@ export default function Dashboard() {
 
   const totalHoje = manutHoje.length + reparacoesHoje.length
 
-  // Manutenções em atraso (data < hoje) — secção dedicada
-  const manutEmAtraso = useMemo(() =>
-    manutencoes
-      .filter(m => (m.status === 'pendente' || m.status === 'agendada') && m.data < hoje)
-      .sort((a, b) => a.data.localeCompare(b.data)),
-  [manutencoes, hoje])
-
-  // Etapa 2 — Alerta de conformidade: dias máximos em atraso
+  // Etapa 2 — Alerta de conformidade: dias máximos em atraso (dias civis, Açores)
   const diasMaxAtraso = useMemo(() => {
-    if (emAtraso.length === 0) return 0
-    const oldest = emAtraso.reduce((min, m) => m.data < min ? m.data : min, emAtraso[0].data)
-    return Math.floor((new Date() - new Date(oldest)) / (1000 * 60 * 60 * 24))
-  }, [emAtraso])
+    if (manutEmAtraso.length === 0) return 0
+    const oldest = manutEmAtraso.reduce((min, m) => (m.data < min ? m.data : min), manutEmAtraso[0].data)
+    const refHoje = startOfDay(parseDateLocal(hoje))
+    const refOldest = startOfDay(parseDateLocal(oldest))
+    return differenceInCalendarDays(refHoje, refOldest)
+  }, [manutEmAtraso, hoje])
 
   // Pré-calcula índice de manutenções por data (string yyyy-MM-dd) para acesso O(1)
   const manutByDate = useMemo(() => {
@@ -168,6 +161,7 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-header dashboard-page-header">
         <h1>Dashboard</h1>
+        <AgendaCompletaRefreshButton />
         <div className="dashboard-header-spacer" aria-hidden="true" />
       </div>
 
@@ -191,7 +185,7 @@ export default function Dashboard() {
         >
           <AlertTriangle size={24} className="stat-icon" />
           <div>
-            <span className="stat-value">{emAtraso.length}</span>
+            <span className="stat-value">{manutEmAtraso.length}</span>
             <span className="stat-label">Em atraso</span>
             {diasMaxAtraso >= 7 && (
               <span className="stat-alerta-dias">⚠ Há {diasMaxAtraso} dias!</span>
@@ -528,9 +522,8 @@ export default function Dashboard() {
                     const maq = maquinas.find(x => x.id === m.maquinaId)
                     const sub = getSubcategoria(maq?.subcategoriaId)
                     const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() : 'Equipamento'
-                    const dataManut = parseDateLocal(m.data)
-                    const statusBadge = m.status === 'concluida' ? 'badge-success' : !isBefore(dataManut, new Date()) ? 'badge-warning' : 'badge-danger'
-                    const statusLabel = m.status === 'concluida' ? 'Executada' : !isBefore(dataManut, new Date()) ? 'Próxima' : 'Em atraso'
+                    const statusBadge = m.status === 'concluida' ? 'badge-success' : m.data >= hoje ? 'badge-warning' : 'badge-danger'
+                    const statusLabel = m.status === 'concluida' ? 'Executada' : m.data >= hoje ? 'Próxima' : 'Em atraso'
                     const podeExecutar = m.status === 'pendente' || m.status === 'agendada'
                     return (
                       <div key={m.id} className="day-panel-item">
@@ -558,7 +551,7 @@ export default function Dashboard() {
                               className="btn primary btn-sm"
                               onClick={() => {
                                 setSelectedDay(null)
-                                const filtro = isBefore(parseDateLocal(m.data), new Date()) ? 'atraso' : 'proximas'
+                                const filtro = m.data < hoje ? 'atraso' : 'proximas'
                                 navigate(`/manutencoes?filter=${filtro}`, { state: { openExecucaoId: m.id } })
                               }}
                             >
@@ -584,7 +577,7 @@ export default function Dashboard() {
           const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
           const checklistItems = sub ? getChecklistBySubcategoria(sub.id, m?.tipo || 'periodica') : []
           const dataFormatada = m?.data ? format(parseDateLocal(m.data), "d 'de' MMMM 'de' yyyy", { locale: pt }) : '—'
-          const statusLabel = m?.status === 'concluida' ? 'Executada' : !isBefore(parseDateLocal(m?.data || '1970-01-01'), new Date()) ? 'Próxima' : 'Em atraso'
+          const statusLabel = m?.status === 'concluida' ? 'Executada' : (m?.data && m.data >= hoje) ? 'Próxima' : 'Em atraso'
           return (
             <div
               className="day-panel-overlay manutencao-detalhe-overlay"

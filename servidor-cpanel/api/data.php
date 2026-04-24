@@ -2,8 +2,8 @@
 /**
  * data.php — API REST AT_Manut (autenticação + CRUD completo)
  *
- * INSTALAR EM: public_html/api/data.php
- * URL:         https://www.navel.pt/api/data.php
+ * INSTALAR EM: public_html/api/data.php (mesma pasta que config.php e db.php no hosting)
+ * URL:         ex.: https://www.navel.pt/api/data.php — o caminho exacto segue o definido em config / front-end
  *
  * Todas as chamadas são POST com corpo JSON:
  *   { "_t": "<token>", "r": "<recurso>", "action": "<acção>", ... }
@@ -19,6 +19,9 @@
  *   relatorios     — CRUD + geração de número
  *   tecnicos       — CRUD (admin only para escrita)
  *   pecasPlano     — plano de consumíveis por máquina (list: todos; escrita: admin; replace_maquina: admin)
+ *   documentosBiblioteca — proxy para documentos-api.php (NAVEL); acções: search, machine_links_get, machine_links_set, upload_folder_for_maquina
+ *                          Requer ATM_NAVEL_DOC_INTEGRATION_TOKEN em config (igual a at_integration_bearer no navel-site).
+ *                          Upload/download de ficheiros: ver navel-documentos-upload.php e navel-documentos-download.php na mesma pasta.
  *
  * Acções: list | get | create | update | delete | bulk_create | bulk_restore
  */
@@ -87,6 +90,7 @@ register_shutdown_function(function() {
 // ══ 4. CONFIG + DB ════════════════════════════════════════════════════════════
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/atm-taxonomy-normalize.php';
 require_once __DIR__ . '/tecnico_horario_restrito.php';
 
 // ══ 5. LER BODY JSON ═════════════════════════════════════════════════════════
@@ -132,7 +136,7 @@ if ($resource === 'auth' && $action === 'login') {
 
     if ($user['role'] === 'tecnico' && atm_tecnico_em_horario_restrito()) {
         json_error(
-            'Acesso da equipa técnica não está permitido neste horário. Contacte a administração se necessário.',
+            'Acesso da equipa técnica só é permitido em horário de expediente (dias úteis, 08:00–18:00, hora dos Açores). Fora desse período ou ao fim de semana, contacte a administração se necessário.',
             403,
             ['code' => 'TECNICO_HORARIO_RESTRITO']
         );
@@ -165,7 +169,7 @@ if (!$authPayload) json_error('Sessão expirada. Por favor faça login novamente
 
 if (($authPayload['role'] ?? '') === 'tecnico' && atm_tecnico_em_horario_restrito()) {
     json_error(
-        'Sessão terminada: horário de acesso restrito para a equipa técnica.',
+        'Sessão terminada: fora do horário de expediente da equipa técnica (dias úteis, 08:00–18:00, hora dos Açores).',
         403,
         ['code' => 'TECNICO_HORARIO_RESTRITO']
     );
@@ -211,6 +215,148 @@ if ($resource === 'logs' && $action === 'list') {
     }
     usort($entries, fn($a, $b) => $b['ts'] - $a['ts']);
     json_ok(array_slice($entries, 0, 2000));
+}
+
+// ══ 6c. Biblioteca NAVEL (Área Reservada) — proxy para documentos-api.php ═════
+// Nota: o JWT só valida o utilizador AT_Manut; o pedido ao navel.pt usa sempre o Bearer
+// de integração (ATM_NAVEL_DOC_INTEGRATION_TOKEN). Admin vs técnico não altera este fluxo.
+if ($resource === 'documentosBiblioteca') {
+    require_once __DIR__ . '/navel-doc-lib.php';
+    if (atm_navel_integration_token() === '') {
+        json_error('Integração com a biblioteca NAVEL não configurada. Defina ATM_NAVEL_DOC_INTEGRATION_TOKEN (cPanel → Environment Variables ou config.php).', 503);
+    }
+
+    $payload = is_array($body['data'] ?? null) ? $body['data'] : [];
+
+    $navelProxyFail = static function (array $res, string $ctx): void {
+        $http = (int) ($res['http'] ?? 0);
+        $curlErr = trim((string) ($res['curlError'] ?? ''));
+        if ($curlErr === 'response_too_large') {
+            if (function_exists('atm_log_api')) {
+                atm_log_api('warn', 'API', 'navel_doc_proxy', $ctx, ['http' => $http, 'curl' => $curlErr]);
+            }
+            json_error('Biblioteca NAVEL: resposta demasiado grande no servidor. Verifique se documentos-api.php está actualizado (pesquisa por índice) ou aumente ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES.', 502);
+        }
+        if ($curlErr !== '') {
+            if (function_exists('atm_log_api')) {
+                atm_log_api('warn', 'API', 'navel_doc_proxy', $ctx, ['http' => $http, 'curl' => $curlErr]);
+            }
+            json_error('Biblioteca NAVEL: falha de ligação ao servidor de documentos.', 502);
+        }
+        $code = $http >= 400 && $http < 600 ? $http : 502;
+        json_error('Biblioteca NAVEL indisponível ou erro (HTTP ' . $http . ').', $code);
+    };
+
+    if ($action === 'search') {
+        $get = ['action' => 'search'];
+        $dt = trim((string) ($payload['documentType'] ?? ''));
+        if ($dt !== '') {
+            if (!in_array($dt, ATM_NAVEL_DOC_TYPES, true)) {
+                json_error('documentType inválido.', 400);
+            }
+            $get['documentType'] = $dt;
+        }
+        foreach (['q', 'machineId', 'taxonomyNodeId'] as $k) {
+            $v = trim((string) ($payload[$k] ?? ''));
+            if ($v === '') {
+                continue;
+            }
+            if ($k === 'machineId' || $k === 'taxonomyNodeId') {
+                if (strlen($v) > ATM_NAVEL_MACHINE_ID_MAX_LEN) {
+                    json_error('Parâmetro de pesquisa demasiado longo.', 400);
+                }
+            }
+            if ($k === 'q' && strlen($v) > 500) {
+                json_error('Termo de pesquisa demasiado longo.', 400);
+            }
+            $get[$k] = $v;
+        }
+        $res = atm_navel_doc_request_get($get);
+        if (!$res['ok'] || !is_array($res['json'])) {
+            $navelProxyFail($res, 'search');
+        }
+        json_ok($res['json']);
+    }
+
+    if ($action === 'machine_links_get') {
+        $rawPath = (string) ($payload['path'] ?? '');
+        $path = atm_navel_doc_sanitize_assistencia_rel_path($rawPath);
+        if ($path === null) {
+            json_error('Caminho do documento inválido.', 400);
+        }
+        $res = atm_navel_doc_request_get(['action' => 'machine_links', 'path' => $path]);
+        if (!$res['ok'] || !is_array($res['json'])) {
+            $navelProxyFail($res, 'machine_links_get');
+        }
+        json_ok($res['json']);
+    }
+
+    if ($action === 'machine_links_set') {
+        $rawPath = (string) ($payload['path'] ?? '');
+        $path = atm_navel_doc_sanitize_assistencia_rel_path($rawPath);
+        if ($path === null) {
+            json_error('Caminho do documento inválido.', 400);
+        }
+        $machineIds = $payload['machineIds'] ?? [];
+        if (!is_array($machineIds)) {
+            json_error('machineIds inválido.', 400);
+        }
+        $normalized = atm_navel_doc_normalize_machine_ids($machineIds);
+        if (count($normalized) > ATM_NAVEL_MAX_MACHINE_LINKS) {
+            json_error('Demasiados equipamentos num único pedido (máx. ' . ATM_NAVEL_MAX_MACHINE_LINKS . ').', 400);
+        }
+        try {
+            $pdoNavel = get_pdo();
+        } catch (PDOException $e) {
+            json_error('Erro de base de dados.', 500);
+        }
+        if ($normalized !== [] && !atm_navel_doc_verify_maquinas_exist($pdoNavel, $normalized)) {
+            json_error('Um ou mais equipamentos não existem.', 404);
+        }
+        $postBody = [
+            'action' => 'machine_links',
+            'path' => $path,
+            'machineIds' => $normalized,
+            'source' => trim((string) ($payload['source'] ?? 'MANUAL')) ?: 'MANUAL',
+        ];
+        if (isset($payload['confidence']) && $payload['confidence'] !== '' && $payload['confidence'] !== null) {
+            $postBody['confidence'] = (float) $payload['confidence'];
+        }
+        $res = atm_navel_doc_request_post_json($postBody);
+        if (!$res['ok'] || !is_array($res['json'])) {
+            $navelProxyFail($res, 'machine_links_set');
+        }
+        json_ok($res['json']);
+    }
+
+    if ($action === 'upload_folder_for_maquina') {
+        $mid = trim((string) ($payload['maquinaId'] ?? ''));
+        if ($mid === '' || strlen($mid) > ATM_NAVEL_MACHINE_ID_MAX_LEN || !preg_match('/^[a-zA-Z0-9_-]+$/', $mid)) {
+            json_error('maquinaId inválido.', 400);
+        }
+        try {
+            $pdo = get_pdo();
+        } catch (PDOException $e) {
+            json_error('Erro de base de dados.', 500);
+        }
+        $st = $pdo->prepare('SELECT id, subcategoria_id FROM maquinas WHERE id = ? LIMIT 1');
+        $st->execute([$mid]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            json_error('Equipamento não encontrado.', 404);
+        }
+        $relPath = atm_assistencia_path_for_subcategoria_id($pdo, (string) $row['subcategoria_id']);
+        if ($relPath === null) {
+            json_error('Não foi possível resolver a pasta Assistência Técnica para este equipamento.', 422);
+        }
+        json_ok([
+            'path' => $relPath,
+            'maquinaId' => (string) $row['id'],
+            'subcategoriaId' => (string) $row['subcategoria_id'],
+        ]);
+    }
+
+    json_error('Acção documentosBiblioteca desconhecida: ' . $action, 400);
 }
 
 // ══ 7. CONFIGURAÇÃO DOS RECURSOS ══════════════════════════════════════════════
@@ -538,6 +684,36 @@ function atm_fetch_relatorio_row_with_maquina(PDO $pdo, string $relId): ?array {
     $stmt->execute([$relId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     return $row === false ? null : $row;
+}
+
+/**
+ * Relatório de manutenção já registado como enviado ao cliente (email ou marcação manual).
+ * Coluna enviado_para_cliente: JSON { "data": "...", "email": "..." }.
+ * Alinhado com a regra do frontend: até ser enviado, técnicos podem editar; depois só admin.
+ *
+ * @param array<string,mixed>|null $row Linha de relatorios (snake_case).
+ */
+function atm_relatorio_enviado_ao_cliente_from_row(?array $row): bool {
+    if (!$row) {
+        return false;
+    }
+    $raw = $row['enviado_para_cliente'] ?? null;
+    if ($raw === null || $raw === '') {
+        return false;
+    }
+    if (is_string($raw)) {
+        $j = json_decode($raw, true);
+    } elseif (is_array($raw)) {
+        $j = $raw;
+    } else {
+        return false;
+    }
+    if (!is_array($j)) {
+        return false;
+    }
+    $e = isset($j['email']) ? trim((string) $j['email']) : '';
+
+    return $e !== '';
 }
 
 /** NIF sem espaços — comparação de mesmo cliente. */
@@ -906,6 +1082,28 @@ switch ($action) {
             unset($rowMarca);
         }
 
+        // Nomes de categorias/subcategorias: gravar sempre em ASCII (corrige BD legada à primeira listagem).
+        if ($resource === 'categorias' || $resource === 'subcategorias') {
+            $updFix = $pdo->prepare("UPDATE `$table` SET nome = ? WHERE id = ?");
+            foreach ($rows as &$rowFix) {
+                $rid = (string)($rowFix['id'] ?? '');
+                $raw = (string)($rowFix['nome'] ?? '');
+                if ($rid === '' || $raw === '') {
+                    continue;
+                }
+                $fixed = atm_taxonomy_ascii_name($raw);
+                if ($fixed !== '' && $fixed !== $raw) {
+                    try {
+                        $updFix->execute([$fixed, $rid]);
+                        $rowFix['nome'] = $fixed;
+                    } catch (Throwable $e) {
+                        atm_log_api('warn', 'API', 'taxonomy_name_autofix', $e->getMessage(), ['id' => $rid, 'table' => $table]);
+                    }
+                }
+            }
+            unset($rowFix);
+        }
+
         $out  = array_map(function($r) use ($json_cols, $resource, $cliente_nif_by_id) {
             $j = row_to_js($r, $json_cols);
             if ($resource === 'maquinas') {
@@ -1079,6 +1277,13 @@ switch ($action) {
             $data['numeroRelatorio'] = sprintf('%s.%s.%05d', $ano, $tipo, $cnt);
         }
 
+        if ($resource === 'categorias' && isset($data['nome'])) {
+            $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+        }
+        if ($resource === 'subcategorias' && isset($data['nome'])) {
+            $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+        }
+
         $dataSql = normalize_payload_for_sql($data);
         [$cols, $params] = js_to_row($dataSql, $allowed);
         if (empty($cols)) json_error('Nenhum campo válido para inserir.');
@@ -1117,6 +1322,32 @@ switch ($action) {
         $data = $body['data'] ?? [];
         if (empty($data)) json_error('Dados em falta.');
 
+        // Relatório já enviado ao cliente: técnicos não podem alterar manutenção nem relatório (só admin).
+        if (($_user_role ?? '') !== 'admin') {
+            if ($resource === 'relatorios') {
+                $stPrev = $pdo->prepare('SELECT * FROM `relatorios` WHERE id = ? LIMIT 1');
+                $stPrev->execute([(string) $recId]);
+                $rowRelPrev = $stPrev->fetch(PDO::FETCH_ASSOC);
+                if ($rowRelPrev && atm_relatorio_enviado_ao_cliente_from_row($rowRelPrev)) {
+                    json_error(
+                        'Este relatório já foi enviado ao cliente. Apenas administradores podem alterar.',
+                        403
+                    );
+                }
+            }
+            if ($resource === 'manutencoes') {
+                $sr = $pdo->prepare('SELECT * FROM `relatorios` WHERE manutencao_id = ? LIMIT 1');
+                $sr->execute([(string) $recId]);
+                $rPrev = $sr->fetch(PDO::FETCH_ASSOC);
+                if ($rPrev && atm_relatorio_enviado_ao_cliente_from_row($rPrev)) {
+                    json_error(
+                        'Esta manutenção tem relatório já enviado ao cliente. Apenas administradores podem alterar.',
+                        403
+                    );
+                }
+            }
+        }
+
         // Updates parciais (ex.: só proximaManut após sync da agenda) não devem deixar
         // preprocess_maquina() assumir periodicidade pela subcategoria nem forçar trimestral,
         // sobrescrevendo anual/semestral já gravados na BD.
@@ -1137,6 +1368,13 @@ switch ($action) {
                 $data = array_merge($existingJs, $data);
             }
             $data = preprocess_maquina($data);
+        }
+
+        if ($resource === 'categorias' && isset($data['nome'])) {
+            $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+        }
+        if ($resource === 'subcategorias' && isset($data['nome'])) {
+            $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
         }
 
         $dataSql = normalize_payload_for_sql($data);
@@ -1162,6 +1400,31 @@ switch ($action) {
     // ── DELETE (com cascade para registos dependentes) ─────────────────────
     case 'delete': {
         if (!$id) json_error('ID em falta.');
+
+        if (($_user_role ?? '') !== 'admin') {
+            if ($table === 'relatorios') {
+                $stPrev = $pdo->prepare('SELECT * FROM `relatorios` WHERE id = ? LIMIT 1');
+                $stPrev->execute([(string) $id]);
+                $rowRelPrev = $stPrev->fetch(PDO::FETCH_ASSOC);
+                if ($rowRelPrev && atm_relatorio_enviado_ao_cliente_from_row($rowRelPrev)) {
+                    json_error(
+                        'Este relatório já foi enviado ao cliente. Apenas administradores podem eliminar.',
+                        403
+                    );
+                }
+            }
+            if ($table === 'manutencoes') {
+                $sr = $pdo->prepare('SELECT * FROM `relatorios` WHERE manutencao_id = ? LIMIT 1');
+                $sr->execute([(string) $id]);
+                $rPrev = $sr->fetch(PDO::FETCH_ASSOC);
+                if ($rPrev && atm_relatorio_enviado_ao_cliente_from_row($rPrev)) {
+                    json_error(
+                        'Não é possível eliminar: o relatório já foi enviado ao cliente. Apenas administradores.',
+                        403
+                    );
+                }
+            }
+        }
 
         // Cascade: eliminar registos filhos antes do pai
         if ($table === 'clientes') {
@@ -1207,6 +1470,12 @@ switch ($action) {
                     $data = preprocess_maquina($data);
                     atm_assert_maquina_serie_unica_cliente($pdo, $data, null, $cliente_nif_by_id);
                 }
+                if ($resource === 'categorias' && isset($data['nome'])) {
+                    $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+                }
+                if ($resource === 'subcategorias' && isset($data['nome'])) {
+                    $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+                }
                 // Geração de número de relatório se necessário
                 if ($resource === 'relatorios' && empty($data['numeroRelatorio'])) {
                     $tipo = 'MP';
@@ -1250,6 +1519,12 @@ switch ($action) {
                 if ($resource === 'maquinas') {
                     $data = preprocess_maquina($data);
                     atm_assert_maquina_serie_unica_cliente($pdo, $data, null, $cliente_nif_by_id);
+                }
+                if ($resource === 'categorias' && isset($data['nome'])) {
+                    $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
+                }
+                if ($resource === 'subcategorias' && isset($data['nome'])) {
+                    $data['nome'] = atm_taxonomy_ascii_name((string)$data['nome']);
                 }
                 $dataSql = normalize_payload_for_sql($data);
                 [$cols, $params] = js_to_row($dataSql, $allowed);

@@ -52,7 +52,7 @@ export default function Metricas() {
   const resumo       = useMemo(() => calcResumoCounts({ clientes, maquinas, manutencoes, relatorios }), [clientes, maquinas, manutencoes, relatorios])
   const cumprimento  = useMemo(() => calcTaxaCumprimento({ manutencoes, meses: 12 }), [manutencoes])
   const semanas      = useMemo(() => calcProximasSemanas({ manutencoes, semanas: 8 }), [manutencoes])
-  const topAtraso    = useMemo(() => calcTopClientesAtraso({ clientes, maquinas }), [clientes, maquinas])
+  const topAtraso    = useMemo(() => calcTopClientesAtraso({ clientes, maquinas, manutencoes }), [clientes, maquinas, manutencoes])
   const evolucao     = useMemo(() => calcEvolucaoMensal({ manutencoes, meses: 6 }), [manutencoes])
 
   // Enquanto o useEffect não redirige, não renderizar para utilizadores sem permissão

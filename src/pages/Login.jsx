@@ -5,13 +5,16 @@ import { useData } from '../context/DataContext'
 import { LogOut } from 'lucide-react'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { STORAGE } from '../config/storageKeys'
+import { TECNICO_HORARIO_EXPEDIENTE_TOAST } from '../config/tecnicoHorarioRestrito'
 import { ASSETS } from '../constants/assets'
+import { useToast } from '../components/Toast'
 import './Login.css'
 
 const NAVEL_SITE_URL = 'https://www.navel.pt'
 
 export default function Login() {
-  const { isAuthenticated, login, logout, loginError, hydrated } = useAuth()
+  const { isAuthenticated, login, logout, loginError, loginErrorCode, hydrated } = useAuth()
+  const { showToast } = useToast()
   const { refreshData } = useData()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -31,9 +34,19 @@ export default function Login() {
       if (!raw) return
       localStorage.removeItem(STORAGE.LOGIN_NOTICE)
       const o = JSON.parse(raw)
+      if (o?.code === 'TECNICO_HORARIO_RESTRITO') {
+        const hint = typeof o.toastHint === 'string' ? o.toastHint : TECNICO_HORARIO_EXPEDIENTE_TOAST
+        showToast(hint, 'warning', 8000)
+      }
       if (o?.message && typeof o.message === 'string') setHorarioNotice(o.message)
     } catch { /* */ }
-  }, [])
+  }, [showToast])
+
+  useEffect(() => {
+    if (loginErrorCode === 'TECNICO_HORARIO_RESTRITO') {
+      showToast(TECNICO_HORARIO_EXPEDIENTE_TOAST, 'warning', 8000)
+    }
+  }, [loginErrorCode, showToast])
 
   if (hydrated && isAuthenticated) {
     return <Navigate to="/" replace />

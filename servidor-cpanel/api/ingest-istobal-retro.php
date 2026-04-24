@@ -16,6 +16,14 @@
  *   --dry-run   Nao envia nada, apenas mostra o que seria enviado
  */
 
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Este script so pode correr em linha de comandos (CLI).');
+}
+
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 

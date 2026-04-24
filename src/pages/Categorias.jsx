@@ -5,6 +5,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, ListChecks, Package, ArrowLeft, ArrowUp, ArrowDown, Check, X, MessageSquareText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { getCanonicalDeclaracaoDepoisSuffix } from '../constants/relatorio'
+import { atmTaxonomyAsciiName } from '../utils/taxonomyAsciiName'
 import './Categorias.css'
 
 const QUICK_NOTES_DEFAULT = [
@@ -168,7 +169,7 @@ export default function Categorias() {
     e.preventDefault()
     const newId = addCategoria({
       ...formCat,
-      nome: formCat.nome.trim(),
+      nome: atmTaxonomyAsciiName(formCat.nome),
       declaracaoClienteDepois: (formCat.declaracaoClienteDepois ?? '').trim(),
     })
     if (newId) setExpandedCat(prev => new Set([...prev, newId]))
@@ -179,7 +180,7 @@ export default function Categorias() {
 
   const handleAddSubcategoria = (e, categoriaId) => {
     e.preventDefault()
-    addSubcategoria({ nome: formSub.nome, categoriaId })
+    addSubcategoria({ nome: atmTaxonomyAsciiName(formSub.nome), categoriaId })
     setFormSub({ nome: '' })
     setAddingSubcategoria(null)
     showToast('Subcategoria adicionada.', 'success')
@@ -197,7 +198,7 @@ export default function Categorias() {
   const handleEditCategoria = (e) => {
     e.preventDefault()
     const decl = (formCat.declaracaoClienteDepois ?? '').trim()
-    updateCategoria(editingCategoria, { ...formCat, declaracaoClienteDepois: decl })
+    updateCategoria(editingCategoria, { ...formCat, nome: atmTaxonomyAsciiName(formCat.nome), declaracaoClienteDepois: decl })
     setEditingCategoria(null)
     showToast('Categoria actualizada.', 'success')
   }
@@ -218,7 +219,7 @@ export default function Categorias() {
 
   const handleEditSubcategoria = (e) => {
     e.preventDefault()
-    updateSubcategoria(editingSubcategoria, formSub)
+    updateSubcategoria(editingSubcategoria, { nome: atmTaxonomyAsciiName(formSub.nome) })
     setEditingSubcategoria(null)
     showToast('Subcategoria actualizada.', 'success')
   }

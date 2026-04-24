@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** 1.16.30 · **Última actualização:** 2026-03-22
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-22
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -85,6 +85,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
 │   │   ├── DocumentacaoModal.jsx       # PDFs/URLs por equipamento (Admin); persistência em maquinas.documentos
+│   │   ├── MaquinaBibliotecaNavel.jsx # Biblioteca NAVEL (área reservada) por equipamento; proxy servidor documentosBiblioteca
 │   │   ├── EnviarEmailModal.jsx        # Envio de email (com painel de destinatários)
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
 │   │   ├── PecasPlanoModal.jsx / .css   # Plano de peças e consumíveis
@@ -139,7 +140,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │
 ├── servidor-cpanel/
 │   ├── api/
-│   │   └── data.php                    # Endpoint central: CRUD MySQL (todas as entidades)
+│   │   ├── data.php                    # Endpoint central: CRUD + recurso documentosBiblioteca (proxy NAVEL)
+│   │   ├── navel-doc-lib.php           # Cliente HTTP → documentos-api.php (token integração)
 │   ├── send-email.php                  # Backend: envio de email + PDF
 │   ├── send-report.php                 # Backend: email HTML (+ PDF base64 opcional, ex. frota)
 │   ├── cron-alertas.php                # Cron diário: lembretes automáticos + log alertas_log
@@ -198,7 +200,9 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 | Data histórica em reparação | ✅ | ❌ |
 | Ver relatórios | ✅ | ✅ |
 | Eliminar registos | ✅ | ❌ |
-| Editar manutenção assinada | ✅ | ❌ |
+| Editar relatório / manutenção concluída | ✅ | ✅ até envio ao cliente (`enviadoParaCliente`) |
+| Datas agendamento + execução (relatório) | ✅ | ✅ até envio ao cliente |
+| Editar manutenção após envio ao cliente | ✅ | ❌ |
 | Aceder a Definições | ✅ | ❌ |
 | Aceder a Logs | ✅ | ❌ |
 | Ver modal de alertas proactivos | ✅ | ❌ |
@@ -390,11 +394,12 @@ As datas mostradas na secção "Próximas Manutenções Agendadas" são **comput
 
 ## 8. Backend PHP (cPanel)
 
-**Localização:** `public_html/api/send-email.php`
+- **`api/data.php`** — CRUD JSON (`r` + `action`), JWT, RBAC; recurso **`documentosBiblioteca`** faz proxy para `documentos-api.php` do navel-site (Bearer `ATM_NAVEL_DOC_INTEGRATION_TOKEN`). Detalhes: `docs/DEPLOY_CHECKLIST.md`, repo `navel-site/docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
+- **`api/send-email.php`** (e `send-report.php`) — envio de correio.
 
-**Tipos de email suportados:**
-- `relatorio` — envio do relatório PDF após execução (manutenção ou reparação)
-- `lembrete` — lembrete de conformidade X dias antes do vencimento
+**Tipos de email (`send-email.php`):**
+- `relatorio` — PDF após execução (manutenção ou reparação)
+- `lembrete` — lembrete de conformidade (cron)
 
 ---
 
@@ -419,10 +424,5 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 
 ## 10. Versão e rodapé
 
-```js
-// src/config/version.js
-export const APP_VERSION = '1.14.0'
-export const APP_FOOTER_TEXT = `José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v${APP_VERSION}`
-```
-
-**Regra:** Incrementar `APP_VERSION` em cada deployment. Usar `APP_FOOTER_TEXT` em todos os relatórios (manutenções, reparações, PDF e emails).
+Canónico: **`src/config/version.js`** — `APP_VERSION`, `APP_FOOTER_TEXT`.  
+Incrementar `APP_VERSION` em cada deploy publicado; usar `APP_FOOTER_TEXT` em relatórios e emails.

@@ -9,7 +9,7 @@ import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS, isKaeserAbcdMaquina, tipoKaeserNaPosicao } from '../context/DataContext'
-import { usePermissions } from '../hooks/usePermissions'
+import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
@@ -26,6 +26,7 @@ import { logger } from '../utils/logger'
 import { parseHorasContadorForm } from '../utils/horasContadorEquipamento'
 import { STORAGE } from '../config/storageKeys'
 import ContentLoader from '../components/ContentLoader'
+import AgendaCompletaRefreshButton from '../components/AgendaCompletaRefreshButton'
 import ActionsOverflow from '../components/ActionsOverflow'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import { manutencoesCategoriaClass } from '../utils/categoriaVisual'
@@ -272,14 +273,17 @@ export default function Manutencoes() {
   }
 
   const openEdit = (m) => {
+    if (!canEditManutencao(m.id)) {
+      showToast('Esta manutenção já não pode ser editada: o relatório foi enviado ao cliente. Só um administrador pode alterar.', 'warning', 4500)
+      return
+    }
     const rel = getRelatorioByManutencao(m.id)
     if (isAdmin && rel) {
       setModalAdminEdit({ manutencao: m, maquina: getMaquina(m.maquinaId) })
       return
     }
-    // ATecnica: com relatório em rascunho, o formulário "Editar manutenção" não tinha fotos —
-    // abrir o mesmo fluxo que "Continuar execução" (Tirar foto / Galeria, checklist, etc.).
-    if (!isAdmin && rel && !rel.assinadoPeloCliente) {
+    // ATecnica: enquanto o relatório não foi enviado ao cliente, usar o fluxo completo (checklist, fotos, assinatura).
+    if (!isAdmin && rel && !isRelatorioEnviadoAoCliente(rel)) {
       setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })
       return
     }
@@ -332,6 +336,8 @@ export default function Manutencoes() {
     if (modal === 'add') {
       addManutencao(payload)
       if (maq && Object.keys(updateMaqData).length > 0) updateMaquina(mId, updateMaqData)
+      showToast('Dados gravados com sucesso.', 'success', 5000)
+      setModal(null)
     } else {
       updateManutencao(form.id, payload)
       if (maq && Object.keys(updateMaqData).length > 0) updateMaquina(mId, updateMaqData)
@@ -343,11 +349,10 @@ export default function Manutencoes() {
             dataCriacao: novaDataISO,
             dataAssinatura: rel.assinadoPeloCliente ? novaDataISO : rel.dataAssinatura,
           })
-          showToast('Data de execução actualizada com sucesso.', 'success')
         }
       }
+      showToast('Dados gravados com sucesso.', 'success', 5000)
     }
-    setModal(null)
   }
 
 
@@ -699,6 +704,7 @@ export default function Manutencoes() {
           )}
         </div>
         <div className="page-header-actions">
+          <AgendaCompletaRefreshButton />
           {!filter && (
             <button
               type="button"
@@ -1097,7 +1103,7 @@ export default function Manutencoes() {
                         {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
                         {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
                         {!canEditManutencao(m.id) && (
-                          <span className="badge-assinado" title="Assinado pelo cliente"><Lock size={12} /> Assinado</span>
+                          <span className="badge-assinado" title="Relatório enviado ao cliente — edição reservada a administradores"><Lock size={12} /> Enviado</span>
                         )}
                       </td>
                       {(mostrarTodas || filter === 'executadas') && (() => {
@@ -1140,7 +1146,7 @@ export default function Manutencoes() {
                             ...(rel?.assinadoPeloCliente ? [{ icon: <FileText size={14} />, label: 'Ver manutenção', onClick: () => setModalRelatorio(m) }] : []),
                             ...(rel && !rel.assinadoPeloCliente ? [{ icon: <FileSignature size={14} />, label: 'Recolher assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
                             ...(!rel && isConcluida ? [{ icon: <FileSignature size={14} />, label: 'Registar assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
-                            ...(canEditManutencao(m.id) ? [{ icon: <Pencil size={14} />, label: 'Editar', onClick: () => openEdit(m) }] : [{ icon: <Lock size={14} />, label: 'Assinada', disabled: true }]),
+                            ...(canEditManutencao(m.id) ? [{ icon: <Pencil size={14} />, label: 'Editar', onClick: () => openEdit(m) }] : [{ icon: <Lock size={14} />, label: 'Enviado ao cliente', disabled: true }]),
                             ...(canDeleteManutencao(m.id) ? [{ icon: <Trash2 size={14} />, label: 'Eliminar', danger: true, onClick: () => setModalConfirmDelete(m) }] : []),
                           ]} />
                         </div>

@@ -1,6 +1,15 @@
-# Instalação do endpoint de email no cPanel — navel.pt
+# Instalação — endpoints PHP no cPanel (navel.pt)
 
-## Nota importante
+## Contexto www.navel.pt
+
+A pasta **`public_html/api/`** pertence ao **AT_Manut** (REST + email). A raiz **`public_html/`** é o site **`navel-site`**; **`public_html/manut/`** é a PWA.
+
+- **Checklist completo, deploy PWA (`deploy:at-manut`) e variáveis:** [`docs/DEPLOY_CHECKLIST.md`](../docs/DEPLOY_CHECKLIST.md)
+- **Segredo email/relatório/logs (passo a passo simples):** [`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](../docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md)
+- Este ficheiro foca **email** (`send-email.php`, `send-report.php`), limites POST e tópicos relacionados.
+
+## Nota importante (email)
+
 O script usa **exactamente a mesma função `mail()` do PHP** que o `send-contact.php`
 que já está em funcionamento no servidor. Não precisa de PHPMailer, não precisa de
 credenciais SMTP, não precisa de instalar nada extra.
@@ -52,14 +61,9 @@ public_html/
 
 O token impede que terceiros utilizem o endpoint para enviar spam.
 
-**a) Nos ficheiros PHP** — editar directamente no cPanel (ou usar variável de ambiente ATM_REPORT_AUTH_TOKEN):
-   - `send-email.php`, `send-report.php`, `log-receiver.php` — usam o mesmo token
-   - Em alternativa: cPanel → Advanced → Environment Variables → adicionar `ATM_REPORT_AUTH_TOKEN`
+**a) No servidor** — definir **`ATM_REPORT_AUTH_TOKEN`** (recomendado: cPanel → Environment Variables ou `putenv` em `config.deploy-secrets.php`). Os scripts **`send-email.php`**, **`send-report.php`**, **`log-receiver.php`** e o cron **via HTTP** leem o valor via `atm_report_auth.php`; **não** há token por omissão no código — sem variável, respondem **503** `misconfigured`.
 
-**b) Na app React** — editar `c:\Cursor_Projetos\NAVEL\AT_Manut\src\config\emailConfig.js`:
-   ```js
-   AUTH_TOKEN: 'Navel2026$Api!Key#xZ99',   // ← mesmo token que no PHP
-   ```
+**b) Na app React** — definir **`VITE_ATM_REPORT_AUTH_TOKEN`** no `.env` local e **no ambiente de build** (o valor é embutido por `npm run build`). Deve coincidir com `ATM_REPORT_AUTH_TOKEN` no servidor. Ver `src/config/emailConfig.js` e `.env.example`. **Não** commitar o `.env` com segredos.
 
 **Nota:** O `send-report.php` também exige `auth_token` no body. A app envia-o automaticamente (EnviarEmailModal, EnviarDocumentoModal).
 
@@ -121,24 +125,20 @@ A API valida **login** e **cada pedido** com JWT: fora do horário permitido, o 
 2. Editar o JSON:
    - `"enabled": true`
    - `"timezone"`: normalmente `"Atlantic/Azores"`
-   - `"blocks"`: lista de períodos. Em cada bloco, `"days"` usa **0 = domingo … 6 = sábado**. Horas `"from"` / `"to"` no formato `HH:mm`. Se `from` > `to`, o intervalo **atravessa meia-noite** (ex.: `19:00` → `07:30`).
+   - `"blocks"`: lista de períodos. Em cada bloco, `"days"` usa **0 = domingo … 6 = sábado**. Horas `"from"` / `"to"` no formato `HH:mm`. Se `from` > `to`, o intervalo **atravessa meia-noite**. **NAVEL:** no bloco nocturno dos dias úteis use **`to: "07:59"`** (não `08:00`): a comparação no PHP é inclusiva, e com `08:00` o minuto das 08:00 ainda contava como bloqueado. Expediente útil: **08:00–17:59**; a partir das **18:00** bloqueado. Fins de semana: dia completo (`00:00`–`23:59`).
 3. Fazer **deploy** de `config.php` actualizado (define o caminho do JSON) e `data.php`, `db.php`, `tecnico_horario_restrito.php`.
 4. **Desligar de emergência** sem apagar o ficheiro: no cPanel → *Environment Variables* → `ATM_TECNICO_HORARIO_DISABLED` = `1`.
 5. Caminho alternativo do JSON: variável `ATM_TECNICO_HORARIO_JSON` (caminho absoluto no servidor).
 
-Na app React, editar também `src/config/tecnicoHorarioRestrito.js` com os **mesmos** `enabled`, `timezone` e `blocks`, para o cliente encerrar a sessão quando o relógio entra num período restrito (a segurança efectiva é sempre na API).
+Na app React, `src/config/tecnicoHorarioRestrito.js` deve ter **`enabled` igual ao JSON do servidor**. Se o servidor **não** tiver horário activo (`tecnico_horario_restrito.json` em falta ou `"enabled": false`), mantém **`enabled: false` no JS** — caso contrário o `TecnicoHorarioGuard` pode expulsar o técnico logo após o login (login e API ok, mas o browser acha que está “fora de horas”). A segurança efectiva é sempre na API.
 
 ---
 
-## Deployment da app AT_Manut (quando estiver pronto)
+## Deployment da app AT_Manut
 
-Quando quiseres publicar a app:
-1. `cd c:\Cursor_Projetos\NAVEL\AT_Manut`
-2. `npm run build:zip`  → cria a pasta `dist/` e o `dist_upload.zip`
-3. Fazer upload do conteúdo de `dist/` para `public_html/manut/`
-   (criar a pasta `manut/` primeiro)
+Fluxo recomendado (build + SFTP para `public_html/manut/`) e variáveis: **[`docs/DEPLOY_CHECKLIST.md`](../docs/DEPLOY_CHECKLIST.md)** — inclui `npm run deploy:at-manut -- --yes` a partir do repo **navel-site**.
 
-A app ficará acessível em: **https://www.navel.pt/manut/**
+Alternativa manual: `npm run build:zip` em AT_Manut e enviar o conteúdo de `dist/` para `public_html/manut/`. URL pública típica: **https://www.navel.pt/manut/**
 
 ---
 
@@ -147,17 +147,17 @@ A app ficará acessível em: **https://www.navel.pt/manut/**
 O endpoint `api/taxonomy-nodes.php` devolve em JSON a árvore de categorias e subcategorias de equipamentos, para que a Área Reservada (`https://navel.pt/area-reservada`) crie automaticamente as pastas `Assistência Técnica/<Categoria>/<Subcategoria>`.
 
 - **URL:** `https://www.navel.pt/api/taxonomy-nodes.php`
-- **Autenticação:** header `Authorization: Bearer <ATM_TAXONOMY_TOKEN>` (definido em `config.php`).
+- **Autenticação:** header `Authorization: Bearer <ATM_TAXONOMY_TOKEN>` (valor em `ATM_TAXONOMY_TOKEN` / `config.deploy-secrets.php` no servidor — ver `servidor-cpanel/api/config.php`).
 - **Dependências:** reaproveita `config.php` e `db.php` existentes (não precisa de ficheiros de config extras).
-- **Token por omissão:** `a8f3c19d-4b25-47e6-9f8a-3c2e1d0b7a95` (mesmo valor no `documentos-api.php` do navel-site). Para alterar, mudar `ATM_TAXONOMY_TOKEN` em `config.php` **e** `taxonomy_auth_token` no `documentos-api-config.php` do navel-site, ou definir a env var `ATM_TAXONOMY_TOKEN` no cPanel (Advanced → Environment Variables).
+- **Alinhar com navel-site:** o token que a Área Reservada envia deve ser o **mesmo** que `ATM_TAXONOMY_TOKEN` (ex.: `taxonomy_auth_token` ou equivalente no `documentos-api-config.php` do navel-site). Não documentar nem commitar o valor real.
 
-Teste rápido (depois do upload):
+Teste rápido (depois do upload; substituir pelo token configurado no servidor):
 
 ```
 curl https://www.navel.pt/api/taxonomy-nodes.php
 # → {"ok":false,"error":"unauthorized"}   (OK — está a exigir token)
 
-curl -H "Authorization: Bearer a8f3c19d-4b25-47e6-9f8a-3c2e1d0b7a95" https://www.navel.pt/api/taxonomy-nodes.php
+curl -H "Authorization: Bearer SEU_TOKEN_AQUI" https://www.navel.pt/api/taxonomy-nodes.php
 # → {"ok":true,"items":[ ... ]}
 ```
 

@@ -220,9 +220,9 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     logger.action('BulkExecutarModal', 'executarEmMassa', `${sucesso} manutenções executadas em massa (${erros} erros)`, { sucesso, erros, tecnico: form.tecnico })
 
     if (erros === 0) {
-      showToast(`${sucesso} manutenções executadas com sucesso!`, 'success')
+      showToast('Dados gravados com sucesso.', 'success', 5000)
     } else {
-      showToast(`${sucesso} executadas, ${erros} com erro. Verifique os registos.`, 'warning')
+      showToast(`${sucesso} gravadas, ${erros} com erro. Verifique os registos.`, 'warning', 6000)
     }
   }, [form, assinaturaFeita, manutencoesList, maquinaMap, clienteComum, getChecklistBySubcategoria, addRelatorio, updateManutencao, getIntervaloDiasByMaquina, updateMaquina, recalcularPeriodicasAposExecucao, updateCliente, showToast])
 

@@ -257,7 +257,7 @@ console.log(`\n  HTML previews: scripts/test-reports/\n`)
 
 // ─── 5. Enviar por email via send-report.php ─────────────────────────────────
 const ENDPOINT = 'https://www.navel.pt/api/send-report.php'
-const AUTH     = 'Navel2026$Api!Key#xZ99'
+const AUTH     = (process.env.ATM_REPORT_AUTH_TOKEN || process.env.VITE_ATM_REPORT_AUTH_TOKEN || '').trim()
 const DEST     = 'comercial@navel.pt'
 
 async function send(label, subject, html) {
@@ -293,16 +293,24 @@ console.log(`  Endpoint: ${ENDPOINT}`)
 console.log('='.repeat(60) + '\n')
 
 const results = []
-for (const r of reports) {
-  results.push(await send(r.label, r.subject, extractEmailHtml(r.html)))
+if (!AUTH) {
+  console.log('  Skipping email send: define ATM_REPORT_AUTH_TOKEN ou VITE_ATM_REPORT_AUTH_TOKEN.\n')
+} else {
+  for (const r of reports) {
+    results.push(await send(r.label, r.subject, extractEmailHtml(r.html)))
+  }
 }
 
 const ok = results.filter(Boolean).length
 console.log(`\n${'='.repeat(60)}`)
-console.log(`  Resultado: ${ok}/${results.length} emails enviados`)
-if (ok === results.length) {
-  console.log('  Verifica a caixa de comercial@navel.pt!')
+if (!AUTH) {
+  console.log('  Emails: não enviados (sem token de ambiente).')
 } else {
-  console.log('  Alguns emails falharam - verificar acima.')
+  console.log(`  Resultado: ${ok}/${results.length} emails enviados`)
+  if (ok === results.length) {
+    console.log('  Verifica a caixa de comercial@navel.pt!')
+  } else {
+    console.log('  Alguns emails falharam - verificar acima.')
+  }
 }
 console.log('='.repeat(60) + '\n')

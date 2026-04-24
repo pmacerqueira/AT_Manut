@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-03-22 — v1.16.30
+> Última revisão: 2026-04-22 — deploy PWA via `navel-site` (`deploy:at-manut`); integração biblioteca NAVEL e proxy documentos.
 
 ## Resumo da verificação da base de dados
 
@@ -53,7 +53,9 @@ SOURCE seed_mock_data.sql; -- 10 clientes, 23 máquinas, 28 manutenções, 13 re
 ```
 
 ### 2. Configuração
-- Editar `api/config.php` com credenciais MySQL do cPanel
+- **Produção (preferido):** `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN` (ver `servidor-cpanel/api/config.php`). Leitura via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`). Muitos planos cPanel **não** expõem variáveis ao PHP: usar então **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — **gitignored**, só no servidor.
+- **Biblioteca NAVEL (opcional):** `ATM_NAVEL_DOC_INTEGRATION_TOKEN` alinhado com `at_integration_bearer` no `documentos-api-config.php` do navel-site; opcional `ATM_NAVEL_DOCUMENTOS_API_URL`, `ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES` (limite de resposta do proxy; omissão 12 MiB). Ver `navel-doc-lib.php` e `navel-site/docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
+- Opcional dev local: `servidor-cpanel/api/config.local.php` (a partir de `config.local.php.example`).
 - Recomendado: `SET GLOBAL max_allowed_packet = 67108864;` (64 MB para fotos em relatórios)
 
 ### 3. Credenciais de login
@@ -79,12 +81,54 @@ Se a BD foi criada antes das migrações mais recentes:
 
 ---
 
+## WWW.NAVEL.PT — Mesmo cPanel que o site institucional (`navel-site`)
+
+A app **AT_Manut** em produção e o **website NAVEL** (`navel-site`) partilham o **mesmo domínio** (`www.navel.pt` / `navel.pt`) e a **mesma conta cPanel** (ex. CiberConceito). A árvore típica em `public_html` é:
+
+| Caminho no servidor | Origem no repositório | Conteúdo |
+|---------------------|------------------------|----------|
+| `public_html/` (raiz) | `navel-site` → `dist/` + `public/*.php` | Site institucional (SPA, formulários, documentos) |
+| `public_html/manut/` | **AT_Manut** → `dist/` (SFTP) ou `dist_upload.zip` | PWA de manutenções e reparações |
+| `public_html/api/` | **AT_Manut** → `servidor-cpanel/api/*.php` | API REST (`data.php`, `db.php`, `config.php`, …) |
+
+- **URL da API** usada pelo AT_Manut: tipicamente `https://www.navel.pt/api` ou `https://navel.pt/api` (ver `VITE_API_BASE_URL` no build).
+- **Integrações** entre as duas apps (taxonomia, biblioteca de documentos): ver no repo `navel-site` o ficheiro `docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
+
+### Deploy automático (recomendado) — repo `navel-site`
+
+Credenciais em **`navel-site/.env.cpanel`** (local, gitignored). Script: **`navel-site/scripts/cpanel-deploy.mjs`**.
+
+**PWA (`public_html/manut/`):** após `npm run build` em **AT_Manut**:
+
+```powershell
+cd c:\Cursor_Projetos\NAVEL\navel-site
+npm run deploy:at-manut -- --yes
+```
+
+Envia `../AT_Manut/dist/` para `{CPANEL_REMOTE_ROOT}/manut/` (incremental por hash).
+
+**Um ficheiro PHP da API** (ex. `data.php`):
+
+```powershell
+cd c:\Cursor_Projetos\NAVEL\navel-site
+node scripts/cpanel-deploy.mjs --file="c:/Cursor_Projetos/NAVEL/AT_Manut/servidor-cpanel/api/data.php" --remote="<CPANEL_REMOTE_ROOT>/api" --yes
+```
+
+`CPANEL_REMOTE_ROOT` está no `.env.cpanel` (ex.: `/home/navel/public_html`).
+
+### Permissões no servidor (`data.php`) e no frontend
+
+- **ATecnica** pode **editar** manutenção concluída e relatório **até** `enviadoParaCliente` indicar envio ao cliente; inclui **corrigir datas de agendamento e de execução** no modal de execução (`ExecutarManutencaoModal.jsx`) enquanto o relatório não foi enviado.
+- **Depois** do envio ao cliente, **só admin** altera ou elimina (`usePermissions.js` + `data.php` em `update`/`delete` de `relatorios` e `manutencoes`).
+
+---
+
 ## Publicação no painel (cPanel)
 
 ### Ficheiros a enviar
 | Pasta / ficheiro | Destino cPanel | Notas |
 |-----------------|----------------|-------|
-| `servidor-cpanel/api/` | `public_html/api/` | PHP da API (inclui atm_log.php, data.php, log-receiver) |
+| `servidor-cpanel/api/` | `public_html/api/` | PHP da API (inclui `atm_report_auth.php`, atm_log.php, data.php, log-receiver) e **`tecnico_horario_restrito.json`** (horário ATecnica; não versionar alterações locais se forem só para um ambiente) |
 | `servidor-cpanel/log-receiver.php` | `public_html/api/log-receiver.php` | Receptor de logs do frontend |
 | `servidor-cpanel/setup.sql` | — | Executar no phpMyAdmin |
 | `servidor-cpanel/seed_mock_data.sql` | — | Executar após setup |
@@ -99,44 +143,34 @@ Se a BD foi criada antes das migrações mais recentes:
 
 ### Build da aplicação React
 
-**Recomendado:** Executar no terminal Windows (fora do Cursor) para evitar crash do editor.
-
 ```powershell
 cd c:\Cursor_Projetos\NAVEL\AT_Manut
-npm run build:zip
-```
-
-Ou comandos separados:
-```powershell
 npm run build
-npm run zip
 ```
 
-Enviar `dist_upload.zip` para o cPanel (File Manager → Upload → Extract em `public_html/manut/`).
-
-Ver [`docs/BUILD-E-ZIP.md`](./BUILD-E-ZIP.md) para instruções completas.
+Em seguida **`npm run deploy:at-manut -- --yes`** a partir de `navel-site` (ver acima).  
+**Alternativa manual:** `npm run build:zip` e extrair `dist_upload.zip` em `public_html/manut/` — ver [`BUILD-E-ZIP.md`](./BUILD-E-ZIP.md).
 
 ### Variáveis de ambiente
-- Garantir que `VITE_API_BASE_URL` aponta para a API no cPanel (ex.: `https://navel.pt/api`)
+- **`VITE_API_BASE_URL`:** em produção costuma ficar vazio; só preencher se a API estiver noutro host (ver `.env.example`).
+- **`VITE_ATM_REPORT_AUTH_TOKEN`:** obrigatório no **momento do `npm run build`** — deve ser **o mesmo** valor que `ATM_REPORT_AUTH_TOKEN` no servidor (`send-email.php`, `send-report.php`, `log-receiver.php`). **Fluxo simples:** em `AT_Manut` corre `npm run gen:report-auth` (preenche `.env.local` + `atm_report_auth.secret.php`, fora do Git); envia o `.secret.php` para `public_html/api/`. Ver **[`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](MEMORIA-SEGREDO-EMAIL-E-LOGS.md)**.
+- **cPanel / PHP:** `ATM_REPORT_AUTH_TOKEN` nas Environment Variables, em `config.deploy-secrets.php`, **ou** em `atm_report_auth.secret.php` (bloqueado por `.htaccess`).
 
 ---
 
 ## Fluxo completo de deployment (resumo)
 
 ```powershell
-# 1. Verificar lints nos ficheiros editados
+# 1. Lints / testes conforme alteração
 # 2. Incrementar APP_VERSION em src/config/version.js
-# 3. Build e zip (no terminal Windows)
-npm run build:zip   # ou: npm run build && npm run zip
-# 4. Actualizar CHANGELOG.md
-# 5. Commit + tag + push
-git add -A
-git commit -m "v{versão} - resumo"
-git tag -a v{versão} -m "Release v{versão}"
-git push origin master
-git push origin v{versão}
-# 6. Upload dist_upload.zip → cPanel → public_html/manut/ (extrair)
-# 7. Upload servidor-cpanel/send-email.php → cPanel → public_html/api/
+# 3. Build PWA
+cd c:\Cursor_Projetos\NAVEL\AT_Manut
+npm run build
+# 4. Deploy PWA (SFTP)
+cd ..\navel-site
+npm run deploy:at-manut -- --yes
+# 5. Se mudou PHP da API: cpanel-deploy.mjs --file=... --remote=.../api --yes
+# 6. CHANGELOG.md, commit, tag, push (se aplicável)
 ```
 
 ---
@@ -148,7 +182,7 @@ git push origin v{versão}
 3. **Relatórios** — Abrir um relatório existente; checklist e fotos exibem correctamente
 4. **Reparações** — Criar reparação pendente, executar, guardar progresso, concluir
 5. **Email** — Testar envio de email após conclusão de manutenção/reparação
-6. **CORS** — Se a app está noutro domínio, verificar headers CORS em `api/index.php`
+6. **CORS** — A API é **`api/data.php`** (POST JSON); origens permitidas estão em `data.php` / `config.php` conforme deploy actual.
 
 ---
 
@@ -181,12 +215,10 @@ git push origin v{versão}
 
 ---
 
-## Resumo de consistência
+## Resumo de consistência (após `seed_mock_data.sql`)
 
-- **clientes**: 10 registos, `id` = `nif`
-- **maquinas**: 23 registos, `cliente_id` e `cliente_nif` alinhados
-- **manutencoes**: 28 registos, `maquina_id` válidos
-- **relatorios**: 13 registos, `manutencao_id` únicos, `checklist_respostas` e `fotos` em JSON
-- **checklist_items**: Todas as subcategorias com itens; sub2/sub4/sub12 com 20 itens
-- **reparacoes**: `maquina_id` válidos, `status` ∈ {pendente, em_progresso, concluida}, `origem` ∈ {manual, istobal}
-- **relatorios_reparacao**: `reparacao_id` únicos, `pecas_usadas` e `fotos` em JSON, `numero_relatorio` no formato `AAAA.RP.NNNNN`
+Contagens típicas de **ambiente de demonstração** — não assumir em produção real.
+
+- **clientes** ~10 (`id` = `nif`), **maquinas** ~23, **manutencoes** ~28, **relatorios** ~13
+- **checklist_items** cobre subcategorias; sub2/sub4/sub12 com checklists alargadas
+- **reparacoes** / **relatorios_reparacao**: FK válidas; `numero_relatorio` reparação formato `AAAA.RP.NNNNN`

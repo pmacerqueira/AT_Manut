@@ -86,6 +86,29 @@ export default function Equipamentos() {
     }, { replace: true })
   }, [maquinas]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Área reservada (portal documentos) → abrir subcategoria correcta
+  useEffect(() => {
+    const subId = searchParams.get('focusSubcategoria')
+    if (!subId) return
+    const sub = getSubcategoria(subId)
+    if (!sub) return
+    const cat = categorias.find((c) => c.id === sub.categoriaId)
+    if (!cat) return
+    setSelectedCategoria(cat)
+    setSelectedSubcategoria(sub)
+    setView('maquinas')
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('focusSubcategoria')
+      return next
+    }, { replace: true })
+    const anchorId = `equip-focus-${sub.id}`
+    setTimeout(() => {
+      const el = document.getElementById(anchorId)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 200)
+  }, [maquinas]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Highlight via state (pesquisa global)
   useEffect(() => {
     const hId = location.state?.highlightId
@@ -301,7 +324,7 @@ export default function Equipamentos() {
 
       {view === 'maquinas' && selectedSubcategoria && selectedCategoria && (
         <>
-          <div className="equipamentos-nav">
+          <div className="equipamentos-nav" id={`equip-focus-${selectedSubcategoria.id}`}>
             <button type="button" className="breadcrumb-btn" onClick={handleBackCategorias}>
               <ArrowLeft size={16} /> Equipamentos
             </button>

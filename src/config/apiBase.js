@@ -45,3 +45,19 @@ export function atmLogReceiverUrl() {
   }
   return `${ATM_API_CANONICAL_ORIGIN}/api/log-receiver.php`
 }
+
+/** Upload multipart para biblioteca NAVEL (navel-documentos-upload.php). */
+export function atmNavelDocUploadUrl() {
+  if (import.meta.env.DEV) {
+    return '/api/navel-documentos-upload.php'
+  }
+  return `${ATM_API_CANONICAL_ORIGIN}/api/navel-documentos-upload.php`
+}
+
+/** Download stream via proxy (navel-documentos-download.php). */
+export function atmNavelDocDownloadUrl() {
+  if (import.meta.env.DEV) {
+    return '/api/navel-documentos-download.php'
+  }
+  return `${ATM_API_CANONICAL_ORIGIN}/api/navel-documentos-download.php`
+}

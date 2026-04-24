@@ -17,6 +17,9 @@ dist_upload.zip
 .env
 .env.local
 .env.*.local
+servidor-cpanel/api/config.local.php
+servidor-cpanel/api/config.deploy-secrets.php
+servidor-cpanel/api/atm_report_auth.secret.php
 
 # Editor directories and files
 .vscode/*

@@ -122,10 +122,10 @@ Deverás ver output como:
 ### Teste via URL (com token)
 
 ```
-https://www.navel.pt/api/cron-alertas.php?token=Navel2026$Api!Key#xZ99
+https://www.navel.pt/api/cron-alertas.php?token=SEU_ATM_REPORT_AUTH_TOKEN
 ```
 
-> O token deve ser igual ao definido em `config.php` como `ATM_REPORT_AUTH_TOKEN`
+> O valor do query param deve ser o **mesmo** que `ATM_REPORT_AUTH_TOKEN` no servidor (nunca commitar o token real neste URL nos docs ou no Git).
 
 ---
 

@@ -1,94 +1,38 @@
-# Build e Zip para Deploy cPanel — AT_Manut
+# Build e ZIP — AT_Manut (alternativa manual)
 
-> Instruções para gerar `dist_upload.zip` para upload em `public_html/manut/`.
+O fluxo **recomendado** em produção é **SFTP incremental**: `npm run build` em AT_Manut e `npm run deploy:at-manut -- --yes` em `navel-site` — ver **[`DEPLOY_CHECKLIST.md`](./DEPLOY_CHECKLIST.md)**.
 
----
-
-## Utilização futura
-
-**Quando for necessário novo build e zip**, executar sempre no **terminal do Windows** (nunca dentro do Cursor) para evitar crash do editor. O assistente AI deve usar estes comandos automaticamente quando o utilizador pedir "build", "zip" ou "preparar deploy".
+Este ficheiro cobre apenas a geração de **`dist_upload.zip`** quando preferires **File Manager** (upload + extrair) em vez do script de deploy.
 
 ---
 
-## Por que executar no terminal (fora do Cursor)?
-
-O build do Vite (3800+ módulos) consome bastante memória. Executar no **terminal do Windows** em vez de dentro do Cursor reduz o risco de crash do editor durante o processo.
-
----
-
-## Opção 1: Um único comando (recomendado)
+## Comandos
 
 ```powershell
 cd c:\Cursor_Projetos\NAVEL\AT_Manut
 npm run build:zip
 ```
 
-Executa `npm run build` (inclui optimize-images) e depois cria `dist_upload.zip`.
+Equivale a `npm run build` (inclui `prebuild` / optimize-images) + `npm run zip`.
 
-**Além do zip:**
-
-- Se alterou **email ou PDF no servidor**, fazer upload separado de `servidor-cpanel/send-email.php` (ver `docs/FOTOS-PDF-EMAIL-LIMITES.md`).
-- Se alterou **API CRUD ou upload de PDFs técnicos** (`machine_pdf`, `replacePath`, `maquinas`), fazer upload de `servidor-cpanel/api/data.php` (e restantes PHP da pasta `api/` se aplicável) para `public_html/api/`. Ver `docs/DEPLOY_CHECKLIST.md`.
+Ou em dois passos: `npm run build` → `npm run zip`.
 
 ---
 
-## Opção 2: Script PowerShell
+## Por que terminal externo?
 
-```powershell
-cd c:\Cursor_Projetos\NAVEL\AT_Manut
-.\scripts\build-and-zip.ps1
-```
-
-O script mostra mensagens de progresso e confirma quando o zip está pronto.
+Builds grandes podem consumir muita RAM; em alguns ambientes o editor fica instável. Preferir **PowerShell** ou **Windows Terminal** para `build:zip`.
 
 ---
 
-## Opção 3: Comandos separados
+## Extrair no cPanel
 
-```powershell
-cd c:\Cursor_Projetos\NAVEL\AT_Manut
-npm run build
-npm run zip
-```
-
-Útil quando já tens o build feito e só precisas de gerar o zip novamente.
+1. File Manager → `public_html/manut/`
+2. Upload `dist_upload.zip`
+3. Extrair (substituir ficheiros). O zip tem `index.html` e `assets/` na **raiz** do arquivo — não deve ficar uma pasta extra `dist/`.
 
 ---
 
-## Comandos PowerShell directos
+## Após alterações no servidor PHP
 
-```powershell
-cd c:\Cursor_Projetos\NAVEL\AT_Manut
-npm run build
-npm run zip
-```
-
-> **Nota:** `npm run zip` executa `scripts/make-deploy-zip.mjs` (pacote `archiver`): o zip contém **`index.html`**, **`assets/`**, etc. na **raíz** — ao extrair em `public_html/manut/`, os ficheiros ficam no sítio certo **sem** uma pasta extra (ex.: não fica `dist/index.html`).
-
----
-
-## Após gerar o zip
-
-1. Abrir cPanel → File Manager
-2. Navegar para `public_html/manut/`
-3. Fazer upload de `dist_upload.zip`
-4. Extrair o conteúdo (substituir ficheiros existentes)
-
----
-
-## Scripts disponíveis (package.json)
-
-| Script | Descrição |
-|--------|-----------|
-| `npm run build` | Build de produção (prebuild executa optimize-images) |
-| `npm run zip` | Cria `dist_upload.zip` a partir de `dist/` |
-| `npm run build:zip` | Build + zip numa única execução |
-
----
-
-## Antes de cada deploy
-
-1. **Incrementar versão** em `src/config/version.js` (ex.: `1.10.0` → `1.10.1`)
-2. **Actualizar** `CHANGELOG.md` com as alterações
-3. Executar `npm run build:zip`
-4. Fazer upload do zip para o cPanel
+Se mudou **email ou PDF** no backend, fazer upload separado dos PHP indicados em [`DEPLOY_CHECKLIST.md`](./DEPLOY_CHECKLIST.md) e [`../servidor-cpanel/INSTRUCOES_CPANEL.md`](../servidor-cpanel/INSTRUCOES_CPANEL.md).

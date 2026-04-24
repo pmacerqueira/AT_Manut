@@ -2,7 +2,9 @@
 
 Aplicação web PWA para gestão de manutenções preventivas e reparações de equipamentos comercializados pela **José Gonçalves Cerqueira (NAVEL-AÇORES), Lda.**
 
-**Versão actual:** `v1.16.30` · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+**Versão actual:** ver `src/config/version.js` (`APP_VERSION`) · **Repositório:** [github.com/pmacerqueira/AT_Manut](https://github.com/pmacerqueira/AT_Manut)
+
+**Produção (www.navel.pt):** a PWA publica-se em `public_html/manut/`; a API PHP em `public_html/api/` — **mesma conta cPanel** que o site institucional (`navel-site`). Ver [`docs/DEPLOY_CHECKLIST.md`](docs/DEPLOY_CHECKLIST.md) § *Mesmo cPanel que o site institucional*.
 
 ---
 
@@ -35,6 +37,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | **CSS responsivo centralizado** | 15 variáveis de layout em :root — ajuste único para todos os ecrãs | ✅ |
 | **Definições** | Backup/restauro, config alertas, modo campo, indicador de armazenamento | ✅ |
 | **Logs** | Registo de sistema (acções, erros, eventos de autenticação) | ✅ |
+| **Biblioteca NAVEL** | Documentos da área reservada (navel.pt) por equipamento; proxy `documentosBiblioteca` na API | ✅ |
 | **PWA** | Instalável no ecrã inicial, offline-first com cache + sync queue | ✅ |
 
 ---
@@ -104,38 +107,29 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 
 ## Deployment
 
+**Produção (www.navel.pt, mesmo cPanel que `navel-site`):** credenciais SFTP em `navel-site/.env.cpanel`.
+
 ```powershell
-# 1. Build e zip (executar no terminal Windows — evita crash do Cursor)
 cd c:\Cursor_Projetos\NAVEL\AT_Manut
-npm run build:zip
-
-# Ou comandos separados:
-# npm run build
-# npm run zip
-
-# 2. Push para GitHub
-git add -A
-git commit -m "v{versão} - resumo"
-git tag -a v{versão} -m "Release v{versão}"
-git push origin master
-git push origin v{versão}
-
-# 3. Upload manual dist_upload.zip para cPanel → public_html/manut/
-# 4. Upload PHP actualizado: public_html/api/data.php (e send-email.php se mudou)
+npm run build
+cd ..\navel-site
+npm run deploy:at-manut -- --yes
 ```
 
-Ver [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md) para instruções detalhadas de build e zip.  
-Ver [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md) para lista completa de verificação.
+Ficheiros PHP da API: `navel-site` → `node scripts/cpanel-deploy.mjs --file="…/AT_Manut/servidor-cpanel/api/data.php" --remote="<CPANEL_REMOTE_ROOT>/api" --yes` — ver [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md).
+
+**Alternativa:** `npm run build:zip` e extrair `dist_upload.zip` no File Manager — [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md).
 
 ---
 
 ## Documentação
 
 ### Fonte canónica (ordem de prioridade)
-1. `DOCUMENTACAO.md`
-2. `DESENVOLVIMENTO.md`
-3. `CHANGELOG.md`
-4. `docs/MANUT-APP-INSIGHTS.md`
+1. [`docs/INDEX.md`](docs/INDEX.md) — índice de toda a documentação
+2. `DOCUMENTACAO.md`
+3. `DESENVOLVIMENTO.md`
+4. `CHANGELOG.md`
+5. `docs/MANUT-APP-INSIGHTS.md`
 
 ### Núcleo canónico
 - [`DOCUMENTACAO.md`](./DOCUMENTACAO.md) — arquitetura, modelo de dados e fluxos técnicos.

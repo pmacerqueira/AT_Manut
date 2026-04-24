@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Versão:** 1.14.0 · **Última actualização:** 2026-03-17
+**Última revisão:** 2026-04-22 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -98,6 +98,7 @@ Próximo passo:
 | **Reparações — API** | `DataContext.jsx` → `addReparacao`, `updateReparacao`, `removeReparacao` |
 | **Reparações — relatório mensal ISTOBAL** | `Reparacoes.jsx` → `RelatorioMensalISTOBAL`, `RelatorioReparacaoView` |
 | **Gestão de técnicos** | `Definicoes.jsx`, `DataContext.jsx` → `addTecnico`, `updateTecnico`, `removeTecnico` |
+| **Biblioteca NAVEL (equipamento)** | `MaquinaBibliotecaNavel.jsx`, `apiService.js` (`documentosBiblioteca`), `servidor-cpanel/api/data.php`, `navel-doc-lib.php` |
 | **Assinatura em 2 passos** | `RecolherAssinaturaModal.jsx`, `Manutencoes.jsx` |
 | **Declaração de aceitação** | `RecolherAssinaturaModal.jsx`, `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx` |
 | **Dashboard — card Próximas** | `Dashboard.jsx` (próximos 6 meses via `useMemo`) |
@@ -179,6 +180,8 @@ git push origin v{versão}
 # 7. Upload dist_upload.zip para cPanel → public_html/manut/
 # 8. Upload PHP em public_html/api/ quando necessário: data.php (CRUD, machine_pdf), send-email.php, etc.
 ```
+
+**Segredos de email / relatório / logs:** no `.env` local e no build de produção, definir **`VITE_ATM_REPORT_AUTH_TOKEN`** igual a **`ATM_REPORT_AUTH_TOKEN`** no servidor (ver `.env.example` e `docs/DEPLOY_CHECKLIST.md`). Sem isto, a UI trata o envio de email como não configurado e o `log-receiver` não autentica.
 
 ---
 

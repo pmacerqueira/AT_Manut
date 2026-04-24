@@ -316,8 +316,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
       logger.action('ExecutarReparacaoModal', 'guardarProgresso',
         `Progresso guardado para reparação ${reparacao.id}`)
-      showToast('Progresso guardado — pode continuar mais tarde', 'success')
-      onClose()
+      showToast('Dados gravados com sucesso.', 'success', 5000)
     } catch (err) {
       showToast('Erro ao guardar progresso: ' + err.message, 'error')
       logger.error('ExecutarReparacaoModal', 'guardarProgresso', err.message)
@@ -467,7 +466,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
       setRelatorioGerado(relFinal)
       setConcluido(true)
-      showToast(`Reparação concluída — ${numeroRelatorio}`, 'success')
+      showToast(`Dados gravados com sucesso. Relatório ${numeroRelatorio}.`, 'success', 6000)
 
       // Envio automático (não bloqueia o UI — corre em background)
       if (isEmailConfigured()) {

@@ -19,8 +19,9 @@
 .relatorio-section-spaced { margin-bottom: 1rem; }
 .dashboard-calendar-link { margin-top: 0.75rem; display: inline-block; }
 @media (max-width: 1024px) {
-  .dashboard-header-spacer {
-    width: 58px;
+  /* Evita order global (.page-header > div { order: 1 }) colocar o espaçador entre o h1 e o botão */
+  .dashboard-page-header .dashboard-header-spacer {
+    display: none;
   }
 }
 

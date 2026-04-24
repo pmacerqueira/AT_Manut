@@ -9,6 +9,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { logger, flushLogsToServer } from '../utils/logger'
 import { ROLES } from '../config/users'
 import { STORAGE } from '../config/storageKeys'
+import { TECNICO_HORARIO_EXPEDIENTE_TOAST } from '../config/tecnicoHorarioRestrito'
 
 const AuthContext = createContext(null)
 
@@ -65,6 +66,8 @@ export function AuthProvider({ children }) {
   const [session,   setSession]   = useState(null)
   const [hydrated,  setHydrated]  = useState(false)
   const [loginError, setLoginError] = useState(null)
+  /** Código do último falhanço de login (ex.: TECNICO_HORARIO_RESTRITO) para o ecrã de login mostrar toast. */
+  const [loginErrorCode, setLoginErrorCode] = useState(null)
   const horarioBlockRef = useRef(false)
 
   // Restaurar sessão a partir do JWT existente (sem chamada de rede)
@@ -94,6 +97,7 @@ export function AuthProvider({ children }) {
           JSON.stringify({
             code: 'TECNICO_HORARIO_RESTRITO',
             message: e.detail?.message || 'Horário de acesso restrito.',
+            toastHint: TECNICO_HORARIO_EXPEDIENTE_TOAST,
           }),
         )
       } catch { /* */ }
@@ -102,6 +106,7 @@ export function AuthProvider({ children }) {
       clearToken()
       setSession(null)
       setLoginError(null)
+      setLoginErrorCode(null)
       try {
         sessionStorage.clear()
       } catch { /* */ }
@@ -114,6 +119,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     setLoginError(null)
+    setLoginErrorCode(null)
     horarioBlockRef.current = false
     // ── DEV BYPASS ──
     if (DEV_BYPASS) {
@@ -157,6 +163,7 @@ export function AuthProvider({ children }) {
       return true
     } catch (err) {
       if (err.code === 'TECNICO_HORARIO_RESTRITO') {
+        setLoginErrorCode('TECNICO_HORARIO_RESTRITO')
         setLoginError(err.message || 'Acesso não permitido neste horário.')
         logger.warn('AuthContext', 'login', `Login bloqueado (horário): ${username}`, { status: err.status })
         return false
@@ -181,6 +188,7 @@ export function AuthProvider({ children }) {
     try { localStorage.setItem('atm_after_logout', '1') } catch { /* */ }
     setSession(null)
     setLoginError(null)
+    setLoginErrorCode(null)
     try {
       sessionStorage.clear()
       if ('caches' in window) {
@@ -196,6 +204,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!session?.user,
     hydrated,
     loginError,
+    loginErrorCode,
     login,
     logout,
   }

@@ -1,0 +1,17 @@
+<?php
+/**
+ * Desenvolvimento local apenas — renomear para config.local.php (não commitar).
+ * O ficheiro real está no .gitignore.
+ *
+ * Exemplo: descomentar e preencher, ou usar putenv a partir de valores do teu .env local.
+ */
+// putenv('ATM_DB_HOST=localhost');
+// putenv('ATM_DB_NAME=navel_atmanut');
+// putenv('ATM_DB_USER=...');
+// putenv('ATM_DB_PASS=...');
+// putenv('ATM_JWT_SECRET=gerar-32-bytes-aleatorios-em-hex-ou-base64');
+// putenv('ATM_TAXONOMY_TOKEN=...');
+// putenv('ATM_REPORT_AUTH_TOKEN=...'); // send-email, send-report, log-receiver, cron HTTP
+// putenv('ATM_WEBHOOK_TOKEN='); // opcional
+// Nunca usar em produção:
+// putenv('ATM_SKIP_CONFIG_VALIDATION=1');

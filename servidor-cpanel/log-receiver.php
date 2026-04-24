@@ -61,7 +61,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // ── Autenticação ─────────────────────────────────────────────────────────────
-define('AUTH_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
+$__atm_ra = __DIR__ . '/atm_report_auth.php';
+if (!is_file($__atm_ra)) {
+    $__atm_ra = __DIR__ . '/api/atm_report_auth.php';
+}
+require_once $__atm_ra;
+$__reportTok = atm_report_auth_token();
+if ($__reportTok === '') {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'code' => 'misconfigured', 'message' => 'ATM_REPORT_AUTH_TOKEN em falta no servidor.']);
+    exit;
+}
+define('AUTH_TOKEN', $__reportTok);
 
 // Token em base64 (sem $ # ! → WAF não filtra); fallback para texto plano
 function b64safe_log($str) {

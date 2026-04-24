@@ -31,8 +31,13 @@ define('DIAS_AVISO', getenv('ATM_DIAS_AVISO') ?: 7);
 // Evita que o cron envie email todos os dias enquanto a manutenção está pendente
 define('DIAS_ENTRE_LEMBRETES', 6);
 
-// Token de segurança para chamadas HTTP (deve ser o mesmo que ATM_REPORT_AUTH_TOKEN)
-define('CRON_TOKEN', getenv('ATM_REPORT_AUTH_TOKEN') ?: 'Navel2026$Api!Key#xZ99');
+$__atm_ra = __DIR__ . '/atm_report_auth.php';
+if (!is_file($__atm_ra)) {
+    $__atm_ra = __DIR__ . '/api/atm_report_auth.php';
+}
+require_once $__atm_ra;
+// Token para chamadas HTTP ao cron (CLI não usa query string)
+define('CRON_TOKEN', atm_report_auth_token());
 
 // Emails da Navel
 define('FROM_EMAIL',   'no-reply@navel.pt');
@@ -47,7 +52,12 @@ define('APP_VERSION_CRON', '1.6.2');
 $isCli = (php_sapi_name() === 'cli');
 
 if (!$isCli) {
-    // Quando chamado via HTTP, exigir token na query string
+    if (CRON_TOKEN === '') {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'code' => 'misconfigured', 'message' => 'ATM_REPORT_AUTH_TOKEN em falta — necessário para cron via HTTP.']);
+        exit;
+    }
     $token_recebido = $_GET['token'] ?? '';
     if (!hash_equals(CRON_TOKEN, $token_recebido)) {
         http_response_code(403);

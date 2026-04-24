@@ -14,7 +14,7 @@
 import { logger } from '../utils/logger'
 import { SESSION } from '../config/storageKeys'
 import { API_TIMEOUT_MS, API_TIMEOUT_BULK_MS } from '../config/limits'
-import { atmDataPhpUrl } from '../config/apiBase'
+import { atmDataPhpUrl, atmNavelDocDownloadUrl, atmNavelDocUploadUrl } from '../config/apiBase'
 
 const API_URL = atmDataPhpUrl()
 const TOKEN_KEY = SESSION.API_TOKEN
@@ -240,6 +240,110 @@ export async function apiUploadMachinePdf({ dataUrl, maquinaId, replacePath = nu
 /** Logs do servidor (apenas Admin) — agrega logs de todos os utilizadores e dispositivos */
 export async function apiLogsList(days = 30) {
   return call('logs', 'list', { days })
+}
+
+// ── Biblioteca NAVEL (documentos-api.php via proxy em data.php + scripts dedicados) ──
+
+export async function apiDocumentosBibliotecaSearch(payload) {
+  return call('documentosBiblioteca', 'search', { data: payload && typeof payload === 'object' ? payload : {} })
+}
+
+export async function apiDocumentosBibliotecaMachineLinksGet(path) {
+  return call('documentosBiblioteca', 'machine_links_get', { data: { path } })
+}
+
+export async function apiDocumentosBibliotecaMachineLinksSet(payload) {
+  return call('documentosBiblioteca', 'machine_links_set', { data: payload && typeof payload === 'object' ? payload : {} })
+}
+
+export async function apiDocumentosBibliotecaUploadFolderForMaquina(maquinaId) {
+  return call('documentosBiblioteca', 'upload_folder_for_maquina', {
+    data: { maquinaId: String(maquinaId) },
+  })
+}
+
+/**
+ * Upload de ficheiro para a pasta AT já resolvida no servidor.
+ * @param {object} opts
+ * @param {string} opts.path — ex.: Assistencia Tecnica/Cat/Sub
+ * @param {File} opts.file
+ * @param {string} [opts.documentType] — MANUAL_UTILIZADOR | MANUAL_TECNICO | PLANO_MANUTENCAO | OUTROS
+ * @param {string} [opts.taxonomyNodeId]
+ * @param {string} [opts.versionLabel]
+ * @param {string} [opts.notes]
+ * @param {string} [opts.maquinaId] — obrigatório: o servidor confirma que path = pasta AT deste equipamento
+ * @param {string[]} [opts.linkMachineIds] — ids de equipamentos AT a associar
+ */
+export async function apiDocumentosBibliotecaUploadMultipart(opts) {
+  const fd = new FormData()
+  fd.append('_t', getToken())
+  fd.append('path', opts.path || '')
+  fd.append('maquinaId', String(opts.maquinaId || ''))
+  fd.append('file', opts.file)
+  if (opts.documentType) fd.append('documentType', opts.documentType)
+  if (opts.taxonomyNodeId) fd.append('taxonomyNodeId', String(opts.taxonomyNodeId))
+  if (opts.versionLabel) fd.append('versionLabel', opts.versionLabel)
+  if (opts.notes) fd.append('notes', opts.notes)
+  if (opts.linkMachineIds && opts.linkMachineIds.length) {
+    fd.append('linkMachineIds', JSON.stringify(opts.linkMachineIds.map(String)))
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS * 5)
+
+  let resp
+  try {
+    resp = await fetch(atmNavelDocUploadUrl(), {
+      method: 'POST',
+      body: fd,
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+
+  const json = await resp.json().catch(() => ({}))
+  if (!resp.ok) {
+    const err = new Error(json.message || json.error || `HTTP ${resp.status}`)
+    err.status = resp.status
+    throw err
+  }
+  if (json.ok === false) {
+    const err = new Error(json.message || json.error || 'Upload biblioteca falhou')
+    err.status = resp.status
+    throw err
+  }
+  return json
+}
+
+/**
+ * Download via proxy (JWT no JSON). Devolve Blob.
+ */
+export async function apiDocumentosBibliotecaDownloadBlob(path, inline = true) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS * 3)
+  let resp
+  try {
+    resp = await fetch(atmNavelDocDownloadUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        _t: getToken(),
+        path,
+        inline,
+      }),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '')
+    const err = new Error(errText || `Download falhou (${resp.status})`)
+    err.status = resp.status
+    throw err
+  }
+  return resp.blob()
 }
 
 // ── Utilitário: fetch paralelo de todos os recursos ───────────────────────────

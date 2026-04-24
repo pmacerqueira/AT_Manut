@@ -63,6 +63,15 @@ npm run build:zip
 
 Ou comandos separados: `npm run build` seguido de `npm run zip`. Ver `docs/BUILD-E-ZIP.md`.
 
+### Deploy para cPanel (produção) — SFTP/FTPS via `navel-site`
+
+Credenciais: **`navel-site/.env.cpanel`** (nunca no Git). O upload incremental usa o mesmo `scripts/cpanel-deploy.mjs` do site.
+
+1. **PWA** (`public_html/manut/`): após `npm run build` neste repo, na pasta **`c:\Cursor_Projetos\NAVEL\navel-site`**: `npm run deploy:at-manut -- --yes` (ou `--dry` primeiro).
+2. **PHP / JSON da API** (`public_html/api/`): a partir de `navel-site`, `node scripts/cpanel-deploy.mjs --file="…\AT_Manut\servidor-cpanel\api\<ficheiro>" --remote="<CPANEL_REMOTE_ROOT>/api" --yes` — ver `docs/DEPLOY_CHECKLIST.md`.
+
+Se não quiseres CLI, o ZIP (`build:zip`) + File Manager continua válido como alternativa.
+
 ---
 
 ## Fluxo obrigatório: "optimizar e preparar build"

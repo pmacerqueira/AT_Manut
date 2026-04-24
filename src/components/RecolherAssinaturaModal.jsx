@@ -133,8 +133,7 @@ export default function RecolherAssinaturaModal({ isOpen, onClose, manutencao, m
         )
       }
 
-      showToast('Assinatura recolhida com sucesso!', 'success')
-      onClose()
+      showToast('Dados gravados com sucesso.', 'success', 5000)
     } catch (err) {
       logger.error('RecolherAssinaturaModal', 'assinar',
         `Erro ao gravar assinatura: ${err.message}`,

@@ -19,6 +19,7 @@ import { pt } from 'date-fns/locale'
 import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/documentacaoEquipamentoCopy'
 import { buildPecasPlanoItemsFromPdfArrayBuffer, contagemPorTipoKaeser } from '../utils/kaeserPlanoPdfImport'
+import MaquinaBibliotecaNavel from './MaquinaBibliotecaNavel'
 
 const PDF_MAX_BYTES = 8 * 1024 * 1024
 
@@ -230,6 +231,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
         {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq?.subcategoriaId) && (
           <p className="modal-hint" style={{ marginTop: '0.5rem' }}>{COPY_DOC_PARAFUSO_KAESER}</p>
         )}
+        {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} /> : null}
         {mostrarPlanoKaeserNaDoc && (
           <div className="consumiveis-card doc-plano-kaeser-card">
             <h4>Plano de peças KAESER (A / B / C / D)</h4>

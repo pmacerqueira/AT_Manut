@@ -294,9 +294,8 @@ export default function Reparacoes() {
     }
     if (isAdmin && formEditar.status) payload.status = formEditar.status
     updateReparacao(modalEditar.id, payload)
-    showToast('Reparação actualizada', 'success')
+    showToast('Dados gravados com sucesso.', 'success', 5000)
     logger.action('Reparacoes', 'editarReparacao', `Reparação ${modalEditar.id} actualizada`, { id: modalEditar.id })
-    setModalEditar(null)
   }
 
   const maquinasFiltradasEditar = useMemo(() => {

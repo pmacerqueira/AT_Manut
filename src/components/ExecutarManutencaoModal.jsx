@@ -25,7 +25,7 @@ import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
 import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown, Plus, HelpCircle } from 'lucide-react'
-import { usePermissions } from '../hooks/usePermissions'
+import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
@@ -238,6 +238,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
+  /** Admin: `adminEdit`. ATecnica: relatório ainda não enviado ao cliente — podem corrigir agendamento e data de execução. */
+  const showStatusDatasSection = adminEdit || (!!rel && !isRelatorioEnviadoAoCliente(rel) && !isAdmin)
   const temContadorHoras = maq && SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq.subcategoriaId)
   const isKaeserAbcdMaq = maq ? isKaeserAbcdMaquina(maq) : false
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual && manutencaoAtual.tipo !== 'montagem')
@@ -974,6 +976,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroAssinatura('')
     if (!manutencaoAtual || !maq) return
 
+    if (!isAdmin && rel && isRelatorioEnviadoAoCliente(rel)) {
+      showToast('O relatório já foi enviado ao cliente. Só um administrador pode alterar.', 'warning')
+      return
+    }
+
+    const agFormGravar = (form.adminDataAgendada || '').trim()
+    const exFormGravar = (form.adminDataExecucao || '').trim()
+    if (rel && !isRelatorioEnviadoAoCliente(rel) && (!agFormGravar || !exFormGravar)) {
+      showToast('Indique a data de agendamento e a data de execução do relatório.', 'warning')
+      return
+    }
+
     if (!adminEdit) {
       if (!confirmaEquipamentoSerie) {
         showToast('Confirme o equipamento (número de série) antes de gravar.', 'warning')
@@ -1025,11 +1039,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const canvas = canvasRef.current
     const assinaturaDataUrl = (!semAssinatura && canvas) ? canvas.toDataURL('image/png') : null
 
-    const usarDataHistorica = form.dataRealizacao && (isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores()))
-    const hoje = usarDataHistorica ? form.dataRealizacao : getHojeAzores()
-    const now  = usarDataHistorica
-      ? `${form.dataRealizacao}T12:00:00.000Z`
-      : nowISO()
+    const podeUsarDatasFormularioRel = !!(rel && !isRelatorioEnviadoAoCliente(rel) && agFormGravar && exFormGravar)
+
+    let hoje
+    let now
+    if (podeUsarDatasFormularioRel) {
+      hoje = exFormGravar
+      now = `${exFormGravar}T12:00:00.000Z`
+    } else {
+      const usarDataHistorica = form.dataRealizacao && (isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores()))
+      hoje = usarDataHistorica ? form.dataRealizacao : getHojeAzores()
+      now = usarDataHistorica
+        ? `${form.dataRealizacao}T12:00:00.000Z`
+        : nowISO()
+    }
 
     const dias = getIntervaloDiasByMaquina(maq)
     const proxima = addDays(new Date(hoje), dias)
@@ -1064,6 +1087,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         sug && form.tipoManutKaeser !== sug ? 'manual' : (aud.motivo || 'fallback')
     }
 
+    if (podeUsarDatasFormularioRel && rel) {
+      const execAnterior = (rel.dataAssinatura || rel.dataCriacao || '').slice(0, 10) || ''
+      const execIso = `${exFormGravar}T12:00:00.000Z`
+      if (exFormGravar !== execAnterior) {
+        relPayload.dataCriacao = execIso
+        if (rel.assinadoPeloCliente && !semAssinatura) {
+          relPayload.dataAssinatura = execIso
+        } else if (!rel.assinadoPeloCliente) {
+          relPayload.dataAssinatura = semAssinatura ? null : now
+        }
+      }
+    }
+
     // Gravar/actualizar o relatório e obter o numeroRelatorio definitivo.
     // addRelatorio devolve { id, numeroRelatorio } — tem de ser capturado aqui
     // para ser passado ao logger e ao serviço de email (evita "undefined"/"S/N").
@@ -1096,7 +1132,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     const manutPatch = {
       status: 'concluida',
-      data: hoje,
+      data: podeUsarDatasFormularioRel ? agFormGravar : hoje,
       tecnico: form.tecnico,
     }
     if (temContadorHoras) {
@@ -1190,7 +1226,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         // Sem conflitos: confirmar imediatamente
         const n = confirmarManutencoesPeriodicas(resultado.novas)
         setManutAgendadas(n)
-        setTimeout(onClose, 3200)
+        showToast('Dados gravados com sucesso.', 'success', 5000)
+        setConcluido(true)
       }
       return
     }
@@ -1213,23 +1250,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     if (semAssinatura) {
-      showToast('Relatório gravado sem assinatura. O cliente poderá assinar depois.', 'success')
+      showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
-      setTimeout(() => {
-        onClose()
-        navigate('/manutencoes?filter=executadas')
-      }, 2000)
       return
     }
 
     // Gravar sem enviar email — concluir processo técnico sem envio
     if (!enviarEmailAoGravar) {
-      showToast('Manutenção gravada com sucesso. O relatório poderá ser enviado posteriormente.', 'success')
+      showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
-      setTimeout(() => {
-        onClose()
-        navigate('/manutencoes?filter=executadas')
-      }, 2000)
       return
     }
 
@@ -1271,14 +1300,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
     }
 
+    showToast('Dados gravados com sucesso.', 'success', 5000)
     const relAtualizado = { ...relPayload, manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal }
     enviarEmail(relAtualizado, { ...manutencaoAtual, status: 'concluida', data: hoje, tecnico: form.tecnico })
       .finally(() => {
         setConcluido(true)
-        setTimeout(() => {
-          onClose()
-          navigate('/manutencoes?filter=executadas')
-        }, 2000)
       })
   }
 
@@ -1536,7 +1562,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               ? 'Relatório gravado. Pendente de assinatura do cliente.'
               : 'Relatório gerado e assinado com sucesso.'}
           </p>
-          <p className="modal-hint">A abrir lista de manutenções executadas…</p>
+          <p className="modal-hint">Pode fechar quando terminar.</p>
+          <button type="button" className="btn primary" style={{ marginTop: '1rem' }} onClick={onClose}>
+            Fechar
+          </button>
         </div>
       </div>
     )
@@ -1559,7 +1588,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const count = confirmarManutencoesPeriodicas(novasAjustadas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
-      setTimeout(onClose, 3200)
+      showToast('Dados gravados com sucesso.', 'success', 5000)
+      setConcluido(true)
     }
 
     const resolverAvancando = () => {
@@ -1587,14 +1617,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const count = confirmarManutencoesPeriodicas(novasAjustadas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
-      setTimeout(onClose, 3200)
+      showToast('Dados gravados com sucesso.', 'success', 5000)
+      setConcluido(true)
     }
 
     const resolverIgnorando = () => {
       const count = confirmarManutencoesPeriodicas(novas)
       setConflitosAgendamento(null)
       setManutAgendadas(count)
-      setTimeout(onClose, 3200)
+      showToast('Dados gravados com sucesso.', 'success', 5000)
+      setConcluido(true)
     }
 
     return (
@@ -1731,8 +1763,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </div>
           )}
 
-          {/* ═══ Admin: Status e data da manutenção ═══ */}
-          {adminEdit && (
+          {/* ═══ Admin: status + datas. ATecnica: só as duas datas (até enviar ao cliente). ═══ */}
+          {showStatusDatasSection && (
             <div className="wizard-step-content" style={{ display: 'block' }}>
               <h3 className="admin-edit-section-title">Status e datas</h3>
               <p className="form-hint" style={{ marginBottom: '0.75rem', maxWidth: '42rem' }}>
@@ -1741,19 +1773,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 São campos independentes.
               </p>
               <div className="admin-edit-status-row">
-                <label className="form-section">
-                  Status da manutenção
-                  <select value={form.adminStatus} onChange={e => setForm(f => ({ ...f, adminStatus: e.target.value }))}>
-                    <option value="concluida">Executada (concluída)</option>
-                    <option value="pendente">Pendente</option>
-                    <option value="agendada">Agendada</option>
-                  </select>
-                  {form.adminStatus !== 'concluida' && (
-                    <span className="form-hint" style={{ color: 'var(--color-warning)' }}>
-                      Ao mudar para pendente/agendada, o relatório existente será mantido mas a manutenção ficará por concluir.
-                    </span>
-                  )}
-                </label>
+                {adminEdit && (
+                  <label className="form-section">
+                    Status da manutenção
+                    <select value={form.adminStatus} onChange={e => setForm(f => ({ ...f, adminStatus: e.target.value }))}>
+                      <option value="concluida">Executada (concluída)</option>
+                      <option value="pendente">Pendente</option>
+                      <option value="agendada">Agendada</option>
+                    </select>
+                    {form.adminStatus !== 'concluida' && (
+                      <span className="form-hint" style={{ color: 'var(--color-warning)' }}>
+                        Ao mudar para pendente/agendada, o relatório existente será mantido mas a manutenção ficará por concluir.
+                      </span>
+                    )}
+                  </label>
+                )}
                 <label className="form-section">
                   Data de agendamento
                   <input
@@ -1773,7 +1807,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   <span className="form-hint">Data real da intervenção; actualiza PDF, email e «Execução» na lista.</span>
                 </label>
               </div>
-              {temContadorHoras && (
+              {adminEdit && temContadorHoras && (
                 <div className="form-section" style={{ marginTop: '0.75rem' }}>
                   <label>
                     Horas no contador (acumuladas)

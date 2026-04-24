@@ -9,6 +9,7 @@ import RelatorioView from '../components/RelatorioView'
 import EnviarEmailModal from '../components/EnviarEmailModal'
 import EnviarDocumentoModal from '../components/EnviarDocumentoModal'
 import MaquinaDocumentacaoLinks from '../components/MaquinaDocumentacaoLinks'
+import MaquinaBibliotecaNavel from '../components/MaquinaBibliotecaNavel'
 import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft, ExternalLink, Mail, Search, FileBarChart, Play, Calendar, QrCode, FileDown, Send, Eye, X, AlertTriangle, PackageOpen } from 'lucide-react'
 
 const ExecutarManutencaoModal = lazy(() => import('../components/ExecutarManutencaoModal'))
@@ -988,6 +989,7 @@ export default function Clientes() {
                         )}
                       </div>
                     )}
+                    <MaquinaBibliotecaNavel maquina={maquinaAtual} />
                     <h4>Documentação obrigatória</h4>
                     <div className="doc-table-wrapper">
                       <table className="data-table doc-table">

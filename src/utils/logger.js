@@ -36,6 +36,7 @@
 
 import { STORAGE, SESSION } from '../config/storageKeys'
 import { atmLogReceiverUrl } from '../config/apiBase'
+import { EMAIL_CONFIG } from '../config/emailConfig'
 
 // ── Configuração ──────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ const MAX_BYTES         = 2_000_000   // 2 MB — localStorage tem ~5-10 MB por 
 const DEDUP_MS          = 5_000       // não repete a mesma mensagem em 5 segundos
 const FLUSH_BATCH_SIZE  = 20          // envia para o servidor após N entradas acumuladas
 const LOG_ENDPOINT      = '/api/log-receiver.php'
-const LOG_AUTH_TOKEN    = 'Navel2026$Api!Key#xZ99'  // mesmo token da API de email
+const LOG_AUTH_TOKEN    = EMAIL_CONFIG.AUTH_TOKEN
 const FLUSH_PENDING_KEY = STORAGE.LOG_PENDING_FLUSH
 const APP_VERSION  = (() => {
   try { return localStorage.getItem(STORAGE.APP_VERSION) || '?' } catch { return '?' }
@@ -397,6 +398,7 @@ function clearPending() {
 
 async function _sendToServer(entries) {
   if (!entries.length) return
+  if (!LOG_AUTH_TOKEN) return
   try {
     // SEM headers customizados → sem preflight OPTIONS → sem bloqueio ModSecurity
     const toB64 = (s) => btoa(unescape(encodeURIComponent(s)))

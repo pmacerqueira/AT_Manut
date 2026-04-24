@@ -2,30 +2,67 @@
  * kpis.js — Funções de cálculo de indicadores de desempenho (KPIs) da frota.
  *
  * Todos os cálculos são feitos localmente sobre os dados do DataContext.
- * Os resultados devem ser memorizados (useMemo) para evitar recálculos desnecessários.
+ * Definições alinhadas com a lista Manutenções (data yyyy-MM-dd, fuso Açores) e
+ * com o Dashboard para os mesmos números nos dois ecrãs.
  */
 
-import { subMonths, isAfter, isBefore, parseISO, format, startOfWeek, endOfWeek, addWeeks } from 'date-fns'
+import {
+  subMonths,
+  isBefore,
+  format,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+  addMonths,
+  startOfDay,
+  endOfDay,
+} from 'date-fns'
 import { pt } from 'date-fns/locale'
+import { getHojeAzores, parseDateLocal } from './datasAzores'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const parseData = (str) => {
-  if (!str) return null
-  try { return parseISO(str) } catch { return null }
+export function isManutencaoPendenteOuAgendada(m) {
+  return m.status === 'pendente' || m.status === 'agendada'
+}
+
+export function isManutencaoConcluidaStatus(m) {
+  return m.status === 'concluida' || m.status === 'concluído'
+}
+
+/** Hoje (início do dia civil) no calendário dos Açores — igual à lista Manutenções / Dashboard. */
+export function refDiaAzores() {
+  return startOfDay(parseDateLocal(getHojeAzores()))
+}
+
+/** Intervenções agendadas/pendentes com data anterior a hoje (igual a /manutencoes?filter=atraso). */
+export function filterManutencoesEmAtraso(manutencoes, hojeStr = getHojeAzores()) {
+  return manutencoes.filter(m => isManutencaoPendenteOuAgendada(m) && m.data < hojeStr)
+}
+
+/** Hoje ou futuro (inclui o dia de hoje). */
+export function filterManutencoesProximas(manutencoes, hojeStr = getHojeAzores()) {
+  return manutencoes.filter(m => isManutencaoPendenteOuAgendada(m) && m.data >= hojeStr)
+}
+
+/** Próximas dentro de N meses a partir de hoje (hoje inclusivo, limite exclusivo por dia). */
+export function filterManutencoesProximasProximosMeses(manutencoes, meses, hojeStr = getHojeAzores()) {
+  const hoje = startOfDay(parseDateLocal(hojeStr))
+  const limite = startOfDay(addMonths(hoje, meses))
+  return manutencoes.filter(m => {
+    if (!isManutencaoPendenteOuAgendada(m)) return false
+    const d = startOfDay(parseDateLocal(m.data))
+    return !isBefore(d, hoje) && isBefore(d, limite)
+  })
 }
 
 // ─── KPIs gerais ─────────────────────────────────────────────────────────────
 
 /**
  * Resumo de contagens gerais da frota.
+ * emAtraso = mesma regra que o cartão «Em atraso» do Dashboard (registos pendentes/agendados com data &lt; hoje).
  */
 export function calcResumoCounts({ clientes, maquinas, manutencoes, relatorios }) {
-  const hoje = new Date()
-  const emAtraso   = maquinas.filter(m => {
-    const prox = parseData(m.proxima_manut ?? m.proximaManut)
-    return prox && isBefore(prox, hoje)
-  })
   const semEmail = clientes.filter(c => !c.email || c.email.trim() === '')
 
   return {
@@ -33,26 +70,25 @@ export function calcResumoCounts({ clientes, maquinas, manutencoes, relatorios }
     totalMaquinas:    maquinas.length,
     totalManutencoes: manutencoes.length,
     totalRelatorios:  relatorios.length,
-    emAtraso:         emAtraso.length,
+    emAtraso:         filterManutencoesEmAtraso(manutencoes).length,
     semEmail:         semEmail.length,
   }
 }
 
 /**
- * Taxa de cumprimento: % de manutenções concluídas nos últimos N meses, no prazo.
- * "No prazo" = status 'concluida' ou 'concluído'.
+ * Taxa de cumprimento: % de manutenções concluídas entre todas as registadas
+ * cuja data cai na janela móvel dos últimos N meses (dias civis, início inclusivo).
  */
 export function calcTaxaCumprimento({ manutencoes, meses = 12 }) {
-  const limite = subMonths(new Date(), meses)
+  const hoje = refDiaAzores()
+  const limite = startOfDay(subMonths(hoje, meses))
   const recentes = manutencoes.filter(m => {
-    const d = parseData(m.data)
-    return d && isAfter(d, limite)
+    const d = startOfDay(parseDateLocal(m.data))
+    return !isBefore(d, limite)
   })
   if (recentes.length === 0) return { percentagem: null, total: 0, concluidas: 0 }
 
-  const concluidas = recentes.filter(m =>
-    m.status === 'concluida' || m.status === 'concluído' || m.status === 'concluida'
-  )
+  const concluidas = recentes.filter(m => isManutencaoConcluidaStatus(m))
   return {
     percentagem: Math.round((concluidas.length / recentes.length) * 100),
     total:       recentes.length,
@@ -62,20 +98,20 @@ export function calcTaxaCumprimento({ manutencoes, meses = 12 }) {
 
 /**
  * Próximas manutenções agrupadas por semana (próximas 8 semanas).
- * Devolve array de { semana, label, pendentes, agendadas }.
  */
 export function calcProximasSemanas({ manutencoes, semanas = 8 }) {
-  const hoje = new Date()
+  const refDia = refDiaAzores()
   const resultado = []
 
   for (let i = 0; i < semanas; i++) {
-    const inicio = startOfWeek(addWeeks(hoje, i), { weekStartsOn: 1 })
-    const fim    = endOfWeek(addWeeks(hoje, i), { weekStartsOn: 1 })
+    const semanaRef = addWeeks(refDia, i)
+    const inicio = startOfDay(startOfWeek(semanaRef, { weekStartsOn: 1 }))
+    const fim = endOfDay(endOfWeek(semanaRef, { weekStartsOn: 1 }))
 
     const daSemana = manutencoes.filter(m => {
-      const d = parseData(m.data)
-      return d && !isBefore(d, inicio) && !isAfter(d, fim) &&
-             (m.status === 'pendente' || m.status === 'agendada')
+      if (!isManutencaoPendenteOuAgendada(m)) return false
+      const d = startOfDay(parseDateLocal(m.data))
+      return !isBefore(d, inicio) && !isBefore(fim, d)
     })
 
     resultado.push({
@@ -96,23 +132,33 @@ export function calcProximasSemanas({ manutencoes, semanas = 8 }) {
 }
 
 /**
- * Top clientes com mais manutenções em atraso.
- * Devolve array de { clienteId, nome, totalMaquinas, emAtraso }.
+ * Top clientes com mais equipamentos com pelo menos uma manutenção em atraso
+ * (mesma regra que emAtraso / lista Manutenções).
  */
-export function calcTopClientesAtraso({ clientes, maquinas }) {
-  const hoje = new Date()
+export function calcTopClientesAtraso({ clientes, maquinas, manutencoes }) {
+  const hojeStr = getHojeAzores()
+  const maquinasComAtraso = new Set()
+  for (const m of manutencoes) {
+    if (isManutencaoPendenteOuAgendada(m) && m.data < hojeStr) {
+      maquinasComAtraso.add(m.maquinaId)
+    }
+  }
 
   const porCliente = clientes.map(c => {
-    const maqsCliente = maquinas.filter(m => m.cliente_id === c.id)
-    const emAtraso    = maqsCliente.filter(m => {
-      const prox = parseData(m.proxima_manut ?? m.proximaManut)
-      return prox && isBefore(prox, hoje)
-    })
+    const nif = c.nif ?? c.id
+    const maqsCliente = maquinas.filter(
+      mq => mq.clienteNif === nif || mq.clienteId === nif || mq.cliente_id === c.id
+    )
+    const ids = new Set(maqsCliente.map(mq => mq.id))
+    let emAtraso = 0
+    for (const mid of maquinasComAtraso) {
+      if (ids.has(mid)) emAtraso++
+    }
     return {
-      clienteId:    c.id,
-      nome:         c.nome ?? '(sem nome)',
+      clienteId:     c.id,
+      nome:          c.nome ?? '(sem nome)',
       totalMaquinas: maqsCliente.length,
-      emAtraso:      emAtraso.length,
+      emAtraso,
     }
   })
 
@@ -123,26 +169,25 @@ export function calcTopClientesAtraso({ clientes, maquinas }) {
 }
 
 /**
- * Evolução mensal de manutenções concluídas (últimos N meses).
- * Para gráfico de linha ou barra histórico.
+ * Evolução mensal (últimos N meses, ancorado ao dia de hoje nos Açores).
  */
 export function calcEvolucaoMensal({ manutencoes, meses = 6 }) {
-  const hoje   = new Date()
+  const refDia = refDiaAzores()
   const resultado = []
 
   for (let i = meses - 1; i >= 0; i--) {
-    const mes    = subMonths(hoje, i)
-    const ano    = mes.getFullYear()
+    const mes = subMonths(refDia, i)
+    const ano = mes.getFullYear()
     const mesNum = mes.getMonth()
 
     const doMes = manutencoes.filter(m => {
-      const d = parseData(m.data)
-      return d && d.getFullYear() === ano && d.getMonth() === mesNum
+      const d = parseDateLocal(m.data)
+      return d.getFullYear() === ano && d.getMonth() === mesNum
     })
 
     resultado.push({
       label:      format(mes, 'MMM yy', { locale: pt }),
-      concluidas: doMes.filter(m => m.status === 'concluida' || m.status === 'concluído').length,
+      concluidas: doMes.filter(m => isManutencaoConcluidaStatus(m)).length,
       pendentes:  doMes.filter(m => m.status === 'pendente').length,
       agendadas:  doMes.filter(m => m.status === 'agendada').length,
       total:      doMes.length,
@@ -151,4 +196,3 @@ export function calcEvolucaoMensal({ manutencoes, meses = 6 }) {
 
   return resultado
 }
-

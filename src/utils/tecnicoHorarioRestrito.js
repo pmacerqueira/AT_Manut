@@ -1,8 +1,10 @@
-import { TECNICO_HORARIO_CONFIG } from '../config/tecnicoHorarioRestrito.js'
+import { TECNICO_HORARIO_CONFIG, TECNICO_HORARIO_EXPEDIENTE_TOAST } from '../config/tecnicoHorarioRestrito.js'
 
-/** Alinhado com a mensagem da API (data.php) quando a sessão cai por horário. */
+/** Alinhado com a API quando a sessão cai por horário (detalhe do expediente no toast). */
 export const TECNICO_HORARIO_MSG_SESSAO =
-  'Sessão terminada: horário de acesso restrito para a equipa técnica.'
+  'Sessão terminada: fora do horário de expediente da equipa técnica.'
+
+export { TECNICO_HORARIO_EXPEDIENTE_TOAST }
 
 const WEEKDAY_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 
