@@ -13,8 +13,12 @@ import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
 import { normEntityId } from '../utils/frotaReportHelpers'
+import { getHojeAzores } from '../utils/datasAzores'
 
 const DataContext = createContext(null)
+
+/** Horizonte de geração de periódicas na sincronização / pós-execução (~3 anos). */
+const THREE_YEARS_MS = 3 * 365.25 * 24 * 3600 * 1000
 
 /**
  * Ao substituir relatórios vindos da API, preserva `enviadoParaCliente` / `ultimoEnvio`
@@ -1819,9 +1823,11 @@ export function DataProvider({ children }) {
   const recalcularPeriodicasAposExecucao = useCallback((maquinaId, periodicidade, dataExecucao, tecnico, options = {}) => {
     if (!periodicidade || !INTERVALOS[periodicidade]) return 0
 
+    const hojeStr = getHojeAzores()
+    const hojeNoonMs = new Date(`${hojeStr}T12:00:00`).getTime()
     const intervaloDias = INTERVALOS[periodicidade].dias
     const dataBaseMs    = new Date(dataExecucao + 'T12:00:00').getTime()
-    const limiteMs      = dataBaseMs + 3 * 365.25 * 24 * 3600 * 1000
+    const limiteMs      = Math.max(dataBaseMs + THREE_YEARS_MS, hojeNoonMs + THREE_YEARS_MS)
     const anoInicio     = new Date(dataExecucao).getFullYear()
     const anoFim        = new Date(limiteMs).getFullYear()
     const feriadosSet   = buildFeriadosSet(anoInicio, anoFim)
@@ -1859,6 +1865,7 @@ export function DataProvider({ children }) {
           String(dAjustada.getMonth() + 1).padStart(2, '0'),
           String(dAjustada.getDate()).padStart(2, '0'),
         ].join('-')
+        if (iso < hojeStr) continue
         novas.push({
           id:           `mp${base}_${novas.length + 1}`,
           maquinaId,
@@ -1915,7 +1922,9 @@ export function DataProvider({ children }) {
   /**
    * Recarrega dados do servidor e, para cada equipamento com periodicidade conhecida,
    * regenera manutenções periódicas futuras (pendente/agendada, exceto montagem)
-   * com base na última execução (campo da ficha ou última concluída na agenda).
+   * com base na última execução: **o mais recente** entre `ultimaManutencaoData` na ficha
+   * e a data da última manutenção `concluida` na agenda (evita âncora antiga na ficha).
+   * Só cria linhas com data **≥ hoje** (Açores); horizonte = max(última exec + 3 anos, hoje + 3 anos).
    * Actualiza `proximaManut` em cada ficha quando difere da agenda.
    */
   const sincronizarAgendaCompleta = useCallback(async () => {
@@ -1928,6 +1937,8 @@ export function DataProvider({ children }) {
 
     agendaCompletaBusyRef.current = true
     try {
+      const hojeStr = getHojeAzores()
+      const hojeNoonMs = new Date(`${hojeStr}T12:00:00`).getTime()
       const d = await fetchTodosOsDados()
       const maqs = d.maquinas ?? []
       const categoriasD = d.categorias ?? []
@@ -1954,11 +1965,11 @@ export function DataProvider({ children }) {
         if (!periodicidade) continue
 
         let dataExec = maq.ultimaManutencaoData ? String(maq.ultimaManutencaoData).slice(0, 10) : null
-        if (!dataExec) {
-          const concl = acc.filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
-          if (concl.length === 0) continue
+        const concl = acc.filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
+        if (concl.length > 0) {
           concl.sort((a, b) => b.data.localeCompare(a.data))
-          dataExec = concl[0].data
+          const ultimaConcl = concl[0].data
+          if (!dataExec || ultimaConcl > dataExec) dataExec = ultimaConcl
         }
         if (!dataExec) continue
 
@@ -1985,7 +1996,7 @@ export function DataProvider({ children }) {
 
         const intervaloDias = INTERVALOS[periodicidade].dias
         const dataBaseMs = new Date(dataExec + 'T12:00:00').getTime()
-        const limiteMs = dataBaseMs + 3 * 365.25 * 24 * 3600 * 1000
+        const limiteMs = Math.max(dataBaseMs + THREE_YEARS_MS, hojeNoonMs + THREE_YEARS_MS)
         const anoInicio = new Date(dataExec).getFullYear()
         const anoFim = new Date(limiteMs).getFullYear()
         const feriadosSet = buildFeriadosSet(anoInicio, anoFim)
@@ -1998,6 +2009,7 @@ export function DataProvider({ children }) {
           if (dcur.getTime() > limiteMs) break
           const { data: dAjustada } = encontrarDiaLivre(dcur, feriadosSet, diasOcupados)
           const iso = `${dAjustada.getFullYear()}-${String(dAjustada.getMonth() + 1).padStart(2, '0')}-${String(dAjustada.getDate()).padStart(2, '0')}`
+          if (iso < hojeStr) continue
           novas.push({
             id: `mp${baseId}_${novas.length}_${Math.random().toString(36).slice(2, 8)}`,
             maquinaId: maq.id,

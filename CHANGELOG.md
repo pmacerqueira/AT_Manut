@@ -9,6 +9,14 @@ Política de continuidade:
 
 ---
 
+## [1.16.69] — 2026-04-22 — Sincronizar agenda: não recriar periódicas antigas nem ignorar concluídas recentes
+
+### Correcção
+- **`sincronizarAgendaCompleta`:** a data-base do recálculo usava só `ultimaManutencaoData` quando preenchida, **ignorando** manutenções `concluida` mais recentes — gerava de novo intervalos a partir de uma âncora antiga e voltava a preencher datas passadas/eliminadas. Passa a usar o **máximo** (mais recente) entre a ficha e a última `concluida`; só grava novas linhas com **data ≥ hoje** (Açores); o horizonte de geração é `max(exec+3 anos, hoje+3 anos)` para âncoras antigas não ficarem sem slots futuros.
+- **`recalcularPeriodicasAposExecucao`:** mesmo critério de horizonte e de **não criar** slots com data antes de hoje (alinhado à sincronização completa).
+
+---
+
 ## [1.16.68] — 2026-04-22 — Sincronizar agenda: refresh de clientes e fichas no estado
 
 ### Correcção
