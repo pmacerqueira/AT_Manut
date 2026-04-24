@@ -9,6 +9,16 @@ Política de continuidade:
 
 ---
 
+## [1.16.66] — 2026-04-24 — Preservar assinatura do cliente ao editar relatório (deploy PWA)
+
+### Correcção
+- **`ExecutarManutencaoModal`:** ao reabrir o assistente para uma manutenção concluída ainda **não enviada ao cliente**, a assinatura do relatório volta a ser carregada no canvas (antes só se usava a assinatura do contacto quando o relatório **não** tinha assinatura). «Limpar assinatura» permite substituir; gravação reutiliza a assinatura existente quando aplicável e preserva `dataAssinatura`.
+
+### Operação
+- Deploy: `npm run build:zip`; `navel-site` → `npm run deploy:at-manut -- --yes`.
+
+---
+
 ## [1.16.65] — 2026-04-24 — Deploy cPanel (PWA + API) para testes no terreno
 
 ### Frontend (PWA)

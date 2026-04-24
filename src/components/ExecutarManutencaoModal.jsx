@@ -193,6 +193,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [erroChecklist, setErroChecklist] = useState('')
   const [erroAssinatura, setErroAssinatura] = useState('')
   const [assinaturaFeita, setAssinaturaFeita] = useState(false)
+  /** True após «Limpar assinatura» no canvas — não reutilizar assinatura antiga do relatório ao gravar. */
+  const [signatureClearedByUser, setSignatureClearedByUser] = useState(false)
   const [manutAgendadas, setManutAgendadas] = useState(0)
   const [concluido, setConcluido] = useState(false)
   const [conflitosAgendamento, setConflitosAgendamento] = useState(null)
@@ -323,6 +325,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       kaeserAuditoriaRef.current = { tipoSugerido: null, motivo: null }
       kaeserWarnAnualHighDeltaRef.current = false
       execCancelBaselineRef.current = ''
+      setSignatureClearedByUser(false)
       return
     }
     if (!maq) return
@@ -481,6 +484,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroChecklist('')
     setErroAssinatura('')
     setAssinaturaFeita(false)
+    setSignatureClearedByUser(false)
     const clienteEmail = cli?.email ?? ''
     setEmailDestinatario(clienteEmail)
     const assinaturaBaseline = !!(existingRel?.assinaturaDigital || cli?.assinaturaContacto)
@@ -500,17 +504,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (!canvas) return
       const ctx = canvas.getContext('2d')
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      const assSalva = !existingRel?.assinaturaDigital && cli?.assinaturaContacto
-      if (assSalva) {
+      // Prioridade: assinatura já guardada no relatório (edição antes de enviar ao cliente);
+      // senão, assinatura reutilizável do contacto do cliente.
+      const assinaturaImgSrc = existingRel?.assinaturaDigital || cli?.assinaturaContacto || null
+      if (assinaturaImgSrc) {
         const img = new Image()
         img.onload = () => {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
           setAssinaturaFeita(true)
         }
-        img.src = cli.assinaturaContacto
+        img.onerror = () => {
+          logger.warn('ExecutarManutencaoModal', 'bootstrapAssinatura', 'Falha ao carregar imagem de assinatura no canvas', {
+            temRelatorio: !!existingRel?.assinaturaDigital,
+          })
+        }
+        img.src = assinaturaImgSrc
       }
     })
-  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq, cli?.assinaturaContacto])
 
   const confirmarCriarIntervencaoHoje = useCallback(() => {
     if (!maq) return
@@ -635,6 +646,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const canvas = canvasRef.current
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
     setAssinaturaFeita(false)
+    setSignatureClearedByUser(true)
   }, [])
 
   const guardarNomeContacto = useCallback(() => {
@@ -785,7 +797,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         return true
       }
       if (s === W.ass) {
-        if (!isAdmin && !assinaturaFeita) {
+        const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
+        if (!isAdmin && !temAssinaturaOuRel) {
           setErroAssinatura('A assinatura digital do cliente é obrigatória.')
           return false
         }
@@ -832,7 +845,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return true
     }
     if (s === W.ass) {
-      if (!isAdmin && !assinaturaFeita) {
+      const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
+      if (!isAdmin && !temAssinaturaOuRel) {
         setErroAssinatura('A assinatura digital do cliente é obrigatória.')
         return false
       }
@@ -840,7 +854,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return true
     }
     return true
-  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes])
+  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes])
 
   const goNext = useCallback(() => {
     if (step >= W.total) return
@@ -923,6 +937,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     try {
       const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
       const cliente = clientes.find(c => c.nif === maq?.clienteNif) ?? null
+      const assinaturaPreview =
+        (assinaturaFeita && canvasRef.current?.toDataURL('image/png'))
+        || (!signatureClearedByUser && rel?.assinaturaDigital)
+        || ''
       const tempRel = {
         ...rel,
         checklistRespostas: form.checklistRespostas,
@@ -930,8 +948,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         fotos,
         tecnico: form.tecnico,
         nomeAssinante: form.nomeAssinante,
-        assinadoPeloCliente: assinaturaFeita,
-        assinaturaDigital: canvasRef.current?.toDataURL('image/png') ?? '',
+        assinadoPeloCliente: !!assinaturaPreview,
+        assinaturaDigital: assinaturaPreview,
         dataAssinatura: rel?.dataAssinatura ?? nowISO(),
         dataCriacao: rel?.dataCriacao ?? nowISO(),
         ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
@@ -969,7 +987,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     } finally {
       setPreviewLoading(false)
     }
-  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, manutencaoAtual, items, getSubcategoria, getTecnicoByNome, showToast, categoriaNome, declaracaoClienteDepois])
+  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, signatureClearedByUser, manutencaoAtual, items, getSubcategoria, getTecnicoByNome, showToast, categoriaNome, declaracaoClienteDepois, isKaeserAbcdMaq])
 
   const gravar = (semAssinatura = false, enviarEmailAoGravar = true) => {
     setErroChecklist('')
@@ -1030,14 +1048,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         setErroAssinatura('Indique o nome do cliente que assina o relatório.')
         return
       }
-      if (!assinaturaFeita) {
+      const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
+      if (!temAssinaturaOuRel) {
         setErroAssinatura('A assinatura digital do cliente é obrigatória.')
         return
       }
     }
 
     const canvas = canvasRef.current
-    const assinaturaDataUrl = (!semAssinatura && canvas) ? canvas.toDataURL('image/png') : null
+    let assinaturaDataUrl = null
+    if (!semAssinatura) {
+      if (assinaturaFeita && canvas) {
+        assinaturaDataUrl = canvas.toDataURL('image/png')
+      } else if (rel?.assinaturaDigital && !signatureClearedByUser) {
+        assinaturaDataUrl = rel.assinaturaDigital
+      }
+    }
+    const usouAssinaturaDoRelatorioSemRedraw =
+      !semAssinatura && !assinaturaFeita && !!rel?.assinaturaDigital && !signatureClearedByUser && !!assinaturaDataUrl
 
     const podeUsarDatasFormularioRel = !!(rel && !isRelatorioEnviadoAoCliente(rel) && agFormGravar && exFormGravar)
 
@@ -1073,7 +1101,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       assinadoPeloCliente: !semAssinatura,
       nomeAssinante: semAssinatura ? '' : form.nomeAssinante.trim(),
       assinaturaDigital: assinaturaDataUrl,
-      dataAssinatura: semAssinatura ? null : now,
+      dataAssinatura: semAssinatura ? null : (usouAssinaturaDoRelatorioSemRedraw ? (rel.dataAssinatura ?? now) : now),
       dataCriacao: rel?.dataCriacao ?? now,
       ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
       ...(pecasParaRelatorio !== undefined && { pecasUsadas: pecasParaRelatorio }),
@@ -2543,6 +2571,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             ) : (
               <>
                 <p className="wizard-step-hint">O cliente deve assinar digitalmente para confirmar a aceitação do serviço.</p>
+                {rel?.assinaturaDigital && (
+                  <p className="wizard-step-hint" style={{ marginTop: '0.35rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
+                    Se o relatório já tinha assinatura, ela é reposta abaixo. Use «Limpar assinatura» para o cliente voltar a assinar, se necessário.
+                  </p>
+                )}
                 {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
                 <div className="assinatura-canvas-wrap">
