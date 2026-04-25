@@ -171,22 +171,24 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
   }
 
   return (
-    <div className="biblioteca-navel-card" style={{ marginBottom: '1.25rem' }}>
-      <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-        <Library size={18} aria-hidden />
-        Biblioteca NAVEL (área reservada)
-      </h4>
-      <p className="text-muted" style={{ fontSize: '0.9rem', margin: '0 0 0.75rem' }}>
-        Manuais e planos no mesmo repositório que navel.pt/area-reservada. As associações são referências — o ficheiro não é duplicado.
-      </p>
+    <div className="biblioteca-navel-card">
+      <div className="library-hero">
+        <div className="library-hero-icon">
+          <Library size={20} aria-hidden />
+        </div>
+        <div>
+          <h4>Biblioteca NAVEL</h4>
+          <p>Manuais e planos no mesmo repositório que navel.pt/area-reservada. As associações são referências: o ficheiro não é duplicado.</p>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-        <button type="button" className="secondary" onClick={() => setModalSearch(true)}>
-          <Search size={15} aria-hidden /> Associar documento existente
+      <div className="library-toolbar">
+        <button type="button" className="equip-action-btn primary" onClick={() => setModalSearch(true)}>
+          <Search size={15} aria-hidden /> Associar existente
         </button>
-        <label className="secondary" htmlFor="bib-navel-upload" style={{ cursor: uploading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+        <label className={`equip-action-btn secondary ${uploading ? 'is-disabled' : ''}`} htmlFor="bib-navel-upload">
           <Upload size={15} aria-hidden />
-          {uploading ? 'A enviar…' : 'Enviar novo ficheiro'}
+          {uploading ? 'A enviar…' : 'Enviar novo'}
           <input
             id="bib-navel-upload"
             ref={fileInputRef}
@@ -196,51 +198,43 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
             onChange={handlePickFile}
           />
         </label>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem' }}>
-          <span className="text-muted">Tipo:</span>
-          <select value={docType} onChange={(e) => setDocType(e.target.value)} style={{ maxWidth: '12rem' }}>
+        <label className="library-type-picker">
+          <span>Tipo de documento</span>
+          <select value={docType} onChange={(e) => setDocType(e.target.value)}>
             {DOC_TYPES.map((d) => (
               <option key={d.id} value={d.id}>{d.label}</option>
             ))}
           </select>
-        </span>
+        </label>
       </div>
 
       {loading ? (
-        <p className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <p className="library-empty">
           <Loader size={16} aria-hidden /> A carregar…
         </p>
       ) : items.length === 0 ? (
-        <p className="text-muted" style={{ margin: 0 }}>Nenhum documento da biblioteca associado a este equipamento.</p>
+        <p className="library-empty">Nenhum documento da biblioteca associado a este equipamento.</p>
       ) : (
-        <div className="doc-table-wrapper">
-          <table className="data-table doc-table">
-            <thead>
-              <tr>
-                <th>Ficheiro</th>
-                <th>Tipo</th>
-                <th>Actualizado</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.path}>
-                  <td data-label="Ficheiro">{row.name || row.path}</td>
-                  <td data-label="Tipo">{metaLabel(row.metadata)}</td>
-                  <td data-label="Actualizado">{row.updatedAt ? new Date(row.updatedAt).toLocaleString('pt-PT') : '—'}</td>
-                  <td className="doc-table-actions">
-                    <button type="button" className="icon-btn secondary" title="Abrir" onClick={() => handleOpen(row.path)}>
-                      <FileDown size={16} />
-                    </button>
-                    <button type="button" className="icon-btn secondary" title="Remover associação" onClick={() => handleUnlink(row.path)}>
-                      <Unlink size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="library-card-grid">
+          {items.map((row) => (
+            <article key={row.path} className="library-doc-card">
+              <div className="library-doc-main">
+                <span className="library-doc-type">{metaLabel(row.metadata)}</span>
+                <strong title={row.name || row.path}>{row.name || row.path}</strong>
+                <span className="library-doc-date">
+                  {row.updatedAt ? new Date(row.updatedAt).toLocaleString('pt-PT') : 'Sem data de actualização'}
+                </span>
+              </div>
+              <div className="library-doc-actions">
+                <button type="button" className="equip-action-btn secondary" onClick={() => handleOpen(row.path)}>
+                  <FileDown size={16} aria-hidden /> Abrir
+                </button>
+                <button type="button" className="equip-action-btn danger" onClick={() => handleUnlink(row.path)}>
+                  <Unlink size={16} aria-hidden /> Remover
+                </button>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
@@ -252,14 +246,14 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
           aria-labelledby="bib-navel-search-title"
           onClick={() => setModalSearch(false)}
         >
-          <div className="modal" style={{ maxWidth: 'min(560px, 96vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h3 id="bib-navel-search-title" style={{ margin: 0 }}>Pesquisar na biblioteca</h3>
+          <div className="modal library-search-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="library-search-header">
+              <h3 id="bib-navel-search-title">Pesquisar na biblioteca</h3>
               <button type="button" className="icon-btn secondary" onClick={() => setModalSearch(false)} aria-label="Fechar">
                 <X size={18} />
               </button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div className="library-search-controls">
               <input
                 type="search"
                 placeholder="Nome do ficheiro…"
@@ -271,7 +265,6 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
                     runSearch()
                   }
                 }}
-                style={{ flex: '1 1 200px' }}
               />
               <select value={searchType} onChange={(e) => setSearchType(e.target.value)}>
                 <option value="">Todos os tipos</option>
@@ -283,28 +276,18 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
                 {searchLoading ? '…' : 'Pesquisar'}
               </button>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '50vh', overflow: 'auto' }}>
+            <ul className="library-search-results">
               {searchResults.map((r) => (
-                <li
-                  key={r.path}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.45rem 0',
-                    borderBottom: '1px solid var(--border-subtle, #eee)',
-                  }}
-                >
-                  <span style={{ wordBreak: 'break-all' }}>{r.name}</span>
-                  <button type="button" className="secondary" onClick={() => handleLink(r)}>
+                <li key={r.path}>
+                  <span>{r.name}</span>
+                  <button type="button" className="equip-action-btn primary" onClick={() => handleLink(r)}>
                     <Link2 size={14} aria-hidden /> Associar
                   </button>
                 </li>
               ))}
             </ul>
             {searchResults.length === 0 && !searchLoading && (
-              <p className="text-muted" style={{ margin: '0.5rem 0 0' }}>Sem resultados. Tente outro termo.</p>
+              <p className="library-empty">Sem resultados. Tente outro termo.</p>
             )}
           </div>
         </div>

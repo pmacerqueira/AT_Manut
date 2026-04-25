@@ -17,7 +17,7 @@ import { getLog, clearLog, exportLogAsText, exportLogAsJson, getLogStats, gerarR
 // Import dinâmico — Logs.jsx é lazy; manter apiService fora do bundle principal
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
-import { ArrowLeft, RefreshCw, Download, Trash2, AlertCircle, Info, Zap, AlertTriangle, Skull, ChevronDown, ChevronRight, ClipboardCopy } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Download, Trash2, AlertCircle, Info, Zap, AlertTriangle, Skull, ChevronDown, ChevronRight, ClipboardCopy, Send } from 'lucide-react'
 import './Logs.css'
 
 // ── Constantes de configuração ────────────────────────────────────────────────
@@ -90,6 +90,18 @@ export default function Logs() {
   const [logSource,    setLogSource]    = useState('local')
   const [loadingServer, setLoadingServer] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [logHelpWide, setLogHelpWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const m = window.matchMedia('(min-width: 1024px)')
+    const apply = () => setLogHelpWide(m.matches)
+    apply()
+    m.addEventListener('change', apply)
+    return () => m.removeEventListener('change', apply)
+  }, [])
 
   const reload = useCallback(async () => {
     if (logSource === 'server') {
@@ -211,17 +223,32 @@ export default function Logs() {
         </div>
       </div>
 
-      {/* Caixa de ajuda — como usar o log para reportar problemas */}
-      <div className="log-help-box">
-        <strong>Como reportar um problema ao assistente:</strong>
-        <ol>
-          <li>Reproduza o erro na aplicação normalmente.</li>
-          <li>Volte a este painel (menu lateral → <em>Logs</em>).</li>
-          <li>Clique em <strong>Copiar para suporte</strong>.</li>
-          <li>Cole o texto copiado no chat — o assistente analisa e resolve.</li>
-        </ol>
-        <p>Não precisa de saber o que aconteceu tecnicamente — o log regista tudo automaticamente.</p>
-      </div>
+      {/* Ajuda: caixa aberta no desktop; <details> compacto em tablet/mobile */}
+      {logHelpWide ? (
+        <div className="log-help-box">
+          <strong>Como reportar um problema ao assistente:</strong>
+          <ol>
+            <li>Reproduza o erro na aplicação normalmente.</li>
+            <li>Volte a este painel (menu lateral → <em>Logs</em>).</li>
+            <li>Clique em <strong>Copiar para suporte</strong>.</li>
+            <li>Cole o texto copiado no chat — o assistente analisa e resolve.</li>
+          </ol>
+          <p>Não precisa de saber o que aconteceu tecnicamente — o log regista tudo automaticamente.</p>
+        </div>
+      ) : (
+        <details className="log-help-details">
+          <summary>Como reportar um problema ao assistente</summary>
+          <div className="log-help-details-body">
+            <ol>
+              <li>Reproduza o erro na aplicação normalmente.</li>
+              <li>Volte a este painel (menu lateral → <em>Logs</em>).</li>
+              <li>Utilize <strong>Copiar suporte</strong> na barra de acções.</li>
+              <li>Cole o texto no chat — o assistente analisa e resolve.</li>
+            </ol>
+            <p>O log regista tudo automaticamente.</p>
+          </div>
+        </details>
+      )}
 
       {/* Estatísticas */}
       <div className="log-stats">
@@ -234,8 +261,8 @@ export default function Logs() {
         <StatCard value={fmtBytes(stats.bytes)} label="No disco" colorClass="log-stat--bytes" small />
       </div>
 
-      {/* Toolbar: filtros + acções */}
-      <div className="card log-toolbar">
+      {/* Barra: filtros + acções (layout compacto em &lt;1024px) */}
+      <div className="log-toolbar-surface">
         <div className="log-filters">
           <select value={logSource} onChange={e => setLogSource(e.target.value)} className="log-select" title="Origem dos logs">
             <option value="local">Este dispositivo</option>
@@ -267,46 +294,50 @@ export default function Logs() {
 
           <input
             type="search"
-            placeholder="Pesquisar componente, acção, mensagem, utilizador…"
+            placeholder="Pesquisar…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="log-search"
+            aria-label="Pesquisar em componente, acção, mensagem, utilizador"
           />
         </div>
 
-        <div className="log-actions">
-          <button type="button" className="icon-btn" onClick={reload} title="Actualizar" disabled={loadingServer}>
-            <RefreshCw size={16} className={loadingServer ? 'spin' : ''} />
+        <div className="log-actions" role="toolbar" aria-label="Acções do log">
+          <button type="button" className="log-icon-btn" onClick={reload} title="Actualizar" disabled={loadingServer}>
+            <RefreshCw size={15} className={loadingServer ? 'spin' : ''} aria-hidden />
+            <span className="log-actions-sr">Actualizar</span>
           </button>
-          <button type="button" className="icon-btn" onClick={handleFlush} title="Enviar logs pendentes para o servidor agora">
-            <RefreshCw size={16} />
-            <span className="log-btn-label">Sync</span>
+          <button type="button" className="log-icon-btn" onClick={handleFlush} title="Enviar logs pendentes para o servidor">
+            <Send size={15} aria-hidden />
+            <span className="log-actions-sr">Enviar para servidor</span>
           </button>
           <button
             type="button"
             className="btn-suporte"
             onClick={handleCopiarSuporte}
-            title="Copiar relatório de erros para colar no chat com o assistente"
+            title="Copiar relatório para colar no chat com o assistente"
           >
-            <ClipboardCopy size={15} />
-            Copiar para suporte
+            <ClipboardCopy size={14} aria-hidden />
+            <span className="btn-suporte__full">Copiar para suporte</span>
+            <span className="btn-suporte__short">Suporte</span>
           </button>
-          <button type="button" className="icon-btn" onClick={exportLogAsText} title="Exportar como .txt (Excel)">
-            <Download size={16} />
-            <span className="log-btn-label">TXT</span>
+          <button type="button" className="log-icon-btn log-icon-btn--with-label" onClick={exportLogAsText} title="Exportar .txt (Excel)">
+            <Download size={15} aria-hidden />
+            <span>TXT</span>
           </button>
-          <button type="button" className="icon-btn" onClick={exportLogAsJson} title="Exportar como .json">
-            <Download size={16} />
-            <span className="log-btn-label">JSON</span>
+          <button type="button" className="log-icon-btn log-icon-btn--with-label" onClick={exportLogAsJson} title="Exportar .json">
+            <Download size={15} aria-hidden />
+            <span>JSON</span>
           </button>
           {confirmClear ? (
             <>
-              <button type="button" className="danger" onClick={handleClear} style={{ fontSize: '0.8rem' }}>Confirmar</button>
-              <button type="button" className="secondary" onClick={() => setConfirmClear(false)} style={{ fontSize: '0.8rem' }}>Cancelar</button>
+              <button type="button" className="log-pill-btn log-pill-btn--danger" onClick={handleClear}>OK</button>
+              <button type="button" className="log-pill-btn" onClick={() => setConfirmClear(false)}>Não</button>
             </>
           ) : (
-            <button type="button" className="icon-btn danger" onClick={handleClear} title="Limpar todo o log">
-              <Trash2 size={16} />
+            <button type="button" className="log-icon-btn log-icon-btn--danger" onClick={handleClear} title="Limpar log local">
+              <Trash2 size={15} aria-hidden />
+              <span className="log-actions-sr">Limpar</span>
             </button>
           )}
         </div>

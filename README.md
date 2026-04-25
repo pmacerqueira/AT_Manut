@@ -16,6 +16,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | **Dashboard** | KPIs, "O meu dia", alertas proactivos, card Próximas (6 meses), card Reparações | ✅ |
 | **Clientes** | CRUD com validação de email obrigatório e badge "Sem email" | ✅ |
 | **Equipamentos** | Gestão hierárquica (Categoria → Subcategoria → Máquina), QR Code | ✅ |
+| **Documentação por equipamento** | Documentos obrigatórios, Biblioteca NAVEL estilo cartões e arquivo de fotografias técnicas | ✅ |
 | **Manutenções** | Wizard fixo (7 passos), checklist, assinatura, reagendamento automático | ✅ |
 | **Reparações** | Registo, execução multi-dia, fotos, assinatura, relatórios, mensal ISTOBAL | ✅ |
 | **Agendamento** | Pipeline cascata (Cliente → Categoria → Equipamento → Data + Técnico) | ✅ |
@@ -37,7 +38,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | **CSS responsivo centralizado** | 15 variáveis de layout em :root — ajuste único para todos os ecrãs | ✅ |
 | **Definições** | Backup/restauro, config alertas, modo campo, indicador de armazenamento | ✅ |
 | **Logs** | Registo de sistema (acções, erros, eventos de autenticação) | ✅ |
-| **Biblioteca NAVEL** | Documentos da área reservada (navel.pt) por equipamento; proxy `documentosBiblioteca` na API | ✅ |
+| **Biblioteca NAVEL** | Documentos da área reservada (navel.pt) por equipamento; proxy `documentosBiblioteca` na API, UI tipo M365/SharePoint | ✅ |
 | **PWA** | Instalável no ecrã inicial, offline-first com cache + sync queue | ✅ |
 
 ---
@@ -91,7 +92,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
 | Testes | Playwright E2E — 442 testes (17 specs) |
-| Imagens | sharp (optimize-images via script prebuild) |
+| Imagens | sharp (optimize-images via script prebuild) + compressão JPEG no browser para fotos de relatórios/equipamentos |
 
 ---
 
@@ -119,6 +120,8 @@ npm run deploy:at-manut -- --yes
 Ficheiros PHP da API: `navel-site` → `node scripts/cpanel-deploy.mjs --file="…/AT_Manut/servidor-cpanel/api/data.php" --remote="<CPANEL_REMOTE_ROOT>/api" --yes` — ver [`docs/DEPLOY_CHECKLIST.md`](./docs/DEPLOY_CHECKLIST.md).
 
 **Alternativa:** `npm run build:zip` e extrair `dist_upload.zip` no File Manager — [`docs/BUILD-E-ZIP.md`](./docs/BUILD-E-ZIP.md).
+
+> Nota: funcionalidades como **fotografias por equipamento** exigem também o `data.php` actualizado em `public_html/api/`, porque o upload usa a acção `uploads/machine_photo`.
 
 ---
 

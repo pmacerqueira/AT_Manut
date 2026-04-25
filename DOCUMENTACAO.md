@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-22
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-25
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -40,7 +40,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
 | Testes | Playwright E2E — 442 testes (17 specs) |
-| Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) |
+| Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
 
@@ -84,8 +84,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── ExecutarReparacaoModal.jsx  # Modal execução reparação (fotos+assinatura+email+peças)
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
-│   │   ├── DocumentacaoModal.jsx       # PDFs/URLs por equipamento (Admin); persistência em maquinas.documentos
-│   │   ├── MaquinaBibliotecaNavel.jsx # Biblioteca NAVEL (área reservada) por equipamento; proxy servidor documentosBiblioteca
+│   │   ├── DocumentacaoModal.jsx       # Documentos da ficha, Biblioteca NAVEL, fotografias técnicas e plano/consumíveis
+│   │   ├── MaquinaBibliotecaNavel.jsx  # Biblioteca NAVEL (área reservada) em cartões estilo M365/SharePoint; proxy documentosBiblioteca
 │   │   ├── EnviarEmailModal.jsx        # Envio de email (com painel de destinatários)
 │   │   ├── EnviarDocumentoModal.jsx    # Envio de documento PDF
 │   │   ├── PecasPlanoModal.jsx / .css   # Plano de peças e consumíveis
@@ -140,7 +140,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │
 ├── servidor-cpanel/
 │   ├── api/
-│   │   ├── data.php                    # Endpoint central: CRUD + recurso documentosBiblioteca (proxy NAVEL)
+│   │   ├── data.php                    # Endpoint central: CRUD + uploads (machine_pdf/machine_photo) + proxy documentosBiblioteca
 │   │   ├── navel-doc-lib.php           # Cliente HTTP → documentos-api.php (token integração)
 │   ├── send-email.php                  # Backend: envio de email + PDF
 │   ├── send-report.php                 # Backend: email HTML (+ PDF base64 opcional, ex. frota)
@@ -203,6 +203,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 | Editar relatório / manutenção concluída | ✅ | ✅ até envio ao cliente (`enviadoParaCliente`) |
 | Datas agendamento + execução (relatório) | ✅ | ✅ até envio ao cliente |
 | Editar manutenção após envio ao cliente | ✅ | ❌ |
+| Fotografias técnicas do equipamento | ✅ | ✅ adicionar e renomear |
 | Aceder a Definições | ✅ | ❌ |
 | Aceder a Logs | ✅ | ❌ |
 | Ver modal de alertas proactivos | ✅ | ❌ |
@@ -247,9 +248,11 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
   "documentos": [] }
 ```
 
-**Campo `documentos` (JSON na BD):** lista de PDFs e links técnicos (manual, plano de manutenção, etc.). Cada item inclui `id`, `tipo`, `titulo`, `url`. Nos envios por **Importar PDF (servidor)**, a app grava também `uploadFileName` e `uploadFileSize`; se voltares a carregar o **mesmo tipo + nome + tamanho**, a entrada é **actualizada** (sem duplicar linhas) e o servidor apaga o ficheiro antigo em disco antes de gravar o novo (`replacePath` em `data.php`). A gravação na ficha usa `addDocumentoMaquina` no `DataContext.jsx` com `persist` → `apiMaquinas.update` (comparação de IDs com `String(id)`).
+**Campo `documentos` (JSON na BD):** lista de PDFs, links técnicos e fotografias internas da ficha. Documentos obrigatórios usam `tipo` dos `TIPOS_DOCUMENTO` e incluem `id`, `tipo`, `titulo`, `url`. Fotografias usam o tipo interno **`__foto_equipamento`** e metadados como `criadoEm`, `uploadFileName`, `uploadBytes`, `width`, `height`; não contam para "Documentação completa/incompleta". Nos envios por **Importar PDF (servidor)**, a app grava também `uploadFileName` e `uploadFileSize`; se voltares a carregar o **mesmo tipo + nome + tamanho**, a entrada é **actualizada** (sem duplicar linhas) e o servidor apaga o ficheiro antigo em disco antes de gravar o novo (`replacePath` em `data.php`). A gravação na ficha usa `addDocumentoMaquina` ou `updateMaquina` no `DataContext.jsx` com `persist` → `apiMaquinas.update` (comparação de IDs com `String(id)`).
 
 **Armazenamento no servidor:** ficheiros em `public_html/uploads/machine-docs/`, nome `maq-{maquinaId}-{YmdHis}-{hex}.pdf`. Endpoint: `POST data.php` com `r: uploads`, `action: machine_pdf` (só Admin). Ver `docs/DEPLOY_CHECKLIST.md` e `servidor-cpanel/INSTRUCOES_CPANEL.md`.
+
+**Fotografias técnicas do equipamento:** ficheiros JPEG optimizados em `public_html/uploads/machine-photos/`, nome sanitizado `equipamento_numeroSerie_dataHora_random.jpg` (ex.: `ISTOBAL-4PD6005215_SN123_20260425-112530_a1b2c3.jpg`). Endpoint: `POST data.php` com `r: uploads`, `action: machine_photo` (Admin/Técnico autenticado). A compressão/redimensionamento é feita no browser por `comprimirImagemRelatorio.js`, antes do upload. A visualização ordena por `criadoEm` da mais recente para a mais antiga.
 
 **Manutenções:**
 ```json

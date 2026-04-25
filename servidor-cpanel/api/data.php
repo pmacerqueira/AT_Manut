@@ -579,6 +579,9 @@ if ($resource === 'uploads' && $action === 'machine_pdf') {
     $payload = $body['data'] ?? [];
     $dataUrl = trim((string)($payload['dataUrl'] ?? ''));
     $maquinaId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($payload['maquinaId'] ?? ''));
+    $equipamentoNome = trim((string)($payload['equipamentoNome'] ?? ''));
+    $numeroSerie = trim((string)($payload['numeroSerie'] ?? ''));
+    $capturedAt = trim((string)($payload['capturedAt'] ?? ''));
 
     if ($dataUrl === '' || $maquinaId === '') {
         json_error('PDF ou identificador do equipamento em falta.', 400);
@@ -649,6 +652,75 @@ if ($resource === 'uploads' && $action === 'machine_pdf') {
         'path' => $relativePath,
         'mime' => 'application/pdf',
         'bytes' => $size,
+    ]);
+}
+
+// ══ 7e. UPLOADS (Admin/Técnico) — fotografia técnica associada a equipamento ──
+if ($resource === 'uploads' && $action === 'machine_photo') {
+    $payload = $body['data'] ?? [];
+    $dataUrl = trim((string)($payload['dataUrl'] ?? ''));
+    $maquinaId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($payload['maquinaId'] ?? ''));
+
+    if ($dataUrl === '' || $maquinaId === '') {
+        json_error('Fotografia ou identificador do equipamento em falta.', 400);
+    }
+
+    if (!preg_match('#^data:image/(jpeg|jpg);base64,#i', $dataUrl)) {
+        json_error('Formato inválido. Envie fotografia JPEG optimizada pela aplicação.', 400);
+    }
+
+    $commaPos = strpos($dataUrl, ',');
+    if ($commaPos === false) {
+        json_error('Payload de fotografia inválido.', 400);
+    }
+
+    $base64 = substr($dataUrl, $commaPos + 1);
+    $bin = base64_decode($base64, true);
+    if ($bin === false) {
+        json_error('Falha ao decodificar fotografia.', 400);
+    }
+
+    $size = strlen($bin);
+    $maxBytes = 1536 * 1024; // frontend comprime para ~300-450 KB; margem para casos difíceis
+    if ($size <= 0 || $size > $maxBytes) {
+        json_error('Fotografia inválida ou demasiado grande (máx. 1.5 MB).', 400);
+    }
+
+    $info = @getimagesizefromstring($bin);
+    if (!$info || (int)($info[2] ?? 0) !== IMAGETYPE_JPEG) {
+        json_error('O ficheiro não parece ser uma fotografia JPEG válida.', 400);
+    }
+
+    $equipSegment = atm_safe_filename_segment($equipamentoNome, 'equipamento-' . $maquinaId, 70);
+    $serieSegment = atm_safe_filename_segment($numeroSerie, 'sem-serie', 45);
+    $dateSegment = atm_photo_datetime_for_filename($capturedAt);
+    $rand = substr(bin2hex(random_bytes(3)), 0, 6);
+    $filename = $equipSegment . '_' . $serieSegment . '_' . $dateSegment . '_' . $rand . '.jpg';
+
+    $rootDir = dirname(__DIR__);
+    $uploadDir = $rootDir . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'machine-photos';
+    if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0755, true)) {
+        json_error('Não foi possível preparar pasta de fotografias.', 500);
+    }
+
+    $target = $uploadDir . DIRECTORY_SEPARATOR . $filename;
+    if (@file_put_contents($target, $bin, LOCK_EX) === false) {
+        json_error('Falha ao gravar fotografia no servidor.', 500);
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'www.navel.pt';
+    $relativePath = '/uploads/machine-photos/' . $filename;
+    $url = $scheme . '://' . $host . $relativePath;
+
+    json_ok([
+        'url' => $url,
+        'path' => $relativePath,
+        'mime' => 'image/jpeg',
+        'bytes' => $size,
+        'width' => (int)($info[0] ?? 0),
+        'height' => (int)($info[1] ?? 0),
+        'filename' => $filename,
     ]);
 }
 
@@ -991,6 +1063,39 @@ function normalize_payload_for_sql(array $data): array {
  */
 function generate_text_pk(string $prefix = 'mk'): string {
     return $prefix . date('YmdHis') . substr(bin2hex(random_bytes(3)), 0, 6);
+}
+
+/**
+ * Segmento seguro para nomes de ficheiros públicos.
+ */
+function atm_safe_filename_segment(?string $value, string $fallback = 'sem-dados', int $maxLen = 80): string {
+    $s = trim((string)$value);
+    if ($s === '') {
+        $s = $fallback;
+    }
+    if (function_exists('iconv')) {
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+        if (is_string($converted) && $converted !== '') {
+            $s = $converted;
+        }
+    }
+    $s = preg_replace('/[^A-Za-z0-9]+/', '-', $s) ?? '';
+    $s = trim($s, '-');
+    if ($s === '') {
+        $s = $fallback;
+    }
+    return substr($s, 0, $maxLen);
+}
+
+function atm_photo_datetime_for_filename(?string $iso): string {
+    $raw = trim((string)$iso);
+    if ($raw !== '') {
+        $ts = strtotime($raw);
+        if ($ts !== false) {
+            return date('Ymd-His', $ts);
+        }
+    }
+    return date('Ymd-His');
 }
 
 // ══ 8. ROLE-BASED ACCESS CONTROL ═════════════════════════════════════════════

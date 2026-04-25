@@ -20,8 +20,10 @@ import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
 import { COPY_DOC_RESUMO_EQUIPAMENTOS, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 
+const FOTO_EQUIPAMENTO_TIPO = '__foto_equipamento'
+
 function getDocumentacaoStatus(maquina) {
-  const docs = maquina?.documentos ?? []
+  const docs = (maquina?.documentos ?? []).filter(d => d.tipo !== FOTO_EQUIPAMENTO_TIPO)
   const existentes = new Set(docs.map(d => d.tipo).filter(Boolean))
   const emFalta = TIPOS_DOCUMENTO.filter(t => !existentes.has(t.id))
   return {

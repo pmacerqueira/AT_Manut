@@ -11,17 +11,37 @@ import {
   isKaeserMarca,
 } from '../context/DataContext'
 import { safeHttpUrl } from '../utils/sanitize'
-import { apiUploadMachinePdf } from '../services/apiService'
+import { apiUploadMachinePdf, apiUploadMachinePhoto } from '../services/apiService'
 import { logger } from '../utils/logger'
-import { Plus, ExternalLink, Trash2, Upload, PackageOpen } from 'lucide-react'
-import { format } from 'date-fns'
+import { Plus, ExternalLink, Trash2, Upload, PackageOpen, Camera, Images, Save } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { pt } from 'date-fns/locale'
 import { horasContadorNaFicha } from '../utils/horasContadorEquipamento'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/documentacaoEquipamentoCopy'
 import { buildPecasPlanoItemsFromPdfArrayBuffer, contagemPorTipoKaeser } from '../utils/kaeserPlanoPdfImport'
+import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import MaquinaBibliotecaNavel from './MaquinaBibliotecaNavel'
 
 const PDF_MAX_BYTES = 8 * 1024 * 1024
+const FOTO_EQUIPAMENTO_TIPO = '__foto_equipamento'
+const FOTO_MAX_FILES = 8
+
+function nomeEquipamentoParaFoto(maq) {
+  return [maq?.marca, maq?.modelo]
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** Texto embutido no píxel (rodapé do JPEG): equipamento_série_data/hora. */
+function linhaRodapeFotoArquivo(maq, iso) {
+  const nome = (nomeEquipamentoParaFoto(maq) || 'Equipamento').replace(/\s+/g, ' ').trim()
+  const sn = String(maq?.numeroSerie || maq?.numero_serie || '').trim() || 's/n'
+  const raw = typeof iso === 'string' ? parseISO(iso) : iso
+  const d = raw instanceof Date && !Number.isNaN(raw.getTime()) ? raw : new Date()
+  const when = format(d, 'dd/MM/yyyy HH:mm')
+  return `${nome}_${sn}_${when}`
+}
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -59,9 +79,12 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const { isAdmin } = usePermissions()
   const pdfInputRef = useRef(null)
+  const fotoInputRef = useRef(null)
   const [formDoc, setFormDoc] = useState({ tipo: 'manual_utilizador', titulo: '', url: '' })
   const [confirmDeleteDocId, setConfirmDeleteDocId] = useState(null)
   const [activeDocTab, setActiveDocTab] = useState('ficha')
+  const [fotoBusy, setFotoBusy] = useState(false)
+  const [fotoTitulos, setFotoTitulos] = useState({})
 
   const maq = maquinas.find(m => String(m.id) === String(maquina?.id)) ?? maquina
   const maqId = maq?.id
@@ -87,11 +110,16 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
     const parafuso = SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maqSubcategoriaId)
     setFormDoc(f => ({ ...f, tipo: parafuso ? 'plano_manutencao' : 'manual_utilizador' }))
     setActiveDocTab('ficha')
+    setFotoTitulos({})
   }, [isOpen, maqId, maqSubcategoriaId])
 
   if (!isOpen) return null
 
-  const documentos = maq ? (maq.documentos ?? []) : []
+  const todosDocumentos = maq ? (maq.documentos ?? []) : []
+  const documentos = todosDocumentos.filter(d => d.tipo !== FOTO_EQUIPAMENTO_TIPO)
+  const fotosEquipamento = todosDocumentos
+    .filter(d => d.tipo === FOTO_EQUIPAMENTO_TIPO)
+    .sort((a, b) => String(b.criadoEm || b.data || '').localeCompare(String(a.criadoEm || a.data || '')))
   const getTipoLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
   const tiposComDocumento = new Set(documentos.map(d => d.tipo).filter(Boolean))
   const tiposEmFalta = TIPOS_DOCUMENTO.filter(t => !tiposComDocumento.has(t.id))
@@ -177,6 +205,96 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
     }
   }
 
+  const handleFotosSelected = async (e) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!files.length || !maq?.id) return
+
+    const selecionadas = files.slice(0, FOTO_MAX_FILES)
+    if (files.length > selecionadas.length) {
+      showToast(`Foram seleccionadas ${files.length}; serão gravadas as primeiras ${FOTO_MAX_FILES}.`, 'warning')
+    }
+
+    const invalidas = selecionadas.filter(f => !String(f.type || '').startsWith('image/'))
+    if (invalidas.length > 0) {
+      showToast('Seleccione apenas fotografias/imagens.', 'warning')
+      return
+    }
+
+    setFotoBusy(true)
+    showGlobalLoading()
+    try {
+      const novas = []
+      for (const file of selecionadas) {
+        const blob = await fileToMemory(file)
+        const criadoEm = new Date().toISOString()
+        const dataUrl = await comprimirFotoParaRelatorio(blob, {
+          footerLine: linhaRodapeFotoArquivo(maq, criadoEm),
+        })
+        const uploadRes = await apiUploadMachinePhoto({
+          dataUrl,
+          maquinaId: maq.id,
+          equipamentoNome: nomeEquipamentoParaFoto(maq),
+          numeroSerie: maq.numeroSerie || maq.numero_serie || '',
+          capturedAt: criadoEm,
+        })
+        if (!uploadRes?.url) {
+          throw new Error('Resposta do servidor sem URL da fotografia.')
+        }
+        const nomeBase = (uploadRes.filename || file.name || '').replace(/\.[^.]+$/i, '').trim()
+        novas.push({
+          id: `foto-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          tipo: FOTO_EQUIPAMENTO_TIPO,
+          titulo: (nomeBase || `Foto ${format(new Date(criadoEm), 'dd/MM/yyyy HH:mm')}`).slice(0, 120),
+          url: uploadRes.url,
+          criadoEm,
+          uploadFileName: uploadRes.filename || file.name || '',
+          originalFileName: file.name || '',
+          uploadFileSize: file.size || 0,
+          uploadBytes: uploadRes.bytes || null,
+          width: uploadRes.width || null,
+          height: uploadRes.height || null,
+        })
+      }
+
+      await updateMaquina(maq.id, { documentos: [...todosDocumentos, ...novas] })
+      showToast(`${novas.length} fotografia(s) adicionada(s) ao arquivo do equipamento.`, 'success')
+      setActiveDocTab('fotos')
+    } catch (err) {
+      logger.error('DocumentacaoModal', 'uploadFotosEquipamento', err?.message || String(err), {
+        maquinaId: maq?.id,
+        stack: err?.stack?.slice(0, 400),
+      })
+      showToast(err?.message || 'Não foi possível gravar a fotografia.', 'error', 4500)
+    } finally {
+      hideGlobalLoading()
+      setFotoBusy(false)
+    }
+  }
+
+  const handleGuardarFotoTitulo = async (foto) => {
+    if (!maq?.id || !foto?.id) return
+    const titulo = (fotoTitulos[foto.id] ?? foto.titulo ?? '').trim()
+    if (!titulo) {
+      showToast('Indique um nome para a fotografia.', 'warning')
+      return
+    }
+    const nextDocs = todosDocumentos.map(d =>
+      String(d.id) === String(foto.id) ? { ...d, titulo: titulo.slice(0, 120) } : d
+    )
+    try {
+      await updateMaquina(maq.id, { documentos: nextDocs })
+      setFotoTitulos(prev => {
+        const next = { ...prev }
+        delete next[foto.id]
+        return next
+      })
+      showToast('Nome da fotografia actualizado.', 'success')
+    } catch (err) {
+      showToast(err?.message || 'Não foi possível actualizar o nome da fotografia.', 'error', 4000)
+    }
+  }
+
   const handleImportarPecasDoPdfNaFicha = async () => {
     if (!isAdmin || !maq?.id || !docPlanoManutPdf?.url) {
       showToast('É necessário um documento «Plano de manutenção (PDF)» na lista abaixo.', 'warning')
@@ -255,6 +373,9 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
           <button type="button" className={activeDocTab === 'biblioteca' ? 'active' : ''} onClick={() => setActiveDocTab('biblioteca')}>
             Biblioteca NAVEL
           </button>
+          <button type="button" className={activeDocTab === 'fotos' ? 'active' : ''} onClick={() => setActiveDocTab('fotos')}>
+            Fotografias ({fotosEquipamento.length})
+          </button>
           {mostrarPlanoKaeserNaDoc && (
             <button type="button" className={activeDocTab === 'plano' ? 'active' : ''} onClick={() => setActiveDocTab('plano')}>
               Plano / consumíveis
@@ -326,6 +447,81 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
               <span>Documentos partilhados/externos à ficha deste equipamento.</span>
             </div>
             {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} /> : null}
+          </section>
+        )}
+
+        {activeDocTab === 'fotos' && (
+          <section className="doc-panel doc-panel--fotos">
+            <div className="doc-source-intro">
+              <strong>Arquivo fotográfico do equipamento</strong>
+              <span>Fotos tiradas no terreno, organizadas da mais recente para a mais antiga.</span>
+            </div>
+
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleFotosSelected}
+            />
+            <div className="doc-photo-actions">
+              <button
+                type="button"
+                className="btn secondary btn-add-doc"
+                onClick={() => fotoInputRef.current?.click()}
+                disabled={fotoBusy}
+              >
+                <Camera size={16} /> {fotoBusy ? 'A gravar fotografias…' : 'Tirar/adicionar fotografia'}
+              </button>
+              <span className="text-muted">
+                A aplicação redimensiona automaticamente para JPEG leve antes do upload.
+              </span>
+            </div>
+
+            {fotosEquipamento.length > 0 ? (
+              <div className="doc-photo-grid">
+                {fotosEquipamento.map(foto => {
+                  const criado = foto.criadoEm || foto.data || ''
+                  const tituloAtual = fotoTitulos[foto.id] ?? foto.titulo ?? ''
+                  const tituloMudou = tituloAtual.trim() !== String(foto.titulo ?? '').trim()
+                  return (
+                    <article key={foto.id} className="doc-photo-card">
+                      <a href={safeHttpUrl(foto.url)} target="_blank" rel="noopener noreferrer" className="doc-photo-thumb" title="Abrir fotografia">
+                        <img src={safeHttpUrl(foto.url)} alt={foto.titulo || 'Fotografia do equipamento'} loading="lazy" />
+                      </a>
+                      <div className="doc-photo-meta">
+                        <label>
+                          Nome da foto
+                          <input
+                            value={tituloAtual}
+                            onChange={e => setFotoTitulos(prev => ({ ...prev, [foto.id]: e.target.value }))}
+                            placeholder="Ex: Ligações eléctricas após intervenção"
+                          />
+                        </label>
+                        <div className="doc-photo-footer">
+                          <span className="text-muted">
+                            <Images size={14} aria-hidden />
+                            {criado ? format(new Date(criado), 'dd/MM/yyyy HH:mm', { locale: pt }) : 'Sem data'}
+                          </span>
+                          <button
+                            type="button"
+                            className="equip-action-btn secondary"
+                            onClick={() => handleGuardarFotoTitulo(foto)}
+                            disabled={!tituloMudou}
+                          >
+                            <Save size={14} aria-hidden /> Guardar nome
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="doc-empty">Ainda não existem fotografias arquivadas neste equipamento.</p>
+            )}
           </section>
         )}
 

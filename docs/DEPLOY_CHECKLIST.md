@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-04-22 — deploy PWA via `navel-site` (`deploy:at-manut`); integração biblioteca NAVEL e proxy documentos.
+> Última revisão: 2026-04-25 — `v1.16.72`: fotografias técnicas por equipamento, bibliotecas M365/SharePoint e upload `machine_photo`.
 
 ## Resumo da verificação da base de dados
 
@@ -144,6 +144,15 @@ node scripts/cpanel-deploy.mjs --file="c:/Cursor_Projetos/NAVEL/AT_Manut/servido
 - **Actualizar `data.php`** no cPanel sempre que o repositório incluir alterações a `machine_pdf` (upload, `replacePath` para substituir ficheiro antigo, limites de tamanho) ou a `maquinas` (merge em updates parciais, etc.).
 - **Frontend:** importações/substituições e gravação da lista usam `DocumentacaoModal.jsx` + `DataContext.addDocumentoMaquina` (v1.16.28+).
 
+### Fotografias técnicas dos equipamentos (`uploads/machine-photos/`)
+
+- O primeiro upload cria automaticamente `public_html/uploads/machine-photos/`.
+- As fotos são captadas/seleccionadas em `DocumentacaoModal.jsx` (separador **Fotografias**) e comprimidas no browser para JPEG leve com `comprimirImagemRelatorio.js`.
+- Nome no servidor: `equipamento_numeroSerie_dataHora_random.jpg` (segmentos sanitizados para URL/disco). A galeria mostra da foto mais recente para a mais antiga.
+- O servidor aceita apenas JPEG optimizado via `uploads/machine_photo` em `data.php`; técnicos e admins autenticados podem gravar.
+- A referência fica em `maquinas.documentos` com tipo interno `__foto_equipamento`; por isso **não** afecta a contagem de documentação obrigatória.
+- Sempre que esta funcionalidade muda, publicar **PWA** (`public_html/manut/`) e **`data.php`** (`public_html/api/data.php`).
+
 ### Build da aplicação React
 
 ```powershell
@@ -157,7 +166,7 @@ Em seguida **`npm run deploy:at-manut -- --yes`** a partir de `navel-site` (ver 
 ### Variáveis de ambiente
 - **`VITE_API_BASE_URL`:** em produção costuma ficar vazio; só preencher se a API estiver noutro host (ver `.env.example`).
 - **`VITE_ATM_REPORT_AUTH_TOKEN`:** obrigatório no **momento do `npm run build`** — deve ser **o mesmo** valor que `ATM_REPORT_AUTH_TOKEN` no servidor (`send-email.php`, `send-report.php`, `log-receiver.php`). **Fluxo simples:** em `AT_Manut` corre `npm run gen:report-auth` (preenche `.env.local` + `atm_report_auth.secret.php`, fora do Git); envia o `.secret.php` para `public_html/api/`. Ver **[`docs/MEMORIA-SEGREDO-EMAIL-E-LOGS.md`](MEMORIA-SEGREDO-EMAIL-E-LOGS.md)**.
-- **cPanel / PHP:** `ATM_REPORT_AUTH_TOKEN` nas Environment Variables, em `config.deploy-secrets.php`, **ou** em `atm_report_auth.secret.php` (bloqueado por `.htaccess`).
+- **cPanel / PHP:** neste alojamento a fonte primária é o bloco `RewriteRule [E=ATM_...:valor]` no `.htaccess` real de `public_html/api/` (gerido pelos scripts do `navel-site`). Para `ATM_REPORT_AUTH_TOKEN`, também existe o fallback dedicado `atm_report_auth.secret.php` (bloqueado por `.htaccess`). O painel cPanel → Environment Variables não é usado neste plano LSPHP.
 
 ---
 
@@ -183,9 +192,10 @@ npm run deploy:at-manut -- --yes
 1. **Login** — Admin e ATecnica conseguem autenticar
 2. **Dados** — Lista de clientes, máquinas, manutenções e reparações carregam
 3. **Relatórios** — Abrir um relatório existente; checklist e fotos exibem correctamente
-4. **Reparações** — Criar reparação pendente, executar, guardar progresso, concluir
-5. **Email** — Testar envio de email após conclusão de manutenção/reparação
-6. **CORS** — A API é **`api/data.php`** (POST JSON); origens permitidas estão em `data.php` / `config.php` conforme deploy actual.
+4. **Documentação equipamento** — Abrir ficha → Documentação → confirmar `Documentos da ficha`, `Biblioteca NAVEL` e `Fotografias`; testar upload de fotografia em tablet/telemóvel se possível
+5. **Reparações** — Criar reparação pendente, executar, guardar progresso, concluir
+6. **Email** — Testar envio de email após conclusão de manutenção/reparação
+7. **CORS** — A API é **`api/data.php`** (POST JSON); origens permitidas estão em `data.php` / `config.php` conforme deploy actual.
 
 ---
 

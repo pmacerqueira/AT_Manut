@@ -159,12 +159,13 @@ LIMIT 20;
 
 ### Alterar o número de dias de aviso
 
-**Opção A — Variável de ambiente no cPanel** (recomendado):
+**Opção A — Variável `ATM_DIAS_AVISO` no bloco de ambiente da API** (recomendado):
 ```
-cPanel → Advanced → Environment Variables → Adicionar:
-  Nome:  ATM_DIAS_AVISO
-  Valor: 14
+public_html/api/.htaccess  → bloco # BEGIN ATM_ENV
+RewriteRule ^ - [E=ATM_DIAS_AVISO:14]
 ```
+
+> Neste alojamento (LiteSpeed/LSPHP) o painel cPanel → Environment Variables não é a fonte efectiva. Usar o runbook canónico: `docs/CPANEL-RUNBOOK-SEGREDOS.md`.
 
 **Opção B — Editar directamente no ficheiro:**
 ```php

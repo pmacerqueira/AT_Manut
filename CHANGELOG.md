@@ -9,6 +9,71 @@ Política de continuidade:
 
 ---
 
+## [1.16.76] — 2026-04-25 — Logs: painel compacto (tablet / responsivo)
+
+### Alteração
+- **`Logs.jsx` / `Logs.css`:** remoção do `card` pesado; barra de filtros com grelha 2 colunas e pesquisa em largura total em `≤1024px`; acções com botões dedicados (`.log-icon-btn`, 32px) em vez de `icon-btn` de 48px; ícone **Enviar** (`Send`) para sync; ajuda com `<details>` colapsável em ecrã estreito; estatísticas em carrossel horizontal leve; entradas com linha contínua e borda esquerda, menos “caixa” em cada linha; rótulo “Suporte” em vez de frase longa no estreito.
+- **Acessibilidade:** texto para leitores de ecrã nos ícones-only (classe `log-actions-sr`).
+
+### Verificação
+- `npm run build`; lint em `Logs.jsx`.
+
+---
+
+## [1.16.75] — 2026-04-25 — Contraste: cartões de categoria (Equipamentos / Clientes)
+
+### Correcção
+- **`index.css`:** o parágrafo do contador em `.categoria-card` herdava a cor branca do estilo global `button` com `body.modo-campo p { color: inherit }` (conflito de ordem e especificidade). Passou a haver `color` explícita no cartão, `h3` e `p`, e regras `body.modo-campo .categoria-card` com fundo branco, borda e textos escuros.
+- **`Equipamentos.css`:** reforço de legibilidade em modo campo para migas (`breadcrumb` / `breadcrumb-btn`) e botão `Próximas` (verde sólido em vez de néon do tema escuro).
+
+---
+
+## [1.16.74] — 2026-04-25 — Rodapé visual embutido nas fotografias de equipamento
+
+### Novo
+- **`comprimirImagemRelatorio.js`:** `comprimirFotoParaRelatorio(blob, { footerLine })` desenha uma barra escura no fundo do bitmap com o texto (ex.: `Marca Modelo_SN12345_25/04/2026 14:30`) antes de gerar o JPEG — a informação fica no próprio ficheiro, não só no nome.
+- **`DocumentacaoModal.jsx`:** envio de fotos do separador **Fotografias** passa a incluir essa linha automaticamente (marca+modelo, nº de série, data/hora da gravação).
+
+### Verificação
+- `npm run build` e eslint nos ficheiros alterados.
+
+---
+
+## [1.16.73] — 2026-04-25 — Fotografias: nome de ficheiro com equipamento, série e data
+
+### Ajuste
+- **`uploads/machine_photo` (`data.php`):** o servidor passa a gravar fotografias com nome sanitizado no formato `equipamento_numeroSerie_dataHora_random.jpg`.
+- **`DocumentacaoModal.jsx` / `apiService.js`:** o frontend envia nome do equipamento, nº de série e timestamp de captura; mantém a listagem por `criadoEm` da mais recente para a mais antiga.
+
+### Verificação
+- `php -l servidor-cpanel/api/data.php` sem erros.
+- `npx eslint src/components/DocumentacaoModal.jsx src/services/apiService.js` sem erros.
+- `npm run build` concluído com sucesso.
+
+---
+
+## [1.16.72] — 2026-04-25 — Fotografias por equipamento + bibliotecas M365
+
+### Novo
+- **`DocumentacaoModal.jsx`:** novo separador `Fotografias` no painel de documentação do equipamento. Técnicos e administradores podem ver o arquivo fotográfico ordenado da foto mais recente para a mais antiga.
+- **Captura no terreno:** botão `Tirar/adicionar fotografia` abre o picker/câmara do dispositivo (`capture="environment"` + `image/*`) e aceita uma ou várias imagens quando o dispositivo permitir.
+- **Compressão uniforme:** as fotografias usam o mesmo pipeline seguro de redimensionamento/compressão dos relatórios (`comprimirImagemRelatorio.js`), convertendo para JPEG leve antes do upload para evitar payloads grandes em telemóvel/tablet.
+- **Nome editável por todos:** após gravada, qualquer utilizador autenticado pode alterar o nome/título da fotografia na ficha do equipamento.
+- **Biblioteca NAVEL:** `MaquinaBibliotecaNavel.jsx` passa de tabela compacta para cartões estilo biblioteca M365/SharePoint, com ações textuais (`Abrir`, `Remover`, `Associar existente`, `Enviar novo`) e modal de pesquisa mais limpo.
+- **Menu lateral / modo campo:** `Layout.css` e `index.css` reforçam contraste, footer de utilizador/logout e navegação activa; restyling visual mais limpo, com pills e cartões discretos.
+
+### Técnico
+- **Persistência sem migração de BD:** as fotos ficam no JSON `maquinas.documentos` com tipo interno `__foto_equipamento`, separado da contagem de documentação obrigatória. Assim não afectam `Documentação completa/incompleta`.
+- **`apiService.js` / `servidor-cpanel/api/data.php`:** nova acção `uploads/machine_photo`, permitida a admin e técnico, grava JPEG optimizado em `/uploads/machine-photos/` e devolve URL/metadados.
+- **`Equipamentos.jsx`:** o estado de documentação obrigatória ignora fotos técnicas, mantendo a leitura correcta dos documentos legais/PDFs.
+
+### Verificação
+- `npx eslint src/components/DocumentacaoModal.jsx src/components/MaquinaBibliotecaNavel.jsx src/pages/Equipamentos.jsx src/services/apiService.js` sem erros.
+- `php -l servidor-cpanel/api/data.php` sem erros.
+- `npm run build` concluído com sucesso.
+
+---
+
 ## [1.16.71] — 2026-04-24 — UX execução e fichas de equipamentos com contraste reforçado
 
 ### Melhorias de workflow

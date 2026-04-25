@@ -12,7 +12,7 @@
 | Item (revisão anterior) | O que foi feito no repositório |
 |-------------------------|--------------------------------|
 | Crítico — PHP de diagnóstico | Removidos `test-email.php`, `teste-webhook.php`, `clear-cache.php`, `teste-istobal-post.php`. Adicionado `servidor-cpanel/api/.htaccess` que nega HTTP a `test-*`, `teste-*`, `clear-cache.php` e `ingest-istobal-retro.php` (defesa se ficheiros antigos ainda existirem no servidor). |
-| Crítico — segredos em `config.php` | Eliminados fallbacks de passwords/tokens no Git. Produção deve usar **Environment Variables**; em pedidos **HTTP**, falta de `ATM_JWT_SECRET`, credenciais BD, ou `ATM_TAXONOMY_TOKEN` devolve **503 JSON** `misconfigured`. Criado `config.local.php.example` + entrada no `.gitignore` para `config.local.php` (dev local). |
+| Crítico — segredos em `config.php` | Eliminados fallbacks de passwords/tokens no Git. Em produção neste alojamento, os `ATM_*` entram por `.htaccess` com `RewriteRule [E=KEY:VALUE]` (LiteSpeed/LSPHP; `SetEnv`/Environment Variables do painel não funcionam). Em pedidos **HTTP**, falta de `ATM_JWT_SECRET`, credenciais BD, ou `ATM_TAXONOMY_TOKEN` devolve **503 JSON** `misconfigured`. Criado `config.local.php.example` + entrada no `.gitignore` para `config.local.php` (dev local). |
 | Crítico — token de email / relatório / logs | **2026-04-22:** removidos defaults no Git para `ATM_REPORT_AUTH_TOKEN`. Endpoints `send-email.php`, `send-report.php`, `log-receiver.php` e cron **HTTP** usam `atm_report_auth.php`; PWA: `VITE_ATM_REPORT_AUTH_TOKEN` no build. |
 | Crítico — `ingest-istobal-retro.php` na web | Garantia **CLI-only** no PHP (`403` se não for `php-cli`). |
 | Alto — `image-proxy.php` / SSRF | Validação de host (só IPs públicos após DNS), recusa URLs com utilizador/password embutidos, `verify_peer` TLS activo, sem redirects HTTP automáticos (`follow_location` 0). |
@@ -27,7 +27,7 @@
 
 O conjunto **navel.pt** tem **boas bases**: autenticação JWT na API de manutenção, uso predominante de **SQL preparado** (menos risco de injeção SQL clássica), **papéis** admin vs técnico, webhook ISTOBAL com **token em header** e comparação segura (`hash_equals`), formulário de contacto com **rate limit** por IP, e política escrita de **alojamento partilhado** (`docs/CPIANEL-NAVEL-SHARED-HOSTING.md`).
 
-Os **maiores riscos** encontrados nesta revisão são: (1) **scripts de diagnóstico PHP** na pasta `api/` se estiverem **acessíveis na Internet** — revelam detalhes internos; (2) **valores por omissão** em `config.php` no Git — em produção **tudo** deve vir de **variáveis de ambiente**; (3) o **proxy de imagens** (`image-proxy.php`) pode ser abusado para pedidos a **URLs internas** (SSRF) se não estiver filtrado; (4) dependências **npm** no AT_Manut com vulnerabilidades conhecidas (PDF / sanitização HTML).
+Os **maiores riscos** encontrados nesta revisão eram: (1) **scripts de diagnóstico PHP** na pasta `api/` se estivessem **acessíveis na Internet**; (2) **segredos no código** em vez de injector operacional (`RewriteRule [E=…]` / fallback dedicado bloqueado por HTTP); (3) **proxy de imagens** (`image-proxy.php`) sem filtragem suficiente (SSRF); (4) dependências **npm** com vulnerabilidades conhecidas. Estes pontos críticos/altos foram tratados ou têm runbook operacional nesta documentação.
 
 ---
 

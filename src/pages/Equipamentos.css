@@ -1,5 +1,35 @@
 /* Estilos específicos de Equipamentos - estilos comuns em index.css */
 
+/* Navegação de migas e botão «Voltar atrás» da página: leitura clara no tema claro (modo campo). */
+body.modo-campo .equipamentos-nav .breadcrumb {
+  color: #1e293b;
+  font-weight: 600;
+}
+body.modo-campo .equipamentos-nav .breadcrumb-btn {
+  color: #003d7a;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body.modo-campo .equipamentos-nav .breadcrumb-btn:hover {
+  color: #001f3d;
+  opacity: 1;
+}
+/* «Próximas» — verde legível em fundo claro (evita néon do tema escuro). */
+body.modo-campo .btn-executar-manut {
+  background: #15803d;
+  color: #ffffff;
+  border: 2px solid #14532d;
+  box-shadow: none;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+body.modo-campo .btn-executar-manut:hover {
+  background: #14532d;
+  border-color: #052e16;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+}
+
 /* Badge de ciclo de manutenção para compressores */
 .kaeser-tipo-badge {
   background: rgba(129, 140, 248, 0.18);

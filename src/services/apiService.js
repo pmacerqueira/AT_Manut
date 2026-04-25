@@ -237,6 +237,13 @@ export async function apiUploadMachinePdf({ dataUrl, maquinaId, replacePath = nu
   return call('uploads', 'machine_pdf', { data })
 }
 
+/** Foto técnica do equipamento (Admin/Técnico) — gravada em /uploads/machine-photos/ */
+export async function apiUploadMachinePhoto({ dataUrl, maquinaId, equipamentoNome, numeroSerie, capturedAt }) {
+  return call('uploads', 'machine_photo', {
+    data: { dataUrl, maquinaId, equipamentoNome, numeroSerie, capturedAt },
+  })
+}
+
 /** Logs do servidor (apenas Admin) — agrega logs de todos os utilizadores e dispositivos */
 export async function apiLogsList(days = 30) {
   return call('logs', 'list', { days })

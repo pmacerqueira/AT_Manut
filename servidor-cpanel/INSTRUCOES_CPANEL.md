@@ -36,6 +36,8 @@ credenciais SMTP, não precisa de instalar nada extra.
 
 **PDFs técnicos (planos, manuais importados pela app):** a primeira importação em **Documentação técnica** cria a pasta `public_html/uploads/machine-docs/` (permissoes de escrita para o PHP). Os ficheiros são servidos em `https://(domínio)/uploads/machine-docs/…`. O `data.php` actual define o upload Admin (`machine_pdf`), substituição opcional do ficheiro anterior (`replacePath`) e gravação da lista em `maquinas.documentos` via o frontend.
 
+**Fotografias técnicas por equipamento:** o separador **Fotografias** cria/usa `public_html/uploads/machine-photos/`. A app comprime as imagens para JPEG antes do envio; `data.php` valida `uploads/machine_photo` e permite upload por Admin/Técnico autenticado. O nome do ficheiro inclui equipamento, nº de série e data/hora (`equipamento_numeroSerie_dataHora_random.jpg`, sanitizado). As fotos ficam referenciadas em `maquinas.documentos` com tipo interno `__foto_equipamento`, separadas da documentação obrigatória.
+
 Estrutura final no servidor:
 ```
 public_html/
@@ -52,6 +54,7 @@ public_html/
     parse-istobal-email.php ← parsing de emails ISTOBAL
   uploads/
     machine-docs/        ← PDFs técnicos por equipamento (criada pelo 1.º upload ou manualmente)
+    machine-photos/      ← fotografias técnicas por equipamento (criada pelo 1.º upload ou manualmente)
   cron-alertas.php       ← cron diário de lembretes de conformidade
   send-contact.php       ← já existia (formulário de contacto do site)
   index.html

@@ -30,11 +30,12 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 | [`docs/TESTES-E2E.md`](TESTES-E2E.md) | Playwright |
 | [`docs/MANUAL-UX-UI.md`](MANUAL-UX-UI.md) | Manual de interface |
 | [`docs/IMAGENS-E-ICONES.md`](IMAGENS-E-ICONES.md) | Assets |
+| [`DOCUMENTACAO.md`](../DOCUMENTACAO.md) § Equipamentos / `maquinas.documentos` | Fonte canónica para documentos obrigatórios, Biblioteca NAVEL e fotografias técnicas por equipamento |
 
 ## Domínio específico (referência)
 | Ficheiro | Conteúdo |
 |----------|----------|
-| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos e POST |
+| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST e compressão de fotografias |
 | [`docs/CRON-ALERTAS.md`](CRON-ALERTAS.md) | Lembretes automáticos |
 | [`docs/KAESER-IMPORT-PDF-ESTRATEGIA.md`](KAESER-IMPORT-PDF-ESTRATEGIA.md) | PDF Kaeser |
 | [`docs/TESTE-OFFLINE-MANUAL.md`](TESTE-OFFLINE-MANUAL.md) | Modo offline |
