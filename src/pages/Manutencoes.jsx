@@ -3,7 +3,7 @@
  * Permite executar manutenção, registar assinatura, ver/exportar relatório.
  * @see DOCUMENTACAO.md §11
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
@@ -18,7 +18,6 @@ import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play
 import { format, addDays, subMonths, startOfYear, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
 import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from '../utils/diasUteis'
-import { pt } from 'date-fns/locale'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
@@ -63,7 +62,6 @@ export default function Manutencoes() {
     removeManutencao,
     iniciarManutencao,
     updateMaquina,
-    addRelatorio,
     updateRelatorio,
     getRelatorioByManutencao,
     getIntervaloDiasByMaquina,
@@ -74,7 +72,7 @@ export default function Manutencoes() {
     tecnicos,
     marcas,
   } = useData()
-  const { canDelete, canEditManutencao, canDeleteManutencao, isAdmin } = usePermissions()
+  const { canEditManutencao, canDeleteManutencao, isAdmin } = usePermissions()
   const contentReady = useDeferredReady(manutencoes.length >= 0)
   const [modalConfirmDelete, setModalConfirmDelete] = useState(null)
   const [overflowAberto, setOverflowAberto] = useState(null)
@@ -191,7 +189,9 @@ export default function Manutencoes() {
       const next = typeof v === 'function' ? v(prev) : v
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ mostrarTodas: next }))
-      } catch {}
+      } catch {
+        // localStorage pode falhar em modo privado; o filtro continua em memória.
+      }
       return next
     })
   }, [])
@@ -282,9 +282,10 @@ export default function Manutencoes() {
       setModalAdminEdit({ manutencao: m, maquina: getMaquina(m.maquinaId) })
       return
     }
-    // ATecnica: enquanto o relatório não foi enviado ao cliente, usar o fluxo completo (checklist, fotos, assinatura).
+    // ATecnica: enquanto o relatório não foi enviado ao cliente, usar uma correcção rápida
+    // para evitar repetir o assistente completo só por uma data/nota/foto.
     if (!isAdmin && rel && !isRelatorioEnviadoAoCliente(rel)) {
-      setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })
+      setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId), quickEdit: true })
       return
     }
     const dataExec = rel ? (rel.dataAssinatura || rel.dataCriacao || '').slice(0, 10) : ''
@@ -482,7 +483,7 @@ export default function Manutencoes() {
       const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
       const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
 
-      let sucesso = 0
+      const sucessoDests = []
       for (const dest of dests) {
         const resultado = await enviarRelatorioEmail({
           emailDestinatario: dest,
@@ -498,16 +499,16 @@ export default function Manutencoes() {
           categoriaNome,
           declaracaoClienteDepois,
         })
-        if (resultado?.ok) sucesso++
+        if (resultado?.ok) sucessoDests.push(dest)
         else logger.error('Manutencoes', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
       }
+      const sucesso = sucessoDests.length
       if (sucesso > 0) {
-        const destsArr = [...dests]
         const now = new Date().toISOString()
-        const relUpdate = { ultimoEnvio: { data: now, destinatario: destsArr[0] } }
-        const clientDests = destsArr.filter(e => e !== EMAIL_ADMIN_MANUT)
+        const relUpdate = { ultimoEnvio: { data: now, destinatario: sucessoDests[0], destinatarios: sucessoDests } }
+        const clientDests = sucessoDests.filter(e => e !== EMAIL_ADMIN_MANUT)
         if (clientDests.length > 0) {
-          relUpdate.enviadoParaCliente = { data: now, email: clientDests[0] }
+          relUpdate.enviadoParaCliente = { data: now, email: clientDests[0], emails: clientDests }
         }
         updateRelatorio(rel.id, relUpdate)
         showToast(
@@ -1377,6 +1378,7 @@ export default function Manutencoes() {
           onClose={() => setModalExecucao(null)}
           manutencao={modalExecucao.manutencao}
           maquina={modalExecucao.maquina}
+          quickEdit={!!modalExecucao.quickEdit}
         />
       )}
 

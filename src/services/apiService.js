@@ -75,7 +75,7 @@ async function call(resource, action, { id = null, data = null, ...extra } = {})
     })
   } catch (err) {
     if (err.name === 'AbortError') {
-      const timeoutErr = new Error(`Timeout: API não respondeu em ${ms / 1000}s (${resource}/${action})`)
+      const timeoutErr = new Error(`Timeout: API não respondeu em ${API_TIMEOUT_MS / 1000}s (${resource}/${action})`)
       timeoutErr.status = 408
       logger.error('apiService', 'call', timeoutErr.message, {
         resource, action, status: 408, failureMode: 'timeout', endpoint: API_URL, method: 'POST', stack: timeoutErr.stack,

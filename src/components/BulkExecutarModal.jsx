@@ -2,9 +2,10 @@
  * BulkExecutarModal — Modal para executar várias manutenções em massa.
  * Formulário simplificado (sem wizard): dados comuns partilhados entre todas.
  */
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useToast } from './Toast'
 import { useData } from '../context/DataContext'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { logger } from '../utils/logger'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
@@ -33,6 +34,7 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     notas: '',
     nomeAssinante: '',
     checklistTodosSim: true,
+    confirmarExecucaoSimplificada: false,
   })
   const [assinaturaFeita, setAssinaturaFeita] = useState(false)
   const [processando, setProcessando] = useState(false)
@@ -53,15 +55,35 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     return null
   }, [manutencoesList, maquinaMap, clientes])
 
+  const bulkAvisos = useMemo(() => {
+    const maquinasSelecionadas = manutencoesList.map(m => maquinaMap[m.maquinaId]).filter(Boolean)
+    const nifs = new Set(maquinasSelecionadas.map(m => m.clienteNif).filter(Boolean))
+    const subcategorias = new Set(maquinasSelecionadas.map(m => m.subcategoriaId).filter(Boolean))
+    const tipos = new Set(manutencoesList.map(m => m.tipo || 'periodica'))
+    const temMontagem = manutencoesList.some(m => m.tipo === 'montagem')
+    const temKaeserOuContador = maquinasSelecionadas.some(m => SUBCATEGORIAS_COM_CONTADOR_HORAS?.includes?.(m.subcategoriaId))
+
+    return [
+      nifs.size > 1 && 'Há clientes diferentes na seleção; confirme que a mesma assinatura/notas fazem sentido.',
+      subcategorias.size > 1 && 'Há tipos de equipamento diferentes; a checklist será marcada como Conforme em todos.',
+      tipos.size > 1 && 'Há intervenções de natureza diferente (periódica/montagem).',
+      temMontagem && 'Há montagem na seleção; o fluxo individual tem validações de agenda mais completas.',
+      temKaeserOuContador && 'Há equipamentos com contador/KAESER; confirme horas e consumíveis individualmente se houver dúvidas.',
+    ].filter(Boolean)
+  }, [manutencoesList, maquinaMap])
+
   // Pre-fill client name from common client
-  useState(() => {
+  useEffect(() => {
     if (clienteComum?.nomeContacto) {
-      setForm(f => ({ ...f, nomeAssinante: clienteComum.nomeContacto }))
+      const raf = requestAnimationFrame(() => {
+        setForm(f => ({ ...f, nomeAssinante: f.nomeAssinante || clienteComum.nomeContacto }))
+      })
+      return () => cancelAnimationFrame(raf)
     }
-  })
+  }, [clienteComum?.nomeContacto])
 
   // Pre-fill saved signature
-  useState(() => {
+  useEffect(() => {
     if (clienteComum?.assinaturaContacto) {
       requestAnimationFrame(() => {
         const canvas = canvasRef.current
@@ -74,7 +96,7 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
         img.src = clienteComum.assinaturaContacto
       })
     }
-  })
+  }, [clienteComum?.assinaturaContacto])
 
   // ── Canvas handlers ──
   const getPos = useCallback((e, canvas) => {
@@ -128,6 +150,18 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
       showToast('Selecione o técnico que realizou as manutenções.', 'warning')
       return
     }
+    if (form.notas.trim().length < 15) {
+      showToast('Escreva uma nota comum mínima para auditoria da execução em massa.', 'warning')
+      return
+    }
+    if (!form.checklistTodosSim) {
+      showToast('Execução em massa só é segura com checklist toda Conforme. Use execução individual para excepções.', 'warning', 5500)
+      return
+    }
+    if (bulkAvisos.length > 0 && !form.confirmarExecucaoSimplificada) {
+      showToast('Confirme que aceita a execução simplificada antes de gravar em massa.', 'warning', 5500)
+      return
+    }
     if (!semAssinatura && !form.nomeAssinante.trim()) {
       showToast('Indique o nome do cliente que assina.', 'warning')
       return
@@ -176,7 +210,7 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
           dataCriacao: now,
         }
 
-        const resultado = addRelatorio({ manutencaoId: m.id, ...relPayload })
+        addRelatorio({ manutencaoId: m.id, ...relPayload })
 
         updateManutencao(m.id, {
           status: 'concluida',
@@ -224,7 +258,7 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     } else {
       showToast(`${sucesso} gravadas, ${erros} com erro. Verifique os registos.`, 'warning', 6000)
     }
-  }, [form, assinaturaFeita, manutencoesList, maquinaMap, clienteComum, getChecklistBySubcategoria, addRelatorio, updateManutencao, getIntervaloDiasByMaquina, updateMaquina, recalcularPeriodicasAposExecucao, updateCliente, showToast])
+  }, [form, assinaturaFeita, manutencoesList, maquinaMap, clienteComum, bulkAvisos, getChecklistBySubcategoria, addRelatorio, updateManutencao, getIntervaloDiasByMaquina, updateMaquina, recalcularPeriodicasAposExecucao, updateCliente, showToast])
 
   if (!isOpen || !manutencoesList?.length) return null
 
@@ -251,6 +285,19 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
           Os dados abaixo serão aplicados a todas as manutenções selecionadas.
           {clienteComum && <> Cliente comum: <strong>{clienteComum.nome}</strong></>}
         </p>
+
+        <div className={`bulk-risk-panel${bulkAvisos.length > 0 ? ' bulk-risk-panel--warning' : ''}`}>
+          <strong>Modo rápido de campo</strong>
+          <p>
+            Use apenas quando as intervenções são equivalentes e não há não conformidades.
+            Para anomalias, fotos, KAESER/contador ou consumíveis, execute individualmente.
+          </p>
+          {bulkAvisos.length > 0 && (
+            <ul>
+              {bulkAvisos.map((aviso, idx) => <li key={idx}>{aviso}</li>)}
+            </ul>
+          )}
+        </div>
 
         {processando && (
           <div className="bulk-progress">
@@ -299,7 +346,7 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
             <label>
               Notas (partilhadas) <span className="char-count">({form.notas.length}/300)</span>
               <textarea value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value.slice(0, 300) }))}
-                rows={3} className="textarea-full" maxLength={300} placeholder="Notas comuns a todas as manutenções..." />
+                rows={3} className="textarea-full" maxLength={300} placeholder="Notas comuns a todas as manutenções (obrigatório)..." />
             </label>
           </div>
 
@@ -309,7 +356,20 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
                 onChange={e => setForm(f => ({ ...f, checklistTodosSim: e.target.checked }))} />
               <span>Marcar todos os itens da checklist como <strong>Conforme (Sim)</strong></span>
             </label>
+            {!form.checklistTodosSim && (
+              <p className="form-erro">Com itens não conformes, use execução individual para registar detalhe e fotos por equipamento.</p>
+            )}
           </div>
+
+          {bulkAvisos.length > 0 && (
+            <div className="form-section">
+              <label className="bulk-toggle bulk-confirm-simplificada">
+                <input type="checkbox" checked={form.confirmarExecucaoSimplificada}
+                  onChange={e => setForm(f => ({ ...f, confirmarExecucaoSimplificada: e.target.checked }))} />
+                <span>Confirmo que estas manutenções podem ser fechadas por execução simplificada em massa.</span>
+              </label>
+            </div>
+          )}
 
           <div className="form-section assinatura-section">
             <h3 className="assinatura-titulo"><PenLine size={16} /> Assinatura</h3>

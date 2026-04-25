@@ -42,6 +42,50 @@ export default function QrReaderModal({ isOpen, onClose }) {
     onClose()
   }
 
+  function processar(texto) {
+    setTextoQr(texto)
+    setManutPendente(null)
+    setMaqDetectada(null)
+
+    // Verificar se é um QR da app (URL com ?maquina=ID)
+    try {
+      const url   = new URL(texto)
+      const maqId = url.searchParams.get('maquina')
+      if (maqId) {
+        const maq = maquinas.find(m => m.id === maqId)
+        setMaqDetectada(maq ?? null)
+
+        // M2: Scan & Go — verificar se há manutenção pendente nos próximos 7 dias
+        const hoje = getHojeAzores()
+        const limite7d = addDays(new Date(hoje + 'T12:00:00'), SCAN_GO_DIAS_LIMITE).toISOString().slice(0, 10)
+        const manutProxima = manutencoes
+          .filter(mt => mt.maquinaId === maqId && (mt.status === 'pendente' || mt.status === 'agendada') && mt.data <= limite7d)
+          .sort((a, b) => a.data.localeCompare(b.data))[0]
+
+        if (manutProxima) {
+          setManutPendente(manutProxima)
+          setEstado('lido')
+          setMensagem(maq ? `${maq.marca} ${maq.modelo} — manutenção agendada!` : 'Máquina encontrada — manutenção agendada!')
+          return
+        }
+
+        setEstado('lido')
+        setMensagem(maq ? `${maq.marca} ${maq.modelo} — a abrir ficha…` : 'Máquina encontrada — a abrir ficha…')
+        setTimeout(() => {
+          onClose()
+          navigate(`/equipamentos?maquina=${encodeURIComponent(maqId)}`)
+        }, 800)
+        return
+      }
+    } catch {
+      // Não é URL válida; mostrar o texto lido como QR externo.
+    }
+
+    // QR externo ou desconhecido
+    setEstado('lido')
+    setMensagem('QR lido — não é uma máquina AT_Manut.')
+  }
+
   // Iniciar câmara quando o modal abre
   useEffect(() => {
     if (!isOpen) return
@@ -108,48 +152,6 @@ export default function QrReaderModal({ isOpen, onClose }) {
       pararCamera()
     }
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const processar = (texto) => {
-    setTextoQr(texto)
-    setManutPendente(null)
-    setMaqDetectada(null)
-
-    // Verificar se é um QR da app (URL com ?maquina=ID)
-    try {
-      const url   = new URL(texto)
-      const maqId = url.searchParams.get('maquina')
-      if (maqId) {
-        const maq = maquinas.find(m => m.id === maqId)
-        setMaqDetectada(maq ?? null)
-
-        // M2: Scan & Go — verificar se há manutenção pendente nos próximos 7 dias
-        const hoje = getHojeAzores()
-        const limite7d = addDays(new Date(hoje + 'T12:00:00'), SCAN_GO_DIAS_LIMITE).toISOString().slice(0, 10)
-        const manutProxima = manutencoes
-          .filter(mt => mt.maquinaId === maqId && (mt.status === 'pendente' || mt.status === 'agendada') && mt.data <= limite7d)
-          .sort((a, b) => a.data.localeCompare(b.data))[0]
-
-        if (manutProxima) {
-          setManutPendente(manutProxima)
-          setEstado('lido')
-          setMensagem(maq ? `${maq.marca} ${maq.modelo} — manutenção agendada!` : 'Máquina encontrada — manutenção agendada!')
-          return
-        }
-
-        setEstado('lido')
-        setMensagem(maq ? `${maq.marca} ${maq.modelo} — a abrir ficha…` : 'Máquina encontrada — a abrir ficha…')
-        setTimeout(() => {
-          onClose()
-          navigate(`/equipamentos?maquina=${encodeURIComponent(maqId)}`)
-        }, 800)
-        return
-      }
-    } catch (_) { /* não é URL válida */ }
-
-    // QR externo ou desconhecido
-    setEstado('lido')
-    setMensagem('QR lido — não é uma máquina AT_Manut.')
-  }
 
   // Fechar com Escape
   useEffect(() => {

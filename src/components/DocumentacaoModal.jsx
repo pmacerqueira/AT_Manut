@@ -61,8 +61,11 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
   const pdfInputRef = useRef(null)
   const [formDoc, setFormDoc] = useState({ tipo: 'manual_utilizador', titulo: '', url: '' })
   const [confirmDeleteDocId, setConfirmDeleteDocId] = useState(null)
+  const [activeDocTab, setActiveDocTab] = useState('ficha')
 
   const maq = maquinas.find(m => String(m.id) === String(maquina?.id)) ?? maquina
+  const maqId = maq?.id
+  const maqSubcategoriaId = maq?.subcategoriaId
 
   const temManutencaoConcluidaNaMaq = useMemo(() => {
     if (!maq?.id) return false
@@ -80,15 +83,19 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
   )
 
   useEffect(() => {
-    if (!isOpen || !maq) return
-    const parafuso = SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq.subcategoriaId)
+    if (!isOpen || !maqId) return
+    const parafuso = SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maqSubcategoriaId)
     setFormDoc(f => ({ ...f, tipo: parafuso ? 'plano_manutencao' : 'manual_utilizador' }))
-  }, [isOpen, maq?.id, maq?.subcategoriaId])
+    setActiveDocTab('ficha')
+  }, [isOpen, maqId, maqSubcategoriaId])
 
   if (!isOpen) return null
 
   const documentos = maq ? (maq.documentos ?? []) : []
   const getTipoLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
+  const tiposComDocumento = new Set(documentos.map(d => d.tipo).filter(Boolean))
+  const tiposEmFalta = TIPOS_DOCUMENTO.filter(t => !tiposComDocumento.has(t.id))
+  const docCompleta = tiposEmFalta.length === 0
 
   const handleAddDoc = async (e) => {
     e.preventDefault()
@@ -226,197 +233,248 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-documentacao" onClick={e => e.stopPropagation()}>
-        <h2>Documentação — {maq?.marca} {maq?.modelo}</h2>
-        <p className="modal-hint">{COPY_DOC_FIO_CONDUTOR}</p>
-        {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq?.subcategoriaId) && (
-          <p className="modal-hint" style={{ marginTop: '0.5rem' }}>{COPY_DOC_PARAFUSO_KAESER}</p>
-        )}
-        {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} /> : null}
-        {mostrarPlanoKaeserNaDoc && (
-          <div className="consumiveis-card doc-plano-kaeser-card">
-            <h4>Plano de peças KAESER (A / B / C / D)</h4>
-            <p className="modal-hint" style={{ marginTop: 0 }}>
-              Os consumíveis por fase ficam na base após importação. Pode abrir o gestor de plano aqui ou importar directamente a partir do PDF «Plano de manutenção» já associado a este equipamento (só administrador).
-            </p>
-            <div className="form-row doc-kaeser-actions" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.65rem' }}>
-              {typeof onOpenPlanoPecas === 'function' && (
-                <button
-                  type="button"
-                  className="btn secondary btn-sm"
-                  onClick={() => onOpenPlanoPecas(maq)}
-                >
-                  <PackageOpen size={14} aria-hidden /> Abrir plano de peças (A/B/C/D)
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  type="button"
-                  className="btn primary btn-sm"
-                  onClick={handleImportarPecasDoPdfNaFicha}
-                  disabled={!docPlanoManutPdf}
-                  title={docPlanoManutPdf ? 'Lê o PDF do plano na lista e grava consumíveis A–D na base' : 'Associe primeiro um PDF como «Plano de manutenção (PDF)»'}
-                >
-                  Importar consumíveis do PDF já na ficha
-                </button>
-              )}
-            </div>
-            {!isAdmin && typeof onOpenPlanoPecas === 'function' && (
-              <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: 0, marginTop: '0.5rem' }}>
-                A importação a partir de PDF é feita pelo administrador. Use «Abrir plano de peças» para consultar as linhas já gravadas.
-              </p>
-            )}
+        <div className="doc-modal-header">
+          <div>
+            <h2>Documentação — {maq?.marca} {maq?.modelo}</h2>
+            <p className="modal-hint">{COPY_DOC_FIO_CONDUTOR}</p>
           </div>
-        )}
-        {SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq?.subcategoriaId) && (() => {
-          if (!maq) return null
-          const horasFicha = horasContadorNaFicha(maq)
-          const temOrfaosNaFicha = !temManutencaoConcluidaNaMaq && (!!maq.ultimaManutencaoData || horasFicha != null)
+          <div className={`doc-status-card ${docCompleta ? 'doc-status-card--ok' : 'doc-status-card--warning'}`}>
+            <strong>{docCompleta ? 'Documentação completa' : 'Documentação incompleta'}</strong>
+            <span>{documentos.length}/{TIPOS_DOCUMENTO.length} tipos associados</span>
+          </div>
+        </div>
 
-          if (!temManutencaoConcluidaNaMaq) {
-            return (
-              <div className="consumiveis-card">
-                <h4>Contador</h4>
-                {!temOrfaosNaFicha ? (
-                  <p className="modal-hint" style={{ margin: 0 }}>
-                    Sem manutenções <strong>concluídas</strong> neste equipamento. Referência: <strong>0 h</strong> até à primeira intervenção finalizada com relatório.
-                  </p>
-                ) : (
-                  <>
-                    <p className="modal-hint" style={{ margin: 0 }}>
-                      Não há manutenções concluídas, mas a ficha na base ainda tem data ou horas antigas. A referência correcta é <strong>0 h</strong> até voltar a concluir uma visita.
-                    </p>
-                    {isAdmin && (
-                      <p className="modal-hint" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-                        <span className="text-muted" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                          Valores órfãos: {maq.ultimaManutencaoData
-                            ? `última data ${format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}`
-                            : 'sem data'}
-                          {horasFicha != null ? ` · ${horasFicha} h` : ''}
-                        </span>
+        {SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maq?.subcategoriaId) && (
+          <p className="modal-hint doc-modal-note">{COPY_DOC_PARAFUSO_KAESER}</p>
+        )}
+
+        <div className="doc-tabs" role="tablist" aria-label="Secções de documentação">
+          <button type="button" className={activeDocTab === 'ficha' ? 'active' : ''} onClick={() => setActiveDocTab('ficha')}>
+            Documentos da ficha
+          </button>
+          <button type="button" className={activeDocTab === 'biblioteca' ? 'active' : ''} onClick={() => setActiveDocTab('biblioteca')}>
+            Biblioteca NAVEL
+          </button>
+          {mostrarPlanoKaeserNaDoc && (
+            <button type="button" className={activeDocTab === 'plano' ? 'active' : ''} onClick={() => setActiveDocTab('plano')}>
+              Plano / consumíveis
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={activeDocTab === 'adicionar' ? 'active' : ''} onClick={() => setActiveDocTab('adicionar')}>
+              Adicionar ficheiro
+            </button>
+          )}
+        </div>
+
+        {activeDocTab === 'ficha' && (
+          <section className="doc-panel">
+            {!docCompleta && (
+              <div className="doc-missing-card">
+                <strong>Faltam documentos na ficha:</strong>
+                <span>{tiposEmFalta.map(t => t.label).join(', ')}</span>
+              </div>
+            )}
+            <div className="doc-lista doc-lista--cards">
+              {documentos.map(d => (
+                <div key={d.id} className="doc-item">
+                  <div className="doc-item-info">
+                    <span className="doc-tipo">{getTipoLabel(d.tipo)}</span>
+                    <span className="doc-titulo">{d.titulo}</span>
+                  </div>
+                  <div className="doc-item-actions">
+                    <a href={safeHttpUrl(d.url)} target="_blank" rel="noopener noreferrer" className="equip-action-btn secondary" title="Abrir documento">
+                      <ExternalLink size={16} aria-hidden /> <span>Abrir</span>
+                    </a>
+                    {isAdmin && confirmDeleteDocId === d.id ? (
+                      <>
                         <button
                           type="button"
-                          className="btn secondary btn-sm"
+                          className="equip-action-btn danger"
                           onClick={async () => {
-                            if (!window.confirm('Limpar na ficha a data da última manutenção e as horas acumuladas? (Recomendado após apagar intervenções antigas.)')) return
-                            try {
-                              await updateMaquina(maq.id, {
-                                ultimaManutencaoData: null,
-                                horasServicoAcumuladas: null,
-                                horasTotaisAcumuladas: null,
-                              })
-                              showToast('Contador e data repostos na ficha.', 'success')
-                            } catch (err) {
-                              showToast(err?.message || 'Não foi possível limpar a ficha.', 'error', 4000)
-                            }
+                            setConfirmDeleteDocId(null)
+                            const r = await removeDocumentoMaquina(maq.id, d.id)
+                            showToast(
+                              r?.ok ? 'Documento removido.' : 'Não foi possível remover o documento.',
+                              r?.ok ? 'success' : 'error',
+                              4000
+                            )
                           }}
+                          title="Confirmar remoção"
                         >
-                          Limpar contador e data na ficha
+                          Sim
                         </button>
-                      </p>
+                        <button type="button" className="equip-action-btn secondary" onClick={() => setConfirmDeleteDocId(null)} title="Cancelar remoção">Não</button>
+                      </>
+                    ) : isAdmin && (
+                      <button type="button" className="equip-action-btn danger" onClick={() => setConfirmDeleteDocId(d.id)} title="Remover documento">
+                        <Trash2 size={16} aria-hidden /> <span>Remover</span>
+                      </button>
                     )}
-                  </>
-                )}
-              </div>
-            )
-          }
-
-          if (!maq.ultimaManutencaoData && horasFicha == null) return null
-          return (
-            <div className="consumiveis-card">
-              <h4>Contador (à data da última manutenção)</h4>
-              <div className="consumiveis-grid">
-                {maq.ultimaManutencaoData && (
-                  <span>
-                    <strong>Última manut.:</strong>{' '}
-                    {format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}
-                  </span>
-                )}
-                {horasFicha != null && <span><strong>Horas no contador:</strong> {horasFicha} h</span>}
-              </div>
+                  </div>
+                </div>
+              ))}
+              {documentos.length === 0 && <p className="doc-empty">Nenhum documento associado a esta ficha.</p>}
             </div>
-          )
-        })()}
-        {['sub5', 'sub14'].includes(maq?.subcategoriaId) && (maq?.refKitManut3000h || maq?.refKitManut6000h || maq?.refCorreia || maq?.refFiltroOleo || maq?.refFiltroSeparador || maq?.refFiltroAr) && (
-          <div className="consumiveis-card">
-            <h4>Consumíveis</h4>
-            <div className="consumiveis-grid">
-              {maq.refKitManut3000h && <span><strong>Kit 3000h:</strong> {maq.refKitManut3000h}</span>}
-              {maq.refKitManut6000h && <span><strong>Kit 6000h:</strong> {maq.refKitManut6000h}</span>}
-              {maq.refCorreia && <span><strong>Correia:</strong> {maq.refCorreia}</span>}
-              {maq.refFiltroOleo && <span><strong>Filtro óleo:</strong> {maq.refFiltroOleo}</span>}
-              {maq.refFiltroSeparador && <span><strong>Filtro separador:</strong> {maq.refFiltroSeparador}</span>}
-              {maq.refFiltroAr && <span><strong>Filtro ar:</strong> {maq.refFiltroAr}</span>}
-            </div>
-          </div>
+          </section>
         )}
-        <div className="doc-lista">
-          {documentos.map(d => (
-            <div key={d.id} className="doc-item">
-              <div className="doc-item-info">
-                <span className="doc-tipo">{getTipoLabel(d.tipo)}</span>
-                <span className="doc-titulo">{d.titulo}</span>
-              </div>
-              <div className="doc-item-actions">
-                <a href={safeHttpUrl(d.url)} target="_blank" rel="noopener noreferrer" className="icon-btn secondary" title="Abrir"><ExternalLink size={16} /></a>
-                {isAdmin && confirmDeleteDocId === d.id ? (
-                  <>
-                    <button
-                      type="button"
-                      className="icon-btn danger"
-                      onClick={async () => {
-                        setConfirmDeleteDocId(null)
-                        const r = await removeDocumentoMaquina(maq.id, d.id)
-                        showToast(
-                          r?.ok ? 'Documento removido.' : 'Não foi possível remover o documento.',
-                          r?.ok ? 'success' : 'error',
-                          4000
-                        )
-                      }}
-                      title="Confirmar"
-                    >
-                      Sim
-                    </button>
-                    <button type="button" className="icon-btn secondary" onClick={() => setConfirmDeleteDocId(null)} title="Cancelar">Não</button>
-                  </>
-                ) : isAdmin && (
-                  <button type="button" className="icon-btn danger" onClick={() => setConfirmDeleteDocId(d.id)} title="Remover"><Trash2 size={16} /></button>
+
+        {activeDocTab === 'biblioteca' && (
+          <section className="doc-panel doc-panel--biblioteca">
+            <div className="doc-source-intro">
+              <strong>Biblioteca NAVEL</strong>
+              <span>Documentos partilhados/externos à ficha deste equipamento.</span>
+            </div>
+            {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} /> : null}
+          </section>
+        )}
+
+        {activeDocTab === 'plano' && mostrarPlanoKaeserNaDoc && (
+          <section className="doc-panel">
+            <div className="consumiveis-card doc-plano-kaeser-card">
+              <h4>Plano de peças KAESER (A / B / C / D)</h4>
+              <p className="modal-hint" style={{ marginTop: 0 }}>
+                Os consumíveis por fase ficam na base após importação. Pode abrir o gestor de plano aqui ou importar directamente a partir do PDF «Plano de manutenção» já associado a este equipamento.
+              </p>
+              <div className="form-row doc-kaeser-actions" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.65rem' }}>
+                {typeof onOpenPlanoPecas === 'function' && (
+                  <button type="button" className="btn secondary btn-sm" onClick={() => onOpenPlanoPecas(maq)}>
+                    <PackageOpen size={14} aria-hidden /> Abrir plano de peças (A/B/C/D)
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="btn primary btn-sm"
+                    onClick={handleImportarPecasDoPdfNaFicha}
+                    disabled={!docPlanoManutPdf}
+                    title={docPlanoManutPdf ? 'Lê o PDF do plano na lista e grava consumíveis A-D na base' : 'Associe primeiro um PDF como «Plano de manutenção (PDF)»'}
+                  >
+                    Importar consumíveis do PDF já na ficha
+                  </button>
                 )}
               </div>
+              {!isAdmin && typeof onOpenPlanoPecas === 'function' && (
+                <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: 0, marginTop: '0.5rem' }}>
+                  A importação a partir de PDF é feita pelo administrador. Use «Abrir plano de peças» para consultar as linhas já gravadas.
+                </p>
+              )}
             </div>
-          ))}
-          {documentos.length === 0 && <p className="doc-empty">Nenhum documento associado.</p>}
-        </div>
-        {isAdmin && (
-          <form onSubmit={handleAddDoc} className="form-add-doc">
-            <div className="form-row">
+
+            {SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq?.subcategoriaId) && (() => {
+              if (!maq) return null
+              const horasFicha = horasContadorNaFicha(maq)
+              const temOrfaosNaFicha = !temManutencaoConcluidaNaMaq && (!!maq.ultimaManutencaoData || horasFicha != null)
+
+              if (!temManutencaoConcluidaNaMaq) {
+                return (
+                  <div className="consumiveis-card">
+                    <h4>Contador</h4>
+                    {!temOrfaosNaFicha ? (
+                      <p className="modal-hint" style={{ margin: 0 }}>
+                        Sem manutenções <strong>concluídas</strong> neste equipamento. Referência: <strong>0 h</strong> até à primeira intervenção finalizada com relatório.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="modal-hint" style={{ margin: 0 }}>
+                          Não há manutenções concluídas, mas a ficha na base ainda tem data ou horas antigas. A referência correcta é <strong>0 h</strong> até voltar a concluir uma visita.
+                        </p>
+                        {isAdmin && (
+                          <p className="modal-hint" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+                            <span className="text-muted" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                              Valores órfãos: {maq.ultimaManutencaoData
+                                ? `última data ${format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}`
+                                : 'sem data'}
+                              {horasFicha != null ? ` · ${horasFicha} h` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn secondary btn-sm"
+                              onClick={async () => {
+                                if (!window.confirm('Limpar na ficha a data da última manutenção e as horas acumuladas? (Recomendado após apagar intervenções antigas.)')) return
+                                try {
+                                  await updateMaquina(maq.id, {
+                                    ultimaManutencaoData: null,
+                                    horasServicoAcumuladas: null,
+                                    horasTotaisAcumuladas: null,
+                                  })
+                                  showToast('Contador e data repostos na ficha.', 'success')
+                                } catch (err) {
+                                  showToast(err?.message || 'Não foi possível limpar a ficha.', 'error', 4000)
+                                }
+                              }}
+                            >
+                              Limpar contador e data na ficha
+                            </button>
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )
+              }
+
+              if (!maq.ultimaManutencaoData && horasFicha == null) return null
+              return (
+                <div className="consumiveis-card">
+                  <h4>Contador (à data da última manutenção)</h4>
+                  <div className="consumiveis-grid">
+                    {maq.ultimaManutencaoData && (
+                      <span>
+                        <strong>Última manut.:</strong>{' '}
+                        {format(new Date(maq.ultimaManutencaoData + 'T12:00:00'), 'd MMM yyyy', { locale: pt })}
+                      </span>
+                    )}
+                    {horasFicha != null && <span><strong>Horas no contador:</strong> {horasFicha} h</span>}
+                  </div>
+                </div>
+              )
+            })()}
+            {['sub5', 'sub14'].includes(maq?.subcategoriaId) && (maq?.refKitManut3000h || maq?.refKitManut6000h || maq?.refCorreia || maq?.refFiltroOleo || maq?.refFiltroSeparador || maq?.refFiltroAr) && (
+              <div className="consumiveis-card">
+                <h4>Consumíveis</h4>
+                <div className="consumiveis-grid">
+                  {maq.refKitManut3000h && <span><strong>Kit 3000h:</strong> {maq.refKitManut3000h}</span>}
+                  {maq.refKitManut6000h && <span><strong>Kit 6000h:</strong> {maq.refKitManut6000h}</span>}
+                  {maq.refCorreia && <span><strong>Correia:</strong> {maq.refCorreia}</span>}
+                  {maq.refFiltroOleo && <span><strong>Filtro óleo:</strong> {maq.refFiltroOleo}</span>}
+                  {maq.refFiltroSeparador && <span><strong>Filtro separador:</strong> {maq.refFiltroSeparador}</span>}
+                  {maq.refFiltroAr && <span><strong>Filtro ar:</strong> {maq.refFiltroAr}</span>}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeDocTab === 'adicionar' && isAdmin && (
+          <section className="doc-panel">
+            <form onSubmit={handleAddDoc} className="form-add-doc form-add-doc--panel">
+              <div className="form-row">
+                <label>
+                  Tipo
+                  <select value={formDoc.tipo} onChange={e => setFormDoc(f => ({ ...f, tipo: e.target.value }))}>
+                    {TIPOS_DOCUMENTO.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </label>
+                <label style={{ flex: 1 }}>
+                  Título
+                  <input value={formDoc.titulo} onChange={e => setFormDoc(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: Plano 3000 h / Manual GA-22" />
+                </label>
+              </div>
+              <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }} onChange={handlePdfSelected} />
+              <div className="doc-upload-card">
+                <button type="button" className="btn secondary btn-add-doc" onClick={() => pdfInputRef.current?.click()}>
+                  <Upload size={16} /> Importar PDF para o servidor
+                </button>
+                <span className="text-muted">Máx. 8 MB. Usa o tipo seleccionado acima.</span>
+              </div>
               <label>
-                Tipo
-                <select value={formDoc.tipo} onChange={e => setFormDoc(f => ({ ...f, tipo: e.target.value }))}>
-                  {TIPOS_DOCUMENTO.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
+                Ou URL (link para PDF alojado noutro sítio)
+                <input type="url" value={formDoc.url} onChange={e => setFormDoc(f => ({ ...f, url: e.target.value }))} placeholder="https://..." />
               </label>
-              <label style={{ flex: 1 }}>
-                Título
-                <input value={formDoc.titulo} onChange={e => setFormDoc(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: Plano 3000 h / Manual GA-22" />
-              </label>
-            </div>
-            <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }} onChange={handlePdfSelected} />
-            <div className="form-row doc-upload-row" style={{ alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn secondary btn-add-doc"
-                onClick={() => pdfInputRef.current?.click()}
-              >
-                <Upload size={16} /> Importar PDF (servidor)
-              </button>
-              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Máx. 8 MB · usa o tipo seleccionado acima</span>
-            </div>
-            <label>
-              Ou URL (link para PDF alojado noutro sítio)
-              <input type="url" value={formDoc.url} onChange={e => setFormDoc(f => ({ ...f, url: e.target.value }))} placeholder="https://..." />
-            </label>
-            <button type="submit" className="btn-add-doc"><Plus size={16} /> Adicionar por URL</button>
-          </form>
+              <button type="submit" className="btn-add-doc"><Plus size={16} /> Adicionar por URL</button>
+            </form>
+          </section>
         )}
         <div className="form-actions">
           <button type="button" className="btn secondary" onClick={onClose}>Fechar</button>

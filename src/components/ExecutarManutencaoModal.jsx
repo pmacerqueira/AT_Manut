@@ -88,12 +88,15 @@ function normalizarChecklistRespostasMap(raw) {
   return o
 }
 
-/** Observações com texto livre + pelo menos um excerto das notas rápidas (lista configurável). */
+const OBSERVACOES_TEXTO_LIVRE_MIN = 24
+
+/** Observações aceites por nota rápida ou por texto livre minimamente descritivo. */
 function notasCumpremMinimoObservacoes(notas, quickNotesList) {
   const t = (notas || '').trim()
   if (!t) return false
   const list = Array.isArray(quickNotesList) && quickNotesList.length > 0 ? quickNotesList : QUICK_NOTES_DEFAULT
-  return list.some((q) => typeof q === 'string' && q.trim().length > 0 && t.includes(q))
+  if (list.some((q) => typeof q === 'string' && q.trim().length > 0 && t.includes(q))) return true
+  return t.length >= OBSERVACOES_TEXTO_LIVRE_MIN && /\s/.test(t)
 }
 
 /** Snapshot estável para comparar se o utilizador alterou o assistente (cancelar com confirmação). */
@@ -146,7 +149,7 @@ function snapshotExecCancelState({
   })
 }
 
-export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false }) {
+export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
   const {
     manutencoes,
@@ -242,12 +245,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
+  const isCorrectionMode = adminEdit || quickEdit
   /** Admin: `adminEdit`. ATecnica: relatório ainda não enviado ao cliente — podem corrigir agendamento e data de execução. */
-  const showStatusDatasSection = adminEdit || (!!rel && !isRelatorioEnviadoAoCliente(rel) && !isAdmin)
+  const showStatusDatasSection = isCorrectionMode || (!!rel && !isRelatorioEnviadoAoCliente(rel) && !isAdmin)
   const temContadorHoras = maq && SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maq.subcategoriaId)
   const isKaeserAbcdMaq = maq ? isKaeserAbcdMaquina(maq) : false
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual && manutencaoAtual.tipo !== 'montagem')
-  const useKaeserPipeline = isKaeserPeriodicExec && !adminEdit
+  const useKaeserPipeline = isKaeserPeriodicExec && !isCorrectionMode
 
   /** Data da manutenção concluída mais recente (para fallback quando a ficha não tem `ultimaManutencaoData`). */
   const fallbackUltimaManutDataKaeser = useMemo(() => {
@@ -336,7 +340,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     // Não repor bootstrappedIdRef aqui: `manutencoes` muda com frequência no DataContext e
     // anular o ref fazia o useEffect de bootstrap voltar a correr e `setFotos(rel)` apagava
     // fotos recém-adicionadas no «Editar relatório» / execução (menos de 1s após a galeria).
-    if (adminEdit && manutencao) {
+    if (isCorrectionMode && manutencao) {
       setExecUiPhase('form')
       setManutencaoAtual(prev => (prev?.id === manutencao.id ? prev : manutencao))
       setOpcoesEscolha([])
@@ -348,7 +352,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setOpcoesEscolha([])
       return
     }
-    if (!adminEdit) {
+    if (!isCorrectionMode) {
       const candidatos = candidatosMesmaDataMinimaAberta(maq.id, manutencoes)
       if (candidatos.length === 0) {
         setExecUiPhase('no_intervention')
@@ -373,7 +377,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       })
       setOpcoesEscolha([])
     }
-  }, [isOpen, adminEdit, manutencao?.id, maq?.id, manutencoes])
+  }, [isOpen, adminEdit, quickEdit, isCorrectionMode, manutencao?.id, maq?.id, manutencoes])
 
   useEffect(() => {
     if (!isOpen) return
@@ -474,7 +478,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       nomeAssinante: nomePreenchido,
       tipoManutKaeser,
       pecasUsadas,
-      dataRealizacao: (!adminEdit && m?.data && m.data < getHojeAzores()) ? getHojeAzores() : '',
+      dataRealizacao: (!isCorrectionMode && m?.data && m.data < getHojeAzores()) ? getHojeAzores() : '',
       adminStatus: m?.status || 'concluida',
       adminDataAgendada: m?.data || '',
       adminDataExecucao: existingRel
@@ -498,7 +502,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       assinaturaFeita: assinaturaBaseline,
       step: 1,
       confirmaEquipamentoSerie: false,
-      adminEdit,
+      adminEdit: isCorrectionMode,
       hasPreviewPdf: false,
       kaeserPecasDirty: false,
     })
@@ -524,7 +528,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         img.src = assinaturaImgSrc
       }
     })
-  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq, cli?.assinaturaContacto])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, quickEdit, isCorrectionMode, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq, cli?.assinaturaContacto])
 
   const confirmarCriarIntervencaoHoje = useCallback(() => {
     if (!maq) return
@@ -567,7 +571,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       assinaturaFeita,
       step,
       confirmaEquipamentoSerie,
-      adminEdit,
+      adminEdit: isCorrectionMode,
       hasPreviewPdf: !!previewPdfUrl,
       kaeserPecasDirty,
     })
@@ -586,6 +590,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     step,
     confirmaEquipamentoSerie,
     adminEdit,
+    quickEdit,
+    isCorrectionMode,
     previewPdfUrl,
     kaeserPecasDirty,
     onClose,
@@ -770,7 +776,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           return false
         }
         if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-          setErroChecklist('Inclua pelo menos uma das notas rápidas (toque num chip) para reforçar o relatório.')
+          setErroChecklist(`Use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`)
           return false
         }
         setErroChecklist('')
@@ -818,7 +824,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         return false
       }
       if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-        setErroChecklist('Inclua pelo menos uma das notas rápidas (toque num chip) para reforçar o relatório.')
+        setErroChecklist(`Use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`)
         return false
       }
       setErroChecklist('')
@@ -1009,7 +1015,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
 
-    if (!adminEdit) {
+    if (!isCorrectionMode) {
       if (!confirmaEquipamentoSerie) {
         showToast('Confirme o equipamento (número de série) antes de gravar.', 'warning')
         return
@@ -1030,7 +1036,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         }
       }
       if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-        showToast('Observações: preencha o texto e inclua pelo menos uma nota rápida.', 'warning')
+        showToast(`Observações: use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`, 'warning')
         return
       }
     }
@@ -1322,11 +1328,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
           const dest = emailDestinatario.trim().toLowerCase()
-          if (dest && dest !== 'comercial@navel.pt' && relIdFinal) {
-            updateRelatorio(relIdFinal, {
-              enviadoParaCliente: { data: new Date().toISOString(), email: dest },
-              ultimoEnvio: { data: new Date().toISOString(), destinatario: dest },
-            })
+          if (dest && relIdFinal) {
+            const nowEnvio = new Date().toISOString()
+            const patchEnvio = {
+              ultimoEnvio: { data: nowEnvio, destinatario: dest, destinatarios: [dest] },
+            }
+            if (dest !== 'comercial@navel.pt') {
+              patchEnvio.enviadoParaCliente = { data: nowEnvio, email: dest, emails: [dest] }
+            }
+            updateRelatorio(relIdFinal, patchEnvio)
           }
         } else {
           showToast(resultado.message || 'Erro ao enviar email.', 'error', 4000)
@@ -1338,10 +1348,22 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
     }
 
-    setConclusaoVariant('executada')
-    showToast('Dados gravados com sucesso.', 'success', 5000)
+    if (!emailDestinatario.trim()) {
+      showToast('Indique o email do cliente ou use "Gravar" para fechar sem envio.', 'warning')
+      return
+    }
+
+    setConclusaoVariant('email_enviando')
+    showToast('Dados gravados. A enviar email ao cliente…', 'info', 3500)
     const relAtualizado = { ...relPayload, manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal }
     enviarEmail(relAtualizado, { ...manutencaoAtual, status: 'concluida', data: hoje, tecnico: form.tecnico })
+      .then((resultado) => {
+        setConclusaoVariant(resultado?.ok ? 'email_enviado' : 'email_falhou')
+      })
+      .catch((err) => {
+        logger.error('ExecutarManutencaoModal', 'enviarEmailAposGravar', err?.message || 'Erro ao enviar email')
+        setConclusaoVariant('email_falhou')
+      })
       .finally(() => {
         setConcluido(true)
       })
@@ -1349,7 +1371,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (adminEdit) { handleAdminEditSave(); return }
+    if (isCorrectionMode) { handleAdminEditSave(); return }
     if (step < W.total) { goNext(); return }
     gravar(false, true)
   }
@@ -1376,7 +1398,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
     if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-      showToast('Observações: preencha o texto e inclua pelo menos uma nota rápida.', 'warning')
+      showToast(`Observações: use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`, 'warning')
       return
     }
     if (temContadorHoras) {
@@ -1497,7 +1519,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     const numFinal = relPayload.numeroRelatorio || rel.numeroRelatorio
     const statusChanged = form.adminStatus && form.adminStatus !== manutencaoAtual.status
-    logger.action('ExecutarManutencaoModal', 'adminEditSave', `Admin editou relatório ${numFinal}`,
+    logger.action('ExecutarManutencaoModal', isAdmin ? 'adminEditSave' : 'quickCorrectionSave', `${isAdmin ? 'Admin editou' : 'Técnico corrigiu'} relatório ${numFinal}`,
       {
         manutencaoId: manutencaoAtual.id,
         numeroRelatorio: numFinal,
@@ -1519,8 +1541,28 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   if (!isOpen || !maq) return null
 
   const desc = `${maq.marca} ${maq.modelo} — Nº Série: ${maq.numeroSerie}`
+  const resumoFinalizacao = (() => {
+    const dataExecucao = (form.adminDataExecucao || form.dataRealizacao || getHojeAzores()).trim()
+    const dataAgendada = (form.adminDataAgendada || manutencaoAtual?.data || '').trim()
+    const dias = getIntervaloDiasByMaquina(maq)
+    const proxima = dataExecucao && dias ? format(addDays(new Date(`${dataExecucao}T12:00:00`), dias), 'yyyy-MM-dd') : ''
+    const periodicidade = maq?.periodicidadeManut || manutencaoAtual?.periodicidade || ''
+    return {
+      dataExecucao,
+      dataAgendada,
+      proxima,
+      periodicidade,
+      tecnico: form.tecnico || '—',
+      assinatura: assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser) ? 'Registada' : 'Pendente / sem assinatura',
+      fotos: fotos.length,
+      email: emailDestinatario.trim() || 'Não indicado',
+      destinoEmail: emailDestinatario.trim()
+        ? (emailDestinatario.trim().toLowerCase() === 'comercial@navel.pt' ? 'Interno / administração' : 'Cliente')
+        : 'Sem envio',
+    }
+  })()
 
-  if (!adminEdit && execUiPhase === 'no_intervention') {
+  if (!isCorrectionMode && execUiPhase === 'no_intervention') {
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal modal-compact" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
@@ -1554,7 +1596,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     )
   }
 
-  if (!adminEdit && execUiPhase === 'choose_intervention' && opcoesEscolha.length > 0) {
+  if (!isCorrectionMode && execUiPhase === 'choose_intervention' && opcoesEscolha.length > 0) {
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal modal-compact" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
@@ -1591,11 +1633,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   if (concluido) {
     const relFinal = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
     const foiSemAssinatura = relFinal && !relFinal.assinadoPeloCliente
-    const tituloConclusao = conclusaoVariant === 'gravado_sem_email'
-      ? 'Dados gravados com sucesso'
+    const tituloConclusao =
+      conclusaoVariant === 'gravado_sem_email' ? 'Dados gravados com sucesso'
+      : conclusaoVariant === 'email_enviado' ? 'Manutenção executada e email enviado'
+      : conclusaoVariant === 'email_falhou' ? 'Manutenção executada; email não enviado'
       : 'Manutenção executada!'
-    const textoConclusao = conclusaoVariant === 'gravado_sem_email'
-      ? 'O relatório foi guardado; o email ao cliente não foi enviado. Pode enviar o comprovativo mais tarde a partir da lista de manutenções.'
+    const textoConclusao =
+      conclusaoVariant === 'gravado_sem_email'
+        ? 'O relatório foi guardado; o email ao cliente não foi enviado. Pode enviar o comprovativo mais tarde a partir da lista de manutenções.'
+      : conclusaoVariant === 'email_enviado'
+        ? 'Relatório gravado, assinado e enviado ao cliente. A intervenção fica marcada como enviada ao cliente.'
+      : conclusaoVariant === 'email_falhou'
+        ? 'O relatório foi gravado, mas houve erro no envio. Reenvie a partir da lista de manutenções.'
       : foiSemAssinatura
         ? 'Relatório gravado. Pendente de assinatura do cliente.'
         : 'Relatório gerado e assinado com sucesso.'
@@ -1742,13 +1791,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   return (
     <div className="modal-overlay" role="presentation">
       <div className="modal modal-assinatura modal-relatorio-form" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="exec-manut-modal-title">
-        <h2 id="exec-manut-modal-title">{adminEdit ? 'Editar relatório' : 'Executar manutenção'}</h2>
+          <h2 id="exec-manut-modal-title">{isCorrectionMode ? 'Corrigir relatório' : 'Executar manutenção'}</h2>
         {maq && <p className="modal-hint">{desc}</p>}
-        {adminEdit && rel?.numeroRelatorio && (
+        {isCorrectionMode && rel?.numeroRelatorio && (
           <p className="modal-hint" style={{ marginTop: '-0.25rem' }}>Relatório {rel.numeroRelatorio}</p>
         )}
 
-        {!adminEdit && (
+        {!isCorrectionMode && (
           <div className="wizard-progress">
             <div className="wizard-progress-bar">
               <div className="wizard-progress-fill" style={{ width: `${(step / W.total) * 100}%` }} />
@@ -1764,7 +1813,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         <div className="wizard-body">
 
           {/* ═══ Passo 1: confirmação de equipamento, data e horas (se contador) ═══ */}
-          {!adminEdit && step === W.verif && maq && (
+          {!isCorrectionMode && step === W.verif && maq && (
             <div className="wizard-step-content" data-testid="exec-passo-verificacao">
               <p className="wizard-step-hint">
                 Confirme que está a intervir no equipamento correcto (verifique o <strong>número de série</strong> no local).
@@ -1813,7 +1862,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
           {/* ═══ Admin: status + datas. ATecnica: só as duas datas (até enviar ao cliente). ═══ */}
           {showStatusDatasSection && (
-            <div className="wizard-step-content" style={{ display: 'block' }}>
+              <div className="wizard-step-content" style={{ display: 'block' }}>
               <h3 className="admin-edit-section-title">Status e datas</h3>
               <p className="form-hint" style={{ marginBottom: '0.75rem', maxWidth: '42rem' }}>
                 <strong>Agendamento</strong> é a data prevista no plano (lista «Agendada»).{' '}
@@ -1855,7 +1904,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   <span className="form-hint">Data real da intervenção; actualiza PDF, email e «Execução» na lista.</span>
                 </label>
               </div>
-              {adminEdit && temContadorHoras && (
+              {isCorrectionMode && temContadorHoras && (
                 <div className="form-section" style={{ marginTop: '0.75rem' }}>
                   <label>
                     Horas no contador (acumuladas)
@@ -1877,7 +1926,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </div>
           )}
 
-          {adminEdit && isKaeserPeriodicExec && (
+          {isCorrectionMode && isKaeserPeriodicExec && (
             <div className="wizard-step-content" style={{ display: 'block' }}>
               <h3 className="admin-edit-section-title">KAESER — ciclo, tipo e consumíveis do plano</h3>
               <p className="form-hint" style={{ marginBottom: '0.75rem' }}>
@@ -1993,7 +2042,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </div>
           )}
 
-          {!adminEdit && useKaeserPipeline && step === W.horas && (
+          {!isCorrectionMode && useKaeserPipeline && step === W.horas && (
             <div className="wizard-step-content" data-testid="kaeser-passo-horas">
               <p className="wizard-step-hint">
                 Leia o <strong>contador de horas de serviço</strong>. A app combina <strong>Δh desde a última referência</strong> na ficha com a <strong>janela anual ({KAESER_ANUAL_MIN_DIAS} d)</strong> — sugere o tipo A/B/C/D; pode sempre alterar.
@@ -2195,7 +2244,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             </div>
           )}
 
-          {!adminEdit && useKaeserPipeline && step === W.pecas && (
+          {!isCorrectionMode && useKaeserPipeline && step === W.pecas && (
             <div className="wizard-step-content">
               <p className="wizard-step-hint">
                 Lista do plano para o <strong>Tipo {form.tipoManutKaeser || '—'}</strong>. Pré-preenchida com <strong>1 un.</strong> por linha — ajuste as quantidades (0 = não aplicável) ou acrescente artigos extra.
@@ -2252,9 +2301,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           )}
 
           {/* ═══ Checklist ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.checklist) ? 'block' : 'none' }}>
-            {adminEdit && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
-            {!adminEdit && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.checklist) ? 'block' : 'none' }}>
+            {isCorrectionMode && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
+            {!isCorrectionMode && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
 
             {preFilledFromLast && (
               <div className="prefill-banner">
@@ -2318,7 +2367,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            {(adminEdit || !useKaeserPipeline) && isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem' && (
+            {(isCorrectionMode || !useKaeserPipeline) && isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem' && (
               <div className="form-section">
                 <label>
                   Tipo de manutenção KAESER (A/B/C/D)
@@ -2344,7 +2393,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            {(adminEdit || !useKaeserPipeline) && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser)) && (
+            {(isCorrectionMode || !useKaeserPipeline) && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser)) && (
               <div className="form-section">
                 <div className="pecas-checklist-header">
                   <h3>Consumíveis e peças</h3>
@@ -2397,11 +2446,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ Observações ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.notas) ? 'block' : 'none' }}>
-            {adminEdit && <h3 className="admin-edit-section-title">Observações</h3>}
-            {!adminEdit && (
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.notas) ? 'block' : 'none' }}>
+            {isCorrectionMode && <h3 className="admin-edit-section-title">Observações</h3>}
+            {!isCorrectionMode && (
               <p className="wizard-step-hint">
-                As observações são <strong>obrigatórias</strong>. Deve incluir <strong>pelo menos uma nota rápida</strong> (chip abaixo); pode complementar com texto livre.
+                As observações são <strong>obrigatórias</strong>. Use uma nota rápida ou escreva uma nota livre descritiva.
               </p>
             )}
             <label className="form-section">
@@ -2415,12 +2464,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 rows={6}
                 className="textarea-full"
                 maxLength={300}
-                placeholder="Descreva o trabalho e use as notas rápidas (obrigatório incluir pelo menos uma)…"
+                placeholder="Descreva o trabalho. Pode tocar numa nota rápida ou escrever texto livre suficiente…"
               />
             </label>
 
             <div className="quick-notes-section">
-              <span className="quick-notes-label">Notas rápidas — toque para inserir (pelo menos uma é obrigatória):</span>
+              <span className="quick-notes-label">Notas rápidas — toque para acelerar; texto livre também é aceite se for descritivo:</span>
               <div className="quick-notes-chips">
                 {quickNotes.map((note, i) => {
                   const isIncluded = form.notas.includes(note)
@@ -2439,13 +2488,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 })}
               </div>
             </div>
-            {!adminEdit && step === W.notas && erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+            {!isCorrectionMode && step === W.notas && erroChecklist && <p className="form-erro">{erroChecklist}</p>}
           </div>
 
           {/* ═══ Fotografias ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.fotos) ? 'block' : 'none' }}>
-            {adminEdit && <h3 className="admin-edit-section-title">Fotografias</h3>}
-            {!adminEdit && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.fotos) ? 'block' : 'none' }}>
+            {isCorrectionMode && <h3 className="admin-edit-section-title">Fotografias</h3>}
+            {!isCorrectionMode && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
             <div className="form-section fotos-section">
               <div className="fotos-header">
                 <span className="fotos-label">
@@ -2503,9 +2552,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ Técnico ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.tec) ? 'block' : 'none' }}>
-            {adminEdit && <h3 className="admin-edit-section-title">Técnico</h3>}
-            {!adminEdit && <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>}
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.tec) ? 'block' : 'none' }}>
+            {isCorrectionMode && <h3 className="admin-edit-section-title">Técnico</h3>}
+            {!isCorrectionMode && <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
             <label className="label-required form-section">
               <span>Técnico que realizou a manutenção <span className="req-star">*</span></span>
@@ -2520,12 +2569,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ Nome do cliente ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.cli) ? 'block' : 'none' }}>
-            {adminEdit && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
-            {!adminEdit && <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>}
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.cli) ? 'block' : 'none' }}>
+            {isCorrectionMode && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
+            {!isCorrectionMode && <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>}
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
-            {!adminEdit && (
+            {!isCorrectionMode && (
               <div className="declaracao-assinatura-box">
                 <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
                 <p className="declaracao-assinatura-texto">
@@ -2539,8 +2588,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
             )}
 
-            <label className={`${adminEdit ? '' : 'label-required'} form-section`}>
-              <span>{adminEdit ? 'Nome do cliente que assinou' : 'Nome do cliente que assina'} {!adminEdit && <span className="req-star">*</span>}</span>
+            <label className={`${isCorrectionMode ? '' : 'label-required'} form-section`}>
+              <span>{isCorrectionMode ? 'Nome do cliente que assinou' : 'Nome do cliente que assina'} {!isCorrectionMode && <span className="req-star">*</span>}</span>
               <div className="campo-com-guardar">
                 <input type="text" value={form.nomeAssinante}
                   onChange={e => { setForm(f => ({ ...f, nomeAssinante: e.target.value })); setErroAssinatura('') }}
@@ -2558,8 +2607,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ Assinatura ═══ */}
-          <div className="wizard-step-content" style={{ display: (adminEdit || step === W.ass) ? 'block' : 'none' }}>
-            {adminEdit ? (
+          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.ass) ? 'block' : 'none' }}>
+            {isCorrectionMode ? (
               <>
                 <h3 className="admin-edit-section-title">Assinatura digital</h3>
                 {rel?.assinaturaDigital && !form.limparAssinatura ? (
@@ -2640,9 +2689,29 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           </div>
 
           {/* ═══ Finalizar (hidden in admin edit mode) ═══ */}
-          <div className="wizard-step-content" style={{ display: (!adminEdit && step === W.fin) ? 'block' : 'none' }}>
+          <div className="wizard-step-content" style={{ display: (!isCorrectionMode && step === W.fin) ? 'block' : 'none' }}>
             <p className="wizard-step-hint">Reveja os dados, pré-visualize o relatório e finalize a manutenção.</p>
             {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
+
+            <div className="exec-review-panel">
+              <div className="exec-review-header">
+                <CheckCircle2 size={18} />
+                <div>
+                  <strong>Revisão antes de gravar</strong>
+                  <p>Confirme datas, assinatura, próxima manutenção e envio antes de fechar a intervenção.</p>
+                </div>
+              </div>
+              <div className="exec-review-grid">
+                <div><span>Agendada</span><strong>{resumoFinalizacao.dataAgendada ? formatarDataPT(resumoFinalizacao.dataAgendada) : '—'}</strong></div>
+                <div><span>Execução</span><strong>{resumoFinalizacao.dataExecucao ? formatarDataPT(resumoFinalizacao.dataExecucao) : '—'}</strong></div>
+                <div><span>Técnico</span><strong>{resumoFinalizacao.tecnico}</strong></div>
+                <div><span>Assinatura</span><strong>{resumoFinalizacao.assinatura}</strong></div>
+                <div><span>Fotos</span><strong>{resumoFinalizacao.fotos}/{MAX_FOTOS}</strong></div>
+                <div><span>Email</span><strong>{resumoFinalizacao.destinoEmail}</strong></div>
+                <div className="exec-review-wide"><span>Próxima manutenção prevista</span><strong>{resumoFinalizacao.proxima ? formatarDataPT(resumoFinalizacao.proxima) : '—'}</strong></div>
+                <div className="exec-review-wide"><span>Agenda futura</span><strong>{resumoFinalizacao.periodicidade ? `Recalcular a partir de ${resumoFinalizacao.dataExecucao || 'hoje'}` : 'Sem periodicidade definida'}</strong></div>
+              </div>
+            </div>
 
             {(isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores())) && (
               <div className="form-section-historica">
@@ -2710,7 +2779,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         {/* ═══ Rodapé fixo ═══ */}
         <div className="wizard-footer">
           <button type="button" className="btn secondary" onClick={handleCancelarExecucao}>Cancelar</button>
-          {adminEdit ? (
+          {isCorrectionMode ? (
             <div className="wizard-footer-actions">
               <button type="button" className="btn btn-gravar-sucesso" onClick={handleAdminEditSave}>
                 <Save size={15} /> Guardar alterações

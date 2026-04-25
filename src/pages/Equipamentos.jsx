@@ -20,6 +20,30 @@ import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
 import { COPY_DOC_RESUMO_EQUIPAMENTOS, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 
+function getDocumentacaoStatus(maquina) {
+  const docs = maquina?.documentos ?? []
+  const existentes = new Set(docs.map(d => d.tipo).filter(Boolean))
+  const emFalta = TIPOS_DOCUMENTO.filter(t => !existentes.has(t.id))
+  return {
+    count: docs.length,
+    total: TIPOS_DOCUMENTO.length,
+    complete: emFalta.length === 0,
+    label: emFalta.length === 0 ? 'Docs completas' : `Faltam ${emFalta.length} docs`,
+    title: emFalta.length === 0
+      ? 'Documentação completa'
+      : `Faltam: ${emFalta.map(t => t.label).join(', ')}`,
+  }
+}
+
+function EquipActionButton({ children, icon: Icon, className = 'secondary', ...props }) {
+  return (
+    <button type="button" className={`equip-action-btn ${className}`} {...props}>
+      {Icon && <Icon size={16} aria-hidden />}
+      <span>{children}</span>
+    </button>
+  )
+}
+
 export default function Equipamentos() {
   const {
     clientes,
@@ -51,7 +75,7 @@ export default function Equipamentos() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filterAtraso = searchParams.get('filter') === 'atraso' // whitelist: apenas 'atraso' é aceite
 
-  const [highlightMaqId, setHighlightMaqId] = useState(null)
+  const [, setHighlightMaqId] = useState(null)
 
   const navigateToMaquina = (maqId) => {
     const maq = maquinas.find(m => String(m.id) === String(maqId))
@@ -141,7 +165,7 @@ export default function Equipamentos() {
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank')
       setTimeout(() => URL.revokeObjectURL(url), 30000)
-    } catch (err) {
+    } catch {
       showToast('Erro ao gerar histórico.', 'error')
     } finally {
       hideGlobalLoading()
@@ -226,6 +250,7 @@ export default function Equipamentos() {
                   <h4>{nomeCliente}</h4>
                   {list.map(m => {
                     const sub = getSubcategoria(m.subcategoriaId)
+                    const docStatus = getDocumentacaoStatus(m)
                     return (
                       <div key={m.id} id={`maq-${m.id}`} className="maquina-row maquina-row--atraso">
                         <div className="maquina-row-info">
@@ -245,9 +270,12 @@ export default function Equipamentos() {
                             <span className="badge badge-danger">
                               Próx. manut.: {format(parseDateLocal(m.proximaManut), 'd MMM yyyy', { locale: pt })}
                             </span>
+                            <span className={`badge badge-docs${docStatus.complete ? ' badge-docs--ok' : ''}`} title={docStatus.title}>
+                              {docStatus.label}
+                            </span>
                           </div>
                         </div>
-                        <div className="actions">
+                        <div className="actions equip-actions">
                           <button
                             type="button"
                             className="btn-executar-manut"
@@ -256,14 +284,29 @@ export default function Equipamentos() {
                           >
                             <CalendarDays size={12} /> Próximas
                           </button>
-                          <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
-                          <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
-                          <button type="button" className="icon-btn secondary" onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA} aria-label={COPY_DOC_TITLE_BOTAO_LISTA}><FolderPlus size={16} /></button>
+                          <EquipActionButton icon={FolderPlus} onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA}>
+                            Documentação
+                          </EquipActionButton>
+                          <EquipActionButton icon={FileText} onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}>
+                            Histórico
+                          </EquipActionButton>
+                          <EquipActionButton icon={QrCode} onClick={() => setModalQr(m)} title="Gerar etiqueta QR">
+                            QR
+                          </EquipActionButton>
                           {isAdmin && (
                             <>
-                              <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
-                              <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                              <EquipActionButton icon={PackageOpen} onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis">
+                                Peças
+                              </EquipActionButton>
+                              <EquipActionButton icon={Pencil} onClick={() => setModalEdit(m)} title="Editar ficha">
+                                Editar
+                              </EquipActionButton>
                             </>
+                          )}
+                          {canDelete && (
+                            <EquipActionButton icon={Trash2} className="danger" onClick={() => setModalConfirmDelete(m)} title="Eliminar">
+                              Eliminar
+                            </EquipActionButton>
                           )}
                         </div>
                       </div>
@@ -343,8 +386,7 @@ export default function Equipamentos() {
                     const hoje = startOfDay(new Date(getHojeAzores()))
                     const temProxima = !!m.proximaManut
                     const proxVencida = temProxima && isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)
-                    const docsCount = (m.documentos ?? []).length
-                    const docsTotal = TIPOS_DOCUMENTO.length
+                    const docStatus = getDocumentacaoStatus(m)
                     return (
                     <div key={m.id} id={`maq-${m.id}`} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
                       <div className="maquina-row-info">
@@ -373,12 +415,12 @@ export default function Equipamentos() {
                           ) : (
                             <span className="badge badge-sem-data-equip">Sem manut. agendada</span>
                           )}
-                          <span className={`badge badge-docs${docsCount === docsTotal ? ' badge-docs--ok' : ''}`} title="Documentação obrigatória">
-                            {docsCount}/{docsTotal} docs
+                          <span className={`badge badge-docs${docStatus.complete ? ' badge-docs--ok' : ''}`} title={docStatus.title}>
+                            {docStatus.label}
                           </span>
                         </div>
                       </div>
-                      <div className="actions">
+                      <div className="actions equip-actions">
                         <button
                           type="button"
                           className="btn-executar-manut"
@@ -387,17 +429,29 @@ export default function Equipamentos() {
                         >
                           <CalendarDays size={12} /> Próximas
                         </button>
-                        <button className="icon-btn secondary" onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}><FileText size={16} /></button>
-                        <button className="icon-btn secondary" onClick={() => setModalQr(m)} title="Gerar etiqueta QR"><QrCode size={16} /></button>
-                        <button type="button" className="icon-btn secondary" onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA} aria-label={COPY_DOC_TITLE_BOTAO_LISTA}><FolderPlus size={16} /></button>
+                        <EquipActionButton icon={FolderPlus} onClick={() => setModalDoc(m)} title={COPY_DOC_TITLE_BOTAO_LISTA}>
+                          Documentação
+                        </EquipActionButton>
+                        <EquipActionButton icon={FileText} onClick={() => handleHistoricoPdf(m)} title="Histórico completo em PDF" disabled={loadingHistorico === m.id}>
+                          Histórico
+                        </EquipActionButton>
+                        <EquipActionButton icon={QrCode} onClick={() => setModalQr(m)} title="Gerar etiqueta QR">
+                          QR
+                        </EquipActionButton>
                         {isAdmin && (
                           <>
-                            <button className="icon-btn secondary" onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis"><PackageOpen size={16} /></button>
-                            <button className="icon-btn secondary" onClick={() => setModalEdit(m)} title="Editar"><Pencil size={16} /></button>
+                            <EquipActionButton icon={PackageOpen} onClick={() => setModalPecas(m)} title="Plano de peças e consumíveis">
+                              Peças
+                            </EquipActionButton>
+                            <EquipActionButton icon={Pencil} onClick={() => setModalEdit(m)} title="Editar ficha">
+                              Editar
+                            </EquipActionButton>
                           </>
                         )}
                         {canDelete && (
-                          <button className="icon-btn danger" onClick={() => setModalConfirmDelete(m)} title="Eliminar"><Trash2 size={16} /></button>
+                          <EquipActionButton icon={Trash2} className="danger" onClick={() => setModalConfirmDelete(m)} title="Eliminar">
+                            Eliminar
+                          </EquipActionButton>
                         )}
                       </div>
                     </div>

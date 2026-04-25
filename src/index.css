@@ -372,6 +372,40 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
 .data-table tbody tr:hover { background: var(--color-bg-elevated); }
 
 .actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; flex-shrink: 0; }
+.equip-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 42px;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.equip-action-btn:hover {
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.equip-action-btn.danger {
+  color: var(--color-danger);
+  border-color: rgba(var(--color-danger-rgb), 0.45);
+  background: rgba(var(--color-danger-rgb), 0.12);
+}
+.equip-action-btn.danger:hover {
+  color: var(--color-white);
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
 .icon-btn {
   padding: var(--space-sm) !important;
   min-width: var(--touch-min) !important;
@@ -379,11 +413,12 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: transparent !important;
-  color: var(--color-text-muted) !important;
-  transition: color 0.15s ease, background 0.15s ease;
+  background: var(--color-bg-elevated) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
-.icon-btn:hover { color: var(--color-accent) !important; background: var(--color-accent-muted) !important; }
+.icon-btn:hover { color: var(--color-accent) !important; background: var(--color-accent-muted) !important; border-color: var(--color-accent) !important; }
 .icon-btn.danger:hover { color: var(--color-danger) !important; background: rgba(var(--color-danger-rgb), 0.15) !important; }
 
 /* Modais/Painéis — ecrã completo, fontes ajustadas (experiência consistente) */
@@ -452,7 +487,77 @@ body:has(.modal-overlay) {
 /* Documentação técnica (Equipamentos + Manutenções) */
 .modal-documentacao .modal-hint { font-size: 0.85em; color: var(--color-text-muted); margin: -0.25rem 0 0.85rem; }
 .modal-documentacao .form-actions { margin-top: 1rem; }
+.doc-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
+.doc-modal-header h2 { margin-bottom: 0.35rem; }
+.doc-modal-note { margin-top: 0.25rem !important; }
+.doc-status-card {
+  min-width: 180px;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+.doc-status-card strong,
+.doc-status-card span { display: block; }
+.doc-status-card strong { font-size: 0.86rem; }
+.doc-status-card span { margin-top: 0.15rem; font-size: 0.78rem; color: var(--color-text-muted); }
+.doc-status-card--ok { border-color: rgba(52, 211, 153, 0.45); background: rgba(52, 211, 153, 0.13); }
+.doc-status-card--warning { border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.12); }
+.doc-tabs {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 1rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-elevated);
+}
+.doc-tabs button {
+  flex: 1 1 150px;
+  min-height: 42px;
+  padding: 0.55rem 0.75rem;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.doc-tabs button:hover,
+.doc-tabs button.active {
+  background: var(--color-accent);
+  color: var(--color-white);
+  border-color: var(--color-accent);
+}
+.doc-panel {
+  padding: 0.25rem 0 0;
+}
+.doc-source-intro,
+.doc-missing-card,
+.doc-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+.doc-source-intro span,
+.doc-missing-card span,
+.doc-upload-card span {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+}
+.doc-missing-card {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.11);
+}
 .doc-lista { max-height: min(280px, 35dvh); overflow-y: auto; margin-bottom: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-sm); }
+.doc-lista--cards { max-height: min(360px, 44dvh); }
 .doc-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: 0.6rem; border-radius: var(--radius-sm); background: var(--color-bg-elevated); margin-bottom: 0.4rem; }
 .doc-item:last-child { margin-bottom: 0; }
 .doc-item-link { text-decoration: none; color: inherit; cursor: pointer; transition: background 0.2s; }
@@ -467,6 +572,7 @@ body:has(.modal-overlay) {
 .form-add-doc { padding-top: 1rem; border-top: 1px solid var(--color-border); }
 .form-add-doc .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
 .form-add-doc .form-row label { flex: 1; min-width: 140px; }
+.form-add-doc--panel { padding-top: 0; border-top: 0; }
 .btn-add-doc { display: inline-flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
 .checklist-quick-actions { margin-bottom: 0.75rem; font-size: 0.9em; }
 .checklist-quick-actions .btn-link-checklist {
@@ -884,6 +990,27 @@ body:has(.modal-overlay) {
   .form-actions button,
   .form-actions .btn {
     width: 100%;
+  }
+  .doc-modal-header {
+    flex-direction: column;
+  }
+  .doc-status-card {
+    width: 100%;
+  }
+  .doc-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .doc-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .doc-item-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .doc-item-actions .equip-action-btn {
+    flex: 1 1 140px;
   }
   .data-table thead { display: none; }
   .table-card .data-table { min-width: 0; }
@@ -1349,11 +1476,75 @@ body.modo-campo .required {
   color: #991b1b;
 }
 body.modo-campo .text-muted,
+body.modo-campo .modal-hint,
+body.modo-campo .doc-tipo,
+body.modo-campo .doc-empty,
+body.modo-campo .page-sub,
 body.modo-campo .fotos-vazio,
 body.modo-campo .char-count,
 body.modo-campo .field-hint,
 body.modo-campo .assinatura-hint {
   color: #3a4a5e;
+}
+
+body.modo-campo .equip-action-btn {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 2px solid #64748b;
+  font-weight: 800;
+}
+body.modo-campo .equip-action-btn:hover {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #1d4ed8;
+}
+body.modo-campo .equip-action-btn.danger {
+  background: #fef2f2;
+  color: #7f1d1d;
+  border-color: #991b1b;
+}
+body.modo-campo .equip-action-btn.danger:hover {
+  background: #991b1b;
+  color: #ffffff;
+}
+body.modo-campo .doc-tabs {
+  background: #e2e8f0;
+  border: 2px solid #94a3b8;
+}
+body.modo-campo .doc-tabs button {
+  color: #0f172a;
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+body.modo-campo .doc-tabs button:hover,
+body.modo-campo .doc-tabs button.active {
+  background: #0050a0;
+  color: #ffffff;
+  border-color: #003d7a;
+}
+body.modo-campo .doc-status-card,
+body.modo-campo .doc-source-intro,
+body.modo-campo .doc-upload-card,
+body.modo-campo .doc-item {
+  background: #f8fafc;
+  border: 2px solid #94a3b8;
+  color: #0f172a;
+}
+body.modo-campo .doc-status-card span,
+body.modo-campo .doc-source-intro span,
+body.modo-campo .doc-upload-card span {
+  color: #334155;
+}
+body.modo-campo .doc-missing-card,
+body.modo-campo .doc-status-card--warning {
+  background: #fef3c7;
+  border: 2px solid #92400e;
+  color: #451a03;
+}
+body.modo-campo .doc-status-card--ok {
+  background: #dcfce7;
+  border: 2px solid #166534;
+  color: #052e16;
 }
 
 /* ── Cards e painéis ── */

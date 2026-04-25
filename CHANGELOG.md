@@ -9,6 +9,30 @@ Política de continuidade:
 
 ---
 
+## [1.16.71] — 2026-04-24 — UX execução e fichas de equipamentos com contraste reforçado
+
+### Melhorias de workflow
+- **`ExecutarManutencaoModal.jsx`:** passo final passa a mostrar uma revisão operacional antes de gravar: data agendada, data real de execução, técnico, assinatura, fotos, destino do email, próxima manutenção prevista e indicação de recálculo da agenda futura. Isto torna visível o ponto crítico antes de fechar a intervenção.
+- **Correção rápida para ATecnica:** ao editar uma manutenção executada cujo relatório ainda não foi enviado ao cliente, o técnico já não entra no assistente completo; abre um modo de correcção rápida para datas, checklist, notas, fotos, técnico, nome/assinatura e horas de contador quando aplicável. O Admin mantém o modo de edição avançado.
+- **Observações:** notas rápidas deixam de ser bloqueio absoluto. O utilizador pode tocar num chip para acelerar, mas texto livre descritivo também é aceite.
+- **Envio de email:** o fluxo distingue melhor "gravado", "a enviar", "email enviado" e "email falhou". O botão Enviar exige destinatário; "Gravar" continua disponível para fechar sem envio. O estado `ultimoEnvio` guarda a lista de destinatários com sucesso e `enviadoParaCliente` guarda todos os emails de cliente enviados.
+- **`BulkExecutarModal.jsx`:** execução em massa passa a ter painel de risco, nota comum obrigatória, bloqueio de checklist não-conforme em massa, confirmação explícita quando a selecção mistura clientes/tipos/equipamentos ou contém montagem/contador/KAESER, e correcção do pré-preenchimento de nome/assinatura.
+
+### Responsivo / tablets
+- **`Manutencoes.css`:** novos estilos para painel de revisão e execução em massa, com grelha adaptativa, `max-height`/scroll touch em tablets e overrides em `modo-campo` para legibilidade.
+- **`Equipamentos.jsx` / `Equipamentos.css`:** ações da ficha deixam de ser apenas ícones e passam a botões com texto visível (`Documentação`, `Histórico`, `QR`, `Peças`, `Editar`, `Eliminar`), com grelha responsiva em tablets e telemóvel.
+- **`DocumentacaoModal.jsx`:** documentação reorganizada em separadores claros: `Documentos da ficha`, `Biblioteca NAVEL`, `Plano / consumíveis` e `Adicionar ficheiro`. O estado documental passou de `X/Y docs` para mensagens operacionais como `Documentação completa` ou `Faltam N docs`, com lista dos tipos em falta.
+- **`index.css`:** reforço transversal de contraste para botões secundários/ícones, botões com texto, textos auxiliares, legendas, cartões do modal de documentação e overrides específicos de `modo-campo` para fundo claro.
+
+### Verificação
+- `npm run build` concluído com sucesso.
+- `npx eslint src/components/ExecutarManutencaoModal.jsx src/components/BulkExecutarModal.jsx src/pages/Manutencoes.jsx` sem erros (mantém warnings antigos de hooks nos ficheiros existentes).
+- `npx eslint src/components/DocumentacaoModal.jsx src/pages/Equipamentos.jsx` sem erros.
+- `npm run lint` agora conclui com **0 erros**: `dist/**` e `dist_upload/**` ficaram excluídos do ESLint por serem artefactos gerados/minificados; `scripts` e `tests` passaram a usar globals adequados de Node/Playwright; avisos legados continuam visíveis como warnings.
+- Corrigidos dois bloqueios reais encontrados durante a sanitização: timeout da API referia `ms` inexistente (passa a usar `API_TIMEOUT_MS`) e `QrReaderModal.jsx` deixava o compilador React sinalizar acesso a `processar` antes da declaração.
+
+---
+
 ## [Documentação] — 2026-04-24 — Consolidação dos procedimentos de segredos
 
 ### Novo

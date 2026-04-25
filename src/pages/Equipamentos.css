@@ -117,3 +117,75 @@
   color: #6ee7b7;
   border-color: rgba(52, 211, 153, 0.35);
 }
+
+.maquina-row {
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.equip-actions {
+  justify-content: flex-end;
+  max-width: min(100%, 620px);
+}
+
+.equip-actions .btn-executar-manut,
+.equip-actions .equip-action-btn {
+  min-height: 42px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .maquina-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .equip-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .equip-actions .btn-executar-manut,
+  .equip-actions .equip-action-btn {
+    flex: 1 1 150px;
+  }
+}
+
+@media (max-width: 640px) {
+  .maquina-row-info,
+  .equip-actions {
+    width: 100%;
+  }
+
+  .equip-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .equip-actions .btn-executar-manut,
+  .equip-actions .equip-action-btn {
+    width: 100%;
+  }
+}
+
+body.modo-campo .badge-periodicidade,
+body.modo-campo .kaeser-tipo-badge {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #1d4ed8;
+}
+
+body.modo-campo .badge-conforme-equip,
+body.modo-campo .badge-docs--ok {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #166534;
+}
+
+body.modo-campo .badge-sem-data-equip,
+body.modo-campo .badge-docs {
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #92400e;
+}

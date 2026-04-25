@@ -1193,6 +1193,56 @@ body.modo-campo .num-servico {
   border-top: 1px solid var(--color-border, rgba(255,255,255,0.08));
 }
 
+.exec-review-panel {
+  margin: 0 0 1rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(59, 130, 246, 0.08);
+}
+.exec-review-header {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  color: var(--color-primary, #3b82f6);
+}
+.exec-review-header p {
+  margin: 0.15rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+.exec-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.exec-review-grid > div {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border, rgba(255,255,255,0.08));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-card, rgba(0,0,0,0.18));
+  min-width: 0;
+}
+.exec-review-grid span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.18rem;
+}
+.exec-review-grid strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.exec-review-wide {
+  grid-column: 1 / -1;
+}
+
 /* ── Modo campo (light): tabela de manutenções ─────────────────────────── */
 body.modo-campo .manutencoes-table.table-card.card {
   border: 2px solid #94a3b8;
@@ -1435,6 +1485,20 @@ body.modo-campo .wizard-preview-actions {
   background: #f1f5f9;
   border-top-color: #cbd5e1;
 }
+body.modo-campo .exec-review-panel,
+body.modo-campo .bulk-risk-panel {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+body.modo-campo .bulk-risk-panel--warning,
+body.modo-campo .bulk-confirm-simplificada {
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+body.modo-campo .exec-review-grid > div {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
 body.modo-campo .wizard-footer {
   border-top-color: #e2e8f0;
   background: var(--color-white);
@@ -1451,6 +1515,9 @@ body.modo-campo .wizard-body::-webkit-scrollbar-thumb:hover {
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
+  .exec-review-grid {
+    grid-template-columns: 1fr;
+  }
   .wizard-footer {
     flex-wrap: wrap;
     gap: 0.4rem;
@@ -1467,6 +1534,28 @@ body.modo-campo .wizard-body::-webkit-scrollbar-thumb:hover {
   .wizard-preview-iframe {
     height: 40vh;
     min-height: 250px;
+  }
+  .modal-bulk {
+    max-height: 96dvh;
+  }
+  .bulk-risk-panel,
+  .exec-review-panel {
+    padding: 0.7rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .modal-relatorio-form {
+    width: min(92vw, 820px);
+    max-width: 820px;
+    height: 88dvh;
+    max-height: 88dvh;
+  }
+  .modal-bulk {
+    width: min(90vw, 720px);
+  }
+  .exec-review-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1539,6 +1628,38 @@ body.modo-campo .wizard-body::-webkit-scrollbar-thumb:hover {
 /* Bulk modal */
 .modal-bulk {
   max-width: 640px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.bulk-risk-panel {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(59, 130, 246, 0.06);
+  font-size: 0.88rem;
+}
+.bulk-risk-panel--warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.09);
+}
+.bulk-risk-panel strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.bulk-risk-panel p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+.bulk-risk-panel ul {
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--color-warning, #f59e0b);
+}
+.bulk-risk-panel li {
+  margin: 0.18rem 0;
 }
 .bulk-lista-resumo {
   margin-bottom: 1rem;
@@ -1573,6 +1694,12 @@ body.modo-campo .wizard-body::-webkit-scrollbar-thumb:hover {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: var(--color-primary, #3b82f6);
+}
+.bulk-confirm-simplificada {
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
 }
 
 /* Progress bar inside bulk modal */
