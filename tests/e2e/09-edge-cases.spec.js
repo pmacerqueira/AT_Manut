@@ -13,7 +13,7 @@
  *  - Erro de rede durante operação → toast de erro + queue offline
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, signCanvas, checklistMarcarTodos, checklistFillAllSim, navegarWizardAteFotos } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, signCanvas, checklistMarcarTodos, checklistFillAllSim, navegarWizardAteFotos, expandPrimeiroGrupoManutExecutadas } from './helpers.js'
 import * as path from 'path'
 import * as fs from 'fs'
 
@@ -169,7 +169,7 @@ test.describe('Modal execução — upload de fotos', () => {
         await expect(page.locator('.fotos-grid .foto-thumb, .fotos-grid img').first()).toBeVisible({ timeout: 5000 })
       }
 
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     }
   })
 
@@ -207,7 +207,7 @@ test.describe('Modal execução — upload de fotos', () => {
         }
       }
 
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     }
   })
 
@@ -229,7 +229,7 @@ test.describe('Modal execução — upload de fotos', () => {
         await expect(fotosCount).toContainText(/0\/6|0 \/ 6/)
       }
 
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     }
   })
 
@@ -273,8 +273,16 @@ test.describe('Manutenções — CRUD Admin', () => {
       await newBtn.click()
       await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 4000 })
 
-      // Seleccionar primeira máquina
-      await page.locator('.modal select').first().selectOption({ index: 1 })
+      // Pipeline Cliente → Categoria → Equipamento (modal add; submit depende de form.maquinaId)
+      const modal = page.locator('.modal-overlay .modal')
+      const addSelects = modal.locator('form select')
+      await addSelects.nth(0).selectOption({ index: 1 })
+      await page.waitForTimeout(250)
+      await addSelects.nth(1).waitFor({ state: 'attached', timeout: 4000 })
+      await addSelects.nth(1).selectOption({ index: 1 })
+      await page.waitForTimeout(250)
+      await addSelects.nth(2).waitFor({ state: 'attached', timeout: 4000 })
+      await addSelects.nth(2).selectOption({ index: 1 })
       await page.waitForTimeout(200)
 
       // Data
@@ -304,7 +312,7 @@ test.describe('Manutenções — CRUD Admin', () => {
         await page.waitForTimeout(800)
         await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 4000 })
       } else {
-        await page.locator('.modal-relatorio-form button.secondary').click()
+        await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
       }
     }
   })
@@ -338,6 +346,7 @@ test.describe('Modal assinatura de relatório', () => {
     await doLoginAdmin(page)
     await page.goto('/manut/manutencoes?filter=executadas')
     await page.waitForTimeout(800)
+    await expandPrimeiroGrupoManutExecutadas(page)
 
     // Procurar botão de assinatura (manutenção concluída SEM relatório assinado)
     // Na nossa mock, mt01 já está assinado — mas ainda devemos verificar o fluxo
@@ -348,7 +357,7 @@ test.describe('Modal assinatura de relatório', () => {
     if (await signBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await signBtn.click()
       await expect(page.locator('.modal-assinatura, .modal')).toBeVisible({ timeout: 5000 })
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     } else {
       test.info().annotations.push({ type: 'note', description: 'Nenhuma manutenção concluída sem assinatura encontrada' })
     }

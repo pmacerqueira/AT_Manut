@@ -11,44 +11,6 @@
   background: var(--color-success-dark) !important;
 }
 
-.manutencoes-list-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.manutencoes-concluidas-card {
-  margin-top: 1.5rem;
-}
-
-.manutencoes-concluidas-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  color: var(--color-text);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.manutencoes-concluidas-toggle:hover {
-  background: var(--color-border);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.manutencoes-concluidas-toggle span {
-  flex: 1;
-}
-
 .badge-pendente { background: var(--color-warning); color: #000; white-space: nowrap; }
 .badge-agendada { background: var(--color-warning); color: #000; white-space: nowrap; }
 .badge-proxima { background: var(--color-warning); color: #000; white-space: nowrap; }
@@ -855,6 +817,67 @@ body.modo-campo .num-servico {
 .col-dias-val.dias-atraso { color: var(--color-danger, #ef4444); }
 .col-dias-val.dias-hoje   { color: var(--color-primary, #3b82f6); }
 .col-dias-val.dias-futuro { color: var(--color-success, #22c55e); }
+
+/* ── Desktop/tablet-wide: redistribuição visual das colunas da tabela ───────
+   Objetivo: menos "aperto" em Cliente/Tipo/Técnico e melhor ritmo visual geral. */
+.manutencoes-table .dt-compact {
+  table-layout: fixed;
+}
+.manutencoes-table .dt-compact .col-dias {
+  width: 2.8rem;
+}
+.manutencoes-table .dt-compact .col-equipamento {
+  width: 28%;
+}
+.manutencoes-table .dt-compact .col-cliente {
+  width: 17%;
+}
+.manutencoes-table .dt-compact .col-tipo {
+  width: 9%;
+}
+.manutencoes-table .dt-compact .col-data {
+  width: 16%;
+}
+.manutencoes-table .dt-compact .col-tecnico {
+  width: 11%;
+}
+.manutencoes-table .dt-compact .col-status {
+  width: 12%;
+}
+.manutencoes-table .dt-compact .col-email {
+  width: 2.4rem;
+}
+.manutencoes-table .dt-compact .col-actions {
+  width: 5.4rem;
+}
+
+/* Ecrãs portáteis mais estreitos (mas ainda em modo tabela >1024px). */
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .manutencoes-table .dt-compact {
+    font-size: 0.76em;
+  }
+  .manutencoes-table .dt-compact .col-equipamento {
+    width: 26%;
+  }
+  .manutencoes-table .dt-compact .col-cliente {
+    width: 16%;
+  }
+  .manutencoes-table .dt-compact .col-tipo {
+    width: 8%;
+  }
+  .manutencoes-table .dt-compact .col-data {
+    width: 15%;
+  }
+  .manutencoes-table .dt-compact .col-tecnico {
+    width: 10%;
+  }
+  .manutencoes-table .dt-compact .col-status {
+    width: 11%;
+  }
+  .manutencoes-table .dt-compact .col-actions {
+    width: 5rem;
+  }
+}
 
 /* ── Badge de dias no card mobile ────────────────────────────────────────── */
 .mc-dias-badge {
@@ -1848,100 +1871,49 @@ body.modo-campo .quick-note-chip--active:hover {
 /* ══════════════════════════════════════════════════════════════════════════════
    Filtros para manutenções executadas
    ══════════════════════════════════════════════════════════════════════════════ */
+
 .exec-filter-bar {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
+  gap: 0.65rem;
+  padding: clamp(0.65rem, 2vw, 0.85rem) clamp(0.75rem, 2.5vw, 1.1rem);
+  margin-bottom: 0.85rem;
   background: var(--color-bg-elevated, #1a2332);
   border: 1px solid var(--color-border, rgba(255,255,255,0.08));
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
-.exec-filter-row {
+.exec-filter-toolbar {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
   flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.65rem;
+  width: 100%;
 }
-
-/* ── Period chips ── */
-.exec-filter-chips {
+.exec-filter-side {
   display: flex;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-.period-chip {
-  background: var(--color-bg-elevated, #1e293b);
-  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
-  border-radius: 20px;
-  padding: 0.28rem 0.8rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-muted, #94a3b8);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-.period-chip:hover {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: #3b82f6;
-  color: #60a5fa;
-}
-.period-chip--active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
-  color: #93c5fd;
-  font-weight: 600;
-}
-
-/* ── Date range ── */
-.exec-date-range {
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: min(100%, 12rem);
 }
-.exec-date-range label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #94a3b8);
-  white-space: nowrap;
-}
-.exec-date-range input[type="date"] {
-  padding: 0.25rem 0.4rem;
-  font-size: 0.78rem;
-  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
-  border-radius: 4px;
-  background: var(--color-bg, #0d1117);
-  color: var(--color-text, #e2e8f0);
-  width: 130px;
-}
-.exec-date-clear {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0.2rem;
-  display: inline-flex;
-  align-items: center;
-}
-.exec-date-clear:hover { color: var(--color-danger, #ef4444); }
 
 /* ── Search ── */
+.exec-search.exec-filter-search,
 .exec-search {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex: 1 1 200px;
+  gap: 0.45rem;
+  flex: 1 1 clamp(240px, 52vw, 520px);
   min-width: 0;
+  min-height: 42px;
   background: var(--color-bg, #0d1117);
   border: 1px solid var(--color-border, rgba(255,255,255,0.12));
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 .exec-search input {
@@ -1950,8 +1922,9 @@ body.modo-campo .quick-note-chip--active:hover {
   border: none;
   outline: none;
   color: var(--color-text, #e2e8f0);
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   min-width: 0;
+  min-height: 2rem;
 }
 .exec-search input::placeholder { color: var(--color-text-muted, #64748b); }
 .exec-search-clear {
@@ -1966,11 +1939,17 @@ body.modo-campo .quick-note-chip--active:hover {
 .exec-search-clear:hover { color: var(--color-danger, #ef4444); }
 
 /* ── Email filter ── */
+.exec-email-filter {
+  min-width: 0;
+}
 .exec-email-filter select {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
+  width: 100%;
+  max-width: 16rem;
+  min-height: 42px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8125rem;
   border: 1px solid var(--color-border, rgba(255,255,255,0.12));
-  border-radius: 4px;
+  border-radius: 8px;
   background: var(--color-bg, #0d1117);
   color: var(--color-text, #e2e8f0);
   cursor: pointer;
@@ -1980,9 +1959,10 @@ body.modo-campo .quick-note-chip--active:hover {
 .exec-filter-reset {
   background: none;
   border: 1px solid var(--color-border, rgba(255,255,255,0.12));
-  border-radius: 4px;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.85rem;
+  min-height: 42px;
+  font-size: 0.8125rem;
   color: var(--color-text-muted, #94a3b8);
   cursor: pointer;
   white-space: nowrap;
@@ -1994,38 +1974,42 @@ body.modo-campo .quick-note-chip--active:hover {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* ── Ordenação executadas (mobile / reforço visual) ── */
+/* ── Ordenação (filas executadas) ── */
 .exec-sort-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  padding-top: 0.15rem;
+  justify-content: space-between;
+  gap: 0.5rem 0.85rem;
+  padding-top: 0.55rem;
+  margin-top: 0.1rem;
   border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
 }
 .exec-sort-hint {
-  font-size: 0.72rem;
+  flex: 0 1 auto;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-muted, #94a3b8);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  line-height: 1.3;
 }
 .exec-sort-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.28rem 0.65rem;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: min(100%, 12rem);
+  min-height: 42px;
+  padding: 0.35rem 0.85rem;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-text-muted, #94a3b8);
   background: var(--color-bg, #0d1117);
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.exec-sort-btn:hover {
+  border-radius: 8px;
   border-color: #3b82f6;
   color: #93c5fd;
   background: rgba(59, 130, 246, 0.1);
@@ -2037,6 +2021,115 @@ body.modo-campo .quick-note-chip--active:hover {
   font-weight: 600;
 }
 
+/* ── Executadas agrupadas por cliente (colapsável) ── */
+.manutencoes-table .exec-grupo-cli-row {
+  background: rgba(59, 130, 246, 0.08);
+  cursor: pointer;
+}
+.manutencoes-table .exec-grupo-cli-row:hover {
+  background: rgba(59, 130, 246, 0.13);
+}
+.exec-grupo-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  margin: 0 auto;
+  color: var(--color-accent, #93c5fd);
+  background: transparent;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+}
+.exec-grupo-expand-btn:hover {
+  background: rgba(59, 130, 246, 0.18);
+}
+.exec-grupo-cli-cell {
+  font-weight: 600;
+}
+.exec-grupo-cli-label {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  max-width: 100%;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text, #e2e8f0);
+}
+.exec-grupo-cli-label:hover .exec-grupo-cli-nome {
+  text-decoration: underline;
+}
+.exec-grupo-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.42rem;
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--color-accent, #bfdbfe);
+  border-radius: var(--radius-sm, 999px);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+.exec-grupo-dash {
+  user-select: none;
+  opacity: 0.42;
+}
+.exec-grupo-chevr {
+  text-align: center;
+  vertical-align: middle !important;
+}
+.manutencoes-table .exec-grupo-detail-row td {
+  box-shadow: inset 3px 0 0 rgba(59, 130, 246, 0.45);
+}
+.exec-grupo-mobile-wrap {
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-bg-elevated, #111827);
+}
+.exec-grupo-mobile-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: rgba(59, 130, 246, 0.1);
+  border: none;
+  cursor: pointer;
+}
+.exec-grupo-mobile-header:active {
+  background: rgba(59, 130, 246, 0.18);
+}
+.exec-grupo-mobile-chev {
+  display: inline-flex;
+  opacity: 0.9;
+}
+.exec-grupo-mobile-nome {
+  flex: 1;
+  min-width: 0;
+}
+.exec-grupo-mobile-cards {
+  padding: 0.5rem 0.65rem;
+  border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.exec-grupo-detail-mc {
+  margin-bottom: 0;
+}
 /* ── Cabeçalho tabela: ordenar por equipamento / série ── */
 .th-equip-sort-wrap {
   vertical-align: middle;
@@ -2077,29 +2170,6 @@ body.modo-campo .quick-note-chip--active:hover {
 body.modo-campo .exec-filter-bar {
   background: #f8fafc;
   border-color: #cbd5e1;
-}
-body.modo-campo .period-chip {
-  background: #e2e8f0;
-  border-color: #94a3b8;
-  color: #475569;
-}
-body.modo-campo .period-chip:hover {
-  background: #dbeafe;
-  border-color: #3b82f6;
-  color: #1d4ed8;
-}
-body.modo-campo .period-chip--active {
-  background: #dbeafe;
-  border-color: #2563eb;
-  color: #1e40af;
-}
-body.modo-campo .exec-date-range input[type="date"] {
-  background: #fff;
-  border-color: #94a3b8;
-  color: #1e293b;
-}
-body.modo-campo .exec-date-range label {
-  color: #475569;
 }
 body.modo-campo .exec-search {
   background: #fff;
@@ -2215,15 +2285,58 @@ body.modo-campo .exec-equip-confirm-label > span {
   color: var(--color-text);
 }
 
-/* ── Responsivo: empilhar em mobile ── */
-@media (max-width: 768px) {
-  .exec-filter-row { flex-direction: column; align-items: stretch; }
-  .exec-filter-chips { flex-wrap: wrap; }
-  .exec-date-range { flex-wrap: wrap; }
-  .exec-search { flex: 1 1 auto; }
+/* ── Responsivo: telemóvel estreito ── */
+@media (max-width: 520px) {
+  .exec-filter-side {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+    min-width: 100%;
+  }
+  .exec-email-filter select {
+    max-width: none;
+  }
+  .exec-filter-toolbar {
+    flex-direction: column;
+  }
 }
+
+/* ── Tablets (≤1024px): mesmo limiar que lista em cartões ── */
+@media (min-width: 521px) and (max-width: 1024px) {
+  .exec-filter-toolbar {
+    align-items: flex-end;
+  }
+  .exec-filter-side {
+    flex: 0 1 auto;
+    min-width: auto;
+  }
+  .exec-filter-bar {
+    margin-bottom: 1rem;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1024px) {
+  .page-manutencoes .manutencoes-cards {
+    max-width: 40rem;
+    margin-inline: auto;
+  }
+  .exec-grupo-mobile-wrap {
+    border-radius: var(--radius-md, 10px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .page-manutencoes .manutencoes-cards {
+    padding-left: clamp(0.5rem, 2vw, 1rem);
+    padding-right: clamp(0.5rem, 2vw, 1rem);
+    padding-bottom: 1.75rem;
+  }
+  .exec-grupo-mobile-header {
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+  }
+}
+
 @media (max-width: 480px) {
-  .exec-filter-bar { padding: 0.5rem 0.6rem; }
-  .period-chip { padding: 0.22rem 0.55rem; font-size: 0.72rem; }
-  .exec-date-range input[type="date"] { width: 110px; }
+  .exec-filter-bar { padding: 0.55rem 0.65rem; }
 }

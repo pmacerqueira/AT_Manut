@@ -10,7 +10,7 @@ import { buildFeriadosSet, proximoDiaUtil, encontrarDiaLivre, distribuirHorarios
 import { minDataManutencaoAberta, STATUS_MANUTENCAO_ABERTA } from '../utils/proximaManutAgenda'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
-import { enqueue, processQueue, queueSize, removeItem } from '../services/syncQueue'
+import { enqueue, processQueue, queueSize } from '../services/syncQueue'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
 import { normEntityId } from '../utils/frotaReportHelpers'
 import { getHojeAzores } from '../utils/datasAzores'

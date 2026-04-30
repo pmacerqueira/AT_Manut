@@ -4,6 +4,9 @@
  *
  * INSTALAR EM: public_html/api/parse-istobal-email.php
  *
+ * Credenciais: via config.php — em CLI o .htaccess não injecta env; é necessário
+ * config.cli-env.php no servidor (gerado por navel-site/scripts/cpanel-migrate-setenv.mjs).
+ *
  * CONFIGURAR NO CPANEL — Email Piping:
  *   1. Em "Email Accounts", ir à conta que recebe os emails ISTOBAL (ex. assist@navel.pt)
  *   2. Em "Email Forwarders" → "Add Forwarder":

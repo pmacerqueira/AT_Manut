@@ -43,7 +43,11 @@ import { useDeferredReady } from '../hooks/useDeferredReady'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
-const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada' }
+const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', em_progresso: 'Em execução', concluida: 'Executada' }
+
+/** Painel «Histórico de manutenções» na ficha de equipamento (Clientes › frota › equipamento). */
+const HIST_FICHA_EXECUTADAS_MAX = 5
+const HIST_FICHA_PROXIMAS_MAX = 2
 const PAGE_SIZE = 25
 
 export default function Clientes() {
@@ -482,8 +486,18 @@ export default function Clientes() {
     ? maquinasCliente.filter(m => m.subcategoriaId === fichaSubcategoria.id)
     : []
 
-  const getManutencoesDaMaquina = (maquinaId) =>
-    manutencoes.filter(m => normEntityId(m.maquinaId) === normEntityId(maquinaId)).sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
+  const getManutencoesResumoFicha = useCallback((maquinaId) => {
+    const list = manutencoes.filter(m => normEntityId(m.maquinaId) === normEntityId(maquinaId))
+    const executadas = list
+      .filter(m => m.status === 'concluida')
+      .sort((a, b) => parseDateLocal(b.data) - parseDateLocal(a.data))
+      .slice(0, HIST_FICHA_EXECUTADAS_MAX)
+    const proximas = list
+      .filter(m => m.status !== 'concluida')
+      .sort((a, b) => parseDateLocal(a.data) - parseDateLocal(b.data))
+      .slice(0, HIST_FICHA_PROXIMAS_MAX)
+    return { executadas, proximas }
+  }, [manutencoes])
 
   const renderProximaManut = (maq) => {
     const prox = proximaDataNaFicha(maq)
@@ -587,7 +601,11 @@ export default function Clientes() {
                     </a>
                   )}
                   <span className="cliente-mobile-maq">{nMaq} máq.</span>
-                  {!c.email && <span className="badge badge-warning badge-inline" title="Cliente sem email registado">⚠ sem email</span>}
+                  {!c.email && (
+                    <span className="badge badge-warning badge-inline sem-email-aviso" title="Cliente sem email registado">
+                      ⚠ sem email
+                    </span>
+                  )}
                 </div>
               </div>
               <ChevronRight size={16} className="cliente-mobile-chevron" />
@@ -621,9 +639,9 @@ export default function Clientes() {
           <thead>
             <tr>
               <th className="col-nif col-sm col-nowrap">NIF</th>
-              <th className="col-nome col-fill">Nome do Cliente</th>
-              <th className="col-local col-md col-truncate">Localidade</th>
-              <th className="col-maq col-xs">Máq.</th>
+              <th className="col-nome col-cliente-nome">Nome do Cliente</th>
+              <th className="col-local col-cliente-local col-nowrap">Localidade</th>
+              <th className="col-maq col-xs col-nowrap">Máq.</th>
               <th className="col-actions"></th>
             </tr>
           </thead>
@@ -633,23 +651,30 @@ export default function Clientes() {
               return (
                 <tr key={c.nif}>
                   <td className="col-nif col-sm col-nowrap"><code>{c.nif}</code></td>
-                  <td className="col-nome col-fill">
-                    <button type="button" className="btn-link-inline" onClick={() => openFicha(c)} title="Abrir ficha">
-                      <strong>{c.nome}</strong>
-                    </button>
+                  <td className="col-nome col-cliente-nome">
+                    <div className="cliente-nome-cell">
+                      <button type="button" className="btn-link-inline" onClick={() => openFicha(c)} title="Abrir ficha">
+                        <strong>{c.nome}</strong>
+                      </button>
+                      {!c.email && (
+                        <span className="badge badge-warning badge-inline sem-email-aviso" title="Cliente sem email registado">
+                          ⚠ sem email
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="col-local col-md col-truncate">{c.localidade || '—'}</td>
+                  <td className="col-local col-cliente-local col-nowrap" title={c.localidade || '—'}>{c.localidade || '—'}</td>
                   <td className="col-maq col-xs">{nMaq}</td>
                   <td className="col-actions">
                     <span className="actions-row">
                       {nMaq > 0 && (
-                        <button className="icon-btn secondary" onClick={() => handleAbrirFiltroFrota(c)} title="Relatório de frota"><FileBarChart size={16} /></button>
+                        <button className="cliente-action-btn secondary" onClick={() => handleAbrirFiltroFrota(c)} title="Relatório de frota"><FileBarChart size={16} /><span className="cliente-action-label">Frota</span></button>
                       )}
                       {canEditCliente && (
-                        <button className="icon-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /></button>
+                        <button className="cliente-action-btn secondary" onClick={() => openEdit(c)} title="Editar"><Pencil size={16} /><span className="cliente-action-label">Editar</span></button>
                       )}
                       {canDelete && (
-                        <button className="icon-btn danger" onClick={() => setModalConfirmDeleteCliente(c)} disabled={nMaq > 0} title={nMaq > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /></button>
+                        <button className="cliente-action-btn danger" onClick={() => setModalConfirmDeleteCliente(c)} disabled={nMaq > 0} title={nMaq > 0 ? 'Elimine as máquinas primeiro' : 'Eliminar'}><Trash2 size={16} /><span className="cliente-action-label">Eliminar</span></button>
                       )}
                     </span>
                   </td>
@@ -927,6 +952,49 @@ export default function Clientes() {
                     const docs = maquinaAtual.documentos ?? []
                     const getDocPorTipo = (tipo) => docs.find(d => d.tipo === tipo)
                     const getDocLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
+                    const { executadas: histExecutadas, proximas: histProximas } = getManutencoesResumoFicha(maquinaAtual.id)
+                    const histTemAlgum = histExecutadas.length > 0 || histProximas.length > 0
+                    const histRow = (manut) => {
+                      const rel = getRelatorioByManutencao(manut.id)
+                      return (
+                        <tr key={manut.id}>
+                          <td><strong>{format(parseDateLocal(manut.data), 'd MMM yyyy', { locale: pt })}</strong></td>
+                          <td className="text-muted">{manut.tecnico || rel?.tecnico || 'Não atribuído'}</td>
+                          <td><span className={`badge badge-${manut.status}`}>{statusLabel[manut.status] ?? manut.status}</span></td>
+                          <td className="hist-numrel">{rel?.numeroRelatorio || '—'}</td>
+                          <td className="hist-manut-actions">
+                            <button
+                              type="button"
+                              className="icon-btn secondary"
+                              title="Ver ficha de manutenção"
+                              onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            {rel && (
+                              <button
+                                type="button"
+                                className="icon-btn secondary"
+                                title="Obter PDF (sem pré-visualizador)"
+                                onClick={() => handleDownloadPdfManutencao(manut, rel, maquinaAtual, fichaCliente)}
+                              >
+                                <FileDown size={14} />
+                              </button>
+                            )}
+                            {rel?.assinadoPeloCliente && (
+                              <button
+                                type="button"
+                                className="icon-btn secondary"
+                                title="Enviar relatório por email"
+                                onClick={() => setModalEmail({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
+                              >
+                                <Mail size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    }
                     return (
                   <div className="ficha-maquina-detalhe">
                     <div className="equipamentos-nav">
@@ -1025,65 +1093,52 @@ export default function Clientes() {
                       </table>
                     </div>
                     <h4>Histórico de manutenções</h4>
-                    {getManutencoesDaMaquina(maquinaAtual.id).length === 0 ? (
+                    <p className="text-muted hist-manut-resumo-legenda">
+                      Até {HIST_FICHA_EXECUTADAS_MAX} últimas intervenções executadas e até {HIST_FICHA_PROXIMAS_MAX} datas planeadas (por ordem cronológica).
+                    </p>
+                    {!histTemAlgum ? (
                       <p className="text-muted">Nenhuma manutenção registada.</p>
                     ) : (
-                      <div className="hist-manut-wrap">
-                        <table className="hist-manut-table">
-                          <thead>
-                            <tr>
-                              <th>Data</th>
-                              <th>Técnico</th>
-                              <th>Estado</th>
-                              <th>N.º Rel.</th>
-                              <th></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {getManutencoesDaMaquina(maquinaAtual.id).map(manut => {
-                              const rel = getRelatorioByManutencao(manut.id)
-                              return (
-                                <tr key={manut.id}>
-                                  <td><strong>{format(parseDateLocal(manut.data), 'd MMM yyyy', { locale: pt })}</strong></td>
-                                  <td className="text-muted">{manut.tecnico || rel?.tecnico || 'Não atribuído'}</td>
-                                  <td><span className={`badge badge-${manut.status}`}>{statusLabel[manut.status]}</span></td>
-                                  <td className="hist-numrel">{rel?.numeroRelatorio || '—'}</td>
-                                  <td className="hist-manut-actions">
-                                    <button
-                                      type="button"
-                                      className="icon-btn secondary"
-                                      title="Ver ficha de manutenção"
-                                      onClick={() => setModalRelatorio({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
-                                    >
-                                      <Eye size={14} />
-                                    </button>
-                                    {rel && (
-                                      <button
-                                        type="button"
-                                        className="icon-btn secondary"
-                                        title="Obter PDF (sem pré-visualizador)"
-                                        onClick={() => handleDownloadPdfManutencao(manut, rel, maquinaAtual, fichaCliente)}
-                                      >
-                                        <FileDown size={14} />
-                                      </button>
-                                    )}
-                                    {rel?.assinadoPeloCliente && (
-                                      <button
-                                        type="button"
-                                        className="icon-btn secondary"
-                                        title="Enviar relatório por email"
-                                        onClick={() => setModalEmail({ manutencao: manut, relatorio: rel, maquina: maquinaAtual, cliente: fichaCliente })}
-                                      >
-                                        <Mail size={14} />
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                      <>
+                        {histExecutadas.length > 0 && (
+                          <>
+                            <h5 className="hist-manut-section-title">Últimas executadas</h5>
+                            <div className="hist-manut-wrap">
+                              <table className="hist-manut-table">
+                                <thead>
+                                  <tr>
+                                    <th>Data</th>
+                                    <th>Técnico</th>
+                                    <th>Estado</th>
+                                    <th>N.º Rel.</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>{histExecutadas.map(histRow)}</tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
+                        {histProximas.length > 0 && (
+                          <>
+                            <h5 className={`hist-manut-section-title${histExecutadas.length > 0 ? ' hist-manut-section-title-spaced' : ''}`}>Próximas a realizar</h5>
+                            <div className="hist-manut-wrap">
+                              <table className="hist-manut-table">
+                                <thead>
+                                  <tr>
+                                    <th>Data</th>
+                                    <th>Técnico</th>
+                                    <th>Estado</th>
+                                    <th>N.º Rel.</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>{histProximas.map(histRow)}</tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
                     )

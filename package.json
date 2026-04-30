@@ -17,7 +17,9 @@
     "test:unit": "node --test tests/unit/*.test.js",
     "gen:report-auth": "node scripts/gerar-token-email-api.mjs",
     "verify:frota-fixture": "node scripts/verify-frota-fixture-ravaglioli.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test tests/e2e/",
+    "test:e2e:last-failed": "playwright test tests/e2e/ --last-failed"
   },
   "dependencies": {
     "@zxing/browser": "^0.1.5",

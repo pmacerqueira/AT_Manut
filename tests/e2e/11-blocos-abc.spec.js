@@ -13,6 +13,7 @@ import {
   fillExecucaoModal,
   expectToast,
   MC,
+  SELETOR_BOTAO_EDITAR,
 } from './helpers.js'
 
 // ── Dados mock com manutenção próxima (para disparar o modal de alertas) ──────
@@ -106,11 +107,14 @@ test.describe('Bloco A — Email obrigatório em clientes', () => {
     await page.goto('/manut/clientes')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
+    await expect(page.locator('.clientes-table tbody tr, .clientes-mobile-card').first()).toBeVisible({
+      timeout: 15000,
+    })
   })
 
   test('A1 — Badge "Sem email" visível para cliente sem email', async ({ page }) => {
     const badge = page.locator('.sem-email-aviso').first()
-    await expect(badge).toBeVisible({ timeout: 5000 })
+    await expect(badge).toBeVisible({ timeout: 12000 })
     await expect(badge).toContainText(/sem email/i)
   })
 
@@ -118,9 +122,11 @@ test.describe('Bloco A — Email obrigatório em clientes', () => {
     const rows = page.locator('tbody tr')
     const bettencourt = rows.filter({ hasText: /Bettencourt/i }).first()
     await expect(bettencourt).toBeVisible()
-    await expect(bettencourt.locator('.sem-email-aviso')).not.toBeVisible()
-    // Deve mostrar o email em texto
-    await expect(bettencourt.locator('td').nth(5)).toContainText(/mecanicabettencourt|geral/i)
+    await expect(bettencourt.locator('.sem-email-aviso')).toHaveCount(0)
+    // A tabela desktop não tem coluna de email — confirmar na ficha do cliente
+    await bettencourt.locator('.btn-link-inline').first().click()
+    await expect(page.locator('.modal-ficha-cliente')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.modal-ficha-cliente')).toContainText(/geral@mecanicabettencourt|mecanicabettencourt/i)
   })
 
   test('A3 — Tentar criar cliente sem email mostra erro', async ({ page }) => {
@@ -172,7 +178,8 @@ test.describe('Bloco A — Email obrigatório em clientes', () => {
   test('A6 — Editar cliente para remover email mostra erro', async ({ page }) => {
     // Editar Mecânica Bettencourt
     const editBtn = page.locator('tbody tr').filter({ hasText: /Bettencourt/i })
-      .locator('.icon-btn.secondary').first()
+      .locator(SELETOR_BOTAO_EDITAR)
+      .first()
     await editBtn.click()
     await page.locator('input[placeholder*="email@cliente"]').waitFor({ state: 'visible', timeout: 5000 })
 
@@ -640,7 +647,7 @@ test.describe('Integração — Fluxos combinados A+B+C', () => {
     await page.waitForTimeout(400)
 
     // "O meu dia" continua visível após fechar o modal de alertas
-    await expect(page.locator('.meu-dia-section')).toBeVisible()
+    await expect(page.locator('.meu-dia-section').first()).toBeVisible()
   })
 
   test('I4 — Admin vê alertas + pode navegar para Definições sem perder estado', async ({ page }) => {

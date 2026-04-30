@@ -458,11 +458,40 @@ export async function gerarPdfCompacto({
     pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
     pdf.text(`${nSim} conforme \u2022 ${nNao} n\u00e3o conforme \u2022 ${checklistItems.length} itens`, M, y); y += 5
 
+    const textLeftCl = M + 8
+    /** Coluna SIM/NÃO alinhada \u00e0 direita; reserva espa\u00e7o para n\u00e3o cortar o texto antes do estado. */
+    const badgeReserveMm = 18
+    const textoItemMaxW = Math.max(40, W - M - badgeReserveMm - textLeftCl)
+
     pdf.setFontSize(8.5)
     checklistItems.forEach((item, i) => {
-      if (y > 270) { pdf.addPage(); y = 20 }
-      if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 7, 'F') }
-      const resp  = relatorio?.checklistRespostas?.[item.id]
+      const texto = String(item.texto ?? '')
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      const linhasTxt = pdf.splitTextToSize(texto, textoItemMaxW)
+
+      /** Espaço entre linhas (~8.5 pt), alinhado a outros blocos do PDF compacto */
+      const checklistLineMm = 3.65
+      /** Folha seguinte at\u00e9 o texto (todas as linhas) caber acima do rodap\u00e9 seguro */
+      while (true) {
+        const textoBlockBottomTry = y + (linhasTxt.length - 1) * checklistLineMm + 2.9
+        if (textoBlockBottomTry <= 274) break
+        pdf.addPage()
+        y = 20
+      }
+      const lastBaseline = y + (linhasTxt.length - 1) * checklistLineMm
+      const textoBlockBottom = lastBaseline + 2.9
+
+      const stripePadTop = 3.95
+      const stripePadBot = 1.85
+      const rowTop = y - stripePadTop
+      const zebraH = textoBlockBottom - rowTop + stripePadBot
+
+      if (i % 2 === 0) {
+        pdf.setFillColor(249, 250, 251)
+        pdf.rect(M, rowTop, cW, zebraH, 'F')
+      }
+
+      const resp = relatorio?.checklistRespostas?.[item.id]
       const badge = resp === 'sim' || resp === 'OK'
         ? 'SIM'
         : resp === 'nao' || resp === 'NOK'
@@ -470,18 +499,24 @@ export async function gerarPdfCompacto({
           : resp === 'N/A'
             ? 'N/A'
             : '\u2014'
-      const rgb   = (resp === 'sim' || resp === 'OK')
+      const rgb = (resp === 'sim' || resp === 'OK')
         ? [22, 163, 74]
         : (resp === 'nao' || resp === 'NOK')
           ? [220, 38, 38]
           : [107, 114, 128]
+
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
       pdf.text(String(i + 1) + '.', M + 1, y)
+
       pdf.setTextColor(55, 65, 81)
-      pdf.text(item.texto, M + 8, y, { maxWidth: cW - 22 })
+      linhasTxt.forEach((ln, li) => {
+        pdf.text(ln, textLeftCl, y + li * checklistLineMm)
+      })
+
       pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...rgb)
       pdf.text(badge, W - M - 2, y, { align: 'right' })
-      y += 7
+
+      y = textoBlockBottom + 3
     })
     y += 4
   }

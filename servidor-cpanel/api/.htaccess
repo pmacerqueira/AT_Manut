@@ -12,9 +12,10 @@
 #   1. `.htaccess` tem `RewriteRule ^ - [E=ATM_*:...]` que injecta os valores
 #      em $_SERVER e getenv() intactos, mesmo com caracteres especiais.
 #   2. `config.php` lê com `atm_env()` (getenv + $_ENV + $_SERVER + REDIRECT_*).
-#   3. O fallback legado `config.deploy-secrets.php` fica arquivado com sufixo
-#      `.disabled-TS` (bloqueado pelo FilesMatch abaixo) — pronto para
-#      rollback se alguma coisa correr mal.
+#   3. `config.cli-env.php` (gerado pelo migrador) dá putenv em SAPI CLI;
+#      bloqueado pelo FilesMatch. Necessário para o pipe ISTOBAL (parse-istobal-email.php).
+#   4. O fallback legado `config.deploy-secrets.php` pode ficar arquivado com sufixo
+#      `.disabled-TS` (bloqueado pelo FilesMatch abaixo) — rollback se necessário.
 #
 # Desenvolvimento local: usar `config.local.php` com `putenv('ATM_*=...')`.
 
@@ -26,6 +27,9 @@
     Require all denied
   </FilesMatch>
   <FilesMatch "^config\.deploy-secrets\.php(\.disabled-.*)?$">
+    Require all denied
+  </FilesMatch>
+  <FilesMatch "^config\.cli-env\.php$">
     Require all denied
   </FilesMatch>
   <FilesMatch "^atm_report_auth\.secret\.php$">

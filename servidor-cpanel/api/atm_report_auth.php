@@ -26,6 +26,12 @@ if (!function_exists('atm_report_auth_bootstrap_env')) {
                 require_once $p;
             }
         }
+        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
+            $cli = $dir . '/config.cli-env.php';
+            if (is_file($cli)) {
+                require_once $cli;
+            }
+        }
         $secretBootstrap = $dir . '/atm_report_auth.secret.php';
         if (is_file($secretBootstrap)) {
             require_once $secretBootstrap;

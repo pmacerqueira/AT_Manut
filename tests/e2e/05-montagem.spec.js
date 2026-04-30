@@ -11,6 +11,7 @@ import { test, expect } from '@playwright/test'
 import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
   fillExecucaoModal,
+  confirmExecWizardVerificacaoEquipamento,
 } from './helpers.js'
 
 /** Abre o modal de execução da linha de MONTAGEM (evita apanhar mt11 periódica primeiro na lista). */
@@ -53,6 +54,9 @@ test.describe('Montagem — Execução completa', () => {
     await abrirModalMontagem(page)
 
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+
+    // Passo de verificação de equipamento primeiro; só depois o checklist fica visível
+    await confirmExecWizardVerificacaoEquipamento(page)
 
     // Para sub2 (montagem), os itens de checklist são do tipo montagem
     await expect(page.locator('.checklist-respostas, .checklist-item-row').first()).toBeVisible({ timeout: 4000 })
@@ -124,7 +128,7 @@ test.describe('Montagem — ATecnica pode executar', () => {
       await executeBtn.click()
       await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 5000 })
       // ATecnica PODE executar — modal abriu
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     }
   })
 

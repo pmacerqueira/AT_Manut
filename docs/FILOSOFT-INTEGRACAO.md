@@ -99,13 +99,11 @@ Este script combina dois passos num só:
 
 2. node "C:\Cursor_Dados_Gestor\scripts\extract-clientes-saft-2026.js"
    → Gera C:\Cursor_Dados_Gestor\dados-exportados\clientes-navel-2026.json
-
-3. Dashboard AT_Manut → Clientes (Admin) → botão "Importar SAF-T"
-   → Escolher clientes-navel-2026.json
-   → Preview mostra: X novos | Y existentes | total
-   → Modo "Ignorar existentes" (recomendado) ou "Actualizar existentes"
-   → Confirmar → toast com resultado
 ```
+
+3. **Na app:** Clientes (Admin) → quando o botão **Importar SAF-T** estiver visível → escolher `clientes-navel-2026.json` → preview (novos / existentes / total) → modo «Ignorar existentes» (recomendado) ou «Actualizar existentes» → confirmar → toast.
+
+   Desde **v1.16.78+** o botão/modal pode não estar exposto na UI; até voltar, use **`importClientes`** (DataContext/API), ferramentas de desenvolvimento, ou importação indirecta conforme política interna — a função no `DataContext` e a API mantêm-se.
 
 ### Função no DataContext
 

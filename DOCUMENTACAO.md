@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-25
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-30
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — 442 testes (17 specs) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (456 testes listados em 19 ficheiros; spec 18 SAF-T em `skip` até a UI regressar) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -150,15 +150,11 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │
 ├── tests/e2e/
 │   ├── helpers.js                      # Utilitários partilhados + dados mock (MC, incluindo reparações)
-│   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Suite base (127 testes)
-│   ├── 10-etapas-evolucao.spec.js      # Vista meu dia, alertas, QR, PDF (48 testes)
-│   ├── 11-blocos-abc.spec.js           # Email, config, reagendamento, modal (40 testes)
-│   ├── 12-v170-features.spec.js        # Pesquisa, QR leitor, modo campo, métricas, LS (42 testes)
-│   ├── 13-performance.spec.js          # Performance com dataset volumoso (14 testes)
-│   ├── 14-kaeser-features.spec.js      # Funcionalidades Kaeser (31 testes)
-│   ├── 15-kaeser-pdf-import.spec.js    # Importação de PDF Kaeser (18 testes)
-│   ├── 16-reparacoes.spec.js           # Reparações: base (42 testes)
-│   └── 17-reparacoes-avancado.spec.js  # Reparações: avançado — permissões, mobile, offline (69 testes)
+│   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Núcleo (139 testes ao correr `--list`)
+│   ├── 10-etapas-evolucao.spec.js … 17-reparacoes-avancado.spec.js
+│   ├── 18-import-saft-clientes.spec.js # SAF-T clientes (6 listados; describe.skip até UI na página Clientes)
+│   ├── 99-responsive-smoke.spec.js     # Smoke mobile/tablet (5 testes)
+│   └── Total suite: ver `docs/TESTES-E2E.md` (456 testes · 19 ficheiros)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)

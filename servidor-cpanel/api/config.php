@@ -9,8 +9,11 @@
  *      LiteSpeed/LSPHP deste alojamento (mod_env não está carregado; `SetEnv`
  *      é ignorado silenciosamente). Gerido pelo script
  *      `navel-site/scripts/cpanel-migrate-setenv.mjs`.
+ *   1b) PHP CLI (pipe de email ISTOBAL, cron, `php -r`…): o .htaccess NÃO corre.
+ *      O mesmo migrador gera `config.cli-env.php` (putenv, gitignored no disco
+ *      local; bloqueado a HTTP pelo FilesMatch) — carregado só em CLI abaixo.
  *   2) Fallback legado: config.deploy-secrets.php (gitignored). Em produção
- *      está arquivado como `config.deploy-secrets.php.disabled-TS` após a
+ *      pode estar arquivado como `config.deploy-secrets.php.disabled-TS` após a
  *      validação do método 1 — renomear de volta em caso de rollback.
  *
  * Obrigatórios típicos: ATM_DB_USER, ATM_DB_PASS, ATM_DB_NAME, ATM_JWT_SECRET,
@@ -65,6 +68,14 @@ if (is_file(__DIR__ . '/config.local.php')) {
  */
 if (is_file(__DIR__ . '/config.deploy-secrets.php')) {
     require_once __DIR__ . '/config.deploy-secrets.php';
+}
+
+// Mail pipe ISTOBAL e outros scripts CLI não herdam [E=…] do .htaccess.
+if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
+    $atmCliEnv = __DIR__ . '/config.cli-env.php';
+    if (is_file($atmCliEnv)) {
+        require_once $atmCliEnv;
+    }
 }
 
 // ── Base de dados MySQL (cPanel) ──────────────────────────────────────────────

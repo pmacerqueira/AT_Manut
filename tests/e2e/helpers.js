@@ -550,6 +550,37 @@ export async function loginAdminSemAlertas(page, { path = '/', customData } = {}
  */
 export const SELETOR_BOTAO_EDITAR = 'button[title="Editar"]'
 
+/** Botão eliminar nas tabelas Clientes (lista) e outras views com classes antigas/alternativas. */
+export const SEL_BTN_DANGER = '.icon-btn.danger, .cliente-action-btn.danger'
+
+/** Igual a `MESES_PT` (`src/constants/locale.js`) — navegação do modal relatório ISTOBAL mensal. */
+export const MESES_PT_E2E = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+/** Garante Fevereiro 2026 no modal mensal ISTOBAL (dados mock: avisos ES-* em Fevereiro). */
+export async function navegarMensalParaFevereiro2026(modal, page) {
+  const tituloEl = modal.locator('.mensal-titulo')
+  const btnPrev = modal.locator('button[aria-label="Mês anterior"]')
+  const btnNext = modal.locator('button[aria-label="Mês seguinte"]')
+  for (let i = 0; i < 24; i++) {
+    const t = (await tituloEl.innerText().catch(() => '')).trim()
+    const m = t.match(/^(\S+)\s+(\d{4})$/)
+    if (!m) break
+    const nomeMes = m[1]
+    const ano = Number.parseInt(m[2], 10)
+    const idxCur = MESES_PT_E2E.indexOf(nomeMes)
+    if (idxCur === -1) break
+    if (ano === 2026 && nomeMes === 'Fevereiro') return
+    const curKey = ano * 12 + idxCur
+    const tarKey = 2026 * 12 + 1 /* Fevereiro índice 1 */
+    if (curKey > tarKey) await btnPrev.click()
+    else await btnNext.click()
+    await page.waitForTimeout(250)
+  }
+}
+
 /**
  * Obter input de formulário pelo texto do label (mais robusto que .nth()).
  * @param {Page} page
@@ -660,6 +691,20 @@ export async function signCanvas(page) {
     await canvas.dispatchEvent('mousedown', { clientX: box.x + 40, clientY: box.y + 50, buttons: 1 })
     await canvas.dispatchEvent('mousemove', { clientX: box.x + 120, clientY: box.y + 60, buttons: 1 })
     await canvas.dispatchEvent('mouseup',   { clientX: box.x + 120, clientY: box.y + 60 })
+    await page.waitForTimeout(400)
+  }
+}
+
+export async function expandPrimeiroGrupoManutExecutadas(page) {
+  const desk = page.locator('.manutencoes-table button.exec-grupo-expand-btn').first()
+  const mob = page.locator('button.exec-grupo-mobile-header').first()
+  if (await desk.isVisible({ timeout: 2500 }).catch(() => false)) {
+    await desk.click({ force: true })
+    await page.waitForTimeout(400)
+    return
+  }
+  if (await mob.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await mob.click({ force: true })
     await page.waitForTimeout(400)
   }
 }

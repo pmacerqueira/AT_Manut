@@ -10,7 +10,7 @@
  *  - ATecnica não pode eliminar nada
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, SEL_BTN_DANGER } from './helpers.js'
 
 // ── Rotas exclusivas Admin ───────────────────────────────────────────────────
 
@@ -119,19 +119,22 @@ test.describe('Permissões Admin — poderes totais', () => {
   test('Admin vê botões de eliminar em clientes', async ({ page }) => {
     await page.goto('/manut/clientes')
     await page.waitForTimeout(800)
-    // canDelete = true para admin — .icon-btn.danger deve existir no DOM
-    const dangerBtns = page.locator('.icon-btn.danger')
-    const count = await dangerBtns.count()
-    expect(count).toBeGreaterThan(0)
+    await expect(page.locator('.clientes-table tbody tr').first()).toBeVisible({ timeout: 15000 })
+    const dangerBtns = page.locator('.clientes-table tbody').locator(`${SEL_BTN_DANGER}`)
+    await expect.poll(async () => dangerBtns.count()).toBeGreaterThan(0)
   })
 
-  test('Admin vê botões de eliminar em manutenções', async ({ page }) => {
-    await page.goto('/manut/manutencoes')
+  test('Admin vê opção Eliminar nas manutenções (menu Mais acções)', async ({ page }) => {
+    await page.goto('/manut/manutencoes?filter=atraso')
     await page.waitForTimeout(800)
-    // canDelete = true para Admin — .icon-btn.danger deve existir no DOM
-    const dangerBtns = page.locator('.icon-btn.danger')
-    const count = await dangerBtns.count()
-    expect(count).toBeGreaterThan(0)
+    await expect(page.locator('.manutencoes-table')).toBeVisible({ timeout: 15000 })
+    await page
+      .locator('.manutencoes-table button.actions-overflow-btn[title="Mais acções"]')
+      .first()
+      .click({ timeout: 10000 })
+    await expect(
+      page.locator('.actions-overflow-menu button.danger-item').filter({ hasText: /eliminar/i }).first(),
+    ).toBeVisible({ timeout: 4000 })
   })
 
   test('Admin pode adicionar categoria', async ({ page }) => {
@@ -157,21 +160,23 @@ test.describe('Permissões ATecnica — restrições', () => {
     await doLoginTecnico(page)
   })
 
-  test('ATecnica não pode eliminar nada — sem botões .icon-btn.danger', async ({ page }) => {
+  test('ATecnica não pode eliminar nada — sem botões de eliminar', async ({ page }) => {
     // Clientes — ATecnica não tem canDelete
     await page.goto('/manut/clientes')
     await page.waitForTimeout(800)
-    const dangerBtnsClientes = page.locator('.icon-btn.danger')
+    const dangerBtnsClientes = page.locator('.clientes-table tbody').locator(`${SEL_BTN_DANGER}`)
     const countClientes = await dangerBtnsClientes.count()
     // Nenhum botão danger visível
     for (let i = 0; i < countClientes; i++) {
       await expect(dangerBtnsClientes.nth(i)).not.toBeVisible()
     }
 
-    // Manutenções — ATecnica não tem canDelete
+    // Manutenções — risco zero: limitar ao conteúdo da página (evita apanhar elementos noutras camadas/DOM órfão)
     await page.goto('/manut/manutencoes')
     await page.waitForTimeout(800)
-    const dangerBtnsManut = page.locator('.icon-btn.danger')
+    await expect(page.locator('.page-manutencoes')).toBeVisible({ timeout: 10000 })
+    const rootManut = page.locator('.page-manutencoes')
+    const dangerBtnsManut = rootManut.locator('.icon-btn.danger, .cliente-action-btn.danger, button.mc-overflow-danger')
     const countManut = await dangerBtnsManut.count()
     for (let i = 0; i < countManut; i++) {
       await expect(dangerBtnsManut.nth(i)).not.toBeVisible()
@@ -198,10 +203,9 @@ test.describe('Permissões ATecnica — restrições', () => {
     await page.waitForTimeout(800)
 
     // A página de manutenções executadas deve carregar
-    await expect(page.locator('.manutencoes-table, .manutencoes-cards, h1').first()).toBeVisible({ timeout: 5000 })
-    // canDelete = false → sem .icon-btn.danger
-    const dangerCount = await page.locator('.icon-btn.danger').count()
-    expect(dangerCount).toBe(0)
+    await expect(page.locator('.page-manutencoes .manutencoes-table, .page-manutencoes .manutencoes-cards, .page-manutencoes h1').first()).toBeVisible({ timeout: 5000 })
+    const rootManut = page.locator('.page-manutencoes')
+    expect(await rootManut.locator('.icon-btn.danger, .cliente-action-btn.danger').count()).toBe(0)
   })
 
   test('ATecnica não vê botão "Nova manutenção"', async ({ page }) => {

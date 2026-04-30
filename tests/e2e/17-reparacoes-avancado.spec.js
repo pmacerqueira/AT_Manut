@@ -25,6 +25,7 @@ import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
   loginAdminSemAlertas, signCanvas,
   MC, dismissAlertasModal, expectToast,
+  navegarMensalParaFevereiro2026,
 } from './helpers.js'
 
 // ── PNG mínimo 1×1 para testes de foto ────────────────────────────────────────
@@ -568,7 +569,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     const modal = page.locator('.modal-relatorio-rep')
     await expect(modal).toBeVisible()
     // Rodapé APP_FOOTER_TEXT (razão social NAVEL-AÇORES) no RelatorioReparacaoView
-    await expect(modal.locator('.rel-footer')).toContainText(/Navel/)
+    await expect(modal.locator('.rel-footer')).toContainText(/NAVEL/i)
   })
 
   test('Botão "Enviar email" abre modal de email com campo de destinatário', async ({ page }) => {
@@ -638,8 +639,8 @@ test.describe('RA-6 — Responsividade mobile (375×812)', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1000)
 
-    // A tabela ou cards devem estar visíveis
-    const content = page.locator('.reparacoes-table, .data-table, tbody').first()
+    // Vista mobile: só .reparacoes-cards visible; vista desktop: tbody
+    const content = page.locator('.reparacoes-cards .rc-card, .reparacoes-table tbody tr').first()
     await expect(content).toBeVisible({ timeout: 5000 })
   })
 
@@ -1121,15 +1122,14 @@ test.describe('RA-13 — Fluxo completo de reparação ISTOBAL', () => {
 
   test('Reparação ISTOBAL mostra badge ⚡ ISTOBAL na lista', async ({ page }) => {
     await irParaReparacoes(page)
-    const badges = page.locator('.rep-origem-istobal')
+    const badges = page.locator('.reparacoes-table .rep-origem-istobal')
     await expect(badges).toHaveCount(2)
     await expect(badges.first()).toContainText('ISTOBAL')
   })
 
   test('Aviso ES- aparece na coluna "Aviso" da tabela', async ({ page }) => {
     await irParaReparacoes(page)
-    const cellsAviso = page.locator('td.td-aviso').filter({ hasText: /ES-2026-/ })
-    await expect(cellsAviso).toHaveCount(2)
+    await expect(page.locator('tbody tr').filter({ hasText: /ES-2026-/ })).toHaveCount(2)
   })
 
   test('Executar reparação ISTOBAL — nº aviso ES- pré-preenchido', async ({ page }) => {
@@ -1163,6 +1163,7 @@ test.describe('RA-13 — Fluxo completo de reparação ISTOBAL', () => {
     await page.locator('button').filter({ hasText: 'Mensal ISTOBAL' }).click()
     await page.waitForTimeout(500)
     const modal = page.locator('.modal-mensal-istobal')
+    await navegarMensalParaFevereiro2026(modal, page)
     await expect(modal).toContainText(/ES-2026-/)
   })
 
@@ -1171,6 +1172,7 @@ test.describe('RA-13 — Fluxo completo de reparação ISTOBAL', () => {
     await page.locator('button').filter({ hasText: 'Mensal ISTOBAL' }).click()
     await page.waitForTimeout(500)
     const modal = page.locator('.modal-mensal-istobal')
+    await navegarMensalParaFevereiro2026(modal, page)
     // rr-rep04 tem 3.5h M.O.
     await expect(modal).toContainText(/3\.5\s*h|3,5\s*h/)
   })

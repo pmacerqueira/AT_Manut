@@ -17,6 +17,7 @@ import {
   fillExecucaoModal,
   confirmExecWizardVerificacaoEquipamento,
   ensureNotasComFrasePredefinida,
+  expandPrimeiroGrupoManutExecutadas,
   MC,
 } from './helpers.js'
 
@@ -104,6 +105,7 @@ test.describe('Manutenções — Visualizar relatório', () => {
     await page.goto('/manut/manutencoes?filter=executadas')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1000)
+    await expandPrimeiroGrupoManutExecutadas(page)
   })
 
   test('Botão PDF visível em manutenção concluída com relatório', async ({ page }) => {
@@ -140,7 +142,7 @@ test.describe('Manutenções — Visualizar relatório', () => {
       })
       if (await emailModal.isVisible({ timeout: 3000 }).catch(() => false)) {
         await expect(emailModal.locator('input[type="email"]')).toBeVisible()
-        await page.locator('.modal-relatorio-form button.secondary, .modal button.secondary').first().click()
+        await emailModal.getByRole('button', { name: 'Cancelar' }).click()
       }
     }
   })
@@ -351,6 +353,7 @@ test.describe('Manutenções — ATecnica', () => {
   test('ATecnica NÃO pode editar manutenção com relatório assinado', async ({ page }) => {
     await page.goto('/manut/manutencoes?filter=executadas')
     await page.waitForTimeout(800)
+    await expandPrimeiroGrupoManutExecutadas(page)
 
     // mt01 tem relatório assinado — o botão de editar deve estar bloqueado (.readonly)
     const blockedBtn = page.locator('.icon-btn.readonly').first()
@@ -371,7 +374,7 @@ test.describe('Manutenções — ATecnica', () => {
     if (await executeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await executeBtn.click()
       await expect(page.locator('.modal-relatorio-form')).toBeVisible({ timeout: 5000 })
-      await page.locator('.modal-relatorio-form button.secondary').click()
+      await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
     }
   })
 

@@ -1126,6 +1126,17 @@ body:has(.modal-overlay) {
 .manutencao-item-btn:hover { color: var(--color-accent); }
 .btn-enviar-email { font-size: 0.9em; padding: 0.5rem 0.75rem !important; }
 
+.hist-manut-resumo-legenda { font-size: 0.85rem; margin: 0 0 0.5rem; line-height: 1.35; }
+.hist-manut-section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0.75rem 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.hist-manut-section-title-spaced { margin-top: 1.25rem; }
+
 /* ── Tabela compacta de histórico de manutenções (ficha de máquina) ── */
 .hist-manut-wrap { overflow-x: auto; margin-top: 0.25rem; }
 .hist-manut-table {

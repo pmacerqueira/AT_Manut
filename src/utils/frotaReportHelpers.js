@@ -126,12 +126,6 @@ export function relatorioLigadoAoEquipamento(r, midSet, maquina, manutencoesGlob
   return !!(serieRel && serieAlvo && serieRel === serieAlvo)
 }
 
-export function pickNewestRelatorioForMidSet(midSet, relatorios) {
-  const list = (relatorios || []).filter(r => midSet.has(normRelatorioManutencaoId(r)))
-  if (!list.length) return null
-  return [...list].sort(compareRelatorioDesc)[0]
-}
-
 /** Relatório entra no `relMap` pré-frota (todas as máquinas do cliente listadas). */
 export function relatorioVisivelNaFrotaCliente(r, maqIds, manutsCliente, manutencoes, maquinas) {
   const rid = normRelatorioManutencaoId(r)

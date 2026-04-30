@@ -6,6 +6,8 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './tests',
   timeout: 45000,
+  // Um único servidor Vite (webServer) por corrida: muitos workers competem por CPU/IO e aumentam flakiness (regra do projecto: ~2).
+  workers: 2,
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
@@ -23,6 +25,7 @@ export default defineConfig({
   },
   reporter: [
     ['list'],
+    ['blob', { outputDir: 'blob-report' }],
     ['html', { outputFolder: 'tests/playwright-report', open: 'never' }],
     ['json', { outputFile: 'tests/results.json' }],
   ],

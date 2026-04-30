@@ -12,6 +12,8 @@
 - **Não** estão no Git. **Não** estão no painel do cPanel como "Environment
   Variables" (neste plano isso não funciona). **Não** estão mais em
   `config.deploy-secrets.php` activo — esse ficheiro foi arquivado.
+  O migrador gera também `config.cli-env.php` (`putenv`) para **PHP CLI**
+  (pipe ISTOBAL); o `.htaccess` não aplica aí.
 - Para **rodar** um segredo (mudar password, trocar `JWT_SECRET`, etc.),
   corre-se um script a partir do repo `navel-site` que trata de tudo
   automaticamente, com backup e rollback.
@@ -44,6 +46,8 @@ lê com `getenv()`" sem alterar o `config.php` da API.
 ├── .htaccess.bak-YYYYMMDD-HHMMSS        ← backup automático (manter)
 ├── config.php                           ← lê tudo via atm_env() (getenv,
 │                                          $_ENV, $_SERVER, REDIRECT_*)
+├── config.cli-env.php                   ← putenv para PHP CLI (pipe ISTOBAL);
+│                                          gerado pelo migrador; bloqueado pelo FilesMatch
 ├── config.deploy-secrets.php.disabled-… ← fallback LEGADO arquivado
 │                                          (bloqueado pelo FilesMatch)
 └── atm_report_auth.secret.php           ← mecanismo separado para
@@ -52,8 +56,8 @@ lê com `getenv()`" sem alterar o `config.php` da API.
 
 **Bloqueado por `FilesMatch` (HTTP 403):**
 `test-*.php`, `teste-*.php`, `clear-cache.php`, `ingest-istobal-retro.php`,
-`config.deploy-secrets.php(.disabled-*)`, `atm_report_auth.secret.php`,
-`.htaccess.bak-*`.
+`config.deploy-secrets.php(.disabled-*)`, `config.cli-env.php`,
+`atm_report_auth.secret.php`, `.htaccess.bak-*`.
 
 **No repositório AT_Manut:** `servidor-cpanel/api/.htaccess` contém **apenas**
 o bloco `FilesMatch` + cabeçalho de documentação. O bloco `# BEGIN ATM_ENV`
@@ -63,7 +67,7 @@ nunca é versionado — é gerado a partir dos valores reais no servidor.
 
 | Script | Função |
 |---|---|
-| `cpanel-migrate-setenv.mjs` | Lê segredos do servidor (do `config.deploy-secrets.php` actual ou de uma versão `.disabled-TS`). Gera `.htaccess` canónico com `RewriteRule [E=ATM_*:...]` para cada variável. Faz backup `.htaccess.bak-TS` e publica. |
+| `cpanel-migrate-setenv.mjs` | Lê segredos do servidor (`config.deploy-secrets.php` ou o `.disabled-*` mais recente). Gera `.htaccess` com `RewriteRule [E=ATM_*:...]` e **`config.cli-env.php`** (putenv para CLI — pipe ISTOBAL). Backup `.htaccess.bak-TS` e upload. |
 | `cpanel-verify-setenv.mjs` | Atomically renomeia o fallback para `.test-disabled-TS`, faz smoke-test HTTPS ao `/api/data.php`. Só arquiva definitivamente se respostas forem 401 esperadas — em qualquer 5xx faz rollback automático. |
 | `cpanel-rollback-htaccess.mjs` | Repõe o `.htaccess` à versão do repo (só `FilesMatch`). Usar **apenas** em emergência e **antes** reactivar o `config.deploy-secrets.php` renomeando `.disabled-TS` de volta. |
 | `cpanel-audit-crosssite.mjs` | Auditoria `.htaccess` (raiz + `/api/`) + smoke-tests HTTPS aos endpoints de AT_Manut e navel-site. Usar depois de qualquer alteração. |

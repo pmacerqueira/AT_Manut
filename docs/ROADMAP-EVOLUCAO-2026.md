@@ -14,7 +14,7 @@
 |----------|--------|-----------|
 | **Base técnica** | React 19, Vite, PWA, offline-first | Solidez para escalar; stack moderna |
 | **Integridade de dados** | Cascatas CRUD completas, confirmações de eliminação | Dados consistentes; protecção contra erros |
-| **Cobertura E2E** | ~450 testes em 18 specs | Regressão controlada; refactoring seguro |
+| **Cobertura E2E** | 456 testes listados em 19 ficheiros (`docs/TESTES-E2E.md`; spec 18 em skip) | Regressão controlada; refactoring seguro |
 | **Módulos maduros** | Clientes, Equipamentos, Manutenções, Reparações | Núcleo completo para operação diária |
 | **Integrações** | ISTOBAL (webhook), Kaeser (PDF), SAF-T (Gestor.32) | Ecossistema alargado; dados centralizados |
 | **UX em campo** | Modo campo, QR Code, assinatura digital, fotos | Adequado a técnicos em instalações |
@@ -114,7 +114,7 @@
 
 | Métrica | Actual | Meta v2.0 |
 |---------|--------|-----------|
-| Testes E2E a passar | ~440 | 100% |
+| Testes E2E a passar | 456 listados (450 activos; spec 18 skip) | 100% activos |
 | Tempo de build | ~60s | <90s |
 | Cobertura de fluxos críticos | Alta | Mantida |
 | Tempo de deploy (cPanel) | ~5 min | <10 min |
@@ -123,13 +123,13 @@
 
 ## 5. Resumo executivo
 
-A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T de clientes foi corrigida e integrada. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
+A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T via **UI** na página Clientes está em pause (E2E spec 18 em `skip`); o pipeline **script + `importClientes`** / API mantém-se para uso operacional. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
 
-**Próximo passo imediato:** O **Relatório executivo PDF** (N3) está em implementação. Decidir entre:
+**Próximo passo imediato (roadmap legado):** Avaliar retoma da UI «Importar SAF-T» e do spec 18. Entretanto, prioridades de produto seguem `CHANGELOG.md` / `ROADMAP.md`. Decidir entre:
 - **Opção A** — Manter modo conservador: apenas correcções e pequenas melhorias (Etapa 2.1, 2.4).
 - **Opção B** — Avançar com faturação (Etapa 2.3) se houver necessidade de negócio.
 - **Opção C** — Investir em notificações push (Etapa 3.1) se alertas em tempo real forem prioritários.
 
 ---
 
-*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-03-13 — v1.12.0*
+*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-04-30 — v1.16.80 (contexto SAF-T / E2E actualizado)*

@@ -130,6 +130,9 @@
   width: 100%;
   padding: 0;
 }
+.clientes-table .dt-semi {
+  table-layout: fixed;
+}
 .clientes-table .data-table th,
 .clientes-table .data-table td {
   padding: 0.45rem 0.6rem;
@@ -138,10 +141,24 @@
 
 /* col NIF — monospace styling */
 .clientes-table .col-nif code { font-size: 0.88em; }
+.clientes-table .col-nif { width: 11%; }
+.clientes-table .col-cliente-nome { width: 41%; }
+.clientes-table .col-cliente-local { width: 28%; }
+.clientes-table .col-maq { width: 6%; text-align: center; }
+.clientes-table .col-actions { width: 14%; }
 
-/* col Nome — link styling */
-.clientes-table .col-nome .btn-link-inline {
+/* col Nome — link + badge sem email */
+.clientes-table .cliente-nome-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.clientes-table .cliente-nome-cell .btn-link-inline {
   display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 100%;
   text-align: left;
   padding: 0;
@@ -153,10 +170,81 @@
 /* col Acções — row styling */
 .clientes-table .col-actions .actions-row {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.15rem;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
   align-items: center;
   justify-content: flex-end;
+}
+
+.cliente-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.cliente-action-btn.secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+.cliente-action-btn.danger {
+  color: var(--color-danger);
+  border-color: rgba(var(--color-danger-rgb), 0.45);
+  background: rgba(var(--color-danger-rgb), 0.1);
+}
+.cliente-action-btn.danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-white);
+}
+.cliente-action-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+.cliente-action-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+  .cliente-action-label {
+    display: none;
+  }
+  .clientes-table .col-actions { width: 10%; }
+  .clientes-table .col-cliente-local { width: 30%; }
+  .clientes-table .col-cliente-nome { width: 39%; }
+}
+
+body.modo-campo .cliente-action-btn {
+  min-height: 34px;
+  background: #f8fafc;
+  color: #0f172a;
+  border: 2px solid #64748b;
+  font-weight: 800;
+}
+body.modo-campo .cliente-action-btn.secondary:hover:not(:disabled) {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #1d4ed8;
+}
+body.modo-campo .cliente-action-btn.danger {
+  background: #fef2f2;
+  color: #7f1d1d;
+  border-color: #991b1b;
+}
+body.modo-campo .cliente-action-btn.danger:hover:not(:disabled) {
+  background: #991b1b;
+  color: #ffffff;
 }
 
 /* ── Ficha do cliente — header e acções ── */

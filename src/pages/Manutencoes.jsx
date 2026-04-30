@@ -14,8 +14,8 @@ import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
 import BulkExecutarModal from '../components/BulkExecutarModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ArrowDownAZ, ArrowUpAZ, CalendarClock } from 'lucide-react'
-import { format, addDays, subMonths, startOfYear, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ArrowDownAZ, ArrowUpAZ, CalendarClock, ChevronRight, ChevronDown } from 'lucide-react'
+import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
 import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from '../utils/diasUteis'
 import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
@@ -126,13 +126,20 @@ export default function Manutencoes() {
   const [modalBulk, setModalBulk] = useState(null)
 
   // ── Filtros para executadas ──────────────────────────────────────────────
-  const [execPeriodo, setExecPeriodo]       = useState(null) // null | 1 | 3 | 6 | 'ano'
-  const [execDataDe, setExecDataDe]         = useState('')
-  const [execDataAte, setExecDataAte]       = useState('')
   const [execPesquisa, setExecPesquisa]     = useState('')
   const [execFiltroEmail, setExecFiltroEmail] = useState('todos') // 'todos' | 'enviado' | 'por_enviar'
   /** Ordenação da lista de executadas (e bloco executadas em «ver todas»): data exec. desc → série A→Z → série Z→A. */
   const [execSortEquipamento, setExecSortEquipamento] = useState('data') // 'data' | 'serieAsc' | 'serieDesc'
+  /** NIF do cliente ou chave `__sem_cliente__` quando `filter===executadas` com lista agrupada */
+  const [execGruposExpandidos, setExecGruposExpandidos] = useState(() => new Set())
+  const toggleExecGrupoCliente = useCallback((grupoKey) => {
+    setExecGruposExpandidos((prev) => {
+      const next = new Set(prev)
+      if (next.has(grupoKey)) next.delete(grupoKey)
+      else next.add(grupoKey)
+      return next
+    })
+  }, [])
 
   const cycleExecSortEquipamento = useCallback(() => {
     setExecSortEquipamento((s) => (s === 'data' ? 'serieAsc' : s === 'serieAsc' ? 'serieDesc' : 'data'))
@@ -177,6 +184,7 @@ export default function Manutencoes() {
   const ALLOWED_FILTERS = ['proximas', 'executadas', 'atraso', 'agendadas', 'concluidas']
   const filterNormalized = filterRaw === 'agendadas' ? 'proximas' : filterRaw === 'concluidas' ? 'executadas' : filterRaw
   const filter = ALLOWED_FILTERS.includes(filterNormalized) ? filterNormalized : null
+  const maquinaIdFiltroUrl = searchParams.get('maquinaId') || ''
   const [mostrarTodas, setMostrarTodas] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -386,27 +394,12 @@ export default function Manutencoes() {
     }),
   [manutencoesExecutadas, getRelatorioByManutencao])
 
-  const execFiltroAtivo = !!(execPeriodo || execDataDe || execDataAte || execPesquisa || execFiltroEmail !== 'todos')
+  const execFiltroAtivo = !!(execPesquisa.trim() || execFiltroEmail !== 'todos')
 
   const executadasFiltradas = useMemo(() => {
     let lista = manutencoesExecutadasOrdenadas
 
-    // 1. Filtro por período rápido OU intervalo de datas
-    if (execDataDe || execDataAte) {
-      lista = lista.filter(m => {
-        const d = m.data
-        if (execDataDe && d < execDataDe) return false
-        if (execDataAte && d > execDataAte) return false
-        return true
-      })
-    } else if (execPeriodo) {
-      const limiteISO = execPeriodo === 'ano'
-        ? format(startOfYear(new Date()), 'yyyy-MM-dd')
-        : format(subMonths(new Date(), execPeriodo), 'yyyy-MM-dd')
-      lista = lista.filter(m => m.data >= limiteISO)
-    }
-
-    // 2. Filtro de email ao cliente
+    // 1. Filtro de email ao cliente
     if (execFiltroEmail === 'enviado') {
       lista = lista.filter(m => {
         const rel = getRelatorioByManutencao(m.id)
@@ -419,7 +412,7 @@ export default function Manutencoes() {
       })
     }
 
-    // 3. Pesquisa por texto
+    // 2. Pesquisa por texto
     if (execPesquisa.trim()) {
       const q = execPesquisa.trim().toLowerCase()
       lista = lista.filter(m => {
@@ -435,7 +428,7 @@ export default function Manutencoes() {
     }
 
     return lista
-  }, [manutencoesExecutadasOrdenadas, execPeriodo, execDataDe, execDataAte, execPesquisa, execFiltroEmail, getRelatorioByManutencao, maquinas, clientes]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [manutencoesExecutadasOrdenadas, execPesquisa, execFiltroEmail, getRelatorioByManutencao, maquinas, clientes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const executadasFiltradasComSort = useMemo(() => {
     if (execSortEquipamento === 'data') return executadasFiltradas
@@ -454,6 +447,34 @@ export default function Manutencoes() {
     })
     return list
   }, [executadasFiltradas, execSortEquipamento, maquinas, getRelatorioByManutencao])
+
+  const gruposExecutadasPorCliente = useMemo(() => {
+    if (filter !== 'executadas') return null
+    let list = executadasFiltradasComSort
+    if (maquinaIdFiltroUrl) list = list.filter(m => m.maquinaId === maquinaIdFiltroUrl)
+    const map = new Map()
+    for (const m of list) {
+      const maq = maquinas.find(x => x.id === m.maquinaId)
+      const rawNif = maq?.clienteNif
+      const grupoKey = rawNif ? String(rawNif) : '__sem_cliente__'
+      if (!map.has(grupoKey)) {
+        const cli = rawNif ? clientes.find(c => c.nif === rawNif) : null
+        map.set(grupoKey, {
+          grupoKey,
+          clienteNif: rawNif ?? '',
+          nome: cli?.nome ?? (grupoKey === '__sem_cliente__' ? 'Sem cliente' : '—'),
+          manutencoes: [],
+        })
+      }
+      map.get(grupoKey).manutencoes.push(m)
+    }
+    return [...map.values()].sort((a, b) =>
+      (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' }))
+  }, [filter, executadasFiltradasComSort, maquinaIdFiltroUrl, maquinas, clientes])
+
+  useEffect(() => {
+    setExecGruposExpandidos(new Set())
+  }, [execPesquisa, execFiltroEmail, maquinaIdFiltroUrl, filter])
 
   // Ordenação: mais dias em atraso primeiro (diasAtraso desc) → próximas por data asc
   const manutencoesOrdenadas = useMemo(() =>
@@ -641,11 +662,11 @@ export default function Manutencoes() {
         ? `${executadasFiltradasComSort.length} de ${manutencoesExecutadasOrdenadas.length} manutenção(ões) executadas`
         : `${manutencoesExecutadasOrdenadas.length} manutenção(ões) já executadas com sucesso`
       if (execSortEquipamento === 'serieAsc') {
-        subtituloPagina = `${baseCount}. Ordenação: nº de série A→Z; mesma série: execução mais recente primeiro.`
+        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções deste cliente — ordem é a da lista (nº de série A→Z; na mesma série, execução mais recente primeiro).`
       } else if (execSortEquipamento === 'serieDesc') {
-        subtituloPagina = `${baseCount}. Ordenação: nº de série Z→A; mesma série: execução mais recente primeiro.`
+        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções deste cliente — ordem é a da lista (nº de série Z→A; na mesma série, execução mais recente primeiro).`
       } else {
-        subtituloPagina = `${baseCount}. Ordenação: data de execução (mais recente primeiro).`
+        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções (mais recente primeiro).`
       }
     }
   } else {
@@ -665,7 +686,6 @@ export default function Manutencoes() {
     }
   }
 
-  const maquinaIdFiltroUrl = searchParams.get('maquinaId') || ''
   const maqFiltroUrl = maquinaIdFiltroUrl ? getMaquina(maquinaIdFiltroUrl) : null
   if (maquinaIdFiltroUrl) {
     listaParaMostrar = listaParaMostrar.filter(m => m.maquinaId === maquinaIdFiltroUrl)
@@ -674,8 +694,268 @@ export default function Manutencoes() {
 
   const manutencoesList_selectable = listaParaMostrar.filter(m => m.status === 'pendente' || m.status === 'agendada')
 
+  function renderManutenTableBodyRow(m, { detailClass = '' } = {}) {
+    const maq = getMaquina(m.maquinaId)
+    const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+    const catEquip = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
+    const catClass = manutencoesCategoriaClass(catEquip?.nome)
+    const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() || 'N/A' : 'N/A'
+    const rel = getRelatorioByManutencao(m.id)
+    const dataExecucao = rel?.dataAssinatura || rel?.dataCriacao
+    const isConcluida = m.status === 'concluida'
+    const dias = isConcluida ? null : calcDiasAtraso(m.data)
+    return (
+      <tr key={m.id} className={[detailClass, catClass, bulkMode && selectedIds.has(m.id) ? 'bulk-row-selected' : ''].filter(Boolean).join(' ')}>
+        {bulkMode && (
+          <td className="col-bulk-check">
+            {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') ? (
+              <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
+            ) : <span />}
+          </td>
+        )}
+        <td data-label="Dias" className={`col-xs col-dias col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
+          {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
+        </td>
+        <td data-label="Equipamento" className="col-lg col-equipamento col-truncate">
+          <div className="equip-desc-block">
+            <strong>{desc}</strong>
+            <span
+              className="text-muted equip-num-serie equip-num-serie-link"
+              role="button" tabIndex={0}
+              title="Abrir ficha do equipamento"
+              onClick={() => maq && navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && maq) navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
+            >Nº Série: {maq?.numeroSerie}</span>
+          </div>
+        </td>
+        <td data-label="Cliente" className="col-md col-cliente col-truncate">{getCliente(maq?.clienteNif)?.nome || '—'}</td>
+        <td data-label="Tipo" className="col-sm col-tipo col-truncate">
+          <span>{m.tipo === 'montagem' ? 'Montagem' : 'Manutenção Peri.'}</span>
+          {isConcluida && rel?.numeroRelatorio && (
+            <span className="num-servico" title="Número de serviço">{rel.numeroRelatorio}</span>
+          )}
+        </td>
+        <td data-label="Data" className="col-md col-data col-nowrap">
+          {isConcluida ? (
+            <div className="datas-manut">
+              <span title="Data agendada">Agendada: {formatDataAzores(m.data)}</span>
+              <span className="text-muted" title="Data e hora de execução/assinatura">
+                Execução: {dataExecucao ? formatDataHoraCurtaAzores(dataExecucao) : '—'}
+              </span>
+            </div>
+          ) : (
+            formatDataAzores(m.data)
+          )}
+        </td>
+        <td data-label="Técnico" className="col-sm col-tecnico col-truncate">{m.tecnico || (isConcluida && rel?.tecnico) || 'Não atribuído'}</td>
+        <td data-label="Status" className="col-sm col-status col-badges">
+          <span className={`badge badge-${isConcluida ? 'concluida' : getDisplayStatus(m)}`}>
+            {statusLabel[isConcluida ? 'concluida' : getDisplayStatus(m)]}
+          </span>
+          {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
+          {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
+          {!canEditManutencao(m.id) && (
+            <span className="badge-assinado" title="Relatório enviado ao cliente — edição reservada a administradores"><Lock size={12} /> Enviado</span>
+          )}
+        </td>
+        {(mostrarTodas || filter === 'executadas') && (() => {
+          const envio = rel?.enviadoParaCliente
+          const enviado = !!envio?.email
+          return (
+            <td className="col-email-status col-email" data-label="Email" title={enviado ? `Enviado a ${envio.email}` : 'Não enviado ao cliente'}>
+              <span className={`email-dot ${enviado ? 'email-dot--sent' : 'email-dot--pending'}`} />
+            </td>
+          )
+        })()}
+        <td className="col-actions" data-label="">
+          <div className="actions-inner">
+            {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') && (
+              <button className="icon-btn btn-executar-manut" onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: getMaquina(m.maquinaId) }) }} title="Executar manutenção">
+                <Play size={16} />
+              </button>
+            )}
+            {!isConcluida && m.status === 'em_progresso' && (
+              <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Continuar execução">
+                <Play size={16} />
+              </button>
+            )}
+            {rel && (
+              <button className="icon-btn secondary" onClick={() => handleAbrirPdf(m, maq, rel, sub, getCliente(maq?.clienteNif))} title="Obter PDF">
+                <FileDown size={16} />
+              </button>
+            )}
+            <ActionsOverflow id={m.id} openId={overflowAberto} setOpenId={setOverflowAberto} items={[
+              ...(rel ? [{ icon: <Mail size={14} />, label: 'Enviar por email', onClick: () => abrirModalEmail(m) }] : []),
+              ...(isAdmin && isConcluida && rel
+                ? (rel.enviadoParaCliente?.email
+                  ? [{ icon: <Undo2 size={14} />, label: 'Reverter marca de envio ao cliente', danger: true, onClick: () => reverterMarcarEnvioCliente(rel) }]
+                  : [{ icon: <MailCheck size={14} />, label: 'Marcar enviado ao cliente (manual)', onClick: () => abrirModalMarcarEnvioManual(m) }])
+                : []),
+              ...(rel?.fotos?.length > 0 ? [{ icon: <Paperclip size={14} />, label: 'Fotografias', onClick: () => setModalFotos({ fotos: rel.fotos }) }] : []),
+              ...(rel?.assinadoPeloCliente ? [{ icon: <FileText size={14} />, label: 'Ver manutenção', onClick: () => setModalRelatorio(m) }] : []),
+              ...(rel && !rel.assinadoPeloCliente ? [{ icon: <FileSignature size={14} />, label: 'Recolher assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
+              ...(!rel && isConcluida ? [{ icon: <FileSignature size={14} />, label: 'Registar assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
+              ...(canEditManutencao(m.id) ? [{ icon: <Pencil size={14} />, label: 'Editar', onClick: () => openEdit(m) }] : [{ icon: <Lock size={14} />, label: 'Enviado ao cliente', disabled: true }]),
+              ...(canDeleteManutencao(m.id) ? [{ icon: <Trash2 size={14} />, label: 'Eliminar', danger: true, onClick: () => setModalConfirmDelete(m) }] : []),
+            ]} />
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderManutenMobileCard(m) {
+    const maq = getMaquina(m.maquinaId)
+    const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+    const catEquip = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
+    const catClass = manutencoesCategoriaClass(catEquip?.nome)
+    const rel = getRelatorioByManutencao(m.id)
+    const dataExec = rel?.dataAssinatura || rel?.dataCriacao
+    const isConcluida = m.status === 'concluida'
+    const cliente = getCliente(maq?.clienteNif)
+    const st = isConcluida ? 'concluida' : getDisplayStatus(m)
+    const isPrimary = !isConcluida && (m.status === 'pendente' || m.status === 'agendada')
+    const dias = isConcluida ? null : calcDiasAtraso(m.data)
+    const equipNome = maq ? `${maq.marca} ${maq.modelo}` : 'N/A'
+    const equipSub = sub?.nome || ''
+
+    return (
+      <div key={m.id} className={`mc mc-${st} ${catClass}${bulkMode && selectedIds.has(m.id) ? ' mc-selected' : ''} exec-grupo-detail-mc`}>
+        <div className="mc-strip" />
+
+        {bulkMode && isPrimary && (
+          <label className="bulk-check-mobile" onClick={e => e.stopPropagation()}>
+            <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
+          </label>
+        )}
+
+        <div className="mc-body">
+          <div className="mc-top">
+            <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
+            {dias != null && (
+              <span className={`mc-dias-badge ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
+                {dias > 0 ? `+${dias}d` : dias === 0 ? 'Hoje' : `${dias}d`}
+              </span>
+            )}
+            {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
+            {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
+            {isConcluida && rel && (
+              <span className={`email-dot ${rel.enviadoParaCliente?.email ? 'email-dot--sent' : 'email-dot--pending'}`} title={rel.enviadoParaCliente?.email ? `Enviado a ${rel.enviadoParaCliente.email}` : 'Não enviado ao cliente'} />
+            )}
+            {maq && isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null && !isConcluida && (
+              <span
+                className="badge kaeser-tipo-badge"
+                title={`Plano KAESER A/B/C/D — próxima: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}
+              >
+                KAESER {tipoKaeserNaPosicao(maq.posicaoKaeser)}
+              </span>
+            )}
+            <span className="mc-tipo-label">
+              {m.tipo === 'montagem' ? 'Montagem' : 'Periódica'}
+              {rel?.numeroRelatorio && <span className="mc-num"> · {rel.numeroRelatorio}</span>}
+            </span>
+          </div>
+
+          <div className="mc-title">
+            {equipSub && <span className="mc-sub">{equipSub}</span>}
+            <strong>{equipNome}</strong>
+          </div>
+
+          <div className="mc-cliente-linha">
+            <span className="mc-cliente-label">Cliente:</span>
+            <span className="mc-cliente-nome">{cliente?.nome || '—'}</span>
+          </div>
+
+          <div className="mc-info">
+            {maq?.numeroSerie && (
+              <span className="mc-serie mc-serie-link" role="button" tabIndex={0}
+                title="Abrir ficha do equipamento"
+                onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
+              >Nº {maq.numeroSerie}</span>
+            )}
+          </div>
+
+          <div className="mc-meta">
+            {dataExec ? (
+              <span className="mc-date-exec">
+                ✓ {formatDataHoraCurtaAzores(dataExec)}
+              </span>
+            ) : (
+              <span className="mc-date-agenda">
+                {formatDataAzores(m.data, true)}
+              </span>
+            )}
+            {m.tecnico && <span className="mc-tecnico">{m.tecnico}</span>}
+          </div>
+
+          <div className="mc-footer">
+            {isPrimary && (
+              <button
+                className="mc-btn-primary"
+                onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: maq }) }}
+              >
+                <Play size={14} /> Executar
+              </button>
+            )}
+            {!isConcluida && m.status === 'em_progresso' && (
+              <button
+                className="mc-btn-primary"
+                onClick={() => setModalExecucao({ manutencao: m, maquina: maq })}
+              >
+                <Play size={14} /> Continuar
+              </button>
+            )}
+            <div className="mc-icons">
+              {rel?.assinadoPeloCliente && (
+                <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver relatório"><FileText size={15} /></button>
+              )}
+              {rel && !rel.assinadoPeloCliente && (
+                <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Recolher assinatura"><FileSignature size={15} /></button>
+              )}
+              {isConcluida && !rel && (
+                <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Registar assinatura"><FileSignature size={15} /></button>
+              )}
+              <div className="mc-overflow-wrapper">
+                <button className="icon-btn secondary" onClick={() => setOverflowOpen(overflowOpen === m.id ? null : m.id)} title="Mais acções"><MoreHorizontal size={15} /></button>
+                {overflowOpen === m.id && (
+                  <div className="mc-overflow-menu" onClick={() => setOverflowOpen(null)}>
+                    {rel?.fotos?.length > 0 && (
+                      <button onClick={() => setModalFotos({ fotos: rel.fotos })}><Paperclip size={14} /> Fotografias</button>
+                    )}
+                    {rel && (
+                      <>
+                        <button onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)}><FileDown size={14} /> PDF</button>
+                        <button onClick={() => abrirModalEmail(m)}><Mail size={14} /> Enviar email</button>
+                        {isAdmin && isConcluida && (
+                          rel.enviadoParaCliente?.email ? (
+                            <button onClick={() => reverterMarcarEnvioCliente(rel)}><Undo2 size={14} /> Reverter marca de envio</button>
+                          ) : (
+                            <button onClick={() => abrirModalMarcarEnvioManual(m)}><MailCheck size={14} /> Marcar enviado ao cliente</button>
+                          )
+                        )}
+                      </>
+                    )}
+                    {canEditManutencao(m.id) && (
+                      <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
+                    )}
+                    {canDeleteManutencao(m.id) && (
+                      <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m)}><Trash2 size={14} /> Eliminar</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const useListaExecutadasAgrupada = filter === 'executadas' && Array.isArray(gruposExecutadasPorCliente)
+
   return (
-    <div className="page">
+    <div className="page page-manutencoes">
       <div className="page-header">
         <div>
           <button type="button" className="btn-back" onClick={() => navigate(-1)}>
@@ -728,63 +1008,40 @@ export default function Manutencoes() {
 
       <ContentLoader loading={!contentReady} message="A carregar manutenções…" hint="Por favor aguarde.">
 
-      {/* ── Barra de filtros (executadas) ──────────────────────────────────── */}
+      {/* ── Barra de filtros (executadas) — vista cartões em ≤1024px (ver Manutencoes.css) ─ */}
       {(filter === 'executadas' || mostrarTodas) && (
         <div className="exec-filter-bar">
-          <div className="exec-filter-row exec-filter-row--top">
-            <div className="exec-filter-chips">
-              {[
-                { value: 1, label: '1M' },
-                { value: 3, label: '3M' },
-                { value: 6, label: '6M' },
-                { value: 'ano', label: 'Este ano' },
-              ].map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  className={`period-chip${execPeriodo === p.value && !execDataDe && !execDataAte ? ' period-chip--active' : ''}`}
-                  onClick={() => {
-                    setExecPeriodo(prev => prev === p.value ? null : p.value)
-                    setExecDataDe(''); setExecDataAte('')
-                  }}
-                >{p.label}</button>
-              ))}
-            </div>
-            <div className="exec-date-range">
-              <label>De <input type="date" value={execDataDe} onChange={e => { setExecDataDe(e.target.value); setExecPeriodo(null) }} /></label>
-              <label>Até <input type="date" value={execDataAte} onChange={e => { setExecDataAte(e.target.value); setExecPeriodo(null) }} /></label>
-              {(execDataDe || execDataAte) && (
-                <button type="button" className="exec-date-clear" onClick={() => { setExecDataDe(''); setExecDataAte('') }} title="Limpar intervalo"><X size={14} /></button>
-              )}
-            </div>
-          </div>
-          <div className="exec-filter-row exec-filter-row--bottom">
-            <div className="exec-search">
-              <Search size={14} />
+          <div className="exec-filter-toolbar" role="search" aria-label="Filtrar lista de executadas">
+            <div className="exec-search exec-filter-search">
+              <Search size={14} aria-hidden />
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
                 placeholder="Pesquisar cliente, equipamento, técnico, relatório…"
                 value={execPesquisa}
                 onChange={e => setExecPesquisa(e.target.value)}
               />
               {execPesquisa && (
-                <button type="button" className="exec-search-clear" onClick={() => setExecPesquisa('')}><X size={12} /></button>
+                <button type="button" className="exec-search-clear" onClick={() => setExecPesquisa('')} aria-label="Limpar pesquisa"><X size={12} aria-hidden /></button>
               )}
             </div>
-            <div className="exec-email-filter">
-              <select value={execFiltroEmail} onChange={e => setExecFiltroEmail(e.target.value)}>
-                <option value="todos">Email: Todos</option>
-                <option value="enviado">Email: Enviados ✓</option>
-                <option value="por_enviar">Email: Por enviar ✗</option>
-              </select>
+            <div className="exec-filter-side">
+              <div className="exec-email-filter">
+                <select value={execFiltroEmail} onChange={e => setExecFiltroEmail(e.target.value)} aria-label="Filtrar por relatório enviado por email ao cliente">
+                  <option value="todos">Email · todos</option>
+                  <option value="enviado">Email · enviados ✓</option>
+                  <option value="por_enviar">Email · por enviar ✗</option>
+                </select>
+              </div>
+              {execFiltroAtivo && (
+                <button
+                  type="button"
+                  className="exec-filter-reset"
+                  onClick={() => { setExecPesquisa(''); setExecFiltroEmail('todos'); setExecSortEquipamento('data') }}
+                >Limpar filtros</button>
+              )}
             </div>
-            {execFiltroAtivo && (
-              <button
-                type="button"
-                className="exec-filter-reset"
-                onClick={() => { setExecPeriodo(null); setExecDataDe(''); setExecDataAte(''); setExecPesquisa(''); setExecFiltroEmail('todos'); setExecSortEquipamento('data') }}
-              >Limpar filtros</button>
-            )}
           </div>
           <div className="exec-sort-row" role="group" aria-label="Ordenação das manutenções executadas">
             <span className="exec-sort-hint">Ordenação (lista executadas)</span>
@@ -814,167 +1071,41 @@ export default function Manutencoes() {
         </div>
       )}
 
-      {/* ── Lista mobile (≤768px) — padrão field-service ───────────────────── */}
+      {/* ── Lista em cartões em ≤1024px; tabela em ecrãs largos ─────────────── */}
       <div className="manutencoes-cards">
-        {listaParaMostrar.length === 0 ? (
+        {(useListaExecutadasAgrupada ? gruposExecutadasPorCliente.length === 0 : listaParaMostrar.length === 0) ? (
           <p className="text-muted manutencoes-cards-vazio">
-            {mostrarTodas ? 'Nenhuma manutenção registada.' : 'Nenhuma manutenção em atraso ou próxima.'}
+            {filter === 'executadas'
+              ? 'Nenhuma manutenção executada com estes critérios.'
+              : mostrarTodas
+                ? 'Nenhuma manutenção registada.'
+                : 'Nenhuma manutenção em atraso ou próxima.'}
           </p>
-        ) : (
-          listaParaMostrar.map(m => {
-              const maq         = getMaquina(m.maquinaId)
-              const sub         = maq ? getSubcategoria(maq.subcategoriaId) : null
-              const catEquip    = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
-              const catClass    = manutencoesCategoriaClass(catEquip?.nome)
-              const rel         = getRelatorioByManutencao(m.id)
-              const dataExec    = rel?.dataAssinatura || rel?.dataCriacao
-              const isConcluida = m.status === 'concluida'
-              const cliente     = getCliente(maq?.clienteNif)
-              const st          = isConcluida ? 'concluida' : getDisplayStatus(m)
-              const isPrimary   = !isConcluida && (m.status === 'pendente' || m.status === 'agendada')
-              const dias        = isConcluida ? null : calcDiasAtraso(m.data)
-              const equipNome   = maq ? `${maq.marca} ${maq.modelo}` : 'N/A'
-              const equipSub    = sub?.nome || ''
-
-              return (
-                <div key={m.id} className={`mc mc-${st} ${catClass}${bulkMode && selectedIds.has(m.id) ? ' mc-selected' : ''}`}>
-                  {/* Faixa de status lateral */}
-                  <div className="mc-strip" />
-
-                  {bulkMode && isPrimary && (
-                    <label className="bulk-check-mobile" onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
-                    </label>
-                  )}
-
-                  <div className="mc-body">
-                    {/* Linha 1: tipo + badge + número + badge KAESER */}
-                    <div className="mc-top">
-                      <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
-                      {dias != null && (
-                        <span className={`mc-dias-badge ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
-                          {dias > 0 ? `+${dias}d` : dias === 0 ? 'Hoje' : `${dias}d`}
-                        </span>
-                      )}
-                      {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
-                      {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
-                      {isConcluida && rel && (
-                        <span className={`email-dot ${rel.enviadoParaCliente?.email ? 'email-dot--sent' : 'email-dot--pending'}`} title={rel.enviadoParaCliente?.email ? `Enviado a ${rel.enviadoParaCliente.email}` : 'Não enviado ao cliente'} />
-                      )}
-                      {maq && isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null && !isConcluida && (
-                        <span
-                          className="badge kaeser-tipo-badge"
-                          title={`Plano KAESER A/B/C/D — próxima: Tipo ${tipoKaeserNaPosicao(maq.posicaoKaeser)}`}
-                        >
-                          KAESER {tipoKaeserNaPosicao(maq.posicaoKaeser)}
-                        </span>
-                      )}
-                      <span className="mc-tipo-label">
-                        {m.tipo === 'montagem' ? 'Montagem' : 'Periódica'}
-                        {rel?.numeroRelatorio && <span className="mc-num"> · {rel.numeroRelatorio}</span>}
-                      </span>
-                    </div>
-
-                    {/* Linha 2: nome do equipamento */}
-                    <div className="mc-title">
-                      {equipSub && <span className="mc-sub">{equipSub}</span>}
-                      <strong>{equipNome}</strong>
-                    </div>
-
-                    {/* Linha 3: identificação do cliente */}
-                    <div className="mc-cliente-linha">
-                      <span className="mc-cliente-label">Cliente:</span>
-                      <span className="mc-cliente-nome">{cliente?.nome || '—'}</span>
-                    </div>
-
-                    {/* Linha 4: série (clicável → ficha do equipamento) */}
-                    <div className="mc-info">
-                      {maq?.numeroSerie && (
-                        <span className="mc-serie mc-serie-link" role="button" tabIndex={0}
-                          title="Abrir ficha do equipamento"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
-                        >Nº {maq.numeroSerie}</span>
-                      )}
-                    </div>
-
-                    {/* Linha 5: data relevante + técnico */}
-                    <div className="mc-meta">
-                      {dataExec ? (
-                        <span className="mc-date-exec">
-                          ✓ {formatDataHoraCurtaAzores(dataExec)}
-                        </span>
-                      ) : (
-                        <span className="mc-date-agenda">
-                          {formatDataAzores(m.data, true)}
-                        </span>
-                      )}
-                      {m.tecnico && <span className="mc-tecnico">{m.tecnico}</span>}
-                    </div>
-
-                    {/* Rodapé: acção primária (se aplicável) + ícones secundários */}
-                    <div className="mc-footer">
-                      {isPrimary && (
-                        <button
-                          className="mc-btn-primary"
-                          onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: maq }) }}
-                        >
-                          <Play size={14} /> Executar
-                        </button>
-                      )}
-                      {!isConcluida && m.status === 'em_progresso' && (
-                        <button
-                          className="mc-btn-primary"
-                          onClick={() => setModalExecucao({ manutencao: m, maquina: maq })}
-                        >
-                          <Play size={14} /> Continuar
-                        </button>
-                      )}
-                      <div className="mc-icons">
-                        {rel?.assinadoPeloCliente && (
-                          <button className="icon-btn secondary" onClick={() => setModalRelatorio(m)} title="Ver relatório"><FileText size={15} /></button>
-                        )}
-                        {rel && !rel.assinadoPeloCliente && (
-                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Recolher assinatura"><FileSignature size={15} /></button>
-                        )}
-                        {isConcluida && !rel && (
-                          <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Registar assinatura"><FileSignature size={15} /></button>
-                        )}
-                        <div className="mc-overflow-wrapper">
-                          <button className="icon-btn secondary" onClick={() => setOverflowOpen(overflowOpen === m.id ? null : m.id)} title="Mais acções"><MoreHorizontal size={15} /></button>
-                          {overflowOpen === m.id && (
-                            <div className="mc-overflow-menu" onClick={() => setOverflowOpen(null)}>
-                              {rel?.fotos?.length > 0 && (
-                                <button onClick={() => setModalFotos({ fotos: rel.fotos })}><Paperclip size={14} /> Fotografias</button>
-                              )}
-                              {rel && (
-                                <>
-                                  <button onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)}><FileDown size={14} /> PDF</button>
-                                  <button onClick={() => abrirModalEmail(m)}><Mail size={14} /> Enviar email</button>
-                                  {isAdmin && isConcluida && (
-                                    rel.enviadoParaCliente?.email ? (
-                                      <button onClick={() => reverterMarcarEnvioCliente(rel)}><Undo2 size={14} /> Reverter marca de envio</button>
-                                    ) : (
-                                      <button onClick={() => abrirModalMarcarEnvioManual(m)}><MailCheck size={14} /> Marcar enviado ao cliente</button>
-                                    )
-                                  )}
-                                </>
-                              )}
-                              {canEditManutencao(m.id) && (
-                                <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
-                              )}
-                              {canDeleteManutencao(m.id) && (
-                                <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m)}><Trash2 size={14} /> Eliminar</button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+        ) : useListaExecutadasAgrupada ? (
+          gruposExecutadasPorCliente.map((grupo) => {
+            const expanded = execGruposExpandidos.has(grupo.grupoKey)
+            return (
+              <div key={grupo.grupoKey} className="exec-grupo-mobile-wrap">
+                <button
+                  type="button"
+                  className="exec-grupo-mobile-header"
+                  aria-expanded={expanded}
+                  onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}
+                >
+                  <span className="exec-grupo-mobile-chev">{expanded ? <ChevronDown size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}</span>
+                  <strong className="exec-grupo-mobile-nome">{grupo.nome}</strong>
+                  <span className="badge exec-grupo-count">{grupo.manutencoes.length}</span>
+                </button>
+                {expanded && (
+                  <div className="exec-grupo-mobile-cards">
+                    {grupo.manutencoes.map((mm) => renderManutenMobileCard(mm))}
                   </div>
-                </div>
-              )
-            })
+                )}
+              </div>
+            )
+          })
+        ) : (
+          listaParaMostrar.map((m) => renderManutenMobileCard(m))
         )}
       </div>
 
@@ -1003,9 +1134,9 @@ export default function Manutencoes() {
                     />
                   </th>
                 )}
-                <th className="col-xs">Dias</th>
+                <th className="col-xs col-dias">Dias</th>
                 <th
-                  className={`col-lg col-truncate${filter === 'executadas' || mostrarTodas ? ' th-equip-sort-wrap' : ''}`}
+                  className={`col-lg col-equipamento col-truncate${filter === 'executadas' || mostrarTodas ? ' th-equip-sort-wrap' : ''}`}
                   aria-sort={filter === 'executadas' || mostrarTodas
                     ? (execSortEquipamento === 'serieAsc' ? 'ascending' : execSortEquipamento === 'serieDesc' ? 'descending' : 'descending')
                     : undefined}
@@ -1033,133 +1164,64 @@ export default function Manutencoes() {
                     'Equipamento'
                   )}
                 </th>
-                <th className="col-md col-truncate">Cliente</th>
-                <th className="col-sm col-truncate">Tipo</th>
-                <th className="col-md col-nowrap">Data</th>
-                <th className="col-sm col-truncate">Técnico</th>
-                <th className="col-sm col-badges">Status</th>
-                {(mostrarTodas || filter === 'executadas') && <th className="col-email-status" title="Relatório enviado ao cliente">Email</th>}
+                <th className="col-md col-cliente col-truncate">Cliente</th>
+                <th className="col-sm col-tipo col-truncate">Tipo</th>
+                <th className="col-md col-data col-nowrap">Data</th>
+                <th className="col-sm col-tecnico col-truncate">Técnico</th>
+                <th className="col-sm col-status col-badges">Status</th>
+                {(mostrarTodas || filter === 'executadas') && <th className="col-email-status col-email" title="Relatório enviado ao cliente">Email</th>}
                 <th className="col-actions"></th>
               </tr>
             </thead>
             <tbody>
-              {listaParaMostrar.map(m => {
-                  const maq = getMaquina(m.maquinaId)
-                  const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
-                  const catEquip = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
-                  const catClass = manutencoesCategoriaClass(catEquip?.nome)
-                  const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() || 'N/A' : 'N/A'
-                  const rel = getRelatorioByManutencao(m.id)
-                  const dataExecucao = rel?.dataAssinatura || rel?.dataCriacao
-                  const isConcluida = m.status === 'concluida'
-                  const dias = isConcluida ? null : calcDiasAtraso(m.data)
-                  return (
-                    <tr key={m.id} className={[catClass, bulkMode && selectedIds.has(m.id) ? 'bulk-row-selected' : ''].filter(Boolean).join(' ')}>
-                      {bulkMode && (
-                        <td className="col-bulk-check">
-                          {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') ? (
-                            <input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} />
-                          ) : <span />}
-                        </td>
-                      )}
-                      <td data-label="Dias" className={`col-xs col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
-                        {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
+              {useListaExecutadasAgrupada
+                ? gruposExecutadasPorCliente.flatMap((grupo) => {
+                  const expanded = execGruposExpandidos.has(grupo.grupoKey)
+                  const grupoRow = (
+                    <tr key={`grp-${grupo.grupoKey}`} className="exec-grupo-cli-row">
+                      {bulkMode && <td className="col-bulk-check" />}
+                      <td data-label="" className="col-xs col-dias exec-grupo-chevr">
+                        <button
+                          type="button"
+                          className="exec-grupo-expand-btn"
+                          aria-expanded={expanded}
+                          aria-label={expanded ? 'Fechar intervenções deste cliente' : 'Abrir intervenções deste cliente'}
+                          onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}
+                          title={expanded ? 'Ocultar manutenções' : `Ver ${grupo.manutencoes.length} manutenção(ões)`}
+                        >
+                          {expanded ? <ChevronDown size={17} aria-hidden /> : <ChevronRight size={17} aria-hidden />}
+                        </button>
                       </td>
-                      <td data-label="Equipamento" className="col-lg col-truncate">
-                        <div className="equip-desc-block">
-                          <strong>{desc}</strong>
-                          <span
-                            className="text-muted equip-num-serie equip-num-serie-link"
-                            role="button" tabIndex={0}
-                            title="Abrir ficha do equipamento"
-                            onClick={() => maq && navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && maq) navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
-                          >Nº Série: {maq?.numeroSerie}</span>
-                        </div>
+                      <td data-label="" className="col-lg col-equipamento col-truncate exec-grupo-dash">—</td>
+                      <td data-label="Cliente" className="col-md col-cliente col-truncate exec-grupo-cli-cell">
+                        <button type="button" className="exec-grupo-cli-label" aria-expanded={expanded} onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}>
+                          <strong className="exec-grupo-cli-nome">{grupo.nome}</strong>{' '}
+                          <span className="badge exec-grupo-count" title={`${grupo.manutencoes.length} intervenção(ões)`}>{grupo.manutencoes.length}</span>
+                        </button>
                       </td>
-                      <td data-label="Cliente" className="col-md col-truncate">{getCliente(maq?.clienteNif)?.nome || '—'}</td>
-                      <td data-label="Tipo" className="col-sm col-truncate">
-                        <span>{m.tipo === 'montagem' ? 'Montagem' : 'Manutenção Peri.'}</span>
-                        {isConcluida && rel?.numeroRelatorio && (
-                          <span className="num-servico" title="Número de serviço">{rel.numeroRelatorio}</span>
-                        )}
-                      </td>
-                      <td data-label="Data" className="col-md col-nowrap">
-                        {isConcluida ? (
-                          <div className="datas-manut">
-                            <span title="Data agendada">Agendada: {formatDataAzores(m.data)}</span>
-                            <span className="text-muted" title="Data e hora de execução/assinatura">
-                              Execução: {dataExecucao ? formatDataHoraCurtaAzores(dataExecucao) : '—'}
-                            </span>
-                          </div>
-                        ) : (
-                          formatDataAzores(m.data)
-                        )}
-                      </td>
-                      <td data-label="Técnico" className="col-sm col-truncate">{m.tecnico || (isConcluida && rel?.tecnico) || 'Não atribuído'}</td>
-                      <td data-label="Status" className="col-sm col-badges">
-                        <span className={`badge badge-${isConcluida ? 'concluida' : getDisplayStatus(m)}`}>
-                          {statusLabel[isConcluida ? 'concluida' : getDisplayStatus(m)]}
-                        </span>
-                        {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
-                        {isPendenteAssinatura(m) && <span className="badge badge-pendente-assinatura">Pend. assinatura</span>}
-                        {!canEditManutencao(m.id) && (
-                          <span className="badge-assinado" title="Relatório enviado ao cliente — edição reservada a administradores"><Lock size={12} /> Enviado</span>
-                        )}
-                      </td>
-                      {(mostrarTodas || filter === 'executadas') && (() => {
-                        const envio = rel?.enviadoParaCliente
-                        const enviado = !!envio?.email
-                        return (
-                          <td className="col-email-status" data-label="Email" title={enviado ? `Enviado a ${envio.email}` : 'Não enviado ao cliente'}>
-                            <span className={`email-dot ${enviado ? 'email-dot--sent' : 'email-dot--pending'}`} />
-                          </td>
-                        )
-                      })()}
-                      <td className="col-actions" data-label="">
-                        <div className="actions-inner">
-                          {/* Botão primário: Executar */}
-                          {!isConcluida && (m.status === 'pendente' || m.status === 'agendada') && (
-                            <button className="icon-btn btn-executar-manut" onClick={() => { iniciarManutencao(m.id); setModalExecucao({ manutencao: { ...m, status: 'em_progresso' }, maquina: getMaquina(m.maquinaId) }) }} title="Executar manutenção">
-                              <Play size={16} />
-                            </button>
-                          )}
-                          {!isConcluida && m.status === 'em_progresso' && (
-                            <button className="icon-btn btn-executar-manut" onClick={() => setModalExecucao({ manutencao: m, maquina: getMaquina(m.maquinaId) })} title="Continuar execução">
-                              <Play size={16} />
-                            </button>
-                          )}
-                          {/* Botão primário: PDF (quando há relatório) */}
-                          {rel && (
-                            <button className="icon-btn secondary" onClick={() => handleAbrirPdf(m, maq, rel, sub, getCliente(maq?.clienteNif))} title="Obter PDF">
-                              <FileDown size={16} />
-                            </button>
-                          )}
-                          {/* Menu overflow: acções secundárias */}
-                          <ActionsOverflow id={m.id} openId={overflowAberto} setOpenId={setOverflowAberto} items={[
-                            ...(rel ? [{ icon: <Mail size={14} />, label: 'Enviar por email', onClick: () => abrirModalEmail(m) }] : []),
-                            ...(isAdmin && isConcluida && rel
-                              ? (rel.enviadoParaCliente?.email
-                                ? [{ icon: <Undo2 size={14} />, label: 'Reverter marca de envio ao cliente', danger: true, onClick: () => reverterMarcarEnvioCliente(rel) }]
-                                : [{ icon: <MailCheck size={14} />, label: 'Marcar enviado ao cliente (manual)', onClick: () => abrirModalMarcarEnvioManual(m) }])
-                              : []),
-                            ...(rel?.fotos?.length > 0 ? [{ icon: <Paperclip size={14} />, label: 'Fotografias', onClick: () => setModalFotos({ fotos: rel.fotos }) }] : []),
-                            ...(rel?.assinadoPeloCliente ? [{ icon: <FileText size={14} />, label: 'Ver manutenção', onClick: () => setModalRelatorio(m) }] : []),
-                            ...(rel && !rel.assinadoPeloCliente ? [{ icon: <FileSignature size={14} />, label: 'Recolher assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
-                            ...(!rel && isConcluida ? [{ icon: <FileSignature size={14} />, label: 'Registar assinatura', onClick: () => setModalRecolherAssinatura({ manutencao: m, maquina: getMaquina(m.maquinaId) }) }] : []),
-                            ...(canEditManutencao(m.id) ? [{ icon: <Pencil size={14} />, label: 'Editar', onClick: () => openEdit(m) }] : [{ icon: <Lock size={14} />, label: 'Enviado ao cliente', disabled: true }]),
-                            ...(canDeleteManutencao(m.id) ? [{ icon: <Trash2 size={14} />, label: 'Eliminar', danger: true, onClick: () => setModalConfirmDelete(m) }] : []),
-                          ]} />
-                        </div>
-                      </td>
+                      <td className="col-sm col-tipo col-truncate text-muted exec-grupo-dash" data-label="Tipo">—</td>
+                      <td className="col-md col-data col-nowrap text-muted exec-grupo-dash" data-label="Data">—</td>
+                      <td className="col-sm col-tecnico col-truncate text-muted exec-grupo-dash" data-label="Técnico">—</td>
+                      <td className="col-sm col-status col-badges text-muted exec-grupo-dash" data-label="Status">—</td>
+                      {(mostrarTodas || filter === 'executadas') && <td className="col-email-status col-email text-muted exec-grupo-dash" data-label="Email">—</td>}
+                      <td className="col-actions exec-grupo-dash" />
                     </tr>
                   )
-                })}
+                  const detailRows = expanded
+                    ? grupo.manutencoes.map((mch) => renderManutenTableBodyRow(mch, { detailClass: 'exec-grupo-detail-row' }))
+                    : []
+                  return [grupoRow, ...detailRows]
+                })
+                : listaParaMostrar.map((m) => renderManutenTableBodyRow(m))}
             </tbody>
           </table>
-          {listaParaMostrar.length === 0 && (
+          {(useListaExecutadasAgrupada ? gruposExecutadasPorCliente.length === 0 : listaParaMostrar.length === 0) && (
             <p className="text-muted" style={{ padding: '1.5rem' }}>
-              {mostrarTodas ? 'Nenhuma manutenção registada.' : 'Nenhuma manutenção em atraso ou próxima.'}
+              {filter === 'executadas'
+                ? 'Nenhuma manutenção executada com estes critérios.'
+                : mostrarTodas
+                  ? 'Nenhuma manutenção registada.'
+                  : 'Nenhuma manutenção em atraso ou próxima.'}
             </p>
           )}
         </div>

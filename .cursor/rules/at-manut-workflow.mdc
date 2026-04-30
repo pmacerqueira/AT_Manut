@@ -82,6 +82,10 @@ ticket CiberConceito #225838). A API lê segredos do bloco
 `RewriteRule ^ - [E=ATM_KEY:VALUE]` — automaticamente em
 `$_SERVER`, `$_ENV` e `getenv()`.
 
+**PHP CLI** (pipe `parse-istobal-email.php`, cron): o `.htaccess` não corre;
+`config.php` carrega `config.cli-env.php`, gerado pelo mesmo migrador com
+`putenv` (bloqueado a HTTP pelo `FilesMatch`).
+
 **Ao actualizar segredos (rotação de password, novo token, nova
 variável) nunca editar o `.htaccess` à mão fora do runbook.** Usar:
 
@@ -238,11 +242,15 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A suite tem **442 testes** (17 specs) em `tests/e2e/` cobrindo todos os fluxos e perfis.
+A suite tem **456 testes** listados (19 ficheiros em `tests/e2e/`) — contagem canónica: `npx playwright test tests/e2e/ --list`. O **spec 18 (SAF-T)** está em **`test.describe.skip`** até o botão/modal voltar à página Clientes (permanece na contagem `--list`). Reporters: **list**, **blob** (`blob-report/`, suporta `--last-failed`), **html**, **json**.
 
 ```powershell
-# Pré-requisito: servidor de desenvolvimento a correr
-npm run dev   # http://localhost:5173
+# O Playwright arranca o Vite via webServer (playwright.config.js). Com CI=true não reaproveita servidor na porta 5173.
+$env:CI = 'true'   # recomendado em CI / quando 5173 deve ser exclusiva do Playwright
+
+# Atalhos package.json
+npm run test:e2e
+npm run test:e2e:last-failed   # requer corrida prévia com reporter blob
 
 # Suite completa
 npx playwright test tests/e2e/

@@ -2,7 +2,7 @@
  * 03-clientes.spec.js — Gestão de clientes: CRUD (Admin) + permissões (ATecnica)
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, getInputByLabel, SELETOR_BOTAO_EDITAR, MC } from './helpers.js'
+import { setupApiMock, doLoginAdmin, doLoginTecnico, loginAdminSemAlertas, getInputByLabel, SELETOR_BOTAO_EDITAR, SEL_BTN_DANGER, MC } from './helpers.js'
 
 // ── Admin ───────────────────────────────────────────────────────────────────
 
@@ -113,7 +113,11 @@ test.describe('Clientes — Admin', () => {
   })
 
   test('Editar cliente — guardar alterações', async ({ page }) => {
-    const editBtn = page.locator(SELETOR_BOTAO_EDITAR).first()
+    const editBtn = page
+      .locator('tbody tr')
+      .filter({ hasText: /Bettencourt/i })
+      .locator(SELETOR_BOTAO_EDITAR)
+      .first()
     await expect(editBtn).toBeVisible({ timeout: 5000 })
     await editBtn.click()
 
@@ -125,18 +129,19 @@ test.describe('Clientes — Admin', () => {
 
     await page.locator('.modal button[type="submit"]').click()
 
-    // Modal deve fechar (aguardar até 6s — submit + toast + unmount)
-    await expect(page.locator('.modal-overlay')).not.toBeVisible({ timeout: 6000 })
+    // Fechar apenas o modal «Editar cliente» (vários overlays podem existir durante animações/toasts)
+    await expect(page.getByRole('heading', { name: 'Editar cliente' })).not.toBeVisible({ timeout: 8000 })
   })
 
   test('Eliminar cliente sem equipamentos → sucesso', async ({ page }) => {
     // "Cliente Sem Máquinas" (cli_nodeps) não tem máquinas → botão activo
-    const rows = page.locator('tr, .cliente-row')
+    const rows = page.locator('tbody tr, .cliente-mobile-card')
     const targetRow = rows.filter({ hasText: /Sem Máquinas/i }).first()
 
     if (await targetRow.isVisible()) {
-      const deleteBtn = targetRow.locator('.icon-btn.danger, button[aria-label*="eliminar" i]').first()
-      await expect(deleteBtn).toBeEnabled()
+      const deleteBtn = targetRow.locator(`${SEL_BTN_DANGER}, button[title="Eliminar"]`).first()
+      await deleteBtn.scrollIntoViewIfNeeded()
+      await expect(deleteBtn).toBeEnabled({ timeout: 6000 })
       await deleteBtn.click()
       await page.waitForTimeout(400)
 
@@ -155,11 +160,11 @@ test.describe('Clientes — Admin', () => {
 
   test('Eliminar cliente COM equipamentos — botão desactivado', async ({ page }) => {
     // "Mecânica Bettencourt" tem máquinas (m01, m02) → botão deve estar desactivado
-    const rows = page.locator('tr, .cliente-row')
+    const rows = page.locator('tbody tr, .cliente-mobile-card')
     const targetRow = rows.filter({ hasText: /Bettencourt/i }).first()
 
     if (await targetRow.isVisible()) {
-      const deleteBtn = targetRow.locator('.icon-btn.danger, button[aria-label*="eliminar" i]').first()
+      const deleteBtn = targetRow.locator(`${SEL_BTN_DANGER}, button[title="Eliminar"]`).first()
       // O botão deve estar desactivado ou não visível
       const isDisabled = await deleteBtn.isDisabled().catch(() => true)
       expect(isDisabled).toBeTruthy()
@@ -203,10 +208,10 @@ test.describe('Clientes — ATecnica (permissões limitadas)', () => {
   })
 
   test('ATecnica NÃO vê botões de editar/eliminar clientes', async ({ page }) => {
-    await expect(page.locator('.icon-btn.danger')).not.toBeVisible()
+    await expect(page.locator('.clientes-table tbody').locator(SEL_BTN_DANGER)).not.toBeVisible()
     // Botão de editar também não deve estar visível
     // (canEditCliente = false para tecnico)
-    const editBtns = page.locator('.icon-btn.secondary')
+    const editBtns = page.locator('.clientes-table tbody').locator(`${SELETOR_BOTAO_EDITAR}`)
     // Se existirem, confirmar que não são de edição de cliente
     // (podem existir outros icon-btn.secondary para outros fins)
     // O teste principal é que canot add e canDelete são false

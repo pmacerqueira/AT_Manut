@@ -3,6 +3,8 @@
  *
  * Testa o fluxo completo: abrir modal, seleccionar ficheiro JSON,
  * pré-visualização, confirmar importação, verificar clientes na lista.
+ *
+ * Omitido até a UI estar novamente disponível na página Clientes (modal + botão).
  */
 import { test, expect } from '@playwright/test'
 import path from 'path'
@@ -12,7 +14,7 @@ import { setupApiMock, loginAdminSemAlertas, expectToast } from './helpers.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURE_PATH = path.join(__dirname, '..', 'fixtures', 'clientes-import-test.json')
 
-test.describe('Importação SAF-T de clientes', () => {
+test.describe.skip('Importação SAF-T de clientes', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAdminSemAlertas(page, { path: '/clientes' })

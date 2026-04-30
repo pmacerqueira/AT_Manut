@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-04-22 · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-04-30 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -263,7 +263,10 @@ const addXxx = useCallback((data) => {
 npm run dev                 # http://localhost:5173
 
 # Testes — suite completa
-npx playwright test tests/e2e/
+npm run test:e2e             # equivalente: npx playwright test tests/e2e/
+
+# Re-correr falhados (após uma corrida com reporter blob)
+npm run test:e2e:last-failed
 
 # Testes — specs específicos
 npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avancado.spec.js --reporter=list

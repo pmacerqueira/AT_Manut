@@ -28,6 +28,7 @@ import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
   loginAdminSemAlertas, signCanvas,
   MC, dismissAlertasModal,
+  navegarMensalParaFevereiro2026,
 } from './helpers.js'
 
 // ── helpers locais ─────────────────────────────────────────────────────────────
@@ -380,7 +381,7 @@ test.describe('R7 — Ver relatório concluído', () => {
     await page.locator('button[title="Ver relatório"]').first().click()
     await page.waitForTimeout(500)
 
-    const modal = page.locator('.modal, [role="dialog"]').last()
+    const modal = page.locator('.modal-relatorio-rep')
     await expect(modal).toBeVisible()
     await expect(modal).toContainText(/\d{4}\.RP\.\d{5}/)
   })
@@ -391,7 +392,7 @@ test.describe('R7 — Ver relatório concluído', () => {
     await page.locator('button[title="Ver relatório"]').first().click()
     await page.waitForTimeout(500)
 
-    const modal = page.locator('.modal, [role="dialog"]').last()
+    const modal = page.locator('.modal-relatorio-rep')
     await expect(modal).toContainText(/Horas M\.O\.|M\.O\./i)
   })
 
@@ -401,9 +402,9 @@ test.describe('R7 — Ver relatório concluído', () => {
     await page.locator('button[title="Ver relatório"]').first().click()
     await page.waitForTimeout(500)
 
-    const modal = page.locator('.modal, [role="dialog"]').last()
-    // rr-rep03 tem pecasUsadas com SENS-NTC-01
-    await expect(modal).toContainText(/SENS-NTC-01|Sensor NTC|Peças|Materiais/i)
+    const modal = page.locator('.modal-relatorio-rep')
+    // Lista ordena por data desc.: primeiro concluído = rep04 (2026-02-05) → rr-rep04 (IST-PUMP-HP …)
+    await expect(modal).toContainText(/IST-PUMP-HP|OR-KIT-02|Peças|Materiais|Consumíveis/i)
   })
 
   test('Reparações concluídas têm botão "Enviar email"', async ({ page }) => {
@@ -441,27 +442,9 @@ test.describe('R8 — Relatório mensal ISTOBAL', () => {
     const modal = page.locator('.modal-mensal-istobal')
     await expect(modal).toBeVisible()
 
-    // Se não estiver em Fevereiro 2026, navegar com os botões corrects (aria-label)
-    const tituloEl = modal.locator('.mensal-titulo')
-    const titulo = await tituloEl.innerText().catch(() => '')
-    if (!titulo.includes('Fevereiro') || !titulo.includes('2026')) {
-      const btnPrev = modal.locator('button[aria-label="Mês anterior"]')
-      const btnNext = modal.locator('button[aria-label="Mês seguinte"]')
-      for (let i = 0; i < 12; i++) {
-        const t = await tituloEl.innerText().catch(() => '')
-        if (t.includes('Fevereiro') && t.includes('2026')) break
-        const [ano, mes] = t.match(/(\w+) (\d{4})/)?.slice(1,3) ?? ['', '0']
-        const anoNum = parseInt(mes)
-        if (anoNum < 2026 || (anoNum === 2026 && !t.includes('Fevereiro'))) {
-          await btnNext.click().catch(() => {})
-        } else {
-          await btnPrev.click().catch(() => {})
-        }
-        await page.waitForTimeout(300)
-      }
-    }
+    await navegarMensalParaFevereiro2026(modal, page)
 
-    // rep04 (ES-2026-00099) e rep05 (ES-2026-00150) são de Fevereiro 2026
+    // rep04 (ES-2026-00099) e rep05 em progresso no mock; avisos ES em Fevereiro 2026
     await expect(modal).toContainText(/ES-2026-/, { timeout: 10000 })
   })
 
@@ -491,6 +474,7 @@ test.describe('R8 — Relatório mensal ISTOBAL', () => {
     await page.waitForTimeout(500)
 
     const modal = page.locator('.modal-mensal-istobal')
+    await navegarMensalParaFevereiro2026(modal, page)
     // rr-rep04 tem 2 peças → badge-materiais com "2"
     const badge = modal.locator('.badge-materiais').first()
     if (await badge.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -504,6 +488,7 @@ test.describe('R8 — Relatório mensal ISTOBAL', () => {
     await page.waitForTimeout(500)
 
     const modal = page.locator('.modal-mensal-istobal')
+    await navegarMensalParaFevereiro2026(modal, page)
     const rowExp = modal.locator('.row-expansivel').first()
 
     if (await rowExp.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -522,6 +507,7 @@ test.describe('R8 — Relatório mensal ISTOBAL', () => {
     await page.waitForTimeout(500)
 
     const modal = page.locator('.modal-mensal-istobal')
+    await navegarMensalParaFevereiro2026(modal, page)
     const rowExp = modal.locator('.row-expansivel').first()
 
     if (await rowExp.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -625,20 +611,20 @@ test.describe('R10 — Badges ISTOBAL na lista', () => {
 
   test('Reparações ISTOBAL mostram badge .rep-origem-istobal', async ({ page }) => {
     await irParaReparacoes(page)
-    // rep04 e rep05 têm origem istobal_email
-    await expect(page.locator('.rep-origem-istobal')).toHaveCount(2)
+    // rep04 e rep05: cartões + tabela coexistem no DOM (CSS esconde um) — medir só a tabela visível desktop
+    await expect(page.locator('.reparacoes-table .rep-origem-istobal')).toHaveCount(2)
   })
 
   test('Badge ISTOBAL contém texto "ISTOBAL"', async ({ page }) => {
     await irParaReparacoes(page)
-    const badges = page.locator('.rep-origem-istobal')
+    const badges = page.locator('.reparacoes-table .rep-origem-istobal')
     await expect(badges.first()).toContainText('ISTOBAL')
   })
 
   test('Avisos ES- aparecem na coluna "Aviso" da tabela', async ({ page }) => {
     await irParaReparacoes(page)
-    // rep04 e rep05 têm avisos ES-2026-00099 e ES-2026-00150
-    await expect(page.locator('td.td-aviso').filter({ hasText: /ES-2026-/ })).toHaveCount(2)
+    // Coluna Aviso: célula com número (sem classe td-aviso no JSX)
+    await expect(page.locator('tbody tr').filter({ hasText: /ES-2026-/ })).toHaveCount(2)
   })
 
 })

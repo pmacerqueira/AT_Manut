@@ -372,8 +372,14 @@ export default function Categorias() {
                   ) : null}
                   <span className="badge badge-intervalo">{INTERVALOS[cat.intervaloTipo]?.label}</span>
                   <div className="categoria-actions">
-                    <button type="button" className="icon-btn secondary" onClick={() => openEditCategoria(cat)} title="Editar categoria"><Pencil size={14} /></button>
-                    <button type="button" className="icon-btn danger" onClick={() => handleRemoveCategoria(cat)} title="Eliminar categoria"><Trash2 size={14} /></button>
+                    <button type="button" className="cat-action-btn secondary" onClick={() => openEditCategoria(cat)} title="Editar categoria">
+                      <Pencil size={14} />
+                      <span className="cat-action-label">Editar</span>
+                    </button>
+                    <button type="button" className="cat-action-btn danger" onClick={() => handleRemoveCategoria(cat)} title="Eliminar categoria">
+                      <Trash2 size={14} />
+                      <span className="cat-action-label">Eliminar</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -434,19 +440,21 @@ export default function Categorias() {
                             <div className="subcategoria-actions">
                               <button
                                 type="button"
-                                className="icon-btn secondary"
+                                className="cat-action-btn secondary"
                                 onClick={() => openEditSubcategoria(sub)}
                                 title="Editar subcategoria"
                               >
                                 <Pencil size={14} />
+                                <span className="cat-action-label">Editar</span>
                               </button>
                               <button
                                 type="button"
-                                className="icon-btn danger"
+                                className="cat-action-btn danger"
                                 onClick={() => handleRemoveSubcategoria(sub)}
                                 title={canRemoveSubcategoria(sub.id) ? 'Eliminar subcategoria' : 'Existem equipamentos associados'}
                               >
                                 <Trash2 size={14} />
+                                <span className="cat-action-label">Eliminar</span>
                               </button>
                             </div>
                           </div>
@@ -477,10 +485,10 @@ export default function Categorias() {
                                     <span className="ordem">{i + 1}.</span>
                                     <span className="texto">{item.texto}</span>
                                     <div className="checklist-item-actions">
-                                      <button type="button" className="icon-btn secondary" onClick={() => handleMoveCheckItem(items, i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /></button>
-                                      <button type="button" className="icon-btn secondary" onClick={() => handleMoveCheckItem(items, i, 1)} disabled={i === items.length - 1} title="Mover para baixo"><ArrowDown size={13} /></button>
-                                      <button type="button" className="icon-btn secondary" onClick={() => { setEditingCheckItem(item.id); setEditCheckTexto(item.texto) }} title="Editar texto"><Pencil size={13} /></button>
-                                      <button type="button" className="icon-btn danger" onClick={() => handleRemoveCheckItem(item)} title="Eliminar item"><Trash2 size={13} /></button>
+                                      <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => handleMoveCheckItem(items, i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /><span className="cat-action-label">Cima</span></button>
+                                      <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => handleMoveCheckItem(items, i, 1)} disabled={i === items.length - 1} title="Mover para baixo"><ArrowDown size={13} /><span className="cat-action-label">Baixo</span></button>
+                                      <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => { setEditingCheckItem(item.id); setEditCheckTexto(item.texto) }} title="Editar texto"><Pencil size={13} /><span className="cat-action-label">Editar</span></button>
+                                      <button type="button" className="cat-action-btn danger cat-action-btn--mini" onClick={() => handleRemoveCheckItem(item)} title="Eliminar item"><Trash2 size={13} /><span className="cat-action-label">Eliminar</span></button>
                                     </div>
                                   </>
                                 )}
@@ -556,10 +564,10 @@ export default function Categorias() {
                       <span className="ordem">{i + 1}.</span>
                       <span className="texto">{note}</span>
                       <div className="checklist-item-actions">
-                        <button type="button" className="icon-btn secondary" onClick={() => qnMove(i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /></button>
-                        <button type="button" className="icon-btn secondary" onClick={() => qnMove(i, 1)} disabled={i === quickNotes.length - 1} title="Mover para baixo"><ArrowDown size={13} /></button>
-                        <button type="button" className="icon-btn secondary" onClick={() => { setQnEditing(i); setQnEditText(note) }} title="Editar texto"><Pencil size={13} /></button>
-                        <button type="button" className="icon-btn danger" onClick={() => qnRemove(i)} title="Eliminar nota"><Trash2 size={13} /></button>
+                        <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => qnMove(i, -1)} disabled={i === 0} title="Mover para cima"><ArrowUp size={13} /><span className="cat-action-label">Cima</span></button>
+                        <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => qnMove(i, 1)} disabled={i === quickNotes.length - 1} title="Mover para baixo"><ArrowDown size={13} /><span className="cat-action-label">Baixo</span></button>
+                        <button type="button" className="cat-action-btn secondary cat-action-btn--mini" onClick={() => { setQnEditing(i); setQnEditText(note) }} title="Editar texto"><Pencil size={13} /><span className="cat-action-label">Editar</span></button>
+                        <button type="button" className="cat-action-btn danger cat-action-btn--mini" onClick={() => qnRemove(i)} title="Eliminar nota"><Trash2 size={13} /><span className="cat-action-label">Eliminar</span></button>
                       </div>
                     </>
                   )}

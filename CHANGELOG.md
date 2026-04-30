@@ -9,6 +9,88 @@ Política de continuidade:
 
 ---
 
+## [1.16.80] — 2026-04-30 — Deploy PWA estável + documentação alinhada
+
+### Documentação
+- **`CHANGELOG`**, **`docs/TESTES-E2E.md`**, **`docs/ROADMAP.md`**, **`docs/DEPLOY_CHECKLIST.md`**, **`README.md`**, **`DOCUMENTACAO.md`**, **`docs/FILOSOFT-INTEGRACAO.md`**, **`docs/ROADMAP-EVOLUCAO-2026.md`**, **`.cursor/rules/at-manut-workflow.mdc`**, **`DESENVOLVIMENTO.md`:** versão de referência **v1.16.80**; spec **18 (SAF-T)** clarificado (**`test.describe.skip`** até a UI voltar à página Clientes); reporter **blob** e **`npm run test:e2e:last-failed`** documentados onde aplicável; workflow Filosoft actualizado (UI SAF-T opcional).
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.80**).
+
+---
+
+## [1.16.79] — 2026-04-29 — Clientes (badge sem email desktop), E2E alinhados ao UI + deploy PWA
+
+### Clientes
+- **Tabela desktop:** badge «sem email» (`sem-email-aviso`) na coluna do nome quando o cliente não tem email — alinha com cartões mobile e torna os testes E2E determinísticos.
+
+### Testes E2E (`tests/e2e/`)
+- **`helpers.js`:** `navegarMensalParaFevereiro2026` + `MESES_PT_E2E` (modal mensal ISTOBAL alinhado ao mês do mock em qualquer data de «hoje» dos testes).
+- **`03-clientes`:** após «Guardar» no editar, assert no `h2` «Editar cliente» (evita falsos negativos por vários `.modal-overlay`); eliminar cliente sem máquinas — `scrollIntoViewIfNeeded` + timeout no `toBeEnabled`.
+- **`07-permissions`:** contagens Admin `poll` até haver linhas; ATecnica — botões danger em manutenções apenas dentro de `.page-manutencoes` (sem `mc-overflow-danger` órfão).
+- **`08-equipamentos-categorias`:** fluxo marca ISTOBAL — `button[title="Editar ficha"]` + breadcrumb; categorias — `.cat-action-btn.danger` em vez de `.icon-btn.danger`.
+- **`playwright.config`:** reporter **`blob`** (`blob-report/`, gitignored) para `npx playwright test tests/e2e/ --last-failed` após uma corrida com falhas.
+- **`16-reparacoes`:** R7 modal `.modal-relatorio-rep`; materiais alinhados a **rep04** (primeiro na lista por data); R8 navegação para Fevereiro 2026; R10 ISTOBAL apenas na `.reparacoes-table`; coluna Aviso sem classe `td-aviso`.
+- **`17-reparacoes-avancado`:** rodapé relatório `/NAVEL/i`; RA-13 mesmos fixes; RA-5 rodapé; RA-6 mobile selector cartões/table; mensal ISTOBAL com helper Fevereiro 2026.
+- **`18-import-saft-clientes`:** **`test.describe.skip`** — UI «Importar SAF-T» já não existe em `Clientes.jsx` até ser reposta.
+
+### Deploy
+- PWA (`public_html/manut/`) via **`navel-site`** `npm run deploy:at-manut -- --yes`.
+
+---
+
+## [1.16.78] — 2026-04-29 — Manutenções executadas, PDF checklist, docs E2E e higiene de código
+
+### Manutenções (lista «executadas»)
+- Agrupamento **por cliente** (A→Z), secções expansíveis; dentro de cada cliente mantém-se a ordenação escolhida (ex.: data recente primeiro).
+- Filtros: **pesquisa** + **email** (enviado / por enviar) + **ordenção** — removidos chips de período e intervalos de datas.
+- **Tablet / ≤1024px:** painel de filtros (`exec-filter-*`) e cartões alinhados ao fluxo já usado quando a lista passa a cartões.
+
+### PDF (`gerarPdfRelatorio.js`)
+- Tabela de **checklist no PDF**: texto em várias linhas, alturas de linha/zebra e quebras de página ajustadas.
+
+### Qualidade — testes E2E (`tests/e2e/`)
+- **`09-edge-cases` / `04-manutencoes` / `05-montagem`:** fecho do wizard com `getByRole('button', { name: 'Cancelar' })` onde havia dois `button.secondary` (Cancelar vs Anterior).
+- **CRUD «Nova manutenção»:** pipeline **Cliente → Categoria → Equipamento** antes de «Agendar».
+- Montagem: **`confirmExecWizardVerificacaoEquipamento`** antes de assert do checklist.
+
+### Documentação
+- **`docs/TESTES-E2E.md`**, **`README.md`**, **`DOCUMENTACAO.md`**, **`docs/ROADMAP.md`**, **`.cursor/rules/at-manut-workflow.mdc`:** contagens canónicas `npx playwright test tests/e2e/ --list` — **456 testes**, **19 ficheiros** (specs **01–18** + **`99-responsive-smoke.spec.js`**).
+
+### Higiene de código
+- **`DataContext.jsx`:** removido import não usado de `syncQueue.removeItem`.
+- **`frotaReportHelpers.js`:** removida **`pickNewestRelatorioForMidSet`** (sem referências).
+- **`Manutencoes.css`:** removidos selectors legacy `.manutencoes-list-title` / `.manutencoes-concluidas-*` sem uso em JSX.
+
+---
+
+## [Unreleased] — 2026-04-27 — ISTOBAL: segredos em CLI (pipe de email)
+
+### Correcção
+- **Causa:** Após migração de segredos para `RewriteRule [E=…]` no `.htaccess`, o script `parse-istobal-email.php` (pipe Exim, SAPI **cli**) deixava de receber `ATM_DB_PASS` → MySQL `Access denied … (using password: NO)`.
+- **`config.php`:** carrega `config.cli-env.php` em SAPI `cli` / `phpdbg` (ficheiro gerado pelo migrador, com as mesmas variáveis que o bloco ATM_ENV).
+- **`navel-site/scripts/cpanel-migrate-setenv.mjs`:** em cada `--yes`, faz upload de `config.cli-env.php`; se só existir `config.deploy-secrets.php.disabled-*`, usa esse ficheiro como fonte; `FilesMatch` no `.htaccess` gerado nega HTTP a `config.cli-env.php`.
+- **`atm_report_auth.php`:** alinhado com o bootstrap CLI.
+- **Documentação:** `docs/CPANEL-RUNBOOK-SEGREDOS.md`, `.gitignore`, `servidor-cpanel/api/.htaccess` (template).
+
+### Operação (produção)
+- Deploy de `config.php` + `.htaccess` (template) ou só `config.php`; em `navel-site`: `node scripts/cpanel-migrate-setenv.mjs --yes` (regenera `.htaccess` completo + `config.cli-env.php`). Sem `config.deploy-secrets.php` activo: o migrador aceita o `.disabled-*` mais recente como fonte.
+
+---
+
+## [1.16.77] — 2026-04-25 — Tabelas e ações UI: Manutenções, Categorias e Clientes
+
+### Alteração
+- **`Manutencoes.jsx` / `Manutencoes.css`:** nova distribuição de larguras por coluna na tabela desktop (`dias`, `equipamento`, `cliente`, `tipo`, `data`, `técnico`, `status`, `email`, `ações`), com ajuste adicional para 1025–1366px; em `≤1024px` mantém o layout de cartões.
+- **`Categorias.jsx` / `Categorias.css`:** ações deixam de depender de hover/tooltips: botões com ícone + rótulo curto (`Editar`, `Eliminar`, `Cima`, `Baixo`), dimensões uniformes e contraste reforçado no tema normal e `modo-campo`.
+- **`Clientes.jsx` / `Clientes.css`:** reequilíbrio da tabela para reduzir truncamento da `Localidade`; ações padronizadas (`Frota`, `Editar`, `Eliminar`) com melhor contraste e alinhamento visual.
+
+### Verificação
+- `npm run build` concluído com sucesso.
+- `npx eslint src/pages/Categorias.jsx src/pages/Clientes.jsx src/pages/Manutencoes.jsx` sem erros (warnings legados mantidos).
+
+---
+
 ## [1.16.76] — 2026-04-25 — Logs: painel compacto (tablet / responsivo)
 
 ### Alteração

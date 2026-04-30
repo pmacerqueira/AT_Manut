@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-> 442 testes automatizados cobrindo todos os fluxos, perfis de utilizador, funcionalidades e performance.
-> Última revisão: 2026-03-17 — v1.14.0
+**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **456 testes** em **19 ficheiros** (specs numerados `01–18` + `99-responsive-smoke.spec.js`). Os 6 testes do **spec 18 (SAF-T)** estão **listados** mas **omitidos em tempo de execução** (`test.describe.skip` em `18-import-saft-clientes.spec.js`) até o botão/modal voltar à página Clientes.
+> Última revisão: 2026-04-30 — v1.16.80
 
 ---
 
@@ -16,34 +16,40 @@
 | `05-montagem.spec.js` | 5 | Fluxo completo montagem, assinatura, periódicas |
 | `06-agendamento.spec.js` | 10 | Formulário, validações, fluxo completo |
 | `07-permissions.spec.js` | 26 | RBAC Admin vs ATecnica, rotas protegidas |
-| `08-equipamentos-categorias.spec.js` | 17 | Equipamentos, categorias CRUD inline, calendário |
+| `08-equipamentos-categorias.spec.js` | 19 | Equipamentos, categorias CRUD inline, calendário |
 | `09-edge-cases.spec.js` | 20 | Fotos, assinatura, modais, mobile, estado vazio |
 | `10-etapas-evolucao.spec.js` | 48 | Vista "O meu dia", alertas badge, QR Code etiqueta, Histórico PDF |
 | `11-blocos-abc.spec.js` | 40 | Email clientes, config alertas, reagendamento, modal proactivo |
 | `12-v170-features.spec.js` | 42 | Pesquisa global, Leitor QR, Modo campo, Métricas, localStorage |
-| `13-performance.spec.js` | 14 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
+| `13-performance.spec.js` | 15 | Render com 240 registos, KPIs volumosos, pesquisa, filtros, limiares de tempo |
 | `14-kaeser-features.spec.js` | 32 | Funcionalidades Kaeser — importação e visualização |
 | `15-kaeser-pdf-import.spec.js` | 18 | Importação de PDF Kaeser — extracção e validação de dados |
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
-| `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T: modal, validação ficheiro, preview, importação completa, 2ª importação (ignorar) |
-| **Total** | **442** | **100% dos fluxos da aplicação + escalabilidade** |
+| `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T (omitido por `describe.skip` até a UI na página Clientes; cenários mantidos no ficheiro) |
+| `99-responsive-smoke.spec.js` | 5 | Smoke responsivo (mobile / tablet): barra inferior, cartões, calendário |
+| **Total** | **456** | **19 ficheiros** |
 
-> **Specs 01–09** (127 testes): cobertura base do núcleo da aplicação.
-> **Specs 10–11** (88 testes): funcionalidades v1.5–v1.6 (alertas, QR, histórico, Blocos A+B+C).
-> **Spec 12** (42 testes): funcionalidades v1.7.0 (pesquisa, leitor QR, modo campo, métricas, localStorage).
-> **Spec 13** (14 testes): performance e escalabilidade com dataset `mock-large.js` (240 registos realistas).
-> **Specs 14–15** (50 testes): importação e funcionalidades Kaeser.
-> **Specs 16–17** (111 testes): módulo Reparações — base + avançado (permissões, responsividade, offline).
-> **Spec 18** (6 testes): importação SAF-T de clientes — modal, validação, preview, importação completa, modo ignorar.
-
+> **Specs 01–09** (139 testes): núcleo da aplicação.
+> **Specs 10–11** (88 testes): alertas, QR, histórico (v1.5–v1.6).
+> **Spec 12** (42 testes): v1.7.0 (pesquisa, QR leitor, modo campo, métricas, localStorage).
+> **Spec 13** (15 testes): performance com `mock-large.js`.
+> **Specs 14–15** (50 testes): Kaeser.
+> **Specs 16–17** (111 testes): Reparações.
+> **Spec 18** (6 testes listados — **skip** até a UI «Importar SAF-T» regressar): importação SAF-T.
+> **Spec 99** (5 testes): smoke responsivo (opcional em CI; incluído na suite completa por omissão).
 ---
 
 ## Pré-requisitos
 
 ```powershell
-# Servidor de desenvolvimento a correr (terminal separado)
-npm run dev    # http://localhost:5173
+# Servidor de desenvolvimento (Playwright inicia o Vite automaticamente via webServer,
+# excepto se reuseExistingServer estiver activo — ver playwright.config.js)
+npm run dev    # http://localhost:5173 — útil para desenvolvimento manual
+
+# CI / agentes: definir CI=true para o Playwright ser dono exclusivo da porta 5173
+# (evita conflito com um `npm run dev` já a correr)
+$env:CI = 'true'   # PowerShell
 
 # Instalar browsers Playwright (apenas na primeira vez)
 npx playwright install chromium
@@ -54,6 +60,12 @@ npx playwright install chromium
 ## Executar os testes
 
 ```powershell
+# Atalhos package.json (equivalente a playwright test tests/e2e/)
+npm run test:e2e
+
+# Re-correr só os testes que falharam na última corrida (requer execução prévia; usa estado do reporter blob)
+npm run test:e2e:last-failed
+
 # Suite completa
 npx playwright test tests/e2e/
 
@@ -119,6 +131,8 @@ await expectToast(page, /texto/, 5000)
 | Modal de alertas | Deixar aparecer (bloqueia interacção) | `dismissAlertasModal(page)` ou `loginAdminSemAlertas()` |
 | Múltiplos botões iguais (empty-state) | `.filter({ hasText: '...' }).click()` | `.filter({ hasText: '...' }).first().click()` |
 | Route handler sequencial | `route.continue()` (vai para rede real) | `route.fallback()` (passa ao handler anterior) |
+| Wizard de execução (dois `.secondary`) | `.modal-relatorio-form button.secondary` único | `page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' })` — distingue «Anterior» |
+| Modal «Nova manutenção» / «Agendar» disabled | Assume um só `select` para máquina | Pipeline Cliente→Categoria→Equipamento: usar `form select` por ordem ou labels explícitos |
 
 ### Dados mock (`MC` — Mock Constants)
 
@@ -299,7 +313,9 @@ MC = {
 
 ---
 
-### Spec 18 — Importação SAF-T de clientes (6 testes)
+### Spec 18 — Importação SAF-T de clientes (6 testes, **actualmente em skip**)
+
+O ficheiro usa `test.describe.skip` até o fluxo UI (botão «Importar SAF-T» + modal) voltar à página Clientes. Abaixo: cobertura pretendida quando o skip for removido.
 
 **Cobertura:**
 - Admin vê botão "Importar SAF-T"
@@ -361,7 +377,9 @@ MC = {
 {
   testDir: './tests',
   timeout: 45000,            // 45 s por teste
+  workers: 2,                // paralelismo (~2 conforme playwright.config.js)
   retries: 1,                // 1 retry por teste falhado
+  webServer: { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: !process.env.CI },
   use: {
     baseURL: 'http://localhost:5173',
     headless: true,
@@ -370,11 +388,18 @@ MC = {
     navigationTimeout: 15000,
     screenshot: 'only-on-failure',
     video: 'on-first-retry'
-  }
+  },
+  reporter: [
+    ['list'],
+    ['blob', { outputDir: 'blob-report' }],  // suporta --last-failed
+    ['html', { outputFolder: 'tests/playwright-report', open: 'never' }],
+    ['json', { outputFile: 'tests/results.json' }]
+  ]
 }
 ```
 
-> **Workers:** Por omissão usa 2 workers em paralelo. Para debugging: `--workers=1`.
+> **Workers:** Por omissão 2 workers. Para debugging: `--workers=1`.  
+> **CI:** Com `CI=true`, o Playwright arranca o Vite (`webServer`) e não reaproveita servidor existente (`reuseExistingServer: false`).
 
 ---
 
@@ -407,4 +432,9 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-03-17 — v1.14.0*
+### Spec 18 SAF-T em pause
+**Motivo:** A UI na página Clientes não expõe de momento o botão/modal de importação; os testes permanecem no repositório com `describe.skip` para não bloquear a suite. **`importClientes`** e a API continuam disponíveis para integrações externas / scripts — ver `docs/FILOSOFT-INTEGRACAO.md`.
+
+---
+
+*Última actualização: 2026-04-30 — v1.16.80*

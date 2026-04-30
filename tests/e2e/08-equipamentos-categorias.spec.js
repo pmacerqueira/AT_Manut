@@ -105,8 +105,11 @@ test.describe('Equipamentos — Admin', () => {
     })
 
     await page.locator('.categoria-card').filter({ hasText: /elevadores/i }).first().click()
+    await page.waitForTimeout(400)
+    await expect(page.locator('.equipamentos-nav').filter({ hasText: /elevadores/i })).toBeVisible({ timeout: 8000 })
     await page.locator('.categoria-card').first().click()
-    await page.locator('button[title="Editar"]').first().click()
+    await page.waitForTimeout(400)
+    await page.locator('button[title="Editar ficha"]').first().click()
     await expect(page.locator('.modal h2').filter({ hasText: /editar máquina/i })).toBeVisible()
 
     await page.locator('.modal label:has-text("Marca") select').first().selectOption({ label: 'ISTOBAL' })
@@ -138,8 +141,11 @@ test.describe('Equipamentos — Admin', () => {
 
     const nomeNovaMarca = `ISTOBAL-E2E-${Date.now()}`
     await page.locator('.categoria-card').filter({ hasText: /elevadores/i }).first().click()
+    await page.waitForTimeout(400)
+    await expect(page.locator('.equipamentos-nav').filter({ hasText: /elevadores/i })).toBeVisible({ timeout: 8000 })
     await page.locator('.categoria-card').first().click()
-    await page.locator('button[title="Editar"]').first().click()
+    await page.waitForTimeout(400)
+    await page.locator('button[title="Editar ficha"]').first().click()
     await expect(page.locator('.modal h2').filter({ hasText: /editar máquina/i })).toBeVisible()
 
     await page.locator('.modal label:has-text("Marca") select').first().selectOption('__new__')
@@ -256,8 +262,9 @@ test.describe('Categorias — Admin', () => {
   })
 
   test('Admin vê botões de eliminar categorias', async ({ page }) => {
-    const deleteBtn = page.locator('.icon-btn.danger').first()
-    await expect(deleteBtn).toBeVisible({ timeout: 5000 })
+    // UI real: `cat-action-btn danger`, não `icon-btn danger` (Categorias.jsx)
+    await expect(page.locator('.cat-action-btn.danger').filter({ hasText: /eliminar/i }).first()).toBeVisible({ timeout: 6000 })
+    await expect(page.locator('button[title="Eliminar categoria"]').first()).toBeVisible({ timeout: 4000 })
   })
 
 })

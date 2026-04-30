@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-04-25 — `v1.16.72`: fotografias técnicas por equipamento, bibliotecas M365/SharePoint e upload `machine_photo`.
+> Última revisão: 2026-04-30 — `v1.16.80`: documentação e E2E alinhados (`TESTES-E2E.md`; spec 18 SAF-T em skip); deploy PWA recomendado via `navel-site` → `npm run deploy:at-manut -- --yes`.
 
 ## Resumo da verificação da base de dados
 
@@ -54,7 +54,7 @@ SOURCE seed_mock_data.sql; -- 10 clientes, 23 máquinas, 28 manutenções, 13 re
 
 ### 2. Configuração
 - **Produção (validado 2026-04-24 via probe PHP ao servidor navel.pt):** os segredos são injectados no PHP via **`RewriteRule ^ - [E=KEY:VALUE]`** em **`public_html/api/.htaccess`**. Neste plano (LiteSpeed + LSPHP) o `mod_env` **não** está carregado, pelo que `SetEnv` é ignorado silenciosamente. O `config.php` lê via **`atm_env()`** (`getenv`, `$_ENV`, `$_SERVER`, `REDIRECT_*`).
-- **Como actualizar em produção:** correr a partir de `navel-site/` o script `node scripts/cpanel-migrate-setenv.mjs` (dry-run; rever lista) e depois com `--yes` (aplica com backup `.htaccess.bak-TS`). O script lê os valores do `config.deploy-secrets.php` que ainda esteja no servidor (ou de uma versão arquivada `.disabled-TS`). Para validar que o método funciona sem depender do fallback, correr `node scripts/cpanel-verify-setenv.mjs --yes` (desativa temporariamente o fallback e faz rollback automático se algo falhar).
+- **Como actualizar em produção:** correr a partir de `navel-site/` o script `node scripts/cpanel-migrate-setenv.mjs` (dry-run; rever lista) e depois com `--yes` (aplica com backup `.htaccess.bak-TS` e publica **`config.cli-env.php`** para PHP CLI — pipe ISTOBAL). O script lê os valores do `config.deploy-secrets.php` activo ou do `.disabled-*` mais recente. Para validar HTTP sem o fallback PHP, correr `node scripts/cpanel-verify-setenv.mjs --yes` (desativa temporariamente o `config.deploy-secrets.php` se existir e faz rollback automático se algo falhar).
 - **Fallback legado:** **`public_html/api/config.deploy-secrets.php`** (modelo `config.deploy-secrets.php.example`) — gitignored, **arquivado** após validação como `config.deploy-secrets.php.disabled-TS` (bloqueado por `FilesMatch`). Renomear de volta se for preciso rollback.
 - Variáveis: `ATM_DB_*`, `ATM_JWT_SECRET`, `ATM_TAXONOMY_TOKEN`, `ATM_REPORT_AUTH_TOKEN`, etc. (lista completa no cabeçalho de `config.php`). O `ATM_REPORT_AUTH_TOKEN` tem também um mecanismo próprio (`atm_report_auth.secret.php`, já activo no servidor).
 - **Biblioteca NAVEL (opcional):** `ATM_NAVEL_DOC_INTEGRATION_TOKEN` alinhado com `at_integration_bearer` no `documentos-api-config.php` do navel-site; opcional `ATM_NAVEL_DOCUMENTOS_API_URL`, `ATM_NAVEL_DOC_PROXY_MAX_RESPONSE_BYTES` (limite de resposta do proxy; omissão 12 MiB). Ver `navel-doc-lib.php` e `navel-site/docs/INTEGRACAO-BIBLIOTECA-AT-MANUT.md`.
@@ -195,7 +195,10 @@ npm run deploy:at-manut -- --yes
 4. **Documentação equipamento** — Abrir ficha → Documentação → confirmar `Documentos da ficha`, `Biblioteca NAVEL` e `Fotografias`; testar upload de fotografia em tablet/telemóvel se possível
 5. **Reparações** — Criar reparação pendente, executar, guardar progresso, concluir
 6. **Email** — Testar envio de email após conclusão de manutenção/reparação
-7. **CORS** — A API é **`api/data.php`** (POST JSON); origens permitidas estão em `data.php` / `config.php` conforme deploy actual.
+7. **Clientes (UI)** — tabela desktop sem truncamento excessivo em `Localidade`; botões `Frota/Editar/Eliminar` com contraste adequado.
+8. **Categorias (UI)** — ações com tamanhos consistentes e rótulos visíveis em desktop/tablet (`Editar`, `Eliminar`, `Cima`, `Baixo`).
+9. **Manutenções (UI)** — distribuição de colunas equilibrada na tabela desktop; em `≤1024px` confirmar fallback para cartões.
+10. **CORS** — A API é **`api/data.php`** (POST JSON); origens permitidas estão em `data.php` / `config.php` conforme deploy actual.
 
 ---
 
