@@ -132,4 +132,4 @@ A aplicação AT_Manut está **madura e estável** para operação diária. O m�
 
 ---
 
-*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-04-30 — v1.16.80 (contexto SAF-T / E2E actualizado)*
+*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-04-30 — v1.16.81 (Reparações E2E 16–17 estáveis / UI campo)*

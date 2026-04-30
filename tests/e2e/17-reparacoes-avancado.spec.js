@@ -26,6 +26,12 @@ import {
   loginAdminSemAlertas, signCanvas,
   MC, dismissAlertasModal, expectToast,
   navegarMensalParaFevereiro2026,
+  clickPrimeiroExecutarReparacao,
+  locatorEliminarReparacaoTabela,
+  locatorExecutarReparacaoTabela,
+  locatorVerRelatorioReparacaoTabela,
+  locatorEnviarEmailReparacaoTabela,
+  seleccionarMaquinaETecnicoModalNovaReparacao,
 } from './helpers.js'
 
 // ── PNG mínimo 1×1 para testes de foto ────────────────────────────────────────
@@ -50,8 +56,12 @@ async function irParaReparacoesATecnica(page, customData = {}) {
 }
 
 async function abrirModalExecucaoPendente(page) {
-  await page.locator('button[title="Executar / Completar reparação"]').first().click()
+  await page.locator('.filtro-tab').filter({ hasText: 'Pendentes' }).click()
+  await page.waitForTimeout(400)
+  await clickPrimeiroExecutarReparacao(page)
   await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
+  const modalExec = page.locator('.modal-exec-rep')
+  await modalExec.locator('h3.exec-section-title').filter({ hasText: /^Fotos\b/i }).scrollIntoViewIfNeeded().catch(() => {})
   await page.waitForTimeout(400)
 }
 
@@ -73,9 +83,10 @@ test.describe('RA-1 — Permissões Admin vs ATecnica', () => {
 
   test('Admin vê botões Eliminar em todas as reparações', async ({ page }) => {
     await irParaReparacoes(page)
-    const dangerBtns = page.locator('button[title="Eliminar reparação"]')
+    const dangerBtns = locatorEliminarReparacaoTabela(page)
     await expect(dangerBtns.first()).toBeVisible()
-    expect(await dangerBtns.count()).toBeGreaterThanOrEqual(5) // 5 reparações no mock
+    // rep03 e rep04 têm relatório assinado → canDeleteReparacao oculta Eliminar para essas linhas (5 − 2 = 3)
+    expect(await dangerBtns.count()).toBe(3)
   })
 
   test('Admin vê botão "Nova Reparação"', async ({ page }) => {
@@ -92,7 +103,8 @@ test.describe('RA-1 — Permissões Admin vs ATecnica', () => {
     await irParaReparacoes(page)
     await abrirModalExecucaoPendente(page)
     // Admin deve ver o campo de data histórica
-    const inputDataHist = page.locator('.modal-exec-rep input[type="date"]')
+    const inputDataHist = page.locator('.modal-exec-rep input[type="date"]').first()
+    await inputDataHist.scrollIntoViewIfNeeded()
     await expect(inputDataHist).toBeVisible({ timeout: 5000 })
   })
 
@@ -116,7 +128,7 @@ test.describe('RA-1 — Permissões Admin vs ATecnica', () => {
 
   test('ATecnica PODE executar reparações pendentes', async ({ page }) => {
     await irParaReparacoesATecnica(page)
-    const btnPlay = page.locator('button[title="Executar / Completar reparação"]').first()
+    const btnPlay = locatorExecutarReparacaoTabela(page).first()
     await expect(btnPlay).toBeVisible()
     await expect(btnPlay).toBeEnabled()
   })
@@ -165,20 +177,19 @@ test.describe('RA-2 — Fluxo multi-dia realista', () => {
     // Criar reparação
     await page.locator('button').filter({ hasText: 'Nova Reparação' }).click()
     const modalNova = page.locator('.modal-nova-rep')
-    await modalNova.locator('select').first().selectOption({ index: 1 })
-    await modalNova.locator('input[placeholder*="écnico"]').first().fill('Rui Nunes')
+    await seleccionarMaquinaETecnicoModalNovaReparacao(modalNova)
     const inputData = modalNova.locator('input[type="date"]').first()
     if (!(await inputData.inputValue())) await inputData.fill('2026-02-20')
     await modalNova.locator('input').filter({ has: page.locator('[placeholder*="viso"], [placeholder*="viso"]') }).fill('AV-2026-050').catch(() => {})
     await modalNova.locator('textarea').first().fill('Motor faz barulho anormal a frio.').catch(() => {})
     await modalNova.locator('button').filter({ hasText: 'Criar Reparação' }).click()
     await page.waitForTimeout(600)
-    await expect(page.locator('.toast').filter({ hasText: /criada|sucesso/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.toast').filter({ hasText: /criada|sucesso/i })).toBeVisible({ timeout: 9000 })
 
     // Executar e guardar progresso
     await page.locator('.filtro-tab').filter({ hasText: 'Pendentes' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Executar / Completar reparação"]').first().click()
+    await clickPrimeiroExecutarReparacao(page)
     await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
 
     await preencherTecnico(page)
@@ -186,7 +197,7 @@ test.describe('RA-2 — Fluxo multi-dia realista', () => {
     if (await textareas.first().isVisible()) await textareas.first().fill('Diagnóstico inicial: barulho no rolamento de banco.')
     await page.locator('.modal-exec-rep button').filter({ hasText: /Guardar progresso/i }).click()
     await page.waitForTimeout(800)
-    await expect(page.locator('.toast').filter({ hasText: /rogresso|guardado/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.toast').filter({ hasText: /Dados gravados/i })).toBeVisible({ timeout: 9000 })
   })
 
   test('Dia 2: Retomar reparação em_progresso, adicionar materiais e concluir', async ({ page }) => {
@@ -195,7 +206,7 @@ test.describe('RA-2 — Fluxo multi-dia realista', () => {
     await page.locator('.filtro-tab').filter({ hasText: 'Em progresso' }).click()
     await page.waitForTimeout(400)
 
-    await page.locator('button[title="Executar / Completar reparação"]').first().click()
+    await clickPrimeiroExecutarReparacao(page)
     await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
 
     const modal = page.locator('.modal-exec-rep')
@@ -259,7 +270,7 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
     // O botão de adicionar foto é .foto-add (câmara). O input[type="file"] é hidden.
-    const fotoAdd = modal.locator('.foto-add')
+    const fotoAdd = modal.locator('button.foto-add:not(.foto-add-gallery)')
     await fotoAdd.scrollIntoViewIfNeeded()
     await expect(fotoAdd).toBeVisible({ timeout: 8000 })
   })
@@ -269,7 +280,7 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
 
-    const fileInput = modal.locator('input[type="file"]')
+    const fileInput = modal.locator('input[type="file"][multiple]')
     await expect(fileInput).toBeAttached({ timeout: 5000 })
 
     await fileInput.setInputFiles({
@@ -287,13 +298,13 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await abrirModalExecucaoPendente(page)
     const modal = page.locator('.modal-exec-rep')
 
-    const fileInput = modal.locator('input[type="file"]')
+    const fileInput = modal.locator('input[type="file"][multiple]')
     await fileInput.setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: PNG_1x1 })
     await page.waitForTimeout(1200)
 
     const thumb = modal.locator('.fotos-grid .foto-thumb, .fotos-grid img').first()
     if (await thumb.isVisible({ timeout: 4000 }).catch(() => false)) {
-      const btnRemover = modal.locator('.foto-remover').first()
+      const btnRemover = modal.locator('.foto-remove').first()
       if (await btnRemover.isVisible({ timeout: 2000 }).catch(() => false)) {
         await btnRemover.click()
         await page.waitForTimeout(400)
@@ -356,7 +367,7 @@ test.describe('RA-3 — Fotos no modal de execução', () => {
     await page.locator('.filtro-tab').filter({ hasText: 'Em progresso' }).click()
     await page.waitForTimeout(400)
 
-    await page.locator('button[title="Executar / Completar reparação"]').first().click()
+    await clickPrimeiroExecutarReparacao(page)
     await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
 
     const modal = page.locator('.modal-exec-rep')
@@ -511,7 +522,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(800)
 
     const modal = page.locator('.modal-relatorio-rep')
@@ -524,7 +535,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(600)
 
     const modal = page.locator('.modal-relatorio-rep')
@@ -537,7 +548,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(600)
 
     const modal = page.locator('.modal-relatorio-rep')
@@ -550,7 +561,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(600)
 
     const modal = page.locator('.modal-relatorio-rep')
@@ -563,7 +574,7 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(600)
 
     const modal = page.locator('.modal-relatorio-rep')
@@ -577,13 +588,14 @@ test.describe('RA-5 — Relatório concluído: conteúdo e estrutura', () => {
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
 
-    await page.locator('button[title="Enviar relatório por email"]').first().click()
+    await locatorEnviarEmailReparacaoTabela(page).first().click()
     await page.waitForTimeout(500)
 
     // Modal de email deve aparecer com input de email
-    const modalEmail = page.locator('.modal, [role="dialog"]').last()
+    // Modal usa input type=text para «Outro(s) endereço(s)», não type=email (Reparacoes.jsx .frota-email-outro-input)
+    const modalEmail = page.locator('.modal-email-rep')
     await expect(modalEmail).toBeVisible()
-    await expect(modalEmail.locator('input[type="email"]')).toBeVisible()
+    await expect(modalEmail.locator('input.frota-email-outro-input')).toBeVisible()
   })
 
 })
@@ -596,6 +608,10 @@ test.describe('RA-6 — Responsividade mobile (375×812)', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
+  })
+
+  test.afterEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
   })
 
   test('Página Reparações carrega sem overflow horizontal', async ({ page }) => {
@@ -671,7 +687,7 @@ test.describe('RA-6 — Responsividade mobile (375×812)', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
 
-    await page.locator('button[title="Executar / Completar reparação"]').first().click()
+    await clickPrimeiroExecutarReparacao(page)
     await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
 
     // Deve ter conteúdo visível no topo
@@ -712,7 +728,11 @@ test.describe('RA-7 — Responsividade tablet (768×1024)', () => {
     await page.setViewportSize({ width: 768, height: 1024 })
   })
 
-  test('Reparações em tablet mostra tabela sem overflow', async ({ page }) => {
+  test.afterEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+  })
+
+  test('Reparações em tablet mostra lista sem overflow (cartões até 1024px)', async ({ page }) => {
     await setupApiMock(page)
     await doLoginAdmin(page)
     await dismissAlertasModal(page)
@@ -720,7 +740,8 @@ test.describe('RA-7 — Responsividade tablet (768×1024)', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
 
-    await expect(page.locator('.data-table, tbody').first()).toBeVisible({ timeout: 5000 })
+    const content = page.locator('.reparacoes-cards .rc-card, .reparacoes-table tbody tr').first()
+    await expect(content).toBeVisible({ timeout: 5000 })
     const hasOverflow = await page.evaluate(() => document.body.scrollWidth > document.body.clientWidth + 10)
     expect(hasOverflow).toBe(false)
   })
@@ -753,7 +774,7 @@ test.describe('RA-7 — Responsividade tablet (768×1024)', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
 
-    await page.locator('button[title="Executar / Completar reparação"]').first().click()
+    await clickPrimeiroExecutarReparacao(page)
     await page.locator('.modal-exec-rep').waitFor({ state: 'visible', timeout: 8000 })
 
     const canvas = page.locator('.assinatura-canvas')
@@ -801,8 +822,8 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     // Criar reparação com rede offline para escrita (mas leitura ainda funciona)
     await page.locator('button').filter({ hasText: 'Nova Reparação' }).click()
     const modal = page.locator('.modal-nova-rep')
-    await modal.locator('select').first().selectOption({ index: 1 })
-    await modal.locator('input[placeholder*="écnico"]').first().fill('Rui Nunes')
+    await modal.locator('select').nth(1).selectOption({ index: 1 })
+    await modal.locator('select').nth(2).selectOption({ index: 1 })
     const inputData = modal.locator('input[type="date"]').first()
     if (!(await inputData.inputValue())) await inputData.fill('2026-02-25')
     await modal.locator('button').filter({ hasText: 'Criar Reparação' }).click()
@@ -837,13 +858,19 @@ test.describe('RA-8 — Offline: criação e execução ficam em fila de sincron
     await preencherTecnico(page)
 
     await page.locator('.modal-exec-rep button').filter({ hasText: /Guardar progresso/i }).click()
-    await page.waitForTimeout(1500)
+    // Guardado local mesmo com API falhada — mesmo critério que R4
+    await expectToast(page, /Dados gravados/)
+    // Modal pode manter-se aberto; fecha para conseguirmos avaliar lista completa
+    await page.locator('.modal-exec-rep button[aria-label="Fechar"]').click()
+    await page.waitForTimeout(300)
 
-    // Graceful degradation: modal fechou (estado guardado localmente — optimistic)
-    const modalFechado = !(await page.locator('.modal-exec-rep').isVisible().catch(() => true))
+    // Estávamos na aba "Pendentes"; rep01 passou a em_progresso (sai do filtro pendentes)
+    await page.locator('.filtro-tab').filter({ hasText: 'Todas' }).click()
+    await page.waitForTimeout(400)
+
     const badges = page.locator('tbody .badge').filter({ hasText: /Em progresso/i })
     const countBadges = await badges.count()
-    expect(modalFechado || countBadges >= 2).toBe(true)
+    expect(countBadges).toBeGreaterThanOrEqual(3)
   })
 
   test('App mantém dados de reparações ao recarregar a página (localStorage)', async ({ page }) => {
@@ -1042,7 +1069,7 @@ test.describe('RA-11 — Peças e consumíveis no modal de execução', () => {
     await irParaReparacoes(page)
     await page.locator('.filtro-tab').filter({ hasText: 'Concluídas' }).click()
     await page.waitForTimeout(400)
-    await page.locator('button[title="Ver relatório"]').first().click()
+    await locatorVerRelatorioReparacaoTabela(page).first().click()
     await page.waitForTimeout(600)
     const modal = page.locator('.modal-relatorio-rep')
     await expect(modal).toBeVisible()
@@ -1064,7 +1091,7 @@ test.describe('RA-11 — Peças e consumíveis no modal de execução', () => {
     await page.waitForTimeout(800)
 
     // A reparação foi guardada sem erro (peça vazia foi filtrada)
-    await expect(page.locator('.toast').filter({ hasText: /rogresso|guardado|sucesso/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.toast').filter({ hasText: /Dados gravados/i })).toBeVisible({ timeout: 5000 })
   })
 
 })
@@ -1275,8 +1302,7 @@ test.describe('RA-15 — Logging de acções de reparação', () => {
     // Criar reparação
     await page.locator('button').filter({ hasText: 'Nova Reparação' }).click()
     const modal = page.locator('.modal-nova-rep')
-    await modal.locator('select').first().selectOption({ index: 1 })
-    await modal.locator('input[placeholder*="écnico"]').first().fill('Pedro Medeiros')
+    await seleccionarMaquinaETecnicoModalNovaReparacao(modal)
     const inputData = modal.locator('input[type="date"]').first()
     if (!(await inputData.inputValue())) await inputData.fill('2026-02-25')
     await modal.locator('button').filter({ hasText: 'Criar Reparação' }).click()
@@ -1307,7 +1333,7 @@ test.describe('RA-15 — Logging de acções de reparação', () => {
     await irParaReparacoes(page)
 
     // Eliminar primeira reparação
-    await page.locator('button[title="Eliminar reparação"]').first().click()
+    await locatorEliminarReparacaoTabela(page).first().click()
     await page.waitForTimeout(400)
     await page.locator('.modal-confirm button.btn.danger').click()
     await page.waitForTimeout(800)

@@ -14,7 +14,7 @@ import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
 import BulkExecutarModal from '../components/BulkExecutarModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ArrowDownAZ, ArrowUpAZ, CalendarClock, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, ArrowUp, ArrowDown, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
 import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from '../utils/diasUteis'
@@ -128,8 +128,11 @@ export default function Manutencoes() {
   // ── Filtros para executadas ──────────────────────────────────────────────
   const [execPesquisa, setExecPesquisa]     = useState('')
   const [execFiltroEmail, setExecFiltroEmail] = useState('todos') // 'todos' | 'enviado' | 'por_enviar'
-  /** Ordenação da lista de executadas (e bloco executadas em «ver todas»): data exec. desc → série A→Z → série Z→A. */
-  const [execSortEquipamento, setExecSortEquipamento] = useState('data') // 'data' | 'serieAsc' | 'serieDesc'
+  /** Ordenação do bloco executadas pela data de execução do relatório (assinatura / criação). */
+  const [execSortExecDate, setExecSortExecDate] = useState('desc') // 'desc' = mais recente primeiro
+  const toggleExecSortExecDate = useCallback(() => {
+    setExecSortExecDate((s) => (s === 'desc' ? 'asc' : 'desc'))
+  }, [])
   /** NIF do cliente ou chave `__sem_cliente__` quando `filter===executadas` com lista agrupada */
   const [execGruposExpandidos, setExecGruposExpandidos] = useState(() => new Set())
   const toggleExecGrupoCliente = useCallback((grupoKey) => {
@@ -139,10 +142,6 @@ export default function Manutencoes() {
       else next.add(grupoKey)
       return next
     })
-  }, [])
-
-  const cycleExecSortEquipamento = useCallback(() => {
-    setExecSortEquipamento((s) => (s === 'data' ? 'serieAsc' : s === 'serieAsc' ? 'serieDesc' : 'data'))
   }, [])
 
   useEffect(() => {
@@ -431,9 +430,7 @@ export default function Manutencoes() {
   }, [manutencoesExecutadasOrdenadas, execPesquisa, execFiltroEmail, getRelatorioByManutencao, maquinas, clientes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const executadasFiltradasComSort = useMemo(() => {
-    if (execSortEquipamento === 'data') return executadasFiltradas
     const list = [...executadasFiltradas]
-    const getSerie = (m) => String(maquinas.find(x => x.id === m.maquinaId)?.numeroSerie ?? '').toLowerCase()
     const getExecTs = (m) => {
       const rel = getRelatorioByManutencao(m.id)
       const d = rel?.dataAssinatura || rel?.dataCriacao || m.data
@@ -441,12 +438,11 @@ export default function Manutencoes() {
       return Number.isFinite(t) ? t : 0
     }
     list.sort((a, b) => {
-      const cmp = getSerie(a).localeCompare(getSerie(b), 'pt', { numeric: true, sensitivity: 'base' })
-      if (cmp !== 0) return execSortEquipamento === 'serieAsc' ? cmp : -cmp
-      return getExecTs(b) - getExecTs(a)
+      const diff = getExecTs(b) - getExecTs(a)
+      return execSortExecDate === 'desc' ? diff : -diff
     })
     return list
-  }, [executadasFiltradas, execSortEquipamento, maquinas, getRelatorioByManutencao])
+  }, [executadasFiltradas, execSortExecDate, getRelatorioByManutencao])
 
   const gruposExecutadasPorCliente = useMemo(() => {
     if (filter !== 'executadas') return null
@@ -661,13 +657,8 @@ export default function Manutencoes() {
       const baseCount = execFiltroAtivo
         ? `${executadasFiltradasComSort.length} de ${manutencoesExecutadasOrdenadas.length} manutenção(ões) executadas`
         : `${manutencoesExecutadasOrdenadas.length} manutenção(ões) já executadas com sucesso`
-      if (execSortEquipamento === 'serieAsc') {
-        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções deste cliente — ordem é a da lista (nº de série A→Z; na mesma série, execução mais recente primeiro).`
-      } else if (execSortEquipamento === 'serieDesc') {
-        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções deste cliente — ordem é a da lista (nº de série Z→A; na mesma série, execução mais recente primeiro).`
-      } else {
-        subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções (mais recente primeiro).`
-      }
+      const ordemExec = execSortExecDate === 'desc' ? 'execução mais recente primeiro' : 'execução mais antiga primeiro'
+      subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções (${ordemExec}).`
     }
   } else {
     listaParaMostrar = mostrarTodas
@@ -676,13 +667,9 @@ export default function Manutencoes() {
     tituloPagina = 'Manutenções'
     subtituloPagina = 'Ordenado por dias de atraso (mais urgente primeiro)'
     if (mostrarTodas) {
-      if (execSortEquipamento === 'serieAsc') {
-        subtituloPagina += ' · Bloco executadas: nº de série A→Z (mesma série: execução mais recente primeiro).'
-      } else if (execSortEquipamento === 'serieDesc') {
-        subtituloPagina += ' · Bloco executadas: nº de série Z→A (mesma série: execução mais recente primeiro).'
-      } else {
-        subtituloPagina += ' · Bloco executadas: data de execução (mais recente primeiro).'
-      }
+      subtituloPagina += execSortExecDate === 'desc'
+        ? ' · Bloco executadas: data de execução (mais recente primeiro).'
+        : ' · Bloco executadas: data de execução (mais antiga primeiro).'
     }
   }
 
@@ -713,9 +700,11 @@ export default function Manutencoes() {
             ) : <span />}
           </td>
         )}
-        <td data-label="Dias" className={`col-xs col-dias col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
-          {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
-        </td>
+        {showDiasColumn && (
+          <td data-label="Dias" className={`col-xs col-dias col-dias-val ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
+            {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
+          </td>
+        )}
         <td data-label="Equipamento" className="col-lg col-equipamento col-truncate">
           <div className="equip-desc-block">
             <strong>{desc}</strong>
@@ -953,6 +942,8 @@ export default function Manutencoes() {
   }
 
   const useListaExecutadasAgrupada = filter === 'executadas' && Array.isArray(gruposExecutadasPorCliente)
+  /** Na vista só executadas, «dias até agendada» não aplica — todas são concluídas. */
+  const showDiasColumn = filter !== 'executadas'
 
   return (
     <div className="page page-manutencoes">
@@ -1038,34 +1029,21 @@ export default function Manutencoes() {
                 <button
                   type="button"
                   className="exec-filter-reset"
-                  onClick={() => { setExecPesquisa(''); setExecFiltroEmail('todos'); setExecSortEquipamento('data') }}
+                  onClick={() => { setExecPesquisa(''); setExecFiltroEmail('todos'); setExecSortExecDate('desc') }}
                 >Limpar filtros</button>
               )}
             </div>
           </div>
-          <div className="exec-sort-row" role="group" aria-label="Ordenação das manutenções executadas">
-            <span className="exec-sort-hint">Ordenação (lista executadas)</span>
+          <div className="exec-sort-exec-date-mobile" role="group" aria-label="Ordenar lista de executadas por data de execução">
             <button
               type="button"
-              className={`exec-sort-btn${execSortEquipamento !== 'data' ? ' exec-sort-btn--active' : ''}`}
-              onClick={cycleExecSortEquipamento}
-              title="Clicar alterna: data de execução (recente primeiro) → nº de série A→Z → nº de série Z→A"
+              className="exec-sort-exec-date-mobile-btn"
+              onClick={toggleExecSortExecDate}
+              title={execSortExecDate === 'desc' ? 'Ordem: execução mais recente primeiro — clicar para mais antiga primeiro' : 'Ordem: execução mais antiga primeiro — clicar para mais recente primeiro'}
+              aria-label={execSortExecDate === 'desc' ? 'Ordenação por data de execução: descendente. Clicar para ascendente.' : 'Ordenação por data de execução: ascendente. Clicar para descendente.'}
             >
-              {execSortEquipamento === 'data' && (
-                <>
-                  <CalendarClock size={15} aria-hidden /> Por data de execução
-                </>
-              )}
-              {execSortEquipamento === 'serieAsc' && (
-                <>
-                  <ArrowDownAZ size={15} aria-hidden /> Por nº de série A→Z
-                </>
-              )}
-              {execSortEquipamento === 'serieDesc' && (
-                <>
-                  <ArrowUpAZ size={15} aria-hidden /> Por nº de série Z→A
-                </>
-              )}
+              {execSortExecDate === 'desc' ? <ArrowDown size={15} aria-hidden /> : <ArrowUp size={15} aria-hidden />}
+              <span>Data execução</span>
             </button>
           </div>
         </div>
@@ -1093,7 +1071,7 @@ export default function Manutencoes() {
                   onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}
                 >
                   <span className="exec-grupo-mobile-chev">{expanded ? <ChevronDown size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}</span>
-                  <strong className="exec-grupo-mobile-nome">{grupo.nome}</strong>
+                  <span className="exec-grupo-mobile-nome"><strong>{grupo.nome}</strong></span>
                   <span className="badge exec-grupo-count">{grupo.manutencoes.length}</span>
                 </button>
                 {expanded && (
@@ -1111,7 +1089,7 @@ export default function Manutencoes() {
 
       {/* ── Tabela desktop (>768px) ──────────────────────────────────────────── */}
       <div className="table-card card manutencoes-table">
-          <table className="data-table dt-compact">
+          <table className={`data-table dt-compact${useListaExecutadasAgrupada ? ' dt-manut-exec-grupos' : ''}`}>
             <thead>
               <tr>
                 {bulkMode && (
@@ -1134,39 +1112,35 @@ export default function Manutencoes() {
                     />
                   </th>
                 )}
-                <th className="col-xs col-dias">Dias</th>
-                <th
-                  className={`col-lg col-equipamento col-truncate${filter === 'executadas' || mostrarTodas ? ' th-equip-sort-wrap' : ''}`}
-                  aria-sort={filter === 'executadas' || mostrarTodas
-                    ? (execSortEquipamento === 'serieAsc' ? 'ascending' : execSortEquipamento === 'serieDesc' ? 'descending' : 'descending')
-                    : undefined}
-                >
-                  {(filter === 'executadas' || mostrarTodas) ? (
-                    <button
-                      type="button"
-                      className="th-equip-sort-btn"
-                      onClick={cycleExecSortEquipamento}
-                      title="Ordenar lista de executadas: data de execução → nº de série A→Z → nº de série Z→A"
-                      aria-label={
-                        execSortEquipamento === 'data'
-                          ? 'Ordenação: data de execução (mais recente primeiro). Clicar para ordenar por nº de série A a Z.'
-                          : execSortEquipamento === 'serieAsc'
-                            ? 'Ordenação: nº de série A a Z. Clicar para ordenar por nº de série Z a A.'
-                            : 'Ordenação: nº de série Z a A. Clicar para voltar à data de execução.'
-                      }
-                    >
-                      <span>Equipamento</span>
-                      {execSortEquipamento === 'data' && <CalendarClock size={14} className="th-equip-sort-ico" aria-hidden />}
-                      {execSortEquipamento === 'serieAsc' && <ArrowDownAZ size={14} className="th-equip-sort-ico" aria-hidden />}
-                      {execSortEquipamento === 'serieDesc' && <ArrowUpAZ size={14} className="th-equip-sort-ico" aria-hidden />}
-                    </button>
-                  ) : (
-                    'Equipamento'
-                  )}
+                {showDiasColumn && <th className="col-xs col-dias">Dias</th>}
+                <th className="col-lg col-equipamento col-truncate">
+                  Equipamento
                 </th>
                 <th className="col-md col-cliente col-truncate">Cliente</th>
                 <th className="col-sm col-tipo col-truncate">Tipo</th>
-                <th className="col-md col-data col-nowrap">Data</th>
+                <th
+                  className={`col-md col-data col-nowrap${(filter === 'executadas' || mostrarTodas) ? ' th-data-col-exec-sort' : ''}`}
+                  {...((filter === 'executadas' || mostrarTodas)
+                    ? { 'aria-sort': execSortExecDate === 'desc' ? 'descending' : 'ascending' }
+                    : {})}
+                >
+                  {(filter === 'executadas' || mostrarTodas) ? (
+                    <span className="th-data-exec-sort-wrap">
+                      Data
+                      <button
+                        type="button"
+                        className="th-data-exec-sort-btn"
+                        onClick={toggleExecSortExecDate}
+                        title={execSortExecDate === 'desc' ? 'Ordem: execução mais recente primeiro — clicar para mais antiga primeiro' : 'Ordem: execução mais antiga primeiro — clicar para mais recente primeiro'}
+                        aria-label={execSortExecDate === 'desc' ? 'Ordenação por data de execução: descendente. Clicar para ascendente.' : 'Ordenação por data de execução: ascendente. Clicar para descendente.'}
+                      >
+                        {execSortExecDate === 'desc' ? <ArrowDown size={13} aria-hidden strokeWidth={2.5} /> : <ArrowUp size={13} aria-hidden strokeWidth={2.5} />}
+                      </button>
+                    </span>
+                  ) : (
+                    'Data'
+                  )}
+                </th>
                 <th className="col-sm col-tecnico col-truncate">Técnico</th>
                 <th className="col-sm col-status col-badges">Status</th>
                 {(mostrarTodas || filter === 'executadas') && <th className="col-email-status col-email" title="Relatório enviado ao cliente">Email</th>}
@@ -1180,22 +1154,22 @@ export default function Manutencoes() {
                   const grupoRow = (
                     <tr key={`grp-${grupo.grupoKey}`} className="exec-grupo-cli-row">
                       {bulkMode && <td className="col-bulk-check" />}
-                      <td data-label="" className="col-xs col-dias exec-grupo-chevr">
+                      <td data-label="" className="col-lg col-equipamento col-truncate exec-grupo-dash">—</td>
+                      <td data-label="Cliente" className="col-md col-cliente exec-grupo-cli-cell">
                         <button
                           type="button"
-                          className="exec-grupo-expand-btn"
+                          className="exec-grupo-cli-label exec-grupo-expand-trigger"
                           aria-expanded={expanded}
                           aria-label={expanded ? 'Fechar intervenções deste cliente' : 'Abrir intervenções deste cliente'}
                           onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}
                           title={expanded ? 'Ocultar manutenções' : `Ver ${grupo.manutencoes.length} manutenção(ões)`}
                         >
-                          {expanded ? <ChevronDown size={17} aria-hidden /> : <ChevronRight size={17} aria-hidden />}
-                        </button>
-                      </td>
-                      <td data-label="" className="col-lg col-equipamento col-truncate exec-grupo-dash">—</td>
-                      <td data-label="Cliente" className="col-md col-cliente col-truncate exec-grupo-cli-cell">
-                        <button type="button" className="exec-grupo-cli-label" aria-expanded={expanded} onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}>
-                          <strong className="exec-grupo-cli-nome">{grupo.nome}</strong>{' '}
+                          <span className="exec-grupo-table-chev" aria-hidden>
+                            {expanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                          </span>
+                          <span className="exec-grupo-cli-nome-wrap">
+                            <strong className="exec-grupo-cli-nome">{grupo.nome}</strong>
+                          </span>
                           <span className="badge exec-grupo-count" title={`${grupo.manutencoes.length} intervenção(ões)`}>{grupo.manutencoes.length}</span>
                         </button>
                       </td>

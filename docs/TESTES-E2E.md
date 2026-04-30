@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
 **Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **456 testes** em **19 ficheiros** (specs numerados `01–18` + `99-responsive-smoke.spec.js`). Os 6 testes do **spec 18 (SAF-T)** estão **listados** mas **omitidos em tempo de execução** (`test.describe.skip` em `18-import-saft-clientes.spec.js`) até o botão/modal voltar à página Clientes.
-> Última revisão: 2026-04-30 — v1.16.80
+> Última revisão: 2026-04-30 — v1.16.81
 
 ---
 
@@ -341,6 +341,11 @@ O ficheiro usa `test.describe.skip` até o fluxo UI (botão «Importar SAF-T» +
 **Problema:** Nos testes RA-8, ao adicionar um segundo handler de route para simular escritas offline, usar `route.continue()` para as leituras envia o pedido para a rede real (não para o handler `setupApiMock` registado anteriormente). Isso impede o carregamento de dados mock, e os testes falham porque o select de máquinas fica vazio.
 **Solução:** Usar `route.fallback()` para passar ao handler anterior na pilha de routes. `continue()` vai para a rede; `fallback()` vai para o próximo handler registado.
 
+### RA-8 offline — filtro «Pendentes», modal aberto e `expectToast` (Playwright strict)
+**Problema:** (1) Com a aba **Pendentes** activa, após **Guardar progresso** a linha sai do filtro (passa *em_progresso*) — contar `tbody .badge` «Em progresso» na vista filtrada dá **0** e o teste falha sem ser regressão de produto. (2) O modal de execução pode ficar aberto (alinhado a R4): o overlay intercepta cliques na aba **Todas**. (3) O selector `[class*="toast"]` fazia também match à **`.toast-stack`**, causando strict mode quando havia texto «Dados gravados» dentro do stack + filhos.
+
+**Solução:** Confirmar resultado com **`expectToast`/toast visível**, fechar o modal (`aria-label="Fechar"`), clicar **Todas**, depois asserts na lista completa (`expectToast` usa `[role="status"].toast` / `.toast-msg` + `.first()`).
+
 ### Dois botões "Nova Reparação" quando lista vazia (strict mode)
 **Problema:** Com `reparacoes: []`, a página mostra dois botões com texto "Nova Reparação" (header + empty-state). Chamar `.click()` sem `.first()` pode violar o strict mode do Playwright.
 **Solução:** Usar `.filter({ hasText: '...' }).first().click()` sempre que possa existir mais do que um elemento com o mesmo texto.
@@ -437,4 +442,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-04-30 — v1.16.80*
+*Última actualização: 2026-04-30 — v1.16.81*

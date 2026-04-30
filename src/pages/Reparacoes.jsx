@@ -489,6 +489,13 @@ export default function Reparacoes() {
     return null
   }
 
+  /** Só o nº de aviso (ES/AV, etc.) — inteiro, sem descrição na grelha para não encolher o código. */
+  const celulaNumeroAviso = (rep) => {
+    const num = typeof rep.numeroAviso === 'string' ? rep.numeroAviso.trim() : (rep.numeroAviso ? String(rep.numeroAviso).trim() : '')
+    if (!num) return '—'
+    return <span className="td-numero-aviso-full" title={num}>{num}</span>
+  }
+
   // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
@@ -508,11 +515,9 @@ export default function Reparacoes() {
           <p className="page-sub">Gestão de reparações e avisos ISTOBAL</p>
         </div>
         <div className="page-header-actions">
-          {isAdmin && (
-            <button type="button" className="btn secondary" onClick={() => setModalMensal(true)} title="Relatório mensal ISTOBAL">
-              <BarChart2 size={18} /> Mensal ISTOBAL
-            </button>
-          )}
+          <button type="button" className="btn secondary" onClick={() => setModalMensal(true)} title="Relatório mensal ISTOBAL">
+            <BarChart2 size={18} /> Mensal ISTOBAL
+          </button>
           <button type="button" className="btn" onClick={() => setModalNova(true)}>
             <Plus size={18} /> Nova Reparação
           </button>
@@ -567,13 +572,20 @@ export default function Reparacoes() {
                     {sub && <span className="rc-sub">{sub.nome}</span>}
                   </div>
                   <div className="rc-meta">
-                    {cli?.nome ?? '—'}
-                    {rep.numeroAviso && <span className="rc-aviso">#{rep.numeroAviso}</span>}
+                    <span>{cli?.nome ?? '—'}</span>
+                    {rep.numeroAviso?.trim() && (
+                      <span className="rc-numero-aviso-full">{rep.numeroAviso.trim()}</span>
+                    )}
                   </div>
                 </div>
                 <div className="rc-actions">
                   {!concluida && (
-                    <button type="button" className="rc-btn-primary" onClick={() => setModalExecucao(rep)}>
+                    <button
+                      type="button"
+                      className="rc-btn-primary"
+                      title="Executar / Completar reparação"
+                      onClick={() => setModalExecucao(rep)}
+                    >
                       <Play size={16} /> Executar
                     </button>
                   )}
@@ -593,7 +605,7 @@ export default function Reparacoes() {
                     </button>
                   )}
                   {canDeleteReparacao(rep.id) && (
-                    <button type="button" className="icon-btn danger" title="Eliminar" onClick={() => handleEliminar(rep)}>
+                    <button type="button" className="icon-btn danger" title="Eliminar reparação" onClick={() => handleEliminar(rep)}>
                       <Trash2 size={18} />
                     </button>
                   )}
@@ -613,7 +625,7 @@ export default function Reparacoes() {
                 <th className="col-md col-truncate">Cliente</th>
                 <th className="col-sm col-truncate">Técnico</th>
                 <th className="col-sm col-badges">Estado</th>
-                <th className="col-sm col-nowrap">Aviso</th>
+                <th className="col-sm col-aviso-istobal">Aviso</th>
                 <th className="col-actions"></th>
               </tr>
             </thead>
@@ -637,7 +649,7 @@ export default function Reparacoes() {
                     <td className="col-md col-truncate">{cli?.nome ?? <em className="text-muted">—</em>}</td>
                     <td className="col-sm col-truncate">{rep.tecnico ?? '—'}</td>
                     <td className="col-sm col-badges">{renderStatusBadge(rep.status)}</td>
-                    <td className="col-sm col-nowrap">{rep.numeroAviso ?? '—'}</td>
+                    <td className="col-sm col-aviso-istobal td-aviso-cell" data-label="Aviso">{celulaNumeroAviso(rep)}</td>
                     <td className="col-actions">
                       <div className="actions-inner">
                         {!concluida && (
@@ -971,7 +983,7 @@ export default function Reparacoes() {
         const emailCli = modalEmail.cli?.email?.trim() ?? ''
         return (
           <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Enviar relatório por email" onClick={() => { setModalEmail(null); setEmailOutro('') }}>
-            <div className="modal modal-email-rep" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div className="modal modal-email-rep" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <h2><Mail size={18} /> Enviar Relatório</h2>
                 <button type="button" className="icon-btn" onClick={() => { setModalEmail(null); setEmailOutro('') }}><X size={20} /></button>
@@ -1072,7 +1084,7 @@ export default function Reparacoes() {
                     <thead>
                       <tr>
                         <th>Data</th>
-                        <th>Aviso ES</th>
+                        <th>Nº aviso ES</th>
                         <th>Máquina</th>
                         <th>Local / Cliente</th>
                         <th>Estado</th>
@@ -1108,7 +1120,7 @@ export default function Reparacoes() {
                               title={pecas.length > 0 ? 'Clique para ver materiais' : undefined}
                             >
                               <td>{formatDataAzores(r.data)}</td>
-                              <td className="td-aviso-bold">{r.numeroAviso ?? '—'}</td>
+                              <td className="td-mensal-aviso">{celulaNumeroAviso(r)}</td>
                               <td>{maq ? `${maq.marca} ${maq.modelo}` : '—'}</td>
                               <td>{cli?.nome ?? '—'}</td>
                               <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
@@ -1191,7 +1203,7 @@ export default function Reparacoes() {
                         return (
                           <tr key={r.id}>
                             <td>{formatDataAzores(r.data)}</td>
-                            <td className="td-aviso-bold">{r.numeroAviso ?? '—'}</td>
+                            <td>{celulaNumeroAviso(r)}</td>
                             <td>{maq ? `${maq.marca} ${maq.modelo}` : '—'}</td>
                             <td>{cli?.nome ?? '—'}</td>
                             <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
@@ -1374,14 +1386,16 @@ function RelatorioReparacaoView({ relatorio: rel, reparacao: rep, maquina: maq, 
       {pecas.length > 0 && (
         <div className="rel-section">
           <h3>Peças / Consumíveis usados</h3>
-          <table className="data-table pecas-table">
-            <thead><tr><th>Código</th><th>Descrição</th><th>Qtd</th></tr></thead>
-            <tbody>
-              {pecas.map((p, i) => (
-                <tr key={i}><td>{p.codigo ?? '—'}</td><td>{p.descricao ?? '—'}</td><td>{p.quantidade ?? 1}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="pecas-table-scroll">
+            <table className="data-table pecas-table">
+              <thead><tr><th>Código</th><th>Descrição</th><th>Qtd</th></tr></thead>
+              <tbody>
+                {pecas.map((p, i) => (
+                  <tr key={i}><td>{p.codigo ?? '—'}</td><td>{p.descricao ?? '—'}</td><td>{p.quantidade ?? 1}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

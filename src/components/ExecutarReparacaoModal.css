@@ -3,7 +3,7 @@
 .modal-exec-rep {
   max-width: var(--modal-width-lg);
   width: 97vw;
-  max-height: 92vh;
+  max-height: min(92vh, 92dvh);
   display: flex;
   flex-direction: column;
   background: var(--color-bg-card, #1a2332);
@@ -53,6 +53,7 @@
 .modal-exec-rep .modal-footer {
   flex-shrink: 0;
   padding: 0.75rem 1rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--color-border, #2d3f55);
   background: var(--color-bg-card, #1a2332);
   display: flex;
@@ -435,7 +436,7 @@
 
 @media (max-width: 600px) {
   .modal-exec-rep {
-    max-height: 98vh;
+    max-height: min(98vh, 98dvh);
     width: 100vw;
     border-radius: 0.75rem 0.75rem 0 0;
     margin: auto 0 0;
@@ -473,5 +474,33 @@
   /* Ecrã de conclusão — botão PDF largura total */
   .exec-rep-concluido .btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .checklist-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+  .checklist-opcoes {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .peca-row {
+    flex-wrap: wrap;
+    align-items: flex-end;
+    row-gap: 0.35rem;
+  }
+  .peca-descricao {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .peca-codigo {
+    flex: 1;
+    min-width: 5rem;
+  }
+  .peca-qtd {
+    flex: 0 0 auto;
   }
 }

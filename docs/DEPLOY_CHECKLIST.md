@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-04-30 — `v1.16.80`: documentação e E2E alinhados (`TESTES-E2E.md`; spec 18 SAF-T em skip); deploy PWA recomendado via `navel-site` → `npm run deploy:at-manut -- --yes`.
+> Última revisão: 2026-04-30 — `v1.16.81`: Reparações/Manutenções UI + RA-8/`expectToast` E2E; suite Reparações 111 testes `--workers=1` verde; deploy PWA `navel-site` → `npm run deploy:at-manut -- --yes`.
 
 ## Resumo da verificação da base de dados
 

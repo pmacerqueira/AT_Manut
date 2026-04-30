@@ -9,6 +9,25 @@ Política de continuidade:
 
 ---
 
+## [1.16.81] — 2026-04-30 — Reparações/Manutenções UI + E2E Reparações verde + deploy PWA
+
+### UI / Responsivo
+- **Reparações** (`Reparacoes.jsx` / `Reparacoes.css`): lista e modais (tabela/coluna Aviso, acções, cartões até ~1024px) alinhados ao uso em campo; sem sobrepor o botão **Executar**.
+- **Manutenções executadas/lista** (`Manutencoes.jsx` / `Manutencoes.css`): refinamento de filtros/cartões e layout em tablet.
+- **`ExecutarReparacaoModal.css`:** formulário/execução (scroll, peças, checklist, viewport móvel) coerentes com os testes RA-6/RA-7.
+
+### Qualidade — testes E2E (`tests/e2e/`)
+- **`helpers.js`:** `expectToast` deixa de fazer match a `.toast-stack` (evita **strict mode** com vários elementos); selector explícito em `[role="status"].toast`, `.toast-msg`, etc.; melhorias de scope em helpers de Reparações (tabela vs cartões).
+- **`17-reparacoes-avancado.spec.js` — RA-8:** após guardar progresso offline, assert com toast **«Dados gravados»**, fecho do modal (overlay bloqueava clique nas tabs), volta ao filtro **Todas** e contagem de badges **Em progresso** (evita falsos negativos com só a aba Pendentes aberta).
+
+### Suite Reparações
+- Corrida de referência: `npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avancado.spec.js --workers=1` — **111 passed**.
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.81**).
+
+---
+
 ## [1.16.80] — 2026-04-30 — Deploy PWA estável + documentação alinhada
 
 ### Documentação

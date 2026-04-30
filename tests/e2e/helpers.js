@@ -550,6 +550,79 @@ export async function loginAdminSemAlertas(page, { path = '/', customData } = {}
  */
 export const SELETOR_BOTAO_EDITAR = 'button[title="Editar"]'
 
+/** Lista de reparações: os cartões vêm antes da tabela no DOM; em desktop os cartões estão ocultos mas os botões continuam no match global. */
+export const TITLE_EXECUTAR_REP = 'Executar / Completar reparação'
+export const TITLE_ELIMINAR_REP = 'Eliminar reparação'
+
+/** Clica no primeiro botão Executar visível na tabela ou, em mobile, nos cartões (tbody primeiro para evitar DOM de cartões ocultos). */
+export async function clickPrimeiroExecutarReparacao(page) {
+  const title = TITLE_EXECUTAR_REP
+  const tableBtns = page.locator('.reparacoes-table tbody').locator(`button[title="${title}"]`)
+  const nTable = await tableBtns.count()
+  for (let i = 0; i < nTable; i++) {
+    const b = tableBtns.nth(i)
+    if (await b.isVisible().catch(() => false)) {
+      await b.scrollIntoViewIfNeeded().catch(() => {})
+      await b.click({ timeout: 15000 })
+      return
+    }
+  }
+  const cardBtns = page.locator('.reparacoes-cards').locator(`button[title="${title}"]`)
+  const nCard = await cardBtns.count()
+  for (let i = 0; i < nCard; i++) {
+    const b = cardBtns.nth(i)
+    if (await b.isVisible().catch(() => false)) {
+      await b.scrollIntoViewIfNeeded().catch(() => {})
+      await b.click({ timeout: 15000 })
+      return
+    }
+  }
+  throw new Error('Botão Executar / Completar reparação não visível')
+}
+
+/** Botões Eliminar só na tabela desktop (evita apanhar cartões ocultos ou duplicar contagens). */
+export function locatorEliminarReparacaoTabela(page) {
+  return page.locator('.reparacoes-table').locator(`button[title="${TITLE_ELIMINAR_REP}"]`)
+}
+
+/** Botões Executar só na tabela desktop. */
+export function locatorExecutarReparacaoTabela(page) {
+  return page.locator('.reparacoes-table').locator(`button[title="${TITLE_EXECUTAR_REP}"]`)
+}
+
+/** Ver relatório apenas na tabela desktop (evita match em cartões com display:none no DOM). */
+export function locatorVerRelatorioReparacaoTabela(page) {
+  return page.locator('.reparacoes-table').locator('button[title="Ver relatório"]')
+}
+
+/** Enviar relatório apenas na tabela desktop. */
+export function locatorEnviarEmailReparacaoTabela(page) {
+  return page.locator('.reparacoes-table').locator('button[title="Enviar relatório por email"]')
+}
+
+/**
+ * Modal «Nova Reparação» (Reparacoes.jsx): ordem dos selects —
+ * 0 Cliente (filtro), 1 Máquina *, 2 Técnico *.
+ */
+export async function seleccionarMaquinaETecnicoModalNovaReparacao(modal) {
+  await modal.locator('select').nth(1).selectOption({ index: 1 })
+  await modal.locator('select').nth(2).selectOption({ index: 1 })
+}
+
+/** Eliminar: primeiro botão visível (útil quando só há lista em cartões). */
+export async function clickPrimeiroEliminarReparacao(page) {
+  const loc = page.locator(`button[title="${TITLE_ELIMINAR_REP}"]`)
+  const n = await loc.count()
+  for (let i = 0; i < n; i++) {
+    const b = loc.nth(i)
+    if (await b.isVisible().catch(() => false)) {
+      await b.click()
+      return
+    }
+  }
+  throw new Error('Botão Eliminar reparação não visível')
+}
+
 /** Botão eliminar nas tabelas Clientes (lista) e outras views com classes antigas/alternativas. */
 export const SEL_BTN_DANGER = '.icon-btn.danger, .cliente-action-btn.danger'
 
@@ -696,7 +769,7 @@ export async function signCanvas(page) {
 }
 
 export async function expandPrimeiroGrupoManutExecutadas(page) {
-  const desk = page.locator('.manutencoes-table button.exec-grupo-expand-btn').first()
+  const desk = page.locator('.manutencoes-table button.exec-grupo-expand-trigger').first()
   const mob = page.locator('button.exec-grupo-mobile-header').first()
   if (await desk.isVisible({ timeout: 2500 }).catch(() => false)) {
     await desk.click({ force: true })
@@ -796,7 +869,8 @@ export async function closeModal(page) {
 // ── Verificar Toast ───────────────────────────────────────────────────────────
 
 export async function expectToast(page, text, timeout = 6000) {
+  // Excluir `.toast-stack` (também contém substring "toast" em alguns selectores antigos)
   await expect(
-    page.locator(`.toast, [class*="toast"], [role="alert"]`).filter({ hasText: text })
+    page.locator('[role="status"].toast, [role="alert"].toast, .toast-msg').filter({ hasText: text }).first()
   ).toBeVisible({ timeout })
 }

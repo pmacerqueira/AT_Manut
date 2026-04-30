@@ -1,7 +1,7 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e arquivo de entregas. **Estado presente da app:** `CHANGELOG.md` e `src/config/version.js`.  
-> Última revisão de formato: 2026-04-30 — v1.16.80
+> Última revisão de formato: 2026-04-30 — v1.16.81
 
 ---
 
@@ -265,6 +265,6 @@
 
 ---
 
-*Última actualização estrutural: 2026-04-30 — v1.16.80; SAF-T spec 18 em skip documentado em `TESTES-E2E.md`.*
+*Última actualização estrutural: 2026-04-30 — v1.16.81; SAF-T spec 18 em skip documentado em `TESTES-E2E.md`; Reparações E2E 16+17 estáveis (`expectToast`, RA-8).*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.
