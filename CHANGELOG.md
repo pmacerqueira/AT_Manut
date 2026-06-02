@@ -9,6 +9,18 @@ Política de continuidade:
 
 ---
 
+## [1.16.82] — 2026-06-02 — Documentação obrigatória: ficha + biblioteca + plano de peças
+
+### Correcção
+- **Ficha de equipamento (Clientes):** a tabela «Documentação obrigatória» deixou de depender só de `maquina.documentos`. Passa a reflectir também documentos da **Biblioteca NAVEL** (ex. `PLANO_MANUTENCAO` → «Plano de manutenção (PDF)») e plano KAESER **A/B/C/D** já importado no modal de peças.
+- **`PecasPlanoModal`:** após importar PDF KAESER, o ficheiro é também gravado na ficha como `plano_manutencao` (upload + `addDocumentoMaquina`).
+- **`DocumentacaoModal` / lista Equipamentos:** indicador de documentação incompleta alinhado com a mesma lógica (`documentacaoObrigatoria.js`).
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.82**).
+
+---
+
 ## [1.16.81] — 2026-04-30 — Reparações/Manutenções UI + E2E Reparações verde + deploy PWA
 
 ### UI / Responsivo

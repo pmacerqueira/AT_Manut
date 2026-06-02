@@ -19,13 +19,20 @@ import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
 import { COPY_DOC_RESUMO_EQUIPAMENTOS, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
+import { tiposObrigatoriosCobertos } from '../utils/documentacaoObrigatoria'
 
 const FOTO_EQUIPAMENTO_TIPO = '__foto_equipamento'
 
-function getDocumentacaoStatus(maquina) {
+function getDocumentacaoStatus(maquina, getPecasPlanoByMaquina) {
+  const cobertos = tiposObrigatoriosCobertos({
+    maquina,
+    bibliotecaItems: [],
+    pecasPlanoCount: maquina?.id && getPecasPlanoByMaquina ? getPecasPlanoByMaquina(maquina.id).length : 0,
+    pecasPlanoKaeserAbcd: isKaeserAbcdMaquina(maquina),
+    TIPOS_DOCUMENTO,
+  })
+  const emFalta = TIPOS_DOCUMENTO.filter(t => !cobertos.has(t.id))
   const docs = (maquina?.documentos ?? []).filter(d => d.tipo !== FOTO_EQUIPAMENTO_TIPO)
-  const existentes = new Set(docs.map(d => d.tipo).filter(Boolean))
-  const emFalta = TIPOS_DOCUMENTO.filter(t => !existentes.has(t.id))
   return {
     count: docs.length,
     total: TIPOS_DOCUMENTO.length,
@@ -58,6 +65,7 @@ export default function Equipamentos() {
     reparacoes,
     tecnicos,
     removeMaquina,
+    getPecasPlanoByMaquina,
   } = useData()
   const contentReady = useDeferredReady(maquinas.length >= 0)
   const { canDelete, isAdmin } = usePermissions()
@@ -252,7 +260,7 @@ export default function Equipamentos() {
                   <h4>{nomeCliente}</h4>
                   {list.map(m => {
                     const sub = getSubcategoria(m.subcategoriaId)
-                    const docStatus = getDocumentacaoStatus(m)
+                    const docStatus = getDocumentacaoStatus(m, getPecasPlanoByMaquina)
                     return (
                       <div key={m.id} id={`maq-${m.id}`} className="maquina-row maquina-row--atraso">
                         <div className="maquina-row-info">
@@ -388,7 +396,7 @@ export default function Equipamentos() {
                     const hoje = startOfDay(new Date(getHojeAzores()))
                     const temProxima = !!m.proximaManut
                     const proxVencida = temProxima && isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)
-                    const docStatus = getDocumentacaoStatus(m)
+                    const docStatus = getDocumentacaoStatus(m, getPecasPlanoByMaquina)
                     return (
                     <div key={m.id} id={`maq-${m.id}`} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
                       <div className="maquina-row-info">

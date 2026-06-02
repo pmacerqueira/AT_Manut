@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-04-30 — `v1.16.81`: Reparações/Manutenções UI + RA-8/`expectToast` E2E; suite Reparações 111 testes `--workers=1` verde; deploy PWA `navel-site` → `npm run deploy:at-manut -- --yes`.
+> Última revisão: 2026-06-02 — `v1.16.82`: documentação obrigatória (ficha + biblioteca NAVEL + plano peças KAESER); deploy PWA `navel-site` → `npm run deploy:at-manut -- --yes`.
 
 ## Resumo da verificação da base de dados
 

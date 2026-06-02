@@ -21,6 +21,7 @@ import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER } from '../constants/do
 import { buildPecasPlanoItemsFromPdfArrayBuffer, contagemPorTipoKaeser } from '../utils/kaeserPlanoPdfImport'
 import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import MaquinaBibliotecaNavel from './MaquinaBibliotecaNavel'
+import { tiposObrigatoriosCobertos } from '../utils/documentacaoObrigatoria'
 
 const PDF_MAX_BYTES = 8 * 1024 * 1024
 const FOTO_EQUIPAMENTO_TIPO = '__foto_equipamento'
@@ -75,6 +76,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
     getPecasPlanoByMaquina,
     replacePecasPlanoMaquina,
   } = useData()
+  const [bibliotecaItems, setBibliotecaItems] = useState([])
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const { isAdmin } = usePermissions()
@@ -113,6 +115,22 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
     setFotoTitulos({})
   }, [isOpen, maqId, maqSubcategoriaId])
 
+  const tiposComDocumento = useMemo(
+    () => tiposObrigatoriosCobertos({
+      maquina: maq,
+      bibliotecaItems,
+      pecasPlanoCount: maq?.id ? getPecasPlanoByMaquina(maq.id).length : 0,
+      pecasPlanoKaeserAbcd: maq ? isKaeserAbcdMaquina(maq) : false,
+      TIPOS_DOCUMENTO,
+    }),
+    [maq, bibliotecaItems, getPecasPlanoByMaquina],
+  )
+  const tiposEmFalta = useMemo(
+    () => TIPOS_DOCUMENTO.filter(t => !tiposComDocumento.has(t.id)),
+    [tiposComDocumento],
+  )
+  const docCompleta = tiposEmFalta.length === 0
+
   if (!isOpen) return null
 
   const todosDocumentos = maq ? (maq.documentos ?? []) : []
@@ -121,9 +139,6 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
     .filter(d => d.tipo === FOTO_EQUIPAMENTO_TIPO)
     .sort((a, b) => String(b.criadoEm || b.data || '').localeCompare(String(a.criadoEm || a.data || '')))
   const getTipoLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
-  const tiposComDocumento = new Set(documentos.map(d => d.tipo).filter(Boolean))
-  const tiposEmFalta = TIPOS_DOCUMENTO.filter(t => !tiposComDocumento.has(t.id))
-  const docCompleta = tiposEmFalta.length === 0
 
   const handleAddDoc = async (e) => {
     e.preventDefault()
@@ -446,7 +461,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
               <strong>Biblioteca NAVEL</strong>
               <span>Documentos partilhados/externos à ficha deste equipamento.</span>
             </div>
-            {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} /> : null}
+            {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} onItemsChange={setBibliotecaItems} /> : null}
           </section>
         )}
 

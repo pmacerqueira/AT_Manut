@@ -21,7 +21,7 @@ const DOC_TYPES = [
  * Documentos da biblioteca NAVEL (área reservada) associados a este equipamento.
  * Requer ATM_NAVEL_DOC_INTEGRATION_TOKEN no servidor + at_integration_bearer alinhado no navel-site.
  */
-export default function MaquinaBibliotecaNavel({ maquina }) {
+export default function MaquinaBibliotecaNavel({ maquina, onItemsChange }) {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState([])
@@ -37,13 +37,16 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
   const load = useCallback(async () => {
     if (!maquina?.id) {
       setItems([])
+      onItemsChange?.([])
       setLoading(false)
       return
     }
     setLoading(true)
     try {
       const data = await apiDocumentosBibliotecaSearch({ machineId: String(maquina.id) })
-      setItems(Array.isArray(data?.items) ? data.items : [])
+      const list = Array.isArray(data?.items) ? data.items : []
+      setItems(list)
+      onItemsChange?.(list)
     } catch (e) {
       const msg = e?.message || ''
       if (String(msg).includes('não configurada') || e?.status === 503) {
@@ -52,10 +55,11 @@ export default function MaquinaBibliotecaNavel({ maquina }) {
         showToast(msg || 'Não foi possível carregar a biblioteca NAVEL.', 'error')
       }
       setItems([])
+      onItemsChange?.([])
     } finally {
       setLoading(false)
     }
-  }, [maquina?.id, showToast])
+  }, [maquina?.id, showToast, onItemsChange])
 
   useEffect(() => {
     load()

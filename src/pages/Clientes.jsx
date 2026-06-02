@@ -40,6 +40,8 @@ import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_L
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
+import { resolveDocumentoObrigatorio } from '../utils/documentacaoObrigatoria'
+import { apiDocumentosBibliotecaDownloadBlob } from '../services/apiService'
 import '../components/PecasPlanoModal.css'
 import './Clientes.css'
 
@@ -69,6 +71,7 @@ export default function Clientes() {
     getTecnicoByNome,
     updateManutencao,
     marcas,
+    getPecasPlanoByMaquina,
   } = useData()
   const contentReady = useDeferredReady(clientes.length >= 0)
   const { canDelete, canEditCliente, canAddCliente, isAdmin } = usePermissions()
@@ -93,6 +96,26 @@ export default function Clientes() {
   const [modalExecucao, setModalExecucao] = useState(null)
   const [fichaKpiFilter, setFichaKpiFilter] = useState(null)
   const [modalFrota, setModalFrota] = useState(null) // { cliente, options }
+
+  const [bibliotecaFichaItems, setBibliotecaFichaItems] = useState([])
+  const fichaMaquinaId =
+    fichaView === 'maquina-detalhe' && fichaMaquina ? String(fichaMaquina.id) : null
+
+  useEffect(() => {
+    if (!fichaMaquinaId) setBibliotecaFichaItems([])
+  }, [fichaMaquinaId])
+
+  const abrirDocumentoBiblioteca = useCallback(async (path) => {
+    if (!path) return
+    try {
+      const blob = await apiDocumentosBibliotecaDownloadBlob(path, true)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+    } catch (e) {
+      showToast(e?.message || 'Não foi possível abrir o documento.', 'error')
+    }
+  }, [showToast])
   const [modalFrotaFiltro, setModalFrotaFiltro] = useState(null) // { cliente }
   const [frotaDataInicio, setFrotaDataInicio] = useState('')
   const [frotaDataFim, setFrotaDataFim] = useState('')
@@ -949,8 +972,14 @@ export default function Clientes() {
 
                 {fichaView === 'maquina-detalhe' && fichaMaquina && (() => {
                     const maquinaAtual = maquinas.find(m => String(m.id) === String(fichaMaquina.id)) ?? fichaMaquina
-                    const docs = maquinaAtual.documentos ?? []
-                    const getDocPorTipo = (tipo) => docs.find(d => d.tipo === tipo)
+                    const pecasPlanoCount = getPecasPlanoByMaquina(maquinaAtual.id).length
+                    const pecasPlanoKaeserAbcd = isKaeserAbcdMaquina(maquinaAtual)
+                    const docObrigatorioOpts = {
+                      maquina: maquinaAtual,
+                      bibliotecaItems: bibliotecaFichaItems,
+                      pecasPlanoCount,
+                      pecasPlanoKaeserAbcd,
+                    }
                     const getDocLabel = (tipo) => TIPOS_DOCUMENTO.find(t => t.id === tipo)?.label ?? tipo
                     const { executadas: histExecutadas, proximas: histProximas } = getManutencoesResumoFicha(maquinaAtual.id)
                     const histTemAlgum = histExecutadas.length > 0 || histProximas.length > 0
@@ -1057,7 +1086,10 @@ export default function Clientes() {
                         )}
                       </div>
                     )}
-                    <MaquinaBibliotecaNavel maquina={maquinaAtual} />
+                    <MaquinaBibliotecaNavel
+                      maquina={maquinaAtual}
+                      onItemsChange={setBibliotecaFichaItems}
+                    />
                     <h4>Documentação obrigatória</h4>
                     <div className="doc-table-wrapper">
                       <table className="data-table doc-table">
@@ -1070,18 +1102,23 @@ export default function Clientes() {
                         </thead>
                         <tbody>
                           {TIPOS_DOCUMENTO.map(tipo => {
-                            const doc = tipo.id === 'outros' ? docs.filter(d => d.tipo === 'outros')[0] : getDocPorTipo(tipo.id)
-                            const existe = !!doc
+                            const { existe, doc, source } = resolveDocumentoObrigatorio(tipo.id, docObrigatorioOpts)
+                            const urlFicha = doc?.url ? safeHttpUrl(doc.url) : null
+                            const podeAbrirFicha = urlFicha && urlFicha !== '#'
                             return (
                               <tr key={tipo.id}>
                                 <td data-label="Documento">{getDocLabel(tipo.id)}</td>
                                 <td data-label="Existe"><span className={existe ? 'badge badge-sim' : 'badge badge-nao'}>{existe ? 'Sim' : 'Não'}</span></td>
                                 <td className="doc-table-actions" data-label="Ações">
-                                  {doc ? (
+                                  {doc && podeAbrirFicha ? (
                                     <>
-                                      <a href={safeHttpUrl(doc.url)} target="_blank" rel="noopener noreferrer" className="icon-btn secondary" title="Visualizar"><ExternalLink size={16} /></a>
+                                      <a href={urlFicha} target="_blank" rel="noopener noreferrer" className="icon-btn secondary" title="Visualizar"><ExternalLink size={16} /></a>
                                       <button type="button" className="icon-btn secondary" onClick={() => setModalDocumentoEmail({ documento: doc, maquina: maquinaAtual })} title="Enviar por email"><Mail size={16} /></button>
                                     </>
+                                  ) : doc && source === 'biblioteca' && doc.bibliotecaPath ? (
+                                    <button type="button" className="icon-btn secondary" onClick={() => abrirDocumentoBiblioteca(doc.bibliotecaPath)} title="Abrir (biblioteca NAVEL)"><ExternalLink size={16} /></button>
+                                  ) : doc && source === 'pecas_plano' ? (
+                                    <button type="button" className="icon-btn secondary" onClick={() => setModalPecasManual(maquinaAtual)} title="Ver plano de peças"><PackageOpen size={16} /></button>
                                   ) : (
                                     <span className="text-muted">—</span>
                                   )}

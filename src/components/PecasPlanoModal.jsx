@@ -5,6 +5,7 @@
  */
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useData, isKaeserAbcdMaquina, isKaeserMarca } from '../context/DataContext'
+import { apiUploadMachinePdf } from '../services/apiService'
 import { usePermissions } from '../hooks/usePermissions'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
@@ -27,7 +28,16 @@ const UNIDADES = ['PÇ', 'TER', 'L', 'KG', 'M', 'UN']
 const PECA_VAZIA = { posicao: '', codigoArtigo: '', descricao: '', quantidade: 1, unidade: 'PÇ' }
 
 export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial = false }) {
-  const { getPecasPlanoByMaquina, addPecaPlano, replacePecasPlanoMaquina, updatePecaPlano, removePecaPlano, getSubcategoria } = useData()
+  const {
+    getPecasPlanoByMaquina,
+    addPecaPlano,
+    replacePecasPlanoMaquina,
+    updatePecaPlano,
+    removePecaPlano,
+    getSubcategoria,
+    addDocumentoMaquina,
+    maquinas,
+  } = useData()
   const { isAdmin } = usePermissions()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
@@ -139,6 +149,29 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
       const kept = getPecasPlanoByMaquina(maquina.id).filter(p => !['A', 'B', 'C', 'D'].includes(p.tipoManut))
       await replacePecasPlanoMaquina(maquina.id, [...kept, ...todas])
       const porTipo = contagemPorTipoKaeser(todas)
+
+      const maqAtual = maquinas.find(m => String(m.id) === String(maquina.id)) ?? maquina
+      const jaTemPlanoPdf = (maqAtual.documentos ?? []).some(d => d.tipo === 'plano_manutencao')
+      if (!jaTemPlanoPdf && podeImportarPdfKaeser) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const r = new FileReader()
+          r.onload = () => resolve(String(r.result || ''))
+          r.onerror = () => reject(new Error('Falha ao ler o PDF'))
+          r.readAsDataURL(file)
+        })
+        const uploadRes = await apiUploadMachinePdf({ dataUrl, maquinaId: maquina.id })
+        if (uploadRes?.url) {
+          const titulo = file.name.replace(/\.pdf$/i, '').slice(0, 200)
+          await addDocumentoMaquina(maquina.id, {
+            tipo: 'plano_manutencao',
+            titulo,
+            url: uploadRes.url,
+            uploadFileName: file.name,
+            uploadFileSize: file.size,
+          })
+        }
+      }
+
       showToast(`${todas.length} peças importadas (A: ${porTipo.A}, B: ${porTipo.B}, C: ${porTipo.C}, D: ${porTipo.D}).`, 'success')
     } catch (err) {
       logger.error('PecasPlanoModal', 'importarPdfKaeser', err?.message || 'Falha na importação PDF ou na gravação do plano', {
