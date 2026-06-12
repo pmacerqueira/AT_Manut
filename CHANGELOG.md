@@ -9,6 +9,28 @@ Política de continuidade:
 
 ---
 
+## [1.16.86] — 2026-06-12 — Sanitização de código morto + revisão documental
+
+### Código morto removido (zero impacto em runtime — Bugbot sem findings)
+- **`src/utils/relatorioHtml.js` (30 KB) e `src/utils/relatorioReparacaoHtml.js` (13 KB) eliminados.** Eram os geradores HTML client-side dos relatórios individuais — substituídos há várias versões pela renderização no servidor (`send-email.php` recebe JSON estruturado) e pelo PDF jsPDF (`gerarPdfRelatorio.js`). Nenhum import em `src/`.
+- **`scripts/test-email-reports.js` eliminado** — único consumidor dos dois geradores acima; não estava em `package.json`.
+- **`relatorioBaseStyles.js`:** removidas `htmlPaginaCliente` e `htmlFotos` (usadas só pelos ficheiros eliminados). Mantêm-se `cssBase`, `htmlHeader`, `htmlTituloBar`, `htmlFooter`, `PALETA`, `TIPO` — usados pelos relatórios de frota e histórico.
+- **Exports mortos removidos:** `filterManutencoesProximas` (kpis.js), `normNifCompactCliente` (maquinaSerieCliente.js), `TECNICOS_FALLBACK` (users.js, deprecated desde a migração de técnicos para a BD), `RELATORIO_DECLARACAO_LEGISLACAO_IDS` / `getRelatorioModuloFlagsForCategoria` / `DECLARACAO_CLIENTE` (constants/relatorio.js), `SUBCATEGORIAS_COMPRESSOR` (equipamentoDomain.js — só existia como re-export nunca importado).
+- Parâmetro não usado `ultima` removido em `gerarRelatorioFrotaHtml.js`.
+
+### Qualidade
+- ESLint: 0 erros; 19 testes unitários a passar; build limpo; contagem E2E confirmada (456 testes / 19 ficheiros).
+- **Bugbot** sobre o diff completo: **sem findings**.
+
+### Documentação actualizada (redundante/obsoleto eliminado)
+- `DOCUMENTACAO.md`: árvore de estrutura corrigida — removidos `relatorioHtml.js`/`relatorioReparacaoHtml.js`; adicionados `src/domain/`, `useBibliotecaItemsForMaquinas.js` e `components/executarManutencao/` (v1.16.85).
+- `DESENVOLVIMENTO.md`: mapa funcionalidade→ficheiros alinhado com a geração de relatórios actual (PDF jsPDF + HTML servidor).
+- `docs/FOTOS-PDF-EMAIL-LIMITES.md`: secção «HTML de relatório» obsoleta removida.
+- `docs/MANUAL-UX-UI.md` e `.cursor/rules/at-manut-workflow.mdc`: listas de rodapé sem ficheiros eliminados.
+- `docs/MANUT-APP-INSIGHTS.md`: referência a `SESSAO-FILOSOFT-2026-02-22.md` (inexistente) substituída.
+
+---
+
 ## [1.16.85] — 2026-06-12 — Simplificação estrutural: DataContext, batch biblioteca, passos KAESER
 
 ### Refactoring (sem alteração de comportamento)

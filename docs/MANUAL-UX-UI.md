@@ -195,7 +195,7 @@ import { APP_FOOTER_TEXT } from '../config/version'
 // APP_FOOTER_TEXT = "José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v{APP_VERSION}"
 ```
 
-Aplicar em: `relatorioHtml.js`, `gerarPdfRelatorio.js`, `gerarHtmlHistoricoMaquina.js`, `send-email.php`, `EnviarDocumentoModal`, e qualquer novo relatório.
+Aplicar em: `gerarPdfRelatorio.js`, `gerarHtmlHistoricoMaquina.js`, `gerarRelatorioFrotaHtml.js`, `send-email.php`, `EnviarDocumentoModal`, e qualquer novo relatório.
 
 ---
 

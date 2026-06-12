@@ -40,11 +40,6 @@ export function filterManutencoesEmAtraso(manutencoes, hojeStr = getHojeAzores()
   return manutencoes.filter(m => isManutencaoPendenteOuAgendada(m) && m.data < hojeStr)
 }
 
-/** Hoje ou futuro (inclui o dia de hoje). */
-export function filterManutencoesProximas(manutencoes, hojeStr = getHojeAzores()) {
-  return manutencoes.filter(m => isManutencaoPendenteOuAgendada(m) && m.data >= hojeStr)
-}
-
 /** Próximas dentro de N meses a partir de hoje (hoje inclusivo, limite exclusivo por dia). */
 export function filterManutencoesProximasProximosMeses(manutencoes, meses, hojeStr = getHojeAzores()) {
   const hoje = startOfDay(parseDateLocal(hojeStr))

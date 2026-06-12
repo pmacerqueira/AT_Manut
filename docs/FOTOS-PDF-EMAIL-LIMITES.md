@@ -10,7 +10,7 @@ Documento de **memória operacional** para agentes e desenvolvimento futuro (v1.
 |-----------|-------|----------|
 | `MAX_FOTOS` | **6** | `src/config/limits.js` |
 
-Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdfRelatorio.js` (`gerarPdfCompacto`), `relatorioHtml.js`, `relatorioReparacaoHtml.js`, mensagens de UI/toast.
+Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdfRelatorio.js` (`gerarPdfCompacto`), mensagens de UI/toast.
 
 **Dados legados** com mais de 6 entradas no array `fotos`: HTML e PDF mostram **apenas as primeiras 6**; o PDF compacto pode indicar no subtítulo que existem mais fotografias no total (quando aplicável).
 
@@ -41,18 +41,6 @@ Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdf
 - URLs `http(s)` nas fotos: resolução via `loadImageAsDataUrl` (proxy CORS quando necessário).
 
 **Ordem canónica das secções** do PDF: ver `.cursor/rules/at-manut-workflow.mdc` (secção 6 actualizada para grelha + máx. 6).
-
----
-
-## HTML de relatório (impressão / pré-visualização)
-
-| Ficheiro | Função |
-|----------|--------|
-| `src/utils/relatorioBaseStyles.js` | `htmlFotos` — linhas de 1, 2, 3 ou 4 fotos (`rpt-fotos-row--single|pair|triple|quad`) |
-| `src/utils/relatorioHtml.js` | Manutenção periódica / montagem |
-| `src/utils/relatorioReparacaoHtml.js` | Reparação |
-
-`object-fit: contain`; `page-break-inside: avoid` nas linhas da grelha.
 
 ---
 

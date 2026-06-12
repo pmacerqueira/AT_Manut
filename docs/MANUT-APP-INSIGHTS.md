@@ -24,7 +24,7 @@
 - Sempre que houver correção crítica, registar impacto funcional e risco mitigado.
 
 ### C. Notas de sessão
-- Usar `docs/SESSAO-FILOSOFT-2026-02-22.md` como histórico e manter novas notas no mesmo formato.
+- Registar decisões e contexto de sessões relevantes no `CHANGELOG.md` e, quando justificado, em documentos dedicados em `docs/` (ex.: `docs/FILOSOFT-INTEGRACAO.md`).
 - Cada nota deve incluir: contexto, problema, causa raiz, ficheiros alterados e próximos passos.
 
 ---

@@ -7,7 +7,6 @@
  *   (2) override opcional na categoria (`declaracaoClienteDepois` na BD), sufixo após «na {serviço} »;
  *   (3) resolução única em `resolveDeclaracaoCliente` / `resolveDeclaracaoClienteForMaquina`.
  * - **Email/PDF servidor:** o browser envia `declaracao_texto` já resolvido → PHP não duplica regras.
- * - **Secções condicionais (futuro):** `getRelatorioModuloFlagsForCategoria`.
  *
  * Variantes canónicas (quando não há override na categoria):
  * - **elevadores:** EN 1493:2022, Dir. Máquinas 2006/42/CE, Reg. (UE) 2023/1230 (quando aplicável), DL 50/2005.
@@ -17,9 +16,6 @@
  */
 
 /** @typedef {'elevadores'|'compressores'|'outros'} DeclaracaoLegislacaoId */
-
-/** Lista canónica — validação de payloads (ex.: email → PHP). */
-export const RELATORIO_DECLARACAO_LEGISLACAO_IDS = /** @type {const} */ (['elevadores', 'compressores', 'outros'])
 
 const TEXTO_BASE_ANTES = 'Declaro que li e concordo com o que foi relatado pelo técnico na'
 
@@ -114,17 +110,6 @@ export function declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, get
   return String(raw ?? '').trim()
 }
 
-export function getRelatorioModuloFlagsForCategoria(_nomeCategoria) {
-  return {
-    checklist: true,
-    fotos: true,
-    consumiveisOpcional: true,
-    declaracao: true,
-    proximasManutencoes: true,
-    assinaturas: true,
-  }
-}
-
 /**
  * Texto canónico completo (sem override de categoria).
  * @param {'montagem'|'periodica'|'reparacao'} tipo
@@ -161,6 +146,3 @@ export function resolveDeclaracaoClienteForMaquina(tipo, maquina, getSubcategori
   const depois = declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria)
   return resolveDeclaracaoCliente(tipo, nome, depois)
 }
-
-/** Fallback genérico (manutenção periódica, variante «outros») */
-export const DECLARACAO_CLIENTE = getDeclaracaoCliente('periodica', 'outros')

@@ -13,9 +13,6 @@ export const INTERVALOS = {
 // Subcategorias com contador de horas (compressores e geradores — elevadores não usam)
 export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub14', 'sub15', 'sub16']
 
-// Compressores (categoria) — vários tipos
-export const SUBCATEGORIAS_COMPRESSOR = ['sub5', 'sub6', 'sub10', 'sub11', 'sub14', 'sub15']
-
 /** Parafuso e parafuso com secador — aqui podem aplicar-se planos por fases (A/B/C/D, etc.). */
 export const SUBCATEGORIAS_COMPRESSOR_PARAFUSO = ['sub5', 'sub14']
 

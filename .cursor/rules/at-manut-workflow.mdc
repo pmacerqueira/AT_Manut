@@ -421,7 +421,7 @@ await page.waitForTimeout(500)
 `José Gonçalves Cerqueira (NAVEL-AÇORES), Lda. — Todos os direitos reservados · v{APP_VERSION}`
 
 - Usar `APP_FOOTER_TEXT` de `src/config/version.js` (inclui versão automaticamente)
-- Aplicar em: relatorioHtml.js, gerarPdfRelatorio.js, send-email.php, EnviarDocumentoModal, e qualquer novo relatório
+- Aplicar em: gerarPdfRelatorio.js, send-email.php, EnviarDocumentoModal, e qualquer novo relatório
 
 ## ⚠ ESTRUTURA CANÓNICA DO PDF — `gerarPdfCompacto` (gerarPdfRelatorio.js)
 

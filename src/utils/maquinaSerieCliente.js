@@ -7,10 +7,6 @@ export function normNumeroSerieEquipamento(s) {
   return String(s ?? '').trim().toLowerCase()
 }
 
-export function normNifCompactCliente(s) {
-  return String(s ?? '').trim().replace(/\s+/g, '')
-}
-
 /**
  * A máquina `m` pertence ao cliente identificado por NIF (ou clienteId legado = NIF).
  * @param {object} m

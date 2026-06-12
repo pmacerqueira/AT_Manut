@@ -62,14 +62,19 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │
 │   ├── context/
 │   │   ├── AuthContext.jsx             # Login/logout, JWT, user, isAdmin
-│   │   ├── DataContext.jsx             # Estado global: CRUD de todas as entidades
+│   │   ├── DataContext.jsx             # Estado global: CRUD de todas as entidades (re-exporta domínio)
 │   │   └── GlobalLoadingContext.jsx    # Overlay de carregamento
+│   │
+│   ├── domain/
+│   │   ├── equipamentoDomain.js        # Constantes de equipamento (INTERVALOS, subcategorias, KAESER, TIPOS_DOCUMENTO)
+│   │   └── marcasDomain.js             # INITIAL_MARCAS, normalizeMarca, merge de marcas
 │   │
 │   ├── hooks/
 │   │   ├── usePermissions.js           # canDelete, canEditManutencao, isAdmin
 │   │   ├── useMediaQuery.js            # Detecção mobile
 │   │   ├── useDebounce.js             # Debounce para pesquisa
-│   │   └── useDeferredReady.js         # Atraso de render para modais pesados
+│   │   ├── useDeferredReady.js         # Atraso de render para modais pesados
+│   │   └── useBibliotecaItemsForMaquinas.js # Batch fetch Biblioteca NAVEL (search_many + fallback)
 │   │
 │   ├── components/
 │   │   ├── Layout.jsx / .css           # Sidebar, menu, logout, Ctrl+K, Ler QR, modo campo
@@ -81,6 +86,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── SignaturePad.jsx / .css     # Canvas de assinatura
 │   │   ├── RelatorioView.jsx / .css    # Visualização de relatório de manutenção
 │   │   ├── ExecutarManutencaoModal.jsx # Modal execução manutenção (checklist+assinatura+email)
+│   │   ├── executarManutencao/         # Helpers puros + passos KAESER do wizard (execWizardHelpers, KaeserHorasStep, KaeserPecasStep)
 │   │   ├── ExecutarReparacaoModal.jsx  # Modal execução reparação (fotos+assinatura+email+peças)
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
@@ -117,9 +123,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   └── syncQueue.js                # Fila de operações offline → sync
 │   │
 │   ├── utils/
-│   │   ├── relatorioHtml.js            # HTML do relatório individual (manutenções)
-│   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios (assinaturas, tabelas)
-│   │   ├── relatorioReparacaoHtml.js   # HTML do relatório de reparação
+│   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios HTML (frota, histórico)
 │   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — grelha fotos A4, email anexo
 │   │   ├── comprimirImagemRelatorio.js # Compressão JPEG das fotos no browser (relatórios)
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina

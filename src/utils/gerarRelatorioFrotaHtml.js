@@ -277,7 +277,7 @@ ${headBlock}`
   <th class="cell-center" style="width:11%">Tendência</th>
   <th class="cell-center" style="width:18%">Últ. rel.</th>
 </tr></thead><tbody>`
-    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, ultima, dataUltimaKey, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
+    grupo.linhas.sort((a, b) => (b.diasAtraso ?? -9999) - (a.diasAtraso ?? -9999)).forEach(({ m, sub, dataUltimaKey, proxima, diasAtraso, totalManuts, totalReps, relUltima, estadoBadge, estadoLabel, tendencia, proxDataKey }, idx) => {
       const diasStr = diasAtraso != null ? (diasAtraso > 0 ? `<span class="data-atraso">+${diasAtraso}</span>` : diasAtraso === 0 ? 'Hoje' : `<span class="data-ok">${diasAtraso}</span>`) : '—'
       const parClass = idx % 2 === 0 ? 'par' : ''
       const proximaRaw = proxDataKey || proxima?.data || m.proximaManut
