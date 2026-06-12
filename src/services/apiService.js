@@ -255,6 +255,11 @@ export async function apiDocumentosBibliotecaSearch(payload) {
   return call('documentosBiblioteca', 'search', { data: payload && typeof payload === 'object' ? payload : {} })
 }
 
+/** Pesquisa em lote: associações da biblioteca para vários equipamentos num só pedido. */
+export async function apiDocumentosBibliotecaSearchMany(machineIds) {
+  return call('documentosBiblioteca', 'search_many', { data: { machineIds: (machineIds ?? []).map(String) } })
+}
+
 export async function apiDocumentosBibliotecaMachineLinksGet(path) {
   return call('documentosBiblioteca', 'machine_links_get', { data: { path } })
 }

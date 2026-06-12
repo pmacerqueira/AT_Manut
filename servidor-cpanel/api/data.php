@@ -278,6 +278,31 @@ if ($resource === 'documentosBiblioteca') {
         json_ok($res['json']);
     }
 
+    // Pesquisa em lote por equipamento — evita N pedidos do cliente nas listas (badges de documentação).
+    // O upstream (documentos-api.php) só aceita 1 machineId; o loop corre aqui (server→server, mesmo host).
+    if ($action === 'search_many') {
+        $ids = $payload['machineIds'] ?? null;
+        if (!is_array($ids) || $ids === []) {
+            json_error('machineIds (lista) em falta.', 400);
+        }
+        if (count($ids) > 100) {
+            json_error('Máximo 100 equipamentos por pedido.', 400);
+        }
+        $itemsByMachine = [];
+        foreach ($ids as $rawId) {
+            $id = trim((string) $rawId);
+            if ($id === '' || strlen($id) > ATM_NAVEL_MACHINE_ID_MAX_LEN || isset($itemsByMachine[$id])) {
+                continue;
+            }
+            $res = atm_navel_doc_request_get(['action' => 'search', 'machineId' => $id]);
+            $items = ($res['ok'] && is_array($res['json']) && is_array($res['json']['items'] ?? null))
+                ? $res['json']['items']
+                : [];
+            $itemsByMachine[$id] = $items;
+        }
+        json_ok(['itemsByMachine' => $itemsByMachine]);
+    }
+
     if ($action === 'machine_links_get') {
         $rawPath = (string) ($payload['path'] ?? '');
         $path = atm_navel_doc_sanitize_assistencia_rel_path($rawPath);

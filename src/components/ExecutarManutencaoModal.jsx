@@ -17,7 +17,6 @@ import {
   proximaPosicaoKaeser,
   descricaoCicloKaeser,
   isKaeserAbcdMaquina,
-  tipoKaeserSugeridoPorHorasServico,
 } from '../context/DataContext'
 import { KAESER_INTERVALO_HORAS_REF, KAESER_ANUAL_MIN_DIAS, KAESER_DELTA_H_WARNING_ANUAL } from '../constants/kaeserCiclo.js'
 import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
@@ -41,113 +40,18 @@ import {
   parseHorasContadorForm,
 } from '../utils/horasContadorEquipamento.js'
 import { normEntityId } from '../utils/frotaReportHelpers'
-
-const STEP_LABELS_BASE = ['Confirmação', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
-const STEP_LABELS_KAESER = ['Confirmação', 'Horas e fase KAESER', 'Consumíveis', 'Checklist', 'Observações', 'Fotografias', 'Técnico', 'Cliente', 'Assinatura', 'Finalizar']
-
-function sanitizarPecasRelatorio(pecasUsadas) {
-  return pecasUsadas.map(p => {
-    const q = Math.max(0, Number(p.quantidadeUsada ?? p.quantidade ?? 0))
-    return { ...p, quantidade: q, quantidadeUsada: q, usado: q > 0 }
-  })
-}
-
-const QUICK_NOTES_DEFAULT = [
-  'Equipamento em bom estado geral',
-  'Desgaste normal, dentro do esperado',
-  'Necessita acompanhamento na próxima visita',
-  'Cliente informado de anomalia',
-  'Peça substituída preventivamente',
-  'Ruído anormal detetado — monitorizar',
-  'Lubrificação efetuada em todos os pontos',
-  'Alinhamento verificado e corrigido',
-  'Filtros substituídos conforme plano',
-  'Sem observações adicionais',
-]
-
-function getQuickNotes() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('atm_quick_notes') || 'null')
-    if (Array.isArray(stored) && stored.length > 0) return stored
-  } catch { /* fallback */ }
-  return QUICK_NOTES_DEFAULT
-}
-
-/** Respostas da checklist: API pode devolver object ou JSON em string (cache/offline). */
-function normalizarChecklistRespostasMap(raw) {
-  if (raw == null || raw === '') return {}
-  let o = raw
-  if (typeof raw === 'string') {
-    try {
-      o = JSON.parse(raw)
-    } catch {
-      return {}
-    }
-  }
-  if (typeof o !== 'object' || o === null || Array.isArray(o)) return {}
-  return o
-}
-
-const OBSERVACOES_TEXTO_LIVRE_MIN = 24
-
-/** Observações aceites por nota rápida ou por texto livre minimamente descritivo. */
-function notasCumpremMinimoObservacoes(notas, quickNotesList) {
-  const t = (notas || '').trim()
-  if (!t) return false
-  const list = Array.isArray(quickNotesList) && quickNotesList.length > 0 ? quickNotesList : QUICK_NOTES_DEFAULT
-  if (list.some((q) => typeof q === 'string' && q.trim().length > 0 && t.includes(q))) return true
-  return t.length >= OBSERVACOES_TEXTO_LIVRE_MIN && /\s/.test(t)
-}
-
-/** Snapshot estável para comparar se o utilizador alterou o assistente (cancelar com confirmação). */
-function snapshotExecCancelState({
-  form,
-  fotos,
-  emailDestinatario,
-  assinaturaFeita,
-  step,
-  confirmaEquipamentoSerie,
-  adminEdit,
-  hasPreviewPdf,
-  kaeserPecasDirty,
-}) {
-  const cr = form?.checklistRespostas || {}
-  const checklist = Object.keys(cr).sort().reduce((acc, k) => {
-    acc[k] = cr[k]
-    return acc
-  }, {})
-  const pecasNorm = (form?.pecasUsadas || []).map(p => ({
-    id: p.id,
-    codigoArtigo: p.codigoArtigo ?? '',
-    descricao: p.descricao ?? '',
-    quantidadeUsada: Number(p.quantidadeUsada ?? p.quantidade ?? 0),
-    usado: !!p.usado,
-    unidade: p.unidade || 'PÇ',
-  }))
-  const fotosNorm = (fotos || []).map(f => f.id || f.preview || f.name || '').join('|')
-  return JSON.stringify({
-    checklist,
-    notas: form?.notas || '',
-    horasServico: form?.horasServico || '',
-    tecnico: form?.tecnico || '',
-    nomeAssinante: form?.nomeAssinante || '',
-    tipoManutKaeser: form?.tipoManutKaeser || '',
-    pecas: pecasNorm,
-    dataRealizacao: form?.dataRealizacao || '',
-    adminStatus: form?.adminStatus || '',
-    adminDataAgendada: form?.adminDataAgendada || '',
-    adminDataExecucao: form?.adminDataExecucao || '',
-    limparAssinatura: !!form?.limparAssinatura,
-    fotos: fotosNorm,
-    email: emailDestinatario || '',
-    assinaturaFeita: !!assinaturaFeita,
-    step,
-    confirmaEquipamentoSerie: !!confirmaEquipamentoSerie,
-    adminEdit: !!adminEdit,
-    preview: !!hasPreviewPdf,
-    kaeserPecasDirty: !!kaeserPecasDirty,
-  })
-}
+import {
+  STEP_LABELS_BASE,
+  STEP_LABELS_KAESER,
+  sanitizarPecasRelatorio,
+  getQuickNotes,
+  normalizarChecklistRespostasMap,
+  notasCumpremMinimoObservacoes,
+  OBSERVACOES_TEXTO_LIVRE_MIN,
+  snapshotExecCancelState,
+} from './executarManutencao/execWizardHelpers'
+import KaeserHorasStep from './executarManutencao/KaeserHorasStep'
+import KaeserPecasStep from './executarManutencao/KaeserPecasStep'
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
@@ -2043,261 +1947,35 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           )}
 
           {!isCorrectionMode && useKaeserPipeline && step === W.horas && (
-            <div className="wizard-step-content" data-testid="kaeser-passo-horas">
-              <p className="wizard-step-hint">
-                Leia o <strong>contador de horas de serviço</strong>. A app combina <strong>Δh desde a última referência</strong> na ficha com a <strong>janela anual ({KAESER_ANUAL_MIN_DIAS} d)</strong> — sugere o tipo A/B/C/D; pode sempre alterar.
-                <button
-                  type="button"
-                  className="btn-icon-hint kaeser-help-btn"
-                  aria-label="Ajuda: o que ocorrer primeiro (horas ou ano)"
-                  title="Regra: o que ocorrer primeiro — manutenção ao atingir o intervalo de horas do plano, ou pelo menos uma vez por ano se esse intervalo ainda não foi atingido. A sugestão não é obrigatória."
-                  onClick={() => showToast(`O que ocorrer primeiro: intervalo de horas (ex.: Δh ≥ ${KAESER_INTERVALO_HORAS_REF}) ou visita anual (≥ ${KAESER_ANUAL_MIN_DIAS} dias desde a última). Pode alterar o tipo e os consumíveis.`, 'info', 3500)}
-                >
-                  <HelpCircle size={18} />
-                </button>
-              </p>
-              {conflitoHorasFichaVsUltimoRel && (
-                <div className="wizard-confirm" style={{ marginBottom: '0.75rem' }}>
-                  <AlertTriangle size={16} />
-                  <span>
-                    Diferença entre ficha e último relatório: ficha indica <strong>{conflitoHorasFichaVsUltimoRel.hm} h</strong> de serviço;
-                    última manutenção concluída ({conflitoHorasFichaVsUltimoRel.last.data}) registou <strong>{conflitoHorasFichaVsUltimoRel.hr} h</strong>.
-                    Confirme a referência antes de interpretar Δh.
-                  </span>
-                </div>
-              )}
-              <div className="form-section">
-                <label>
-                  Horas no contador (acumuladas) <span className="req-star">*</span>
-                  <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 400 }}>
-                    Valor acumulado no compressor — usado para Δh e para a sugestão de fase A/B/C/D.
-                  </span>
-                  <input
-                    className="wizard-input-horas-compact"
-                    type="number"
-                    min={0}
-                    step={1}
-                    required
-                    value={form.horasServico}
-                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                    onBlur={() => {
-                      const hs = parseInt(String(form.horasServico).trim(), 10)
-                      if (!Number.isFinite(hs) || hs < 0) return
-                      const sug = sugerirFaseKaeser({
-                        maquina: maq,
-                        horasServicoAtuais: hs,
-                        dataExecucao: getHojeAzores(),
-                        fallbackUltimaData: fallbackUltimaManutDataKaeser,
-                        contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
-                      })
-                      kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
-                      if (kaeserIntervencaoAnual) return
-                      setForm(f => ({
-                        ...f,
-                        tipoManutKaeser: f.tipoManutKaeser || sug.tipoPreSelecao,
-                        pecasUsadas: f.tipoManutKaeser ? f.pecasUsadas : pecasDoPlanoKaeser(sug.tipoPreSelecao),
-                      }))
-                    }}
-                    placeholder="Ex: 6200"
-                  />
-                </label>
-              </div>
-              <div className="form-section" style={{ marginTop: '0.25rem' }}>
-                <label className="kaeser-anual-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.95rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={kaeserIntervencaoAnual}
-                    onChange={e => setKaeserIntervencaoAnual(e.target.checked)}
-                    style={{ marginTop: '0.2rem' }}
-                  />
-                  <span>
-                    <strong>Intervenção anual</strong> — escolher livremente o kit (A/B/C/D). A sugestão automática deixa de alterar o tipo ao sair do campo das horas; escolha o kit no menu abaixo e carregue os consumíveis desse tipo.
-                  </span>
-                </label>
-              </div>
-              {kaeserSugestaoLive?.tipoIndicadoPorContadorHoras && (
-                <div className="form-section kaeser-aviso-tipo-horas" style={{
-                  marginTop: '0.35rem',
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: 8,
-                  border: '1px solid var(--color-border, #e5e7eb)',
-                  background: 'var(--color-bg-elevated, #f8fafc)',
-                  fontSize: '0.9rem',
-                  lineHeight: 1.45,
-                }}
-                >
-                  Pelo número de horas indicado no contador, o tipo associado ao <strong>intervalo de horas</strong> do plano seria{' '}
-                  <strong>Tipo {kaeserSugestaoLive.tipoIndicadoPorContadorHoras}</strong>
-                  {INTERVALOS_KAESER[kaeserSugestaoLive.tipoIndicadoPorContadorHoras]
-                    ? ` (${INTERVALOS_KAESER[kaeserSugestaoLive.tipoIndicadoPorContadorHoras].label})`
-                    : ''}.
-                  {kaeserIntervencaoAnual
-                    ? ' Na intervenção anual pode manter este tipo ou seleccionar outro (A, B, C ou D) conforme a decisão no local.'
-                    : ' Pode aceitar a sugestão do resumo abaixo ou seleccionar outro tipo se a intervenção for diferente (ex.: emergência, outro kit).'}
-                </div>
-              )}
-              {kaeserSugestaoLive && (
-                <div className="form-section kaeser-sugestao-resumo">
-                  <p className="form-hint" style={{ marginTop: 0 }}>
-                    <strong>Sugestão:</strong>{' '}
-                    {kaeserSugestaoLive.motivoPrincipal === 'ambos' && 'calendário e horas indicam tipos diferentes — escolha abaixo.'}
-                    {kaeserSugestaoLive.motivoPrincipal === 'anual' && `janela anual (≥ ${KAESER_ANUAL_MIN_DIAS} d desde a referência).`}
-                    {kaeserSugestaoLive.motivoPrincipal === 'horas' && `Δh ≥ ${KAESER_INTERVALO_HORAS_REF} h desde a última referência na ficha.`}
-                    {kaeserSugestaoLive.motivoPrincipal === 'fallback' && 'sem critério anual/Δh — fallback pelo contador absoluto.'}
-                    {' '}
-                    <strong>Tipo pré-seleccionado: {kaeserSugestaoLive.tipoPreSelecao}</strong>
-                  </p>
-                  {kaeserSugestaoLive.mostrarDual && kaeserSugestaoLive.tipoSugeridoCalendario && kaeserSugestaoLive.tipoSugeridoHoras && (
-                    <div className="kaeser-dual-sugestao">
-                      <button
-                        type="button"
-                        className="btn secondary btn-sm"
-                        onClick={() => {
-                          const t = kaeserSugestaoLive.tipoSugeridoCalendario
-                          kaeserAuditoriaRef.current = { tipoSugerido: t, motivo: 'anual' }
-                          aplicarTipoKaeserComPecas(t, { skipDirtyConfirm: true })
-                        }}
-                      >
-                        Aplicar sugestão (calendário): Tipo {kaeserSugestaoLive.tipoSugeridoCalendario}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn secondary btn-sm"
-                        onClick={() => {
-                          const t = kaeserSugestaoLive.tipoSugeridoHoras
-                          kaeserAuditoriaRef.current = { tipoSugerido: t, motivo: 'horas' }
-                          aplicarTipoKaeserComPecas(t, { skipDirtyConfirm: true })
-                        }}
-                      >
-                        Aplicar sugestão (horas): Tipo {kaeserSugestaoLive.tipoSugeridoHoras}
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="btn-link-checklist"
-                    data-testid="kaeser-toggle-detalhes"
-                    onClick={() => setKaeserCalcDetalhesOpen(o => !o)}
-                  >
-                    {kaeserCalcDetalhesOpen ? 'Ocultar detalhes do cálculo' : 'Detalhes do cálculo'}
-                  </button>
-                  {kaeserCalcDetalhesOpen && (
-                    <ul className="kaeser-calc-detalhes text-muted" style={{ fontSize: '0.85rem', margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
-                      <li>Data de referência: {kaeserSugestaoLive.detalhes.dataUltimaReferencia ?? '—'}</li>
-                      <li>Dias desde a referência: {kaeserSugestaoLive.detalhes.diasDesdeUltima ?? '—'}</li>
-                      <li>
-                        Horas na ficha (última):{' '}
-                        {kaeserSugestaoLive.detalhes.contadorFichaConfiavel
-                          ? (kaeserSugestaoLive.detalhes.horasUltima ?? '—')
-                          : '0'}
-                        {!kaeserSugestaoLive.detalhes.contadorFichaConfiavel && (
-                          <span className="text-muted"> (sem manutenção concluída — valores da ficha ignorados)</span>
-                        )}
-                      </li>
-                      <li>Δh (actual − ficha): {kaeserSugestaoLive.detalhes.deltaH ?? '—'}</li>
-                      <li>Limiar horas: {KAESER_INTERVALO_HORAS_REF} h · Limiar anual: {KAESER_ANUAL_MIN_DIAS} d</li>
-                      {kaeserSugestaoLive.tipoSugeridoCalendario && (
-                        <li>Sugestão por calendário (posição ciclo): Tipo {kaeserSugestaoLive.tipoSugeridoCalendario}</li>
-                      )}
-                      {kaeserSugestaoLive.tipoSugeridoHoras && (
-                        <li>Sugestão por Δh: Tipo {kaeserSugestaoLive.tipoSugeridoHoras}</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              )}
-              <div className="form-section">
-                <label>
-                  Tipo de manutenção KAESER (A/B/C/D) <span className="req-star">*</span>
-                  <select
-                    value={form.tipoManutKaeser}
-                    onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
-                  >
-                    <option value="">— Seleccionar —</option>
-                    {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
-                      <option key={tipo} value={tipo}>{info.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <p className="form-hint" style={{ marginTop: '0.35rem' }}>
-                  Fallback absoluto (sem Δh fiável):{' '}
-                  <strong>
-                    {(() => {
-                      const hs = parseInt(String(form.horasServico).trim(), 10)
-                      return Number.isFinite(hs) && hs >= 0
-                        ? `Tipo ${tipoKaeserSugeridoPorHorasServico(hs)}`
-                        : '— (preencha as horas de serviço)'
-                    })()}
-                  </strong>
-                  {maq?.posicaoKaeser != null && (
-                    <>
-                      {' '}
-                      <span className="kaeser-ciclo-hint">
-                        · Ciclo na ficha: {descricaoCicloKaeser(maq.posicaoKaeser)}
-                        {' '}· Próximo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-              {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
-            </div>
+            <KaeserHorasStep
+              maq={maq}
+              form={form}
+              setForm={setForm}
+              showToast={showToast}
+              conflitoHorasFichaVsUltimoRel={conflitoHorasFichaVsUltimoRel}
+              fallbackUltimaManutDataKaeser={fallbackUltimaManutDataKaeser}
+              temManutencaoConcluidaNaMaq={temManutencaoConcluidaNaMaq}
+              kaeserAuditoriaRef={kaeserAuditoriaRef}
+              kaeserIntervencaoAnual={kaeserIntervencaoAnual}
+              setKaeserIntervencaoAnual={setKaeserIntervencaoAnual}
+              kaeserSugestaoLive={kaeserSugestaoLive}
+              kaeserCalcDetalhesOpen={kaeserCalcDetalhesOpen}
+              setKaeserCalcDetalhesOpen={setKaeserCalcDetalhesOpen}
+              aplicarTipoKaeserComPecas={aplicarTipoKaeserComPecas}
+              pecasDoPlanoKaeser={pecasDoPlanoKaeser}
+              erroChecklist={erroChecklist}
+            />
           )}
 
           {!isCorrectionMode && useKaeserPipeline && step === W.pecas && (
-            <div className="wizard-step-content">
-              <p className="wizard-step-hint">
-                Lista do plano para o <strong>Tipo {form.tipoManutKaeser || '—'}</strong>. Pré-preenchida com <strong>1 un.</strong> por linha — ajuste as quantidades (0 = não aplicável) ou acrescente artigos extra.
-              </p>
-              <div className="kaeser-pecas-table-wrap">
-                {form.pecasUsadas.length === 0 ? (
-                  <p className="text-muted">Nenhum consumível no plano para este tipo. Adicione linhas manualmente ou configure o plano em Equipamentos.</p>
-                ) : (
-                  <table className="data-table kaeser-pecas-table">
-                    <thead><tr><th>Cód.</th><th>Descrição</th><th>Qtd</th><th>Un.</th><th /></tr></thead>
-                    <tbody>
-                      {form.pecasUsadas.map((p, idx) => (
-                        <tr key={p.id ?? `k-${idx}`}>
-                          <td><input className="kaeser-peca-cell" value={p.codigoArtigo ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, codigoArtigo: e.target.value } : pp) })) }} /></td>
-                          <td><input className="kaeser-peca-cell" value={p.descricao ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, descricao: e.target.value } : pp) })) }} /></td>
-                          <td style={{ width: '5rem' }}>
-                            <input type="number" min={0} step={0.5} className="kaeser-peca-cell"
-                              value={p.quantidadeUsada ?? p.quantidade ?? 0}
-                              onChange={e => {
-                                const q = Math.max(0, parseFloat(e.target.value) || 0)
-                                setKaeserPecasDirty(true)
-                                setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, quantidadeUsada: q, quantidade: q, usado: q > 0 } : pp) }))
-                              }}
-                            />
-                          </td>
-                          <td style={{ width: '4rem' }}>
-                            <select value={p.unidade || 'PÇ'} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, unidade: e.target.value } : pp) })) }}>
-                              {['PÇ', 'TER', 'L', 'KG', 'M', 'UN'].map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                          </td>
-                          <td>
-                            <button type="button" className="icon-btn danger" aria-label="Remover linha" onClick={() => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) })) }}><X size={14} /></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                <button type="button" className="btn secondary btn-sm" style={{ marginTop: '0.5rem' }}
-                  onClick={() => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: '', quantidadeUsada: 1, quantidade: 1, unidade: 'PÇ', usado: true, manual: true }] })) }}>
-                  <Plus size={14} /> Adicionar linha
-                </button>
-              </div>
-              <label className="exec-equip-confirm-label form-section" style={{ marginTop: '0.75rem' }}>
-                <input
-                  type="checkbox"
-                  checked={kaeserSemConsumiveis}
-                  onChange={e => setKaeserSemConsumiveis(e.target.checked)}
-                />
-                <span>Confirmo que nesta intervenção não houve substituição nem consumo de materiais do plano (lista vazia ou só inspecção).</span>
-              </label>
-              {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
-            </div>
+            <KaeserPecasStep
+              form={form}
+              setForm={setForm}
+              setKaeserPecasDirty={setKaeserPecasDirty}
+              kaeserSemConsumiveis={kaeserSemConsumiveis}
+              setKaeserSemConsumiveis={setKaeserSemConsumiveis}
+              erroChecklist={erroChecklist}
+            />
           )}
 
           {/* ═══ Checklist ═══ */}

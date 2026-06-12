@@ -9,6 +9,23 @@ Política de continuidade:
 
 ---
 
+## [1.16.85] — 2026-06-12 — Simplificação estrutural: DataContext, batch biblioteca, passos KAESER
+
+### Refactoring (sem alteração de comportamento)
+- **`DataContext.jsx`: 2.240 → ~1.700 linhas.** Constantes e funções puras de domínio extraídas para `src/domain/equipamentoDomain.js` (INTERVALOS, TIPOS_DOCUMENTO, SUBCATEGORIAS_*, isKaeserAbcdMaquina, …) e `src/domain/marcasDomain.js` (INITIAL_MARCAS, merge de marcas). O DataContext **re-exporta tudo** — imports existentes continuam válidos.
+- **Mock data órfão removido do bundle:** os 7 arrays `initial*` (~570 linhas, nunca usados em runtime) movidos para `src/data/seedDemoData.js` como referência do seed MySQL — não é importado, não entra no bundle.
+- **`ExecutarManutencaoModal.jsx`: 2.684 → ~2.370 linhas.** Helpers puros em `executarManutencao/execWizardHelpers.js`; passos KAESER «Horas e fase» e «Consumíveis» extraídos para `KaeserHorasStep.jsx` / `KaeserPecasStep.jsx` (estado continua no modal-pai; JSX copiado textualmente).
+- Limpeza: imports não usados (`proximoDiaUtil`, `distribuirHorarios` no DataContext; `tipoKaeserSugeridoPorHorasServico` no modal).
+
+### Performance
+- **Biblioteca NAVEL em lote (`search_many`):** novo endpoint no proxy `data.php` — as listas de Equipamentos passam de N pedidos (1 por máquina) para **1 pedido** com `machineIds`. Cliente com fallback automático para pedidos individuais se o PHP ainda não estiver actualizado.
+- ⚠ **Deploy PHP necessário:** `servidor-cpanel/api/data.php` → `public_html/api/`.
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.85**) + `data.php` via `cpanel-deploy.mjs`.
+
+---
+
 ## [1.16.84] — 2026-06-02 — Bugbot: biblioteca NAVEL em badges e modal de documentação
 
 ### Correcções
