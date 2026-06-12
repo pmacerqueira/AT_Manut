@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { useData, TIPOS_DOCUMENTO, INTERVALOS, tipoKaeserNaPosicao, isKaeserAbcdMaquina } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
@@ -20,13 +20,14 @@ import { useDeferredReady } from '../hooks/useDeferredReady'
 import './Equipamentos.css'
 import { COPY_DOC_RESUMO_EQUIPAMENTOS, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
 import { tiposObrigatoriosCobertos } from '../utils/documentacaoObrigatoria'
+import { useBibliotecaItemsForMaquinas } from '../hooks/useBibliotecaItemsForMaquinas'
 
 const FOTO_EQUIPAMENTO_TIPO = '__foto_equipamento'
 
-function getDocumentacaoStatus(maquina, getPecasPlanoByMaquina) {
+function getDocumentacaoStatus(maquina, getPecasPlanoByMaquina, bibliotecaItems = []) {
   const cobertos = tiposObrigatoriosCobertos({
     maquina,
-    bibliotecaItems: [],
+    bibliotecaItems,
     pecasPlanoCount: maquina?.id && getPecasPlanoByMaquina ? getPecasPlanoByMaquina(maquina.id).length : 0,
     pecasPlanoKaeserAbcd: isKaeserAbcdMaquina(maquina),
     TIPOS_DOCUMENTO,
@@ -219,6 +220,20 @@ export default function Equipamentos() {
   }, {})
   const clientesOrdenados = Object.keys(maquinasAgrupadasPorCliente).sort((a, b) => a.localeCompare(b))
 
+  const visibleMaquinaIds = useMemo(() => {
+    if (filterAtraso) return maquinasEmAtraso.map(m => m.id)
+    if (view === 'maquinas') return maquinasDaSubcategoria.map(m => m.id)
+    return []
+  }, [filterAtraso, view, maquinasEmAtraso, maquinasDaSubcategoria])
+
+  const bibliotecaByMaquina = useBibliotecaItemsForMaquinas(visibleMaquinaIds)
+
+  const docStatusFor = (m) => getDocumentacaoStatus(
+    m,
+    getPecasPlanoByMaquina,
+    bibliotecaByMaquina[String(m.id)] ?? [],
+  )
+
   return (
     <div className="page">
       <div className="page-header">
@@ -260,7 +275,7 @@ export default function Equipamentos() {
                   <h4>{nomeCliente}</h4>
                   {list.map(m => {
                     const sub = getSubcategoria(m.subcategoriaId)
-                    const docStatus = getDocumentacaoStatus(m, getPecasPlanoByMaquina)
+                    const docStatus = docStatusFor(m)
                     return (
                       <div key={m.id} id={`maq-${m.id}`} className="maquina-row maquina-row--atraso">
                         <div className="maquina-row-info">
@@ -396,7 +411,7 @@ export default function Equipamentos() {
                     const hoje = startOfDay(new Date(getHojeAzores()))
                     const temProxima = !!m.proximaManut
                     const proxVencida = temProxima && isBefore(startOfDay(parseDateLocal(m.proximaManut)), hoje)
-                    const docStatus = getDocumentacaoStatus(m, getPecasPlanoByMaquina)
+                    const docStatus = docStatusFor(m)
                     return (
                     <div key={m.id} id={`maq-${m.id}`} className={`maquina-row${proxVencida ? ' maquina-row--atraso' : ''}`}>
                       <div className="maquina-row-info">

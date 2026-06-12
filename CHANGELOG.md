@@ -9,6 +9,18 @@ Política de continuidade:
 
 ---
 
+## [1.16.84] — 2026-06-02 — Bugbot: biblioteca NAVEL em badges e modal de documentação
+
+### Correcções
+- **`DocumentacaoModal`:** biblioteca NAVEL carrega ao abrir o modal (não só no separador «Biblioteca»); `bibliotecaItems` limpo ao mudar equipamento; subtítulo do estado alinhado (`X/6 tipos obrigatórios cobertos`).
+- **`Equipamentos`:** badges «Docs completas / Faltam N» passam a incluir associações da biblioteca NAVEL (`useBibliotecaItemsForMaquinas` + `bibliotecaMaquinaFetch.js`).
+- **`MaquinaBibliotecaNavel`:** lista limpa no início de cada `load()` para evitar leak entre equipamentos.
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.84**).
+
+---
+
 ## [1.16.83] — 2026-06-02 — Revisão Bugbot: PDF plano KAESER + higiene código
 
 ### Correcções

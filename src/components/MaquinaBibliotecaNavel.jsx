@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Library, Search, Upload, FileDown, Unlink, Loader, X, Link2 } from 'lucide-react'
+import { fetchBibliotecaItemsForMaquina } from '../utils/bibliotecaMaquinaFetch'
 import {
   apiDocumentosBibliotecaSearch,
   apiDocumentosBibliotecaMachineLinksGet,
@@ -42,9 +43,10 @@ export default function MaquinaBibliotecaNavel({ maquina, onItemsChange }) {
       return
     }
     setLoading(true)
+    setItems([])
+    onItemsChange?.([])
     try {
-      const data = await apiDocumentosBibliotecaSearch({ machineId: String(maquina.id) })
-      const list = Array.isArray(data?.items) ? data.items : []
+      const list = await fetchBibliotecaItemsForMaquina(maquina.id)
       setItems(list)
       onItemsChange?.(list)
     } catch (e) {

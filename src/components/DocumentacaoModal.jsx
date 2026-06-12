@@ -109,6 +109,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
 
   useEffect(() => {
     if (!isOpen || !maqId) return
+    setBibliotecaItems([])
     const parafuso = SUBCATEGORIAS_COMPRESSOR_PARAFUSO.includes(maqSubcategoriaId)
     setFormDoc(f => ({ ...f, tipo: parafuso ? 'plano_manutencao' : 'manual_utilizador' }))
     setActiveDocTab('ficha')
@@ -373,7 +374,7 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
           </div>
           <div className={`doc-status-card ${docCompleta ? 'doc-status-card--ok' : 'doc-status-card--warning'}`}>
             <strong>{docCompleta ? 'Documentação completa' : 'Documentação incompleta'}</strong>
-            <span>{documentos.length}/{TIPOS_DOCUMENTO.length} tipos associados</span>
+            <span>{tiposComDocumento.size}/{TIPOS_DOCUMENTO.length} tipos obrigatórios cobertos</span>
           </div>
         </div>
 
@@ -455,15 +456,19 @@ export default function DocumentacaoModal({ isOpen, onClose, maquina, onOpenPlan
           </section>
         )}
 
-        {activeDocTab === 'biblioteca' && (
-          <section className="doc-panel doc-panel--biblioteca">
+        {isOpen && maq?.id ? (
+          <section
+            className="doc-panel doc-panel--biblioteca"
+            hidden={activeDocTab !== 'biblioteca'}
+            aria-hidden={activeDocTab !== 'biblioteca'}
+          >
             <div className="doc-source-intro">
               <strong>Biblioteca NAVEL</strong>
               <span>Documentos partilhados/externos à ficha deste equipamento.</span>
             </div>
-            {maq?.id ? <MaquinaBibliotecaNavel maquina={maq} onItemsChange={setBibliotecaItems} /> : null}
+            <MaquinaBibliotecaNavel maquina={maq} onItemsChange={setBibliotecaItems} />
           </section>
-        )}
+        ) : null}
 
         {activeDocTab === 'fotos' && (
           <section className="doc-panel doc-panel--fotos">
