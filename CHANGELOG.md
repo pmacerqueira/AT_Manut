@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.16.83] — 2026-06-02 — Revisão Bugbot: PDF plano KAESER + higiene código
+
+### Correcções
+- **`PecasPlanoModal`:** após importar consumíveis A/B/C/D, falha ao espelhar o PDF na ficha (`plano_manutencao`) deixa de ser silenciosa — toasts `warning` + log quando upload ou `addDocumentoMaquina` falham.
+- Removido **`useBibliotecaMaquina.js`** (hook não utilizado; biblioteca via `MaquinaBibliotecaNavel` + `onItemsChange`).
+
+### Deploy
+- PWA **`public_html/manut/`** via **`navel-site`** `npm run deploy:at-manut -- --yes` (bundle **v1.16.83**).
+
+---
+
 ## [1.16.82] — 2026-06-02 — Documentação obrigatória: ficha + biblioteca + plano de peças
 
 ### Correcção

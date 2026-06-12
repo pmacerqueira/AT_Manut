@@ -153,22 +153,47 @@ export default function PecasPlanoModal({ isOpen, onClose, maquina, modoInicial 
       const maqAtual = maquinas.find(m => String(m.id) === String(maquina.id)) ?? maquina
       const jaTemPlanoPdf = (maqAtual.documentos ?? []).some(d => d.tipo === 'plano_manutencao')
       if (!jaTemPlanoPdf && podeImportarPdfKaeser) {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const r = new FileReader()
-          r.onload = () => resolve(String(r.result || ''))
-          r.onerror = () => reject(new Error('Falha ao ler o PDF'))
-          r.readAsDataURL(file)
-        })
-        const uploadRes = await apiUploadMachinePdf({ dataUrl, maquinaId: maquina.id })
-        if (uploadRes?.url) {
-          const titulo = file.name.replace(/\.pdf$/i, '').slice(0, 200)
-          await addDocumentoMaquina(maquina.id, {
-            tipo: 'plano_manutencao',
-            titulo,
-            url: uploadRes.url,
-            uploadFileName: file.name,
-            uploadFileSize: file.size,
+        try {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const r = new FileReader()
+            r.onload = () => resolve(String(r.result || ''))
+            r.onerror = () => reject(new Error('Falha ao ler o PDF'))
+            r.readAsDataURL(file)
           })
+          const uploadRes = await apiUploadMachinePdf({ dataUrl, maquinaId: maquina.id })
+          if (uploadRes?.url) {
+            const titulo = file.name.replace(/\.pdf$/i, '').slice(0, 200)
+            const saveRes = await addDocumentoMaquina(maquina.id, {
+              tipo: 'plano_manutencao',
+              titulo,
+              url: uploadRes.url,
+              uploadFileName: file.name,
+              uploadFileSize: file.size,
+            })
+            if (!saveRes?.ok) {
+              showToast(
+                'Peças importadas, mas o PDF não ficou registado na ficha. Use «Documentação técnica» para associar o plano.',
+                'warning',
+                5000,
+              )
+            }
+          } else {
+            showToast(
+              'Peças importadas, mas o servidor não devolveu URL do PDF. Associe o plano em Documentação técnica.',
+              'warning',
+              5000,
+            )
+          }
+        } catch (pdfErr) {
+          logger.warn('PecasPlanoModal', 'importarPdfKaeser', 'Plano gravado; falha ao espelhar PDF na ficha', {
+            maquinaId: maquina?.id,
+            message: pdfErr?.message,
+          })
+          showToast(
+            'Peças importadas. O PDF não foi guardado na ficha — adicione-o em Documentação técnica se precisar do ficheiro.',
+            'warning',
+            5000,
+          )
         }
       }
 

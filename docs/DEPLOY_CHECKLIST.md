@@ -1,6 +1,6 @@
 # Checklist de Deploy — AT_Manut
 
-> Última revisão: 2026-06-02 — `v1.16.82`: documentação obrigatória (ficha + biblioteca NAVEL + plano peças KAESER); deploy PWA `navel-site` → `npm run deploy:at-manut -- --yes`.
+> Última revisão: 2026-06-02 — `v1.16.83`: revisão Bugbot (PDF plano KAESER); deploy PWA `navel-site` → `npm run deploy:at-manut -- --yes`.
 
 ## Resumo da verificação da base de dados
 
