@@ -131,3 +131,104 @@ export function resolverDataExecucaoParaMaquina(maq, manutencoes, sameMid) {
   }
   return dataExec
 }
+
+/**
+ * Recalcula slots periódicos futuros no array de manutenções (pós-execução).
+ * @returns {{ next: object[], idsRemover: string[], novas: object[], novaCount: number }}
+ */
+export function recalcularPeriodicasNoEstado(prev, {
+  maquinaId,
+  periodicidade,
+  dataExecucao,
+  tecnico = '',
+  hojeStr,
+  intervalos,
+  idSeed = Date.now(),
+  observacoes = 'Reagendamento automático pós-execução periódica.',
+}) {
+  if (!periodicidade || !intervalos?.[periodicidade]) {
+    return { next: prev, idsRemover: [], novas: [], novaCount: 0 }
+  }
+
+  const intervaloDias = intervalos[periodicidade].dias
+  const limiteMs = calcLimiteExecucaoMs(dataExecucao, hojeStr)
+  const aRemover = prev.filter(m => isSlotCadeiaPeriodicaAberta(m, maquinaId))
+  const idsRemover = aRemover.map(m => m.id)
+  const idsRemoverSet = new Set(idsRemover)
+  const semFuturas = prev.filter(m => !idsRemoverSet.has(m.id))
+  const diasOcupados = buildDiasOcupadosFromManutencoes(semFuturas)
+  const { novas } = gerarManutencoesPeriodicasFuturas({
+    dataBaseIso: dataExecucao,
+    periodicidade,
+    intervaloDias,
+    maquinaId,
+    tecnico,
+    limiteMs,
+    diasOcupados,
+    hojeStr,
+    observacoes,
+    idSeed,
+  })
+
+  return {
+    next: [...semFuturas, ...novas],
+    idsRemover,
+    novas,
+    novaCount: novas.length,
+  }
+}
+
+/**
+ * Um equipamento na sincronização completa da agenda: remove cadeia aberta e gera novas ≥ hoje.
+ * @returns {{ acc: object[], idsRemover: string[], novas: object[], recalculada: boolean }}
+ */
+export function recalcularAgendaMaquinaNoAcc(acc, {
+  maq,
+  subcategorias,
+  categorias,
+  hojeStr,
+  intervalos,
+  sameMid,
+  idSeed,
+}) {
+  const periodicidade = periodicidadeEfetivaParaMaquina(maq, subcategorias, categorias)
+  if (!periodicidade) {
+    return { acc, idsRemover: [], novas: [], recalculada: false }
+  }
+
+  const dataExec = resolverDataExecucaoParaMaquina(maq, acc, sameMid)
+  if (!dataExec) {
+    return { acc, idsRemover: [], novas: [], recalculada: false }
+  }
+
+  const aRemover = acc.filter(m => isSlotCadeiaPeriodicaAberta(m, maq.id))
+  const idsRemover = aRemover.map(m => m.id)
+  const idsRemoverSet = new Set(idsRemover)
+  let nextAcc = acc.filter(m => !idsRemoverSet.has(m.id))
+
+  const diasOcupados = buildDiasOcupadosFromManutencoes(nextAcc)
+  const conclConc = nextAcc
+    .filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
+    .sort((a, b) => b.data.localeCompare(a.data))
+  const tecnico = conclConc[0]?.tecnico || ''
+
+  const intervaloDias = intervalos[periodicidade].dias
+  const limiteMs = calcLimiteExecucaoMs(dataExec, hojeStr)
+  const { novas } = gerarManutencoesPeriodicasFuturas({
+    dataBaseIso: dataExec,
+    periodicidade,
+    intervaloDias,
+    maquinaId: maq.id,
+    tecnico,
+    limiteMs,
+    diasOcupados,
+    hojeStr,
+    observacoes: 'Reagendamento automático (sincronização completa da agenda).',
+    idSeed,
+    idSuffixRandom: true,
+    incluirCriadoEm: true,
+  })
+
+  nextAcc = [...nextAcc, ...novas]
+  return { acc: nextAcc, idsRemover, novas, recalculada: true }
+}

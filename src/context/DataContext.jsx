@@ -8,14 +8,14 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { flushSync } from 'react-dom'
 import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
 import {
-  isSlotCadeiaPeriodicaAberta,
   buildDiasOcupadosFromManutencoes,
   calcLimiteMontagemMs,
-  calcLimiteExecucaoMs,
   gerarManutencoesPeriodicasFuturas,
-  periodicidadeEfetivaParaMaquina,
-  resolverDataExecucaoParaMaquina,
+  recalcularPeriodicasNoEstado,
+  recalcularAgendaMaquinaNoAcc,
 } from '../domain/agendaDomain'
+import { mergeRelatoriosMantendoEnvio, proximoNumeroRelatorioSequencial } from '../domain/relatorioDomain'
+import { resolverIdsRemoverAoEliminarConcluida } from '../domain/manutencaoDomain'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize } from '../services/syncQueue'
@@ -24,29 +24,6 @@ import { normEntityId } from '../utils/frotaReportHelpers'
 import { getHojeAzores } from '../utils/datasAzores'
 
 const DataContext = createContext(null)
-
-/**
- * Ao substituir relatórios vindos da API, preserva `enviadoParaCliente` / `ultimoEnvio`
- * quando o servidor ainda não devolve esses campos (ex.: antes da migração SQL ou race na sync).
- */
-function mergeRelatoriosMantendoEnvio(prev, incoming) {
-  if (!Array.isArray(incoming)) return prev
-  const map = new Map((prev ?? []).map(r => [r.id, r]))
-  return incoming.map(r => {
-    const old = map.get(r.id)
-    if (!old) return r
-    const merged = { ...r }
-    const newHasEmail = merged.enviadoParaCliente?.email
-    const oldHasEmail = old.enviadoParaCliente?.email
-    if (!newHasEmail && oldHasEmail) {
-      merged.enviadoParaCliente = old.enviadoParaCliente
-    }
-    if (old.ultimoEnvio && !merged.ultimoEnvio) {
-      merged.ultimoEnvio = old.ultimoEnvio
-    }
-    return merged
-  })
-}
 
 // ── Domínio partilhado (constantes e funções puras) — src/domain/ ──────────
 // O DataContext re-exporta estes símbolos para manter compatíveis os imports
@@ -994,39 +971,21 @@ export function DataProvider({ children }) {
   const removeManutencao = useCallback((id) => {
     let syncIds = []
     setManutencoes(prev => {
-      const alvo = prev.find(m => m.id === id)
-      if (!alvo) return prev.filter(m => m.id !== id)
+      const { idsRemover, alvo, cascadeFuturas } = resolverIdsRemoverAoEliminarConcluida(prev, id)
 
-      // Se a manutenção eliminada é concluída, remover também as periódicas
-      // futuras pendentes/agendadas dessa máquina (geradas pelo recalcular)
-      const isConcluida = alvo.status === 'concluida'
-      const idsRemover = new Set([id])
-
-      if (isConcluida && alvo.maquinaId) {
-        prev.forEach(m => {
-          if (m.id === id) return
-          if (m.maquinaId !== alvo.maquinaId) return
-          if (m.status !== 'pendente' && m.status !== 'agendada') return
-          if (m.data > alvo.data) {
-            idsRemover.add(m.id)
-          }
-        })
-
-        if (idsRemover.size > 1) {
-          logger.action('DataContext', 'removeManutencao',
-            `Eliminada manutenção concluída ${id} + ${idsRemover.size - 1} periódicas futuras da máquina ${alvo.maquinaId}`,
-            { principal: id, futuras: idsRemover.size - 1 })
-          // Persistir remoção das futuras no servidor
-          import('../services/apiService').then(({ apiManutencoes }) => {
-            ;[...idsRemover].filter(rid => rid !== id).forEach(rid =>
-              persist(() => apiManutencoes.remove(rid),
-                      { resource: 'manutencoes', action: 'delete', id: rid })
-            )
-          }).catch(() => {})
-        }
+      if (cascadeFuturas) {
+        logger.action('DataContext', 'removeManutencao',
+          `Eliminada manutenção concluída ${id} + ${idsRemover.size - 1} periódicas futuras da máquina ${alvo.maquinaId}`,
+          { principal: id, futuras: idsRemover.size - 1 })
+        import('../services/apiService').then(({ apiManutencoes }) => {
+          ;[...idsRemover].filter(rid => rid !== id).forEach(rid =>
+            persist(() => apiManutencoes.remove(rid),
+                    { resource: 'manutencoes', action: 'delete', id: rid })
+          )
+        }).catch(() => {})
       }
 
-      if (alvo.maquinaId) syncIds = [alvo.maquinaId]
+      if (alvo?.maquinaId) syncIds = [alvo.maquinaId]
       return prev.filter(m => !idsRemover.has(m.id))
     })
     scheduleSyncProximaParaMaquinas(syncIds)
@@ -1058,14 +1017,7 @@ export function DataProvider({ children }) {
       const ano = new Date(dataCriacao).getFullYear()
       const tipoManut = manutencoes.find(m => m.id === r.manutencaoId)?.tipo ?? 'periodica'
       const prefix = tipoManut === 'montagem' ? 'MT' : 'MP'
-      const pattern = `${ano}.${prefix}.`
-      const existingNums = relatorios
-        .map(rel => rel.numeroRelatorio)
-        .filter(n => typeof n === 'string' && n.startsWith(pattern))
-        .map(n => parseInt(n.split('.')[2] ?? '0', 10))
-        .filter(n => !isNaN(n))
-      const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
-      numeroRelatorio = `${ano}.${prefix}.${String(next).padStart(5, '0')}`
+      numeroRelatorio = proximoNumeroRelatorioSequencial(relatorios, { ano, prefix })
     }
 
     const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
@@ -1193,14 +1145,7 @@ export function DataProvider({ children }) {
     let numeroRelatorio = r.numeroRelatorio
     if (!numeroRelatorio) {
       const ano = new Date().getFullYear()
-      const pattern = `${ano}.RP.`
-      const existingNums = relatoriosReparacao
-        .map(rel => rel.numeroRelatorio)
-        .filter(n => typeof n === 'string' && n.startsWith(pattern))
-        .map(n => parseInt(n.split('.')[2] ?? '0', 10))
-        .filter(n => !isNaN(n))
-      const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
-      numeroRelatorio = `${ano}.RP.${String(next).padStart(5, '0')}`
+      numeroRelatorio = proximoNumeroRelatorioSequencial(relatoriosReparacao, { ano, prefix: 'RP' })
     }
 
     const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
@@ -1246,35 +1191,23 @@ export function DataProvider({ children }) {
     if (!periodicidade || !INTERVALOS[periodicidade]) return 0
 
     const hojeStr = getHojeAzores()
-    const intervaloDias = INTERVALOS[periodicidade].dias
-    const limiteMs = calcLimiteExecucaoMs(dataExecucao, hojeStr)
-
     let novaCount = 0
 
     setManutencoes(prev => {
-      const aRemover = prev.filter(m => isSlotCadeiaPeriodicaAberta(m, maquinaId))
-      const idsRemover = new Set(aRemover.map(m => m.id))
-      const semFuturas = prev.filter(m => !idsRemover.has(m.id))
-      const diasOcupados = buildDiasOcupadosFromManutencoes(semFuturas)
-      const { novas } = gerarManutencoesPeriodicasFuturas({
-        dataBaseIso: dataExecucao,
-        periodicidade,
-        intervaloDias,
+      const { next, idsRemover, novas, novaCount: n } = recalcularPeriodicasNoEstado(prev, {
         maquinaId,
+        periodicidade,
+        dataExecucao,
         tecnico,
-        limiteMs,
-        diasOcupados,
         hojeStr,
-        observacoes: 'Reagendamento automático pós-execução periódica.',
+        intervalos: INTERVALOS,
         idSeed: Date.now(),
       })
+      novaCount = n
 
-      novaCount = novas.length
-
-      // Persistir remoção das antigas e criação das novas no servidor
       import('../services/apiService').then(({ apiManutencoes }) => {
-        if (idsRemover.size > 0) {
-          ;[...idsRemover].forEach(rid =>
+        if (idsRemover.length > 0) {
+          idsRemover.forEach(rid =>
             persist(() => apiManutencoes.remove(rid),
                     { resource: 'manutencoes', action: 'delete', id: rid })
           )
@@ -1287,13 +1220,13 @@ export function DataProvider({ children }) {
         logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
       })
 
-      if (novas.length > 0 || idsRemover.size > 0) {
+      if (novas.length > 0 || idsRemover.length > 0) {
         logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
-          `${novas.length} periódicas criadas, ${idsRemover.size} removidas para máquina ${maquinaId}`,
-          { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.size })
+          `${novas.length} periódicas criadas, ${idsRemover.length} removidas para máquina ${maquinaId}`,
+          { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.length })
       }
 
-      return [...semFuturas, ...novas]
+      return next
     })
 
     queueMicrotask(() => {
@@ -1341,44 +1274,19 @@ export function DataProvider({ children }) {
       let recalculadas = 0
 
       for (const maq of maqs) {
-        const periodicidade = periodicidadeEfetivaParaMaquina(maq, subcategoriasD, categoriasD)
-        if (!periodicidade) continue
-
-        const dataExec = resolverDataExecucaoParaMaquina(maq, acc, sameMid)
-        if (!dataExec) continue
-
-        recalculadas += 1
-
-        const aRemover = acc.filter(m => isSlotCadeiaPeriodicaAberta(m, maq.id))
-        const idsRemover = new Set(aRemover.map(m => m.id))
-        acc = acc.filter(m => !idsRemover.has(m.id))
-        for (const id of idsRemover) idsDeleted.push(id)
-
-        const diasOcupados = buildDiasOcupadosFromManutencoes(acc)
-
-        const conclConc = acc
-          .filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
-          .sort((a, b) => b.data.localeCompare(a.data))
-        const tecnico = conclConc[0]?.tecnico || ''
-
-        const intervaloDias = INTERVALOS[periodicidade].dias
-        const limiteMs = calcLimiteExecucaoMs(dataExec, hojeStr)
         const baseId = Date.now() + Math.floor(Math.random() * 1e6)
-        const { novas } = gerarManutencoesPeriodicasFuturas({
-          dataBaseIso: dataExec,
-          periodicidade,
-          intervaloDias,
-          maquinaId: maq.id,
-          tecnico,
-          limiteMs,
-          diasOcupados,
+        const { acc: nextAcc, idsRemover, novas, recalculada } = recalcularAgendaMaquinaNoAcc(acc, {
+          maq,
+          subcategorias: subcategoriasD,
+          categorias: categoriasD,
           hojeStr,
-          observacoes: 'Reagendamento automático (sincronização completa da agenda).',
+          intervalos: INTERVALOS,
+          sameMid,
           idSeed: baseId,
-          idSuffixRandom: true,
-          incluirCriadoEm: true,
         })
-        acc = [...acc, ...novas]
+        acc = nextAcc
+        if (recalculada) recalculadas += 1
+        idsDeleted.push(...idsRemover)
         rowsCreated.push(...novas)
       }
 

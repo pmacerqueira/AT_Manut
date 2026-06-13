@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.16.91] — 2026-06-13 — Split DataContext: relatorioDomain + manutencaoDomain + agenda
+
+### Refactoring (sem alteração de comportamento)
+- **`relatorioDomain.js`:** `mergeRelatoriosMantendoEnvio`, `proximoNumeroRelatorioSequencial`.
+- **`manutencaoDomain.js`:** `resolverIdsRemoverAoEliminarConcluida` (cascata ao eliminar concluída).
+- **`agendaDomain.js`:** `recalcularPeriodicasNoEstado`, `recalcularAgendaMaquinaNoAcc` — `DataContext` ~120 linhas mais leve.
+
+### Qualidade
+- **Unit tests:** 40 (+5: relatorioDomain, manutencaoDomain, recalcularPeriodicasNoEstado).
+
+### Documentação
+- `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `README.md` — mapa `src/domain/`.
+
+### Deploy
+- PWA em `public_html/manut/`.
+
+---
+
 ## [1.16.90] — 2026-06-13 — Correcções pós-review + documentação optimizações
 
 ### Correcções

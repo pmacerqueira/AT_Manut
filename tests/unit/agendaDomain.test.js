@@ -7,7 +7,9 @@ import {
   buildDiasOcupadosFromManutencoes,
   periodicidadeEfetivaParaMaquina,
   resolverDataExecucaoParaMaquina,
+  recalcularPeriodicasNoEstado,
 } from '../../src/domain/agendaDomain.js'
+import { INTERVALOS } from '../../src/domain/equipamentoDomain.js'
 
 describe('isSlotCadeiaPeriodicaAberta', () => {
   it('matches open periodic slot for machine', () => {
@@ -108,5 +110,27 @@ describe('resolverDataExecucaoParaMaquina', () => {
     ]
     const sameMid = (m, mid) => String(m.maquinaId) === String(mid)
     assert.equal(resolverDataExecucaoParaMaquina(maq, manuts, sameMid), '2026-03-10')
+  })
+})
+
+describe('recalcularPeriodicasNoEstado', () => {
+  it('replaces open periodic chain with new slots', () => {
+    const prev = [
+      { id: 'old1', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2026-12-01' },
+      { id: 'keep', maquinaId: 'm2', status: 'agendada', tipo: 'periodica', data: '2026-12-01' },
+    ]
+    const { next, idsRemover, novaCount } = recalcularPeriodicasNoEstado(prev, {
+      maquinaId: 'm1',
+      periodicidade: 'trimestral',
+      dataExecucao: '2026-06-01',
+      tecnico: 'Tec',
+      hojeStr: '2026-06-12',
+      intervalos: INTERVALOS,
+      idSeed: 9000,
+    })
+    assert.ok(idsRemover.includes('old1'))
+    assert.ok(novaCount >= 1)
+    assert.ok(next.some(m => m.maquinaId === 'm1' && m.id !== 'old1'))
+    assert.ok(next.some(m => m.id === 'keep'))
   })
 })

@@ -56,7 +56,9 @@ Próximo passo:
 | `src/App.jsx` | Rotas, Layout, ProtectedRoute |
 | `src/context/DataContext.jsx` | Estado global: CRUD; delega lógica pura a `src/domain/` |
 | `src/domain/equipamentoDomain.js` | Constantes e helpers de equipamento (INTERVALOS, KAESER, …) |
-| `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, …) |
+| `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, `recalcularPeriodicasNoEstado`, `recalcularAgendaMaquinaNoAcc`, …) |
+| `src/domain/relatorioDomain.js` | `mergeRelatoriosMantendoEnvio`, `proximoNumeroRelatorioSequencial` |
+| `src/domain/manutencaoDomain.js` | `resolverIdsRemoverAoEliminarConcluida` (cascata ao eliminar concluída) |
 | `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, `buildRelatorioManutencaoEmailArgs`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
@@ -73,7 +75,7 @@ Próximo passo:
 |----------------|-------------------|
 | Novo cliente / validação email | `Clientes.jsx`, `Clientes.css` |
 | Execução de manutenção | `ExecutarManutencaoModal.jsx`, `executarManutencao/*` |
-| Reagendamento automático | `DataContext.jsx` → `recalcularPeriodicasAposExecucao` |
+| Reagendamento automático | `DataContext.jsx` → `recalcularPeriodicasAposExecucao` (delega a `agendaDomain.recalcularPeriodicasNoEstado`) |
 | Modal de alertas proactivos | `AlertaProactivoModal.jsx`, `alertasConfig.js` |
 | Config "dias de aviso" | `Definicoes.jsx`, `alertasConfig.js` |
 | QR Code — geração / etiqueta | `QrEtiquetaModal.jsx`, `QrEtiquetaModal.css` |

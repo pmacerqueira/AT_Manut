@@ -68,6 +68,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── domain/
 │   │   ├── equipamentoDomain.js        # Constantes de equipamento (INTERVALOS, subcategorias, KAESER, TIPOS_DOCUMENTO)
 │   │   ├── agendaDomain.js             # Geração de periódicas futuras (lógica pura, sem React)
+│   │   ├── relatorioDomain.js          # Merge sync API + numeração sequencial de relatórios
+│   │   ├── manutencaoDomain.js         # Regras puras de eliminação em cascata na agenda
 │   │   └── marcasDomain.js             # INITIAL_MARCAS, normalizeMarca, merge de marcas
 │   │
 │   ├── hooks/
