@@ -67,6 +67,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │
 │   ├── domain/
 │   │   ├── equipamentoDomain.js        # Constantes de equipamento (INTERVALOS, subcategorias, KAESER, TIPOS_DOCUMENTO)
+│   │   ├── agendaDomain.js             # Geração de periódicas futuras (lógica pura, sem React)
 │   │   └── marcasDomain.js             # INITIAL_MARCAS, normalizeMarca, merge de marcas
 │   │
 │   ├── hooks/
@@ -85,8 +86,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── InstallPrompt.jsx / .css    # Prompt PWA
 │   │   ├── SignaturePad.jsx / .css     # Canvas de assinatura
 │   │   ├── RelatorioView.jsx / .css    # Visualização de relatório de manutenção
-│   │   ├── ExecutarManutencaoModal.jsx # Modal execução manutenção (checklist+assinatura+email)
-│   │   ├── executarManutencao/         # Helpers puros + passos KAESER do wizard (execWizardHelpers, KaeserHorasStep, KaeserPecasStep)
+│   │   ├── ExecutarManutencaoModal.jsx # Modal execução manutenção (estado + handlers; wizard em passos)
+│   │   ├── executarManutencao/         # Wizard: execWizardHelpers, KaeserHoras/Pecas, Checklist/Notas/Fotos, Tecnico/Cliente/Assinatura/Finalizar
 │   │   ├── ExecutarReparacaoModal.jsx  # Modal execução reparação (fotos+assinatura+email+peças)
 │   │   ├── RecolherAssinaturaModal.jsx  # Recolha de assinatura pós-execução
 │   │   ├── MaquinaFormModal.jsx        # Formulário de máquina
@@ -125,6 +126,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── utils/
 │   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios HTML (frota, histórico)
 │   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — grelha fotos A4, email anexo
+│   │   ├── relatorioManutencaoPayload.js # Payload canónico PDF/email manutenção (data exec, próximas, declaração)
 │   │   ├── comprimirImagemRelatorio.js # Compressão JPEG das fotos no browser (relatórios)
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
 │   │   ├── gerarRelatorioFrota.js      # PDF do relatório executivo de frota (jsPDF)
@@ -370,7 +372,9 @@ Ordem canónica das secções — **não alterar** (ver `.cursor/rules/at-manut-
 
 ### Cálculo das datas futuras no PDF/email
 
-As datas mostradas na secção "Próximas Manutenções Agendadas" são **computadas em tempo real** via `computarProximasDatas()` (em `diasUteis.js`), partindo da data de execução do relatório e da periodicidade da máquina. Não dependem dos registos na base de dados.
+As datas mostradas na secção "Próximas Manutenções Agendadas" são **computadas em tempo real** via `relatorioManutencaoPayload.js` → `buildProximasManutencoesManutencao()` → `computarProximasDatas()` (`diasUteis.js`), partindo da data de execução do relatório e da periodicidade (`maquina.periodicidadeManut` ou `manutencao.periodicidade` em montagem). Não dependem dos registos na base de dados.
+
+**Callers:** `Manutencoes.jsx`, `Clientes.jsx`, `EnviarEmailModal.jsx`, `ExecutarManutencaoModal.jsx` (pré-visualização + envio), `emailService.js`. No wizard, a pré-visualização PDF usa a mesma data de execução que o painel «Revisão» (`form.dataRealizacao` / `form.adminDataExecucao`).
 
 ### Fluxo de reparação (multi-dia)
 1. **Criação:** Admin ou ATecnica regista a reparação com máquina, data, técnico, avaria (+ aviso ISTOBAL se aplicável)

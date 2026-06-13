@@ -9,6 +9,23 @@ Política de continuidade:
 
 ---
 
+## [1.16.90] — 2026-06-13 — Correcções pós-review + documentação optimizações
+
+### Correcções
+- **Pré-visualização PDF (wizard):** `tempRel.dataCriacao` alinha com `form.dataRealizacao` / `form.adminDataExecucao` — próximas manutenções no PDF de preview coincidem com o painel «Revisão».
+- **`relatorioManutencaoPayload`:** `resolvePeriodicidadeManutencao` — fallback a `manutencao.periodicidade` (montagem antes de copiar para a ficha).
+
+### Qualidade
+- **Unit tests:** 35 (3 novos em `relatorioManutencaoPayload.test.js`).
+
+### Documentação
+- `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `README.md`, `.cursor/rules/at-manut-workflow.mdc` — wizard completo, payload canónico, `agendaDomain`.
+
+### Deploy
+- PWA em `public_html/manut/`.
+
+---
+
 ## [1.16.89] — 2026-06-13 — Wizard completo + payload canónico PDF/email
 
 ### Refactoring (sem alteração de comportamento)

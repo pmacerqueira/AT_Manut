@@ -200,7 +200,6 @@ export async function enviarRelatorioEmail({
         ? formatDataAzores(proximaManutRaw, true)
         : ''
 
-      const periMaq = isRepair ? '' : maquina?.periodicidadeManut
       const proximasManutencoes = isRepair
         ? []
         : buildProximasManutencoesManutencao({ relatorio, manutencao, maquina })

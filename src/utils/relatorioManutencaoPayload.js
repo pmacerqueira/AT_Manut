@@ -5,8 +5,14 @@
 import { computarProximasDatas } from './diasUteis.js'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio.js'
 
+/** Periodicidade efectiva: ficha da máquina ou linha de manutenção (montagem antes de copiar para máquina). */
+export function resolvePeriodicidadeManutencao({ maquina, manutencao }) {
+  return maquina?.periodicidadeManut || manutencao?.periodicidade || ''
+}
+
 /** Data-base para cálculo de próximas manutenções (PDF/email em tempo real). */
-export function resolveDataExecucaoManutencao({ relatorio, manutencao }) {
+export function resolveDataExecucaoManutencao({ relatorio, manutencao, dataExecucaoOverride }) {
+  if (dataExecucaoOverride) return String(dataExecucaoOverride).slice(0, 10)
   return (
     relatorio?.dataCriacao?.slice(0, 10) ||
     relatorio?.dataAssinatura?.slice(0, 10) ||
@@ -18,7 +24,7 @@ export function resolveDataExecucaoManutencao({ relatorio, manutencao }) {
 /** 12 próximas datas futuras a partir da execução (não usar registos da BD). */
 export function buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao }) {
   const dataExec = dataExecucao ?? resolveDataExecucaoManutencao({ relatorio, manutencao })
-  const periMaq = maquina?.periodicidadeManut
+  const periMaq = resolvePeriodicidadeManutencao({ maquina, manutencao })
   if (!periMaq || !dataExec) return []
   return computarProximasDatas(dataExec, periMaq, {
     tecnico: manutencao?.tecnico || relatorio?.tecnico || '',
@@ -47,7 +53,7 @@ export function buildRelatorioManutencaoMeta({
     categoriaNome: categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria),
     declaracaoClienteDepois: declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria),
     dataExecucao,
-    periodicidade: maquina?.periodicidadeManut ?? '',
+    periodicidade: resolvePeriodicidadeManutencao({ maquina, manutencao }),
   }
 }
 

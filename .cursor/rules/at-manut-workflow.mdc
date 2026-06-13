@@ -453,25 +453,29 @@ A ordem "declaração → próximas → assinaturas" é lógica do ponto de vist
 
 ## ⚠ CÁLCULO DE DATAS FUTURAS — Próximas Manutenções
 
-### Regra para PDF e Email (desde v1.16.0):
+### Regra para PDF e Email (desde v1.16.0, payload centralizado v1.16.89+):
 As datas das próximas manutenções mostradas no PDF e no email HTML são **SEMPRE COMPUTADAS em tempo real** a partir de:
-- `dataExecucao` = data de criação do relatório (`rel.dataCriacao`) ou data de assinatura (`rel.dataAssinatura`) ou data da manutenção (`m.data`)
-- `periodicidade` = `maquina.periodicidadeManut` ('trimestral' = 90 dias, 'semestral' = 180, 'anual' = 365)
+- `dataExecucao` = data de criação do relatório (`rel.dataCriacao`) ou data de assinatura (`rel.dataAssinatura`) ou data da manutenção (`m.data`); no wizard, `form.dataRealizacao` / `form.adminDataExecucao` alimentam a pré-visualização
+- `periodicidade` = `maquina.periodicidadeManut` ou `manutencao.periodicidade` (montagem antes de copiar para a ficha)
 
 **NÃO usar registos da base de dados** para as próximas manutenções no PDF/email. Os registos na BD podem estar desactualizados devido a race conditions na persistência assíncrona.
 
-### Função canónica: `computarProximasDatas()` em `src/utils/diasUteis.js`
+### Camada canónica: `relatorioManutencaoPayload.js` (v1.16.89+)
 ```js
-import { computarProximasDatas } from '../utils/diasUteis'
+import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 
-// Gera 12 datas futuras a partir da data de execução, ajustadas para dias úteis
-const proximas = computarProximasDatas(dataExecucao, periodicidade, { tecnico, count: 12 })
+// PDF: buildRelatorioManutencaoPdfArgs({ relatorio, manutencao, maquina, cliente, ... })
+// Email: buildRelatorioManutencaoEmailArgs({ emailDestinatario, relatorio, manutencao, ... })
 ```
 
-### Callers que usam `computarProximasDatas`:
-1. `Manutencoes.jsx` → `handleAbrirPdf` (botão "Obter PDF")
+Internamente usa `computarProximasDatas()` em `src/utils/diasUteis.js` (12 datas futuras, dias úteis).
+
+### Callers que usam o payload (não chamar `computarProximasDatas` directamente em manutenção):
+1. `Manutencoes.jsx` → `handleAbrirPdf`, `handleEnviarEmail`
 2. `Clientes.jsx` → `handleDownloadPdfManutencao`
 3. `EnviarEmailModal.jsx` → `handleSubmit`
+4. `ExecutarManutencaoModal.jsx` → `handlePreviewInline`, envio ao gravar
+5. `emailService.js` → `enviarRelatorioEmail` (manutenção/montagem)
 
 ### Recálculo no servidor (base de dados):
 A função `recalcularPeriodicasAposExecucao()` em `DataContext.jsx` recria os registos futuros no estado e persiste-os no MySQL. É chamada:

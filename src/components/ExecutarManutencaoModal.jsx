@@ -853,6 +853,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         (assinaturaFeita && canvasRef.current?.toDataURL('image/png'))
         || (!signatureClearedByUser && rel?.assinaturaDigital)
         || ''
+      const dataExecPreview = (form.adminDataExecucao || form.dataRealizacao || getHojeAzores()).trim()
+      const previewDataCriacao = dataExecPreview
+        ? `${dataExecPreview}T12:00:00.000Z`
+        : (rel?.dataCriacao ?? nowISO())
       const tempRel = {
         ...rel,
         checklistRespostas: form.checklistRespostas,
@@ -862,8 +866,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         nomeAssinante: form.nomeAssinante,
         assinadoPeloCliente: !!assinaturaPreview,
         assinaturaDigital: assinaturaPreview,
-        dataAssinatura: rel?.dataAssinatura ?? nowISO(),
-        dataCriacao: rel?.dataCriacao ?? nowISO(),
+        dataAssinatura: rel?.dataAssinatura ?? previewDataCriacao,
+        dataCriacao: (form.adminDataExecucao || form.dataRealizacao) ? previewDataCriacao : (rel?.dataCriacao ?? nowISO()),
         ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
         ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
         ...(isKaeserAbcdMaq && form.tipoManutKaeser

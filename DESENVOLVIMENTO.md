@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-06-12 · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-06-13 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -57,7 +57,8 @@ Próximo passo:
 | `src/context/DataContext.jsx` | Estado global: CRUD; delega lógica pura a `src/domain/` |
 | `src/domain/equipamentoDomain.js` | Constantes e helpers de equipamento (INTERVALOS, KAESER, …) |
 | `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, …) |
-| `src/components/executarManutencao/` | Passos do wizard: `ChecklistStep`, `NotasStep`, `FotosStep`, KAESER |
+| `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
+| `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, `buildRelatorioManutencaoEmailArgs`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
 | `src/hooks/usePermissions.js` | `canDelete`, `canEditManutencao`, `isAdmin` |
 | `src/config/alertasConfig.js` | `getDiasAviso()`, `getManutencoesPendentesAlertas()` |
@@ -71,7 +72,7 @@ Próximo passo:
 | Funcionalidade | Ficheiros a editar |
 |----------------|-------------------|
 | Novo cliente / validação email | `Clientes.jsx`, `Clientes.css` |
-| Execução de manutenção | `ExecutarManutencaoModal.jsx` |
+| Execução de manutenção | `ExecutarManutencaoModal.jsx`, `executarManutencao/*` |
 | Reagendamento automático | `DataContext.jsx` → `recalcularPeriodicasAposExecucao` |
 | Modal de alertas proactivos | `AlertaProactivoModal.jsx`, `alertasConfig.js` |
 | Config "dias de aviso" | `Definicoes.jsx`, `alertasConfig.js` |
@@ -82,14 +83,14 @@ Próximo passo:
 | Modo campo | `Definicoes.jsx`, `index.css` (`.modo-campo`), `App.jsx`, `Layout.jsx` |
 | Indicador de armazenamento | `Definicoes.jsx`, `Definicoes.css` |
 | Histórico HTML máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx`, `Clientes.jsx` |
-| Relatório individual PDF | `gerarPdfRelatorio.js`, `relatorioBaseStyles.js` |
+| Relatório individual PDF | `gerarPdfRelatorio.js`, `relatorioManutencaoPayload.js`, `relatorioBaseStyles.js` |
 | Relatório de frota | `gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `frotaReportHelpers.js`, `Clientes.jsx` |
 | Relatório de reparação (email/PDF) | `servidor-cpanel/send-email.php` (HTML servidor), `gerarPdfRelatorio.js` |
 | Envio de email (manutenção, lembretes) | `emailService.js`, `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` |
 | Envio HTML + PDF opcional (frota, reparação, etc.) | `emailService.js` (`enviarRelatorioHtmlEmail`, `blobToRawBase64`), `servidor-cpanel/api/send-report.php` |
 | Alertas automáticos (cron) | `servidor-cpanel/cron-alertas.php`, `docs/CRON-ALERTAS.md` |
 | Agendamento novo (pipeline) | `Agendamento.jsx` |
-| Execução de manutenção (wizard) | `ExecutarManutencaoModal.jsx`, `Manutencoes.css` |
+| Execução de manutenção (wizard) | `ExecutarManutencaoModal.jsx`, `executarManutencao/*`, `Manutencoes.css` |
 | Lista de manutenções | `Manutencoes.jsx` |
 | Calendário | `Calendario.jsx` |
 | Clientes / Equipamentos | `Clientes.jsx`, `Equipamentos.jsx` |

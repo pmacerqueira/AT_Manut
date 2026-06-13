@@ -2,12 +2,20 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   resolveDataExecucaoManutencao,
+  resolvePeriodicidadeManutencao,
   buildProximasManutencoesManutencao,
   buildRelatorioManutencaoPdfArgs,
 } from '../../src/utils/relatorioManutencaoPayload.js'
 
 const getSub = (id) => ({ id, nome: 'Elevador', categoriaId: 'c1' })
 const getCat = (id) => ({ id, nome: 'Elevadores', intervaloTipo: 'trimestral' })
+
+describe('resolvePeriodicidadeManutencao', () => {
+  it('prefers maquina then manutencao', () => {
+    assert.equal(resolvePeriodicidadeManutencao({ maquina: { periodicidadeManut: 'anual' }, manutencao: { periodicidade: 'trimestral' } }), 'anual')
+    assert.equal(resolvePeriodicidadeManutencao({ maquina: {}, manutencao: { periodicidade: 'semestral' } }), 'semestral')
+  })
+})
 
 describe('resolveDataExecucaoManutencao', () => {
   it('prefers dataCriacao then assinatura then manutencao.data', () => {
@@ -49,6 +57,16 @@ describe('buildProximasManutencoesManutencao', () => {
     assert.ok(prox.length >= 1)
     assert.ok(prox[0].data)
   })
+
+  it('falls back to manutencao.periodicidade (montagem antes de copiar para máquina)', () => {
+    const prox = buildProximasManutencoesManutencao({
+      relatorio: { dataCriacao: '2026-02-01T12:00:00Z' },
+      manutencao: { tipo: 'montagem', periodicidade: 'semestral', tecnico: 'Tec' },
+      maquina: {},
+    })
+    assert.ok(prox.length >= 1)
+    assert.ok(prox[0].data)
+  })
 })
 
 describe('buildRelatorioManutencaoPdfArgs', () => {
@@ -68,5 +86,21 @@ describe('buildRelatorioManutencaoPdfArgs', () => {
     assert.ok(Array.isArray(args.proximasManutencoes))
     assert.ok(args.categoriaNome)
     assert.equal(args.checklistItems.length, 1)
+  })
+
+  it('uses relatorio dataCriacao for proximas (preview alinha com data de execução no form)', () => {
+    const args = buildRelatorioManutencaoPdfArgs({
+      relatorio: { id: 'r1', dataCriacao: '2026-04-10T12:00:00.000Z' },
+      manutencao: { id: 'm1', tipo: 'periodica', tecnico: 'João', data: '2026-01-01' },
+      maquina: { subcategoriaId: 's1', periodicidadeManut: 'trimestral', marca: 'X', modelo: 'Y' },
+      cliente: { nome: 'Cliente' },
+      marcas: [],
+      getSubcategoria: getSub,
+      getCategoria: getCat,
+      getTecnicoByNome: () => ({ nome: 'João' }),
+      checklistItems: [],
+    })
+    assert.ok(args.proximasManutencoes.length >= 1)
+    assert.ok(args.proximasManutencoes[0].data > '2026-04-10')
   })
 })
