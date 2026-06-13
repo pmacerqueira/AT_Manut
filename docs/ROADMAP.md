@@ -42,7 +42,6 @@
 | **Reparações — fluxo ISTOBAL** | Avisos ES-, relatório individual + resumo mensal faturável | **v1.9.x** |
 | **Reparações — relatório mensal** | Modal mensal ISTOBAL com horas M.O., materiais expansíveis, impressão | **v1.9.x** |
 | **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
-| **Importação SAF-T clientes** | Modal Admin, preview, modos Ignorar/Actualizar — **removido v1.16.95** (clientes só manual) | **v1.10.3** |
 | **Suite de testes E2E** | 452 testes Playwright (19 ficheiros — ver `docs/TESTES-E2E.md`) | **v1.10.3+** |
 | **Manutenções históricas** | Inserção de registos passados, badges "Histórico"/"Pendente assinatura" | **v1.11.0** |
 | **Assinatura em 2 passos** | RecolherAssinaturaModal — gravar → recolher assinatura depois | **v1.11.0** |
@@ -141,20 +140,8 @@
 
 ---
 
-### v1.9.7 — Importação SAF-T de clientes + correcções E2E
-**Implementado:** Fevereiro 2026
-
-**Funcionalidades:**
-- Importação em massa de clientes a partir de ficheiro JSON (formato SAF-T/Gestor.32)
-- Modal com preview (novos vs existentes), modos "Ignorar" e "Actualizar"
-- Persistência na API para cada cliente criado/actualizado
-
-**Correcções críticas (descobertas via E2E):**
-- `importClientes` faltava no objeto `value` do DataContext → importação falhava com "is not a function"
-- `importClientes` não chamava `apiClientes.create`/`update` → clientes só em memória, perdidos ao recarregar
-- Mock E2E: `clientesMutable` para acumular clientes criados e retornar em `list`
-
-**Spec 18 (removido v1.16.95):** 6 testes E2E para importação SAF-T — eliminados com a funcionalidade; clientes inseridos manualmente na app.
+### v1.9.7 — Importação SAF-T (removida na v1.16.95)
+Importação em massa de clientes via JSON SAF-T/Gestor.32 — **eliminada**; clientes só manual na app. Detalhe histórico em `CHANGELOG.md` (entradas 1.9.7 e 1.16.95).
 
 ---
 
@@ -265,6 +252,6 @@
 
 ---
 
-*Última actualização estrutural: 2026-06-12 — v1.16.95; remoção importação SAF-T; Reparações E2E 16+17 estáveis.*
+*Última actualização estrutural: 2026-06-13 — v1.16.97; refactor DataContext em slices (passos 6–8); 92 testes unitários.*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

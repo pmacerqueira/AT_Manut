@@ -66,11 +66,15 @@ Próximo passo:
 | `src/domain/clientesDomain.js` | Entidade cliente (build, cascata ids, merge) |
 | `src/domain/categoriasDomain.js` | Categorias, subcategorias, checklist (regras puras) |
 | `src/domain/maquinasDomain.js` | Equipamentos, documentos, cascata delete |
+| `src/domain/manutencoesDomain.js` | Builders manutenção + relatório manutenção |
+| `src/domain/reparacoesDomain.js` | Builders reparação + relatório reparação |
 | `src/context/slices/tecnicosSlice.js` | CRUD técnicos extraído do DataContext |
 | `src/context/slices/marcasSlice.js` | CRUD marcas extraído do DataContext |
 | `src/context/slices/clientesSlice.js` | CRUD clientes + cascata + clear all |
 | `src/context/slices/categoriasSlice.js` | CRUD categorias / subcategorias / checklist |
 | `src/context/slices/maquinasSlice.js` | CRUD máquinas + documentos |
+| `src/context/slices/manutencoesSlice.js` | CRUD manutenções, relatórios, agenda periódica, sync agenda completa |
+| `src/context/slices/reparacoesSlice.js` | CRUD reparações + relatórios de reparação |
 | `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, `buildRelatorioManutencaoEmailArgs`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
@@ -87,7 +91,7 @@ Próximo passo:
 |----------------|-------------------|
 | Novo cliente / validação email | `Clientes.jsx`, `Clientes.css` |
 | Execução de manutenção | `ExecutarManutencaoModal.jsx`, `executarManutencao/*` |
-| Reagendamento automático | `DataContext.jsx` → `recalcularPeriodicasAposExecucao` (delega a `agendaDomain.recalcularPeriodicasNoEstado`) |
+| Reagendamento automático | `manutencoesSlice.js` → `recalcularPeriodicasAposExecucao` (delega a `agendaDomain.recalcularPeriodicasNoEstado`) |
 | Modal de alertas proactivos | `AlertaProactivoModal.jsx`, `alertasConfig.js` |
 | Config "dias de aviso" | `Definicoes.jsx`, `alertasConfig.js` |
 | QR Code — geração / etiqueta | `QrEtiquetaModal.jsx`, `QrEtiquetaModal.css` |
@@ -113,7 +117,7 @@ Próximo passo:
 | Permissões | `usePermissions.js`, `ProtectedRoute.jsx` |
 | **Reparações — página principal** | `Reparacoes.jsx`, `Reparacoes.css` |
 | **Reparações — execução** | `ExecutarReparacaoModal.jsx` (fotos, peças, assinatura, email) |
-| **Reparações — API** | `DataContext.jsx` → `addReparacao`, `updateReparacao`, `removeReparacao` |
+| **Reparações — API** | `reparacoesSlice.js` (wiring em `DataContext.jsx`) |
 | **Reparações — relatório mensal ISTOBAL** | `Reparacoes.jsx` → `RelatorioMensalISTOBAL`, `RelatorioReparacaoView` |
 | **Gestão de técnicos** | `Definicoes.jsx`, `DataContext.jsx` → `addTecnico`, `updateTecnico`, `removeTecnico` |
 | **Biblioteca NAVEL (equipamento)** | `MaquinaBibliotecaNavel.jsx`, `apiService.js` (`documentosBiblioteca`), `servidor-cpanel/api/data.php`, `navel-doc-lib.php` |
@@ -280,7 +284,10 @@ const addXxx = useCallback((data) => {
 # Desenvolvimento
 npm run dev                 # http://localhost:5173
 
-# Testes — suite completa
+# Testes unitários (domain + slices)
+npm run test:unit            # 92 testes em tests/unit/
+
+# Testes — suite E2E completa (452 listados)
 npm run test:e2e             # equivalente: npx playwright test tests/e2e/
 
 # Re-correr falhados (após uma corrida com reporter blob)

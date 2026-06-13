@@ -6,15 +6,7 @@
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
-import {
-  buildDiasOcupadosFromManutencoes,
-  calcLimiteMontagemMs,
-  gerarManutencoesPeriodicasFuturas,
-  recalcularPeriodicasNoEstado,
-  recalcularAgendaMaquinaNoAcc,
-} from '../domain/agendaDomain'
-import { mergeRelatoriosMantendoEnvio, proximoNumeroRelatorioSequencial } from '../domain/relatorioDomain'
-import { resolverIdsRemoverAoEliminarConcluida } from '../domain/manutencaoDomain'
+import { mergeRelatoriosMantendoEnvio } from '../domain/relatorioDomain'
 import {
   buildBackupPayload,
   backupFilenameForDate,
@@ -29,13 +21,13 @@ import { createMarcasHandlers } from './slices/marcasSlice'
 import { createClientesHandlers } from './slices/clientesSlice'
 import { createCategoriasHandlers } from './slices/categoriasSlice'
 import { createMaquinasHandlers } from './slices/maquinasSlice'
+import { createManutencoesHandlers } from './slices/manutencoesSlice'
+import { createReparacoesHandlers } from './slices/reparacoesSlice'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize } from '../services/syncQueue'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
-import { normEntityId } from '../utils/frotaReportHelpers'
-import { getHojeAzores } from '../utils/datasAzores'
 
 const DataContext = createContext(null)
 
@@ -472,471 +464,67 @@ export function DataProvider({ children }) {
     })
   }, [updateMaquina])
 
-  // ── Manutenções ───────────────────────────────────────────────────────────
-  const addManutencao = useCallback((m) => {
-    const id = 'm' + Date.now()
-    const novo = { ...m, id, criadoEm: m.criadoEm ?? new Date().toISOString() }
-    setManutencoes(prev => [...prev, novo])
-    scheduleSyncProximaParaMaquinas([novo.maquinaId])
-    logger.action('DataContext', 'addManutencao', `Manutenção agendada (maquinaId: ${m.maquinaId})`, { id, maquinaId: m.maquinaId, data: m.data })
-    import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.create(novo),
-              { resource: 'manutencoes', action: 'create', data: novo })
-    ).catch(err => {
-      logger.error('DataContext', 'addManutencao', 'Falha ao persistir manutenção', { msg: err?.message, id })
-    })
-    return id
-  }, [persist, scheduleSyncProximaParaMaquinas])
+  // ── Manutenções + relatórios (slice: manutencoesSlice.js) ───────────────
+  const {
+    addManutencao,
+    addManutencoesBatch,
+    updateManutencao,
+    removeManutencao,
+    addRelatorio,
+    updateRelatorio,
+    getRelatorioByManutencao,
+    prepararManutencoesPeriodicas,
+    confirmarManutencoesPeriodicas,
+    iniciarManutencao,
+    recalcularPeriodicasAposExecucao,
+    sincronizarAgendaCompleta,
+  } = useMemo(
+    () => createManutencoesHandlers({
+      getManutencoes: () => manutencoesRef.current,
+      getManutencoesRef: () => manutencoesRef.current,
+      getRelatorios: () => relatoriosRef.current,
+      setManutencoes,
+      setRelatorios,
+      setClientes,
+      setCategorias,
+      setSubcategorias,
+      setChecklistItems,
+      setMarcas,
+      setMaquinas,
+      setReparacoes,
+      setRelatoriosReparacao,
+      setTecnicos,
+      setPecasPlano,
+      persist,
+      logger,
+      scheduleSyncProximaParaMaquinas,
+      updateMaquina,
+      fetchTodos,
+      agendaCompletaBusyRef,
+      lastBulkFetchOkAtRef,
+      INTERVALOS,
+    }),
+    [persist, scheduleSyncProximaParaMaquinas, updateMaquina, fetchTodos],
+  )
 
-  const addManutencoesBatch = useCallback((lista) => {
-    if (!lista || lista.length === 0) return 0
-    const base = Date.now()
-    const novas = lista.map((m, i) => ({
-      ...m,
-      id: m.id || `mb${base}_${i}`,
-      criadoEm: m.criadoEm ?? new Date().toISOString(),
-    }))
-    setManutencoes(prev => [...prev, ...novas])
-    scheduleSyncProximaParaMaquinas(novas.map(n => n.maquinaId))
-    logger.action('DataContext', 'addManutencoesBatch', `${novas.length} manutenções criadas em lote`, { count: novas.length })
-    import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.bulkCreate(novas),
-              { resource: 'manutencoes', action: 'bulk_create', data: novas })
-    ).catch(err => {
-      logger.error('DataContext', 'addManutencoesBatch', 'Falha ao persistir batch', { msg: err?.message, count: novas.length })
-    })
-    return novas.length
-  }, [persist, scheduleSyncProximaParaMaquinas])
-
-  const updateManutencao = useCallback((id, data) => {
-    let syncIds = []
-    setManutencoes(prev => {
-      const anterior = prev.find(m => m.id === id)
-      const next = prev.map(m => m.id === id ? { ...m, ...data } : m)
-      const mids = new Set()
-      if (anterior?.maquinaId) mids.add(anterior.maquinaId)
-      const alvo = next.find(m => m.id === id)
-      if (alvo?.maquinaId) mids.add(alvo.maquinaId)
-      syncIds = [...mids]
-      return next
-    })
-    scheduleSyncProximaParaMaquinas(syncIds)
-    logger.action('DataContext', 'updateManutencao',
-      `Manutenção ${id} actualizada (${data.status ?? 'sem status'})`,
-      { id, ...data })
-    import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.update(id, data),
-              { resource: 'manutencoes', action: 'update', id, data })
-    ).catch(err => {
-      logger.error('DataContext', 'updateManutencao', 'Falha ao persistir actualização', { msg: err?.message, id })
-    })
-  }, [persist, scheduleSyncProximaParaMaquinas])
-
-  const removeManutencao = useCallback((id) => {
-    let syncIds = []
-    setManutencoes(prev => {
-      const { idsRemover, alvo, cascadeFuturas } = resolverIdsRemoverAoEliminarConcluida(prev, id)
-
-      if (cascadeFuturas) {
-        logger.action('DataContext', 'removeManutencao',
-          `Eliminada manutenção concluída ${id} + ${idsRemover.size - 1} periódicas futuras da máquina ${alvo.maquinaId}`,
-          { principal: id, futuras: idsRemover.size - 1 })
-        import('../services/apiService').then(({ apiManutencoes }) => {
-          ;[...idsRemover].filter(rid => rid !== id).forEach(rid =>
-            persist(() => apiManutencoes.remove(rid),
-                    { resource: 'manutencoes', action: 'delete', id: rid })
-          )
-        }).catch(() => {})
-      }
-
-      if (alvo?.maquinaId) syncIds = [alvo.maquinaId]
-      return prev.filter(m => !idsRemover.has(m.id))
-    })
-    scheduleSyncProximaParaMaquinas(syncIds)
-    const idN = normEntityId(id)
-    const relAlvo = relatorios.find(r => normEntityId(r.manutencaoId) === idN)
-    setRelatorios(prev => prev.filter(r => normEntityId(r.manutencaoId) !== idN))
-    logger.action('DataContext', 'removeManutencao', `Manutenção ${id} eliminada (e relatório associado)`, { id, relatorioId: relAlvo?.id })
-    import('../services/apiService').then(({ apiManutencoes, apiRelatorios }) => {
-      if (relAlvo?.id) {
-        persist(() => apiRelatorios.remove(relAlvo.id),
-                { resource: 'relatorios', action: 'delete', id: relAlvo.id })
-      }
-      persist(() => apiManutencoes.remove(id),
-              { resource: 'manutencoes', action: 'delete', id })
-    }).catch(err => {
-      logger.error('DataContext', 'removeManutencao', 'Falha ao persistir eliminação', { msg: err?.message, id })
-    })
-  }, [relatorios, persist, scheduleSyncProximaParaMaquinas])
-
-  // ── Relatórios ────────────────────────────────────────────────────────────
-  const addRelatorio = useCallback((r) => {
-    const id = 'r' + Date.now()
-    const dataCriacao = r.dataCriacao ?? new Date().toISOString()
-
-    // Número de relatório gerado client-side para resposta imediata.
-    // O servidor aceita o número proposto; a constraint UNIQUE protege contra colisões.
-    let numeroRelatorio = r.numeroRelatorio
-    if (!numeroRelatorio) {
-      const ano = new Date(dataCriacao).getFullYear()
-      const tipoManut = manutencoes.find(m => m.id === r.manutencaoId)?.tipo ?? 'periodica'
-      const prefix = tipoManut === 'montagem' ? 'MT' : 'MP'
-      numeroRelatorio = proximoNumeroRelatorioSequencial(relatorios, { ano, prefix })
-    }
-
-    const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
-    setRelatorios(prev => [...prev, novo])
-    logger.action('DataContext', 'addRelatorio',
-      `Relatório criado: ${numeroRelatorio}`,
-      { id, manutencaoId: r.manutencaoId, assinado: novo.assinadoPeloCliente })
-    import('../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.create(novo),
-              { resource: 'relatorios', action: 'create', data: novo })
-    ).catch(err => {
-      logger.error('DataContext', 'addRelatorio', 'Falha ao persistir relatório', { msg: err?.message, id })
-    })
-    return { id, numeroRelatorio }
-  }, [manutencoes, relatorios, persist])
-
-  const updateRelatorio = useCallback((id, data) => {
-    setRelatorios(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
-    const tipo = data.assinadoPeloCliente ? 'assinatura recolhida' : 'dados actualizados'
-    logger.action('DataContext', 'updateRelatorio',
-      `Relatório ${id} actualizado (${tipo})`,
-      { id, assinado: data.assinadoPeloCliente ?? false })
-    import('../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.update(id, data),
-              { resource: 'relatorios', action: 'update', id, data })
-    ).catch(err => {
-      logger.error('DataContext', 'updateRelatorio', 'Falha ao persistir actualização', { msg: err?.message, id })
-    })
-  }, [persist])
-
-  /**
-   * PASSO 1 — Calcula as datas periódicas, evitando fins de semana e feriados PT/Açores,
-   * e detecta conflitos com manutenções já agendadas na mesma data.
-   *
-   * Não modifica o estado; devolve os registos propostos e a lista de conflitos para
-   * revisão pelo utilizador antes de confirmar.
-   *
-   * @param {object} manutencaoMontagem — { maquinaId, periodicidade, data, tecnico }
-   * @returns {{ novas: object[], conflitos: Array<{index:number, data:string, existentes:number}> }}
-   */
-  const prepararManutencoesPeriodicas = useCallback((manutencaoMontagem) => {
-    const { maquinaId, periodicidade, data: dataBase, tecnico } = manutencaoMontagem
-    const intervaloDias = INTERVALOS[periodicidade]?.dias ?? 365
-    const diasOcupados = buildDiasOcupadosFromManutencoes(manutencoes)
-    const { novas, conflitos } = gerarManutencoesPeriodicasFuturas({
-      dataBaseIso: dataBase,
-      periodicidade,
-      intervaloDias,
-      maquinaId,
-      tecnico,
-      limiteMs: calcLimiteMontagemMs(dataBase),
-      diasOcupados,
-      observacoes: 'Agendamento automático pós-montagem.',
-      idSeed: Date.now(),
-      trackConflitos: true,
-      manutencoesForConflitos: manutencoes,
-    })
-    return { novas, conflitos }
-  }, [manutencoes])
-
-  /**
-   * PASSO 2 — Persiste no estado o array de manutenções já preparado (e eventualmente
-   * ajustado pelo utilizador na resolução de conflitos).
-   *
-   * @param {object[]} novas — array devolvido por prepararManutencoesPeriodicas (eventualmente modificado)
-   * @returns {number} — número de manutenções criadas
-   */
-  const confirmarManutencoesPeriodicas = useCallback((novas) => {
-    if (!novas?.length) return 0
-    setManutencoes(prev => [...prev, ...novas])
-    scheduleSyncProximaParaMaquinas(novas.map(n => n.maquinaId))
-    logger.action('DataContext', 'confirmarManutencoesPeriodicas',
-      `${novas.length} manutenções periódicas confirmadas (pós-montagem)`,
-      { count: novas.length, maquinaId: novas[0]?.maquinaId })
-    import('../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.bulkCreate(novas),
-              { resource: 'manutencoes', action: 'bulk_create', data: novas })
-    ).catch(err => {
-      logger.error('DataContext', 'confirmarManutencoesPeriodicas', 'Falha ao persistir periódicas', { msg: err?.message, count: novas.length })
-    })
-    return novas.length
-  }, [persist, scheduleSyncProximaParaMaquinas])
-
-  const getRelatorioByManutencao = useCallback((manutencaoId) => {
-    const nid = normEntityId(manutencaoId)
-    return relatorios.find(r => normEntityId(r.manutencaoId) === nid)
-  }, [relatorios])
-
-  // ── Reparações ────────────────────────────────────────────────────────────
-  const addReparacao = useCallback((rep) => {
-    const id = 'rep' + Date.now()
-    setReparacoes(prev => [...prev, { ...rep, id }])
-    logger.action('DataContext', 'addReparacao', `Reparação criada (maquinaId: ${rep.maquinaId})`, { id, origem: rep.origem })
-    import('../services/apiService').then(({ apiReparacoes }) =>
-      persist(() => apiReparacoes.create({ ...rep, id }),
-              { resource: 'reparacoes', action: 'create', data: { ...rep, id } })
-    )
-    return id
-  }, [persist])
-
-  const updateReparacao = useCallback((id, data) => {
-    setReparacoes(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
-    import('../services/apiService').then(({ apiReparacoes }) =>
-      persist(() => apiReparacoes.update(id, data),
-              { resource: 'reparacoes', action: 'update', id, data })
-    )
-  }, [persist])
-
-  const removeReparacao = useCallback((id) => {
-    setReparacoes(prev => prev.filter(r => r.id !== id))
-    setRelatoriosReparacao(prev => prev.filter(r => r.reparacaoId !== id))
-    logger.action('DataContext', 'removeReparacao', `Reparação ${id} eliminada (e relatório associado)`, { id })
-    import('../services/apiService').then(({ apiReparacoes }) =>
-      persist(() => apiReparacoes.remove(id),
-              { resource: 'reparacoes', action: 'delete', id })
-    )
-  }, [persist])
-
-  // ── Relatórios de Reparação ───────────────────────────────────────────────
-  const addRelatorioReparacao = useCallback((r) => {
-    const id = 'rr' + Date.now()
-    const dataCriacao = r.dataCriacao ?? new Date().toISOString()
-
-    // Número client-side para resposta imediata; servidor confirma ou gera alternativo.
-    let numeroRelatorio = r.numeroRelatorio
-    if (!numeroRelatorio) {
-      const ano = new Date().getFullYear()
-      numeroRelatorio = proximoNumeroRelatorioSequencial(relatoriosReparacao, { ano, prefix: 'RP' })
-    }
-
-    const novo = { ...r, id, dataCriacao, numeroRelatorio, assinadoPeloCliente: r.assinadoPeloCliente ?? false }
-    setRelatoriosReparacao(prev => [...prev, novo])
-    logger.action('DataContext', 'addRelatorioReparacao',
-      `Relatório de reparação criado: ${numeroRelatorio}`,
-      { id, reparacaoId: r.reparacaoId, assinado: novo.assinadoPeloCliente })
-    import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
-      persist(() => apiRelatoriosReparacao.create(novo),
-              { resource: 'relatoriosReparacao', action: 'create', data: novo })
-    )
-    return { id, numeroRelatorio }
-  }, [relatoriosReparacao, persist])
-
-  const updateRelatorioReparacao = useCallback((id, data) => {
-    setRelatoriosReparacao(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
-    const tipo = data.assinadoPeloCliente ? 'concluído e assinado' : 'progresso guardado'
-    logger.action('DataContext', 'updateRelatorioReparacao',
-      `Relatório de reparação ${id} actualizado (${tipo})`,
-      { id, assinado: data.assinadoPeloCliente ?? false })
-    import('../services/apiService').then(({ apiRelatoriosReparacao }) =>
-      persist(() => apiRelatoriosReparacao.update(id, data),
-              { resource: 'relatoriosReparacao', action: 'update', id, data })
-    )
-  }, [persist])
-
-  const getRelatorioByReparacao = useCallback((reparacaoId) => {
-    const rid = normEntityId(reparacaoId)
-    return relatoriosReparacao.find(r => normEntityId(r.reparacaoId) === rid)
-  }, [relatoriosReparacao])
-
-  /**
-   * Bloco B — Recalcular manutenções periódicas futuras após execução de uma periódica.
-   *
-   * Faz tudo atomicamente dentro do setManutencoes:
-   *  1. Remove **toda** a cadeia periódica em aberto (pendente/agendada/em_progresso, exceto montagem),
-   *     incluindo atrasadas de anos anteriores — evita duplicar com a nova grelha.
-   *  2. Gera novas a partir da data de execução real, para 3 anos
-   *
-   * @returns {number} número de novas manutenções criadas
-   */
-  const recalcularPeriodicasAposExecucao = useCallback((maquinaId, periodicidade, dataExecucao, tecnico, options = {}) => {
-    if (!periodicidade || !INTERVALOS[periodicidade]) return 0
-
-    const hojeStr = getHojeAzores()
-    let novaCount = 0
-
-    setManutencoes(prev => {
-      const { next, idsRemover, novas, novaCount: n } = recalcularPeriodicasNoEstado(prev, {
-        maquinaId,
-        periodicidade,
-        dataExecucao,
-        tecnico,
-        hojeStr,
-        intervalos: INTERVALOS,
-        idSeed: Date.now(),
-      })
-      novaCount = n
-
-      import('../services/apiService').then(async ({ apiManutencoes }) => {
-        try {
-          for (const rid of idsRemover) {
-            await persist(() => apiManutencoes.remove(rid),
-                    { resource: 'manutencoes', action: 'delete', id: rid })
-          }
-          if (novas.length > 0) {
-            await persist(() => apiManutencoes.bulkCreate(novas),
-                    { resource: 'manutencoes', action: 'bulk_create', data: novas })
-          }
-        } catch (err) {
-          logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
-        }
-      })
-
-      if (novas.length > 0 || idsRemover.length > 0) {
-        logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
-          `${novas.length} periódicas criadas, ${idsRemover.length} removidas para máquina ${maquinaId}`,
-          { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.length })
-      }
-
-      return next
-    })
-
-    queueMicrotask(() => {
-      const lista = manutencoesRef.current
-      const proxima = minDataManutencaoAberta(maquinaId, lista)
-      const patchMaq = { proximaManut: proxima }
-      if (options?.ultimaManutencaoData) {
-        patchMaq.ultimaManutencaoData = options.ultimaManutencaoData
-      }
-      updateMaquina(maquinaId, patchMaq)
-    })
-
-    return novaCount
-  }, [persist, updateMaquina])
-
-  /**
-   * Recarrega dados do servidor e, para cada equipamento com periodicidade conhecida,
-   * regenera manutenções periódicas futuras (pendente/agendada, exceto montagem)
-   * com base na última execução: **o mais recente** entre `ultimaManutencaoData` na ficha
-   * e a data da última manutenção `concluida` na agenda (evita âncora antiga na ficha).
-   * Só cria linhas com data **≥ hoje** (Açores); horizonte = max(última exec + 3 anos, hoje + 3 anos).
-   * Antes de gerar, remove toda a cadeia periódica em aberto da máquina (incl. atrasos antigos), não só datas posteriores à última execução.
-   * Actualiza `proximaManut` em cada ficha quando difere da agenda.
-   */
-  const sincronizarAgendaCompleta = useCallback(async () => {
-    if (agendaCompletaBusyRef.current) {
-      return { ok: false, reason: 'busy' }
-    }
-    const { isTokenValid, fetchTodosOsDados, apiManutencoes } = await import('../services/apiService')
-    if (!isTokenValid()) return { ok: false, reason: 'auth' }
-    if (!navigator.onLine) return { ok: false, reason: 'offline' }
-
-    agendaCompletaBusyRef.current = true
-    try {
-      const hojeStr = getHojeAzores()
-      const d = await fetchTodosOsDados()
-      const maqs = d.maquinas ?? []
-      const categoriasD = d.categorias ?? []
-      const subcategoriasD = d.subcategorias ?? []
-      let acc = (d.manutencoes ?? []).map(m => ({ ...m }))
-
-      const sameMid = (m, mid) => normEntityId(m.maquinaId) === normEntityId(mid)
-      const idsDeleted = []
-      const rowsCreated = []
-      let recalculadas = 0
-
-      for (const maq of maqs) {
-        const baseId = Date.now() + Math.floor(Math.random() * 1e6)
-        const { acc: nextAcc, idsRemover, novas, recalculada } = recalcularAgendaMaquinaNoAcc(acc, {
-          maq,
-          subcategorias: subcategoriasD,
-          categorias: categoriasD,
-          hojeStr,
-          intervalos: INTERVALOS,
-          sameMid,
-          idSeed: baseId,
-        })
-        acc = nextAcc
-        if (recalculada) recalculadas += 1
-        idsDeleted.push(...idsRemover)
-        rowsCreated.push(...novas)
-      }
-
-      const uniqueDeletes = [...new Set(idsDeleted)]
-
-      try {
-        for (const rid of uniqueDeletes) {
-          await persist(
-            () => apiManutencoes.remove(rid),
-            { resource: 'manutencoes', action: 'delete', id: rid },
-            undefined,
-            { throwOnFailure: true },
-          )
-        }
-        if (rowsCreated.length > 0) {
-          await persist(
-            () => apiManutencoes.bulkCreate(rowsCreated),
-            { resource: 'manutencoes', action: 'bulk_create', data: rowsCreated },
-            undefined,
-            { throwOnFailure: true },
-          )
-        }
-      } catch (persistErr) {
-        logger.error('DataContext', 'sincronizarAgendaCompleta', persistErr?.message || 'Persistência falhou', {
-          stack: persistErr?.stack?.slice(0, 400),
-        })
-        await fetchTodos({ source: 'manual', force: true })
-        return { ok: false, error: persistErr?.message || 'Erro ao guardar na API' }
-      }
-
-      setManutencoes(acc)
-
-      const updates = []
-      for (const maq of maqs) {
-        const proxima = minDataManutencaoAberta(maq.id, acc)
-        const oldV = maq.proximaManut ?? null
-        const newV = proxima ?? null
-        if (String(oldV ?? '') !== String(newV ?? '')) {
-          updates.push(updateMaquina(maq.id, { proximaManut: proxima }))
-        }
-      }
-      await Promise.all(updates)
-
-      const maquinasMerged = maqs.map(m => ({
-        ...m,
-        proximaManut: minDataManutencaoAberta(m.id, acc) ?? m.proximaManut ?? null,
-      }))
-
-      setClientes(d.clientes ?? [])
-      setCategorias(d.categorias ?? [])
-      setSubcategorias(d.subcategorias ?? [])
-      setChecklistItems(d.checklistItems ?? [])
-      setMarcas(prev => mergeMarcasPreferIncoming(d.marcas ?? [], prev))
-      setMaquinas(maquinasMerged)
-      setRelatorios(prev => mergeRelatoriosMantendoEnvio(prev, d.relatorios ?? []))
-      setReparacoes(d.reparacoes ?? [])
-      setRelatoriosReparacao(d.relatoriosReparacao ?? [])
-      setTecnicos(d.tecnicos ?? [])
-      setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
-
-      lastBulkFetchOkAtRef.current = Date.now()
-
-      saveCache({
-        ...d,
-        manutencoes: acc,
-        maquinas: maquinasMerged,
-      })
-
-      logger.action('DataContext', 'sincronizarAgendaCompleta', 'Agenda e fichas sincronizadas', {
-        recalculadas,
-        removidas: uniqueDeletes.length,
-        criadas: rowsCreated.length,
-        proximaAtualizadas: updates.length,
-      })
-
-      return {
-        ok: true,
-        recalculadas,
-        removidas: uniqueDeletes.length,
-        criadas: rowsCreated.length,
-        proximaAtualizadas: updates.length,
-      }
-    } finally {
-      agendaCompletaBusyRef.current = false
-    }
-  }, [fetchTodos, persist, updateMaquina])
+  // ── Reparações + relatórios (slice: reparacoesSlice.js) ─────────────────
+  const {
+    addReparacao,
+    updateReparacao,
+    removeReparacao,
+    addRelatorioReparacao,
+    updateRelatorioReparacao,
+    getRelatorioByReparacao,
+  } = useMemo(
+    () => createReparacoesHandlers({
+      getRelatoriosReparacao: () => relatoriosReparacaoRef.current,
+      setReparacoes,
+      setRelatoriosReparacao,
+      persist,
+      logger,
+    }),
+    [persist],
+  )
 
   // ── Peças e consumíveis — plano por máquina (MySQL via API; leitura: todos; escrita: só Admin no servidor) ──
   const addPecaPlano = useCallback((peca) => {
@@ -1033,14 +621,6 @@ export function DataProvider({ children }) {
       .sort((a, b) => (a.posicao ?? '').localeCompare(b.posicao ?? ''))
   }, [pecasPlano])
 
-  // ── Ordens de trabalho — iniciar manutenção ───────────────────────────────────
-  const iniciarManutencao = useCallback((id) => {
-    const inicioExecucao = new Date().toISOString()
-    updateManutencao(id, { status: 'em_progresso', inicioExecucao })
-    logger.action('DataContext', 'iniciarManutencao', `Manutenção ${id} iniciada`, { inicioExecucao })
-  }, [updateManutencao])
-
-  // ── Backup / Restore ──────────────────────────────────────────────────────────
 
   /**
    * Exporta todos os dados da aplicação como ficheiro JSON para download.

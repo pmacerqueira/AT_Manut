@@ -121,7 +121,7 @@
 
 ## 5. Resumo executivo
 
-A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T foi **removida na v1.16.95** — clientes criados manualmente na app. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
+A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. O `DataContext` foi modularizado em **slices** (`src/context/slices/`, passos 6–8). A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
 
 **Prioridades de produto:** seguir `CHANGELOG.md` / `docs/ROADMAP.md`. Decidir entre:
 - **Opção A** — Manter modo conservador: apenas correcções e pequenas melhorias (Etapa 2.1, 2.4).
@@ -130,4 +130,4 @@ A aplicação AT_Manut está **madura e estável** para operação diária. O m�
 
 ---
 
-*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-04-30 — v1.16.81 (Reparações E2E 16–17 estáveis / UI campo)*
+*Documento criado: 2026-03-12 — v1.11.0 · Última actualização: 2026-06-13 — v1.16.97 (slices DataContext passo 8)*

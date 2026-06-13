@@ -9,6 +9,23 @@ Política de continuidade:
 
 ---
 
+## [1.16.97] — 2026-06-13 — Passo 8: slices manutenções e reparações
+
+### Refactoring (sem alteração de comportamento)
+- **Passo 8:** `manutencoesDomain` + `manutencoesSlice` (CRUD, relatórios manutenção, agenda periódica, `sincronizarAgendaCompleta`); `reparacoesDomain` + `reparacoesSlice` (CRUD + relatórios reparação).
+- `DataContext.jsx` ~1200 → ~805 linhas; mantém `scheduleSyncProximaParaMaquinas` e `sincronizarProximaManutComAgenda` como ponte com `maquinasSlice`.
+
+### Qualidade
+- **Unit tests:** 92 (+7 domain manutenções/reparações).
+- **E2E:** specs 04-manutencoes + 16-reparacoes — 65 passed.
+- **Bugbot:** sem findings.
+
+### Documentação
+- `DESENVOLVIMENTO.md`, `DOCUMENTACAO.md`, `README.md`, `docs/TESTES-E2E.md`, `docs/ROADMAP.md`, `docs/ROADMAP-EVOLUCAO-2026.md`: slices passo 8, contagens actualizadas, referências SAF-T/spec 18 condensadas ou removidas.
+- Eliminados `tests/fixtures/clientes-import-test.json` e `invalid-import.json` (restos da importação SAF-T removida na v1.16.95).
+
+---
+
 ## [1.16.96] — 2026-06-13 — Passo 6+7: slices clientes, marcas, categorias e máquinas
 
 ### Refactoring (sem alteração de comportamento)

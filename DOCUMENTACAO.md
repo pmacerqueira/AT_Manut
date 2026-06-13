@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-04-30
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-06-13
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (92 testes) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -62,7 +62,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │
 │   ├── context/
 │   │   ├── AuthContext.jsx             # Login/logout, JWT, user, isAdmin
-│   │   ├── DataContext.jsx             # Estado global: CRUD de todas as entidades (re-exporta domínio)
+│   │   ├── DataContext.jsx             # Estado global: wiring, fetch, backup, sync proximaManut
+│   │   ├── slices/                     # Handlers CRUD extraídos (tecnicos, marcas, clientes, categorias, maquinas, manutencoes, reparacoes)
 │   │   └── GlobalLoadingContext.jsx    # Overlay de carregamento
 │   │
 │   ├── domain/
@@ -70,6 +71,15 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── agendaDomain.js             # Geração de periódicas futuras (lógica pura, sem React)
 │   │   ├── relatorioDomain.js          # Merge sync API + numeração sequencial de relatórios
 │   │   ├── manutencaoDomain.js         # Regras puras de eliminação em cascata na agenda
+│   │   ├── manutencoesDomain.js        # Builders manutenção + relatório manutenção
+│   │   ├── reparacoesDomain.js         # Builders reparação + relatório reparação
+│   │   ├── clientesDomain.js           # Entidade cliente
+│   │   ├── categoriasDomain.js         # Categorias, subcategorias, checklist
+│   │   ├── maquinasDomain.js           # Equipamentos e documentos
+│   │   ├── tecnicosDomain.js           # Técnicos
+│   │   ├── backupDomain.js             # Export/import JSON
+│   │   ├── persistDomain.js            # Online/offline + fila sync
+│   │   ├── crudPersistDomain.js        # Mapa recurso → apiService
 │   │   └── marcasDomain.js             # INITIAL_MARCAS, normalizeMarca, merge de marcas
 │   │
 │   ├── hooks/
