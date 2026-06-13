@@ -9,6 +9,27 @@ Política de continuidade:
 
 ---
 
+## [1.16.95] — 2026-06-12 — Remoção completa importação SAF-T
+
+### Decisão
+- Clientes passam a ser criados **manualmente**, caso a caso, na app — sem importação em massa a partir de SAF-T / Gestor.32.
+
+### Removido
+- Spec E2E `18-import-saft-clientes.spec.js`, fixtures `clientes-import-test.json` e `invalid-import.json`.
+- Script `extract-clientes-fttercei.js` e npm script `extract-clientes-fttercei`.
+- Documento `docs/FILOSOFT-INTEGRACAO.md`.
+
+### Correcções
+- **`Clientes.jsx`:** texto do modal «Eliminar todos» deixa de referir importação.
+
+### Qualidade
+- **E2E:** **452** testes listados em **19** ficheiros (specs `01–17`, `19`, `99`).
+
+### Documentação
+- `docs/TESTES-E2E.md`, `README.md`, `DOCUMENTACAO.md`, `docs/ROADMAP.md`, `docs/ROADMAP-EVOLUCAO-2026.md`, `.cursor/rules/at-manut-workflow.mdc`, `docs/MANUT-APP-INSIGHTS.md`.
+
+---
+
 ## [1.16.94] — 2026-06-12 — Passo 5: persist + CRUD slice técnicos
 
 ### Refactoring (sem alteração de comportamento)

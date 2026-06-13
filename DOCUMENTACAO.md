@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (456 testes listados em 19 ficheiros; spec 18 SAF-T em `skip` até a UI regressar) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -160,9 +160,9 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── helpers.js                      # Utilitários partilhados + dados mock (MC, incluindo reparações)
 │   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Núcleo (139 testes ao correr `--list`)
 │   ├── 10-etapas-evolucao.spec.js … 17-reparacoes-avancado.spec.js
-│   ├── 18-import-saft-clientes.spec.js # SAF-T clientes (6 listados; describe.skip até UI na página Clientes)
+│   ├── 19-domain-agenda.spec.js        # Domain agenda (2 testes)
 │   ├── 99-responsive-smoke.spec.js     # Smoke mobile/tablet (5 testes)
-│   └── Total suite: ver `docs/TESTES-E2E.md` (456 testes · 19 ficheiros)
+│   └── Total suite: ver `docs/TESTES-E2E.md` (452 testes · 19 ficheiros)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)

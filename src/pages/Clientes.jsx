@@ -1419,7 +1419,7 @@ export default function Clientes() {
               Esta acção elimina <strong>todos os clientes</strong>, máquinas, manutenções e relatórios. Não é possível desfazer.
             </p>
             <p className="text-muted" style={{ fontSize: '0.88rem' }}>
-              Use esta opção para limpar uma lista importada e importar uma nova.
+              Use apenas em ambiente de teste ou quando precisar de recomeçar a base de clientes do zero.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
               <button type="button" className="secondary" onClick={() => setModalEliminarTodos(false)}>Cancelar</button>

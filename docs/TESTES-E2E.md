@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **458 testes** em **20 ficheiros** (specs numerados `01–19` + `99-responsive-smoke.spec.js`). Os 6 testes do **spec 18 (SAF-T)** estão **listados** mas **omitidos em tempo de execução** (`test.describe.skip` em `18-import-saft-clientes.spec.js`) até o botão/modal voltar à página Clientes.
-> Última revisão: 2026-06-12 — v1.16.93
+**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **452 testes** em **19 ficheiros** (specs numerados `01–17`, `19` + `99-responsive-smoke.spec.js`).
+> Última revisão: 2026-06-12 — v1.16.95
 
 ---
 
@@ -26,10 +26,9 @@
 | `15-kaeser-pdf-import.spec.js` | 18 | Importação de PDF Kaeser — extracção e validação de dados |
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
-| `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T (omitido por `describe.skip` até a UI na página Clientes; cenários mantidos no ficheiro) |
 | `19-domain-agenda.spec.js` | 2 | Cascata delete concluída (B4); recálculo pós-execução persiste API (B5) |
 | `99-responsive-smoke.spec.js` | 5 | Smoke responsivo (mobile / tablet): barra inferior, cartões, calendário |
-| **Total** | **458** | **20 ficheiros** |
+| **Total** | **452** | **19 ficheiros** |
 
 > **Specs 01–09** (139 testes): núcleo da aplicação.
 > **Specs 10–11** (88 testes): alertas, QR, histórico (v1.5–v1.6).
@@ -37,7 +36,6 @@
 > **Spec 13** (15 testes): performance com `mock-large.js`.
 > **Specs 14–15** (50 testes): Kaeser.
 > **Specs 16–17** (111 testes): Reparações.
-> **Spec 18** (6 testes listados — **skip** até a UI «Importar SAF-T» regressar): importação SAF-T.
 > **Spec 19** (2 testes): domain agenda — cascata eliminar concluída + persistência recálculo periódicas.
 > **Spec 99** (5 testes): smoke responsivo (opcional em CI; incluído na suite completa por omissão).
 ---
@@ -315,24 +313,6 @@ MC = {
 
 ---
 
-### Spec 18 — Importação SAF-T de clientes (6 testes, **actualmente em skip**)
-
-O ficheiro usa `test.describe.skip` até o fluxo UI (botão «Importar SAF-T» + modal) voltar à página Clientes. Abaixo: cobertura pretendida quando o skip for removido.
-
-**Cobertura:**
-- Admin vê botão "Importar SAF-T"
-- Abrir modal de importação e ver instruções (ficheiro JSON, input file)
-- Ficheiro com estrutura inválida (object em vez de array) exibe erro `.form-erro`
-- Ficheiro JSON válido mostra pré-visualização (novos, existentes, total)
-- Importação completa: clientes aparecem na lista + toast de sucesso
-- 2ª importação do mesmo ficheiro (modo Ignorar): toast "ignorados"
-
-**Fixtures:** `tests/fixtures/clientes-import-test.json` (2 clientes), `invalid-import.json` (object inválido).
-
-**Mock:** `setupApiMock` acumula clientes criados em `clientesMutable` para `list` retornar dados actualizados.
-
----
-
 ## Problemas técnicos documentados e resoluções
 
 ### Emails durante E2E (send-email / send-report) — bloqueio automático
@@ -414,7 +394,7 @@ O ficheiro usa `test.describe.skip` até o fluxo UI (botão «Importar SAF-T» +
 
 ### Ao adicionar uma nova funcionalidade
 1. Identificar o módulo e as acções que cobre
-2. Adicionar testes ao spec correspondente ou criar novo spec numerado (ex.: `18-xxx.spec.js`)
+2. Adicionar testes ao spec correspondente ou criar novo spec numerado (ex.: `20-xxx.spec.js`)
 3. Atualizar `MC` em `helpers.js` com novos dados mock se necessário
 4. Correr `npx playwright test tests/e2e/` para confirmar que nada quebrou
 
@@ -439,9 +419,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-### Spec 18 SAF-T em pause
-**Motivo:** A UI na página Clientes não expõe de momento o botão/modal de importação; os testes permanecem no repositório com `describe.skip` para não bloquear a suite. **`importClientes`** e a API continuam disponíveis para integrações externas / scripts — ver `docs/FILOSOFT-INTEGRACAO.md`.
-
----
-
-*Última actualização: 2026-04-30 — v1.16.81*
+*Última actualização: 2026-06-12 — v1.16.95 (remoção spec 18 SAF-T)*

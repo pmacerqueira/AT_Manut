@@ -242,7 +242,7 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A suite tem **456 testes** listados (19 ficheiros em `tests/e2e/`) — contagem canónica: `npx playwright test tests/e2e/ --list`. O **spec 18 (SAF-T)** está em **`test.describe.skip`** até o botão/modal voltar à página Clientes (permanece na contagem `--list`). Reporters: **list**, **blob** (`blob-report/`, suporta `--last-failed`), **html**, **json**.
+A suite tem **452 testes** listados (19 ficheiros em `tests/e2e/`) — contagem canónica: `npx playwright test tests/e2e/ --list`. Reporters: **list**, **blob** (`blob-report/`, suporta `--last-failed`), **html**, **json**.
 
 ```powershell
 # O Playwright arranca o Vite via webServer (playwright.config.js). Com CI=true não reaproveita servidor na porta 5173.

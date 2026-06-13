@@ -14,9 +14,9 @@
 |----------|--------|-----------|
 | **Base técnica** | React 19, Vite, PWA, offline-first | Solidez para escalar; stack moderna |
 | **Integridade de dados** | Cascatas CRUD completas, confirmações de eliminação | Dados consistentes; protecção contra erros |
-| **Cobertura E2E** | 456 testes listados em 19 ficheiros (`docs/TESTES-E2E.md`; spec 18 em skip) | Regressão controlada; refactoring seguro |
+| **Cobertura E2E** | 452 testes listados em 19 ficheiros (`docs/TESTES-E2E.md`) | Regressão controlada; refactoring seguro |
 | **Módulos maduros** | Clientes, Equipamentos, Manutenções, Reparações | Núcleo completo para operação diária |
-| **Integrações** | ISTOBAL (webhook), Kaeser (PDF), SAF-T (Gestor.32) | Ecossistema alargado; dados centralizados |
+| **Integrações** | ISTOBAL (webhook), Kaeser (PDF) | Ecossistema alargado; dados centralizados |
 | **UX em campo** | Modo campo, QR Code, assinatura digital, fotos | Adequado a técnicos em instalações |
 | **Dois perfis** | Admin / ATecnica com RBAC | Segurança e auditoria |
 
@@ -46,9 +46,8 @@
 
 | Acção | Prioridade | Notas |
 |-------|------------|-------|
-| Executar suite E2E completa e corrigir falhas | Alta | Especialmente spec 18 (importação) |
+| Executar suite E2E completa e corrigir falhas | Alta | — |
 | Build final + deploy cPanel | Alta | dist_upload.zip |
-| Verificar importação SAF-T em produção | Alta | Testar com ficheiro real |
 | Tag Git v1.9.7 | Média | Histórico de versões |
 
 ---
@@ -90,9 +89,8 @@
 ## 3. Decisão passo-a-passo recomendada
 
 ### Imediato (esta semana)
-1. **Concluir v1.9.7** — Corrigir falhas E2E do spec 18 se existirem; build + deploy.
-2. **Validar importação SAF-T** — Testar em produção com ficheiro real de clientes.
-3. **Commit + tag** — `git tag v1.9.7` e push para GitHub.
+1. **Concluir v1.9.7** — Corrigir falhas E2E se existirem; build + deploy.
+2. **Commit + tag** — `git tag v1.9.7` e push para GitHub.
 
 ### Curto prazo (próximas 2 semanas)
 1. **Etapa 2.1** — BroadcastChannel para multi-tab (baixo esforço, valor visível).
@@ -114,7 +112,7 @@
 
 | Métrica | Actual | Meta v2.0 |
 |---------|--------|-----------|
-| Testes E2E a passar | 456 listados (450 activos; spec 18 skip) | 100% activos |
+| Testes E2E a passar | 452 listados | 100% activos |
 | Tempo de build | ~60s | <90s |
 | Cobertura de fluxos críticos | Alta | Mantida |
 | Tempo de deploy (cPanel) | ~5 min | <10 min |
@@ -123,9 +121,9 @@
 
 ## 5. Resumo executivo
 
-A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T via **UI** na página Clientes está em pause (E2E spec 18 em `skip`); o pipeline **script + `importClientes`** / API mantém-se para uso operacional. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
+A aplicação AT_Manut está **madura e estável** para operação diária. O módulo Reparações (incluindo ISTOBAL, relatórios, assinaturas, email) está completo e testado. A importação SAF-T foi **removida na v1.16.95** — clientes criados manualmente na app. A **v1.12.0** reforçou a integridade de dados (cascatas CRUD, confirmações de eliminação, bloqueio de relatórios assinados) e o pipeline de agendamento.
 
-**Próximo passo imediato (roadmap legado):** Avaliar retoma da UI «Importar SAF-T» e do spec 18. Entretanto, prioridades de produto seguem `CHANGELOG.md` / `ROADMAP.md`. Decidir entre:
+**Prioridades de produto:** seguir `CHANGELOG.md` / `docs/ROADMAP.md`. Decidir entre:
 - **Opção A** — Manter modo conservador: apenas correcções e pequenas melhorias (Etapa 2.1, 2.4).
 - **Opção B** — Avançar com faturação (Etapa 2.3) se houver necessidade de negócio.
 - **Opção C** — Investir em notificações push (Etapa 3.1) se alertas em tempo real forem prioritários.

@@ -24,7 +24,7 @@
 - Sempre que houver correção crítica, registar impacto funcional e risco mitigado.
 
 ### C. Notas de sessão
-- Registar decisões e contexto de sessões relevantes no `CHANGELOG.md` e, quando justificado, em documentos dedicados em `docs/` (ex.: `docs/FILOSOFT-INTEGRACAO.md`).
+- Registar decisões e contexto de sessões relevantes no `CHANGELOG.md` e, quando justificado, em documentos dedicados em `docs/`.
 - Cada nota deve incluir: contexto, problema, causa raiz, ficheiros alterados e próximos passos.
 
 ---

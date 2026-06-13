@@ -426,7 +426,7 @@ export async function stubEmailPhpEndpoints(page) {
 export async function setupApiMock(page, { failFetch = false, customData = {}, apiState = null } = {}) {
   await stubEmailPhpEndpoints(page)
   const data = { ...buildMc(), ...customData }
-  // Estado mutável para clientes (create/update) — permite testes de importação SAF-T
+  // Estado mutável para clientes (create/update) — persiste creates/updates no mock entre pedidos
   const clientesMutable = [...(data.clientes ?? [])]
   const pecasPlanoMutable = [...(data.pecasPlano ?? [])]
   const manutencoesMutable = [...(data.manutencoes ?? [])]
