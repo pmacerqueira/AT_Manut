@@ -5,7 +5,6 @@
  * Estrutura: clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios.
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { flushSync } from 'react-dom'
 import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
 import {
   buildDiasOcupadosFromManutencoes,
@@ -25,8 +24,11 @@ import {
   runBackupBulkRestore,
 } from '../domain/backupDomain'
 import { runPersist } from '../domain/persistDomain'
-import { schedulePersistViaApi } from '../domain/crudPersistDomain'
 import { createTecnicosHandlers } from './slices/tecnicosSlice'
+import { createMarcasHandlers } from './slices/marcasSlice'
+import { createClientesHandlers } from './slices/clientesSlice'
+import { createCategoriasHandlers } from './slices/categoriasSlice'
+import { createMaquinasHandlers } from './slices/maquinasSlice'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
@@ -48,9 +50,7 @@ import {
 } from '../domain/equipamentoDomain'
 import {
   INITIAL_MARCAS,
-  normalizeMarca,
   mergeMarcasPreferIncoming,
-  shouldRetryMarcaCreateWithId,
 } from '../domain/marcasDomain'
 
 export {
@@ -93,10 +93,16 @@ export function DataProvider({ children }) {
   /** Evita cliques repetidos em «Sincronizar agenda completa». */
   const agendaCompletaBusyRef = useRef(false)
   const [relatorios,          setRelatorios]          = useState([])
+  const relatoriosRef = useRef([])
+  relatoriosRef.current = relatorios
   const [reparacoes,          setReparacoes]          = useState([])
   const [relatoriosReparacao, setRelatoriosReparacao] = useState([])
+  const relatoriosReparacaoRef = useRef([])
+  relatoriosReparacaoRef.current = relatoriosReparacao
   const [tecnicos,            setTecnicos]            = useState([])
   const [pecasPlano,    setPecasPlano]    = useState([])
+  const pecasPlanoRef = useRef([])
+  pecasPlanoRef.current = pecasPlano
   const [loading,       setLoading]       = useState(true)
 
   // ── Estado de conectividade e sincronização ────────────────────────────────
@@ -275,6 +281,20 @@ export function DataProvider({ children }) {
 
   const tecnicosRef = useRef([])
   tecnicosRef.current = tecnicos
+  const marcasRef = useRef([])
+  marcasRef.current = marcas
+  const clientesRef = useRef([])
+  clientesRef.current = clientes
+  const maquinasRef = useRef([])
+  maquinasRef.current = maquinas
+  const reparacoesRef = useRef([])
+  reparacoesRef.current = reparacoes
+  const categoriasRef = useRef([])
+  categoriasRef.current = categorias
+  const subcategoriasRef = useRef([])
+  subcategoriasRef.current = subcategorias
+  const checklistItemsRef = useRef([])
+  checklistItemsRef.current = checklistItems
 
   const persist = useCallback(async (apiFn, queueDescriptor, rollback, opts = {}) => {
     return runPersist({
@@ -293,6 +313,84 @@ export function DataProvider({ children }) {
     () => createTecnicosHandlers({
       getTecnicos: () => tecnicosRef.current,
       setTecnicos,
+      persist,
+      logger,
+    }),
+    [persist],
+  )
+
+  const { addMarca, updateMarca } = useMemo(
+    () => createMarcasHandlers({
+      getMarcas: () => marcasRef.current,
+      setMarcas,
+      logger,
+    }),
+    [],
+  )
+
+  const { addCliente, updateCliente, removeCliente, clearAllClientesAndRelated } = useMemo(
+    () => createClientesHandlers({
+      getClientes: () => clientesRef.current,
+      setClientes,
+      getMaquinas: () => maquinasRef.current,
+      setMaquinas,
+      getManutencoes: () => manutencoesRef.current,
+      setManutencoes,
+      getReparacoes: () => reparacoesRef.current,
+      setRelatorios,
+      setReparacoes,
+      getRelatoriosReparacao: () => relatoriosReparacaoRef.current,
+      setRelatoriosReparacao,
+      getPecasPlano: () => pecasPlanoRef.current,
+      setPecasPlano,
+      getCategorias: () => categoriasRef.current,
+      getSubcategorias: () => subcategoriasRef.current,
+      getChecklistItems: () => checklistItemsRef.current,
+      persist,
+      logger,
+    }),
+    [persist],
+  )
+
+  const {
+    addSubcategoria,
+    updateSubcategoria,
+    removeSubcategoria,
+    addChecklistItem,
+    updateChecklistItem,
+    removeChecklistItem,
+    addCategoria,
+    updateCategoria,
+    removeCategoria,
+  } = useMemo(
+    () => createCategoriasHandlers({
+      getMaquinas: () => maquinasRef.current,
+      getSubcategorias: () => subcategoriasRef.current,
+      getChecklistItems: () => checklistItemsRef.current,
+      setCategorias,
+      setSubcategorias,
+      setChecklistItems,
+      persist,
+    }),
+    [persist],
+  )
+
+  const {
+    addMaquina,
+    updateMaquina,
+    removeMaquina,
+    addDocumentoMaquina,
+    removeDocumentoMaquina,
+  } = useMemo(
+    () => createMaquinasHandlers({
+      getManutencoes: () => manutencoesRef.current,
+      getReparacoes: () => reparacoesRef.current,
+      setMaquinas,
+      setManutencoes,
+      setRelatorios,
+      setReparacoes,
+      setRelatoriosReparacao,
+      setPecasPlano,
       persist,
       logger,
     }),
@@ -337,459 +435,15 @@ export function DataProvider({ children }) {
     }
   }, [loading, maquinas, manutencoes, persist])
 
-  // ── Subcategorias ─────────────────────────────────────────────────────────
-  const addSubcategoria = useCallback((s) => {
-    if (!s.nome?.trim()) return null
-    const id = 'sub' + Date.now()
-    const novo = { ...s, id }
-    setSubcategorias(prev => [...prev, novo])
-    schedulePersistViaApi(persist, {
-      resource: 'subcategorias',
-      runWithApi: api => api.create(novo),
-      queueDescriptor: { resource: 'subcategorias', action: 'create', data: novo },
-    })
-    return id
-  }, [persist])
+  // ── Subcategorias / Checklist / Categorias (slice: categoriasSlice.js) ───
 
-  const updateSubcategoria = useCallback((id, data) => {
-    setSubcategorias(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
-    schedulePersistViaApi(persist, {
-      resource: 'subcategorias',
-      runWithApi: api => api.update(id, data),
-      queueDescriptor: { resource: 'subcategorias', action: 'update', id, data },
-    })
-  }, [persist])
+  // ── Clientes (slice: context/slices/clientesSlice.js) ───────────────────
 
-  const removeSubcategoria = useCallback((id) => {
-    if (maquinas.some(m => m.subcategoriaId === id)) return false
-    const idsCheck = checklistItems.filter(c => c.subcategoriaId === id).map(c => c.id)
-    setSubcategorias(prev => prev.filter(s => s.id !== id))
-    setChecklistItems(prev => prev.filter(c => c.subcategoriaId !== id))
-    import('../services/apiService').then(({ apiSubcategorias, apiChecklistItems }) => {
-      idsCheck.forEach(cid =>
-        persist(() => apiChecklistItems.remove(cid),
-                { resource: 'checklistItems', action: 'delete', id: cid })
-      )
-      persist(() => apiSubcategorias.remove(id),
-              { resource: 'subcategorias', action: 'delete', id })
-    })
-    return true
-  }, [maquinas, checklistItems, persist])
-
-  // ── Checklist ─────────────────────────────────────────────────────────────
-  const addChecklistItem = useCallback((item) => {
-    const id = 'ch' + Date.now()
-    const novo = { ...item, id }
-    setChecklistItems(prev => [...prev, novo])
-    import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.create(novo),
-              { resource: 'checklistItems', action: 'create', data: novo })
-    )
-    return id
-  }, [persist])
-
-  const updateChecklistItem = useCallback((id, data) => {
-    setChecklistItems(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
-    import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.update(id, data),
-              { resource: 'checklistItems', action: 'update', id, data })
-    )
-  }, [persist])
-
-  const removeChecklistItem = useCallback((id) => {
-    setChecklistItems(prev => prev.filter(c => c.id !== id))
-    import('../services/apiService').then(({ apiChecklistItems }) =>
-      persist(() => apiChecklistItems.remove(id),
-              { resource: 'checklistItems', action: 'delete', id })
-    )
-  }, [persist])
-
-  // ── Clientes ──────────────────────────────────────────────────────────────
-  const addCliente = useCallback((c) => {
-    const nif = String(c.nif).trim()
-    if (clientes.some(cli => cli.nif === nif)) return null
-    const id = 'cli' + Date.now()
-    const novo = { ...c, id, nif }
-    setClientes(prev => [...prev, novo])
-    logger.action('DataContext', 'addCliente', `Cliente "${c.nome || '—'}" adicionado`, { nif })
-    import('../services/apiService').then(({ apiClientes }) =>
-      persist(() => apiClientes.create(novo),
-              { resource: 'clientes', action: 'create', data: novo })
-    )
-    return nif
-  }, [clientes, persist])
-
-  const updateCliente = useCallback((nif, data) => {
-    setClientes(prev => prev.map(c => c.nif === nif ? { ...c, ...data } : c))
-    const cli = clientes.find(c => c.nif === nif)
-    if (cli) {
-      const merged = { ...cli, ...data }
-      const recId  = cli.id ?? nif
-      import('../services/apiService').then(({ apiClientes }) =>
-        persist(() => apiClientes.update(recId, merged),
-                { resource: 'clientes', action: 'update', id: recId, data: merged })
-      )
-    }
-  }, [clientes, persist])
-
-  const removeCliente = useCallback((nif) => {
-    const cli = clientes.find(c => c.nif === nif)
-    logger.action('DataContext', 'removeCliente', `Cliente "${cli?.nome || nif}" eliminado`, { nif })
-    const maqIds   = maquinas.filter(m => m.clienteNif === nif || m.clienteId === nif).map(m => m.id)
-    const manutIds = manutencoes.filter(m => maqIds.includes(m.maquinaId)).map(m => m.id)
-    const repIds   = reparacoes.filter(r => maqIds.includes(r.maquinaId)).map(r => r.id)
-    setClientes(prev => prev.filter(c => c.nif !== nif))
-    setMaquinas(prev => prev.filter(m => m.clienteNif !== nif && m.clienteId !== nif))
-    setManutencoes(prev => prev.filter(m => !maqIds.includes(m.maquinaId)))
-    setRelatorios(prev => prev.filter(r => !manutIds.includes(r.manutencaoId)))
-    setReparacoes(prev => prev.filter(r => !maqIds.includes(r.maquinaId)))
-    setRelatoriosReparacao(prev => prev.filter(r => !repIds.includes(r.reparacaoId)))
-    setPecasPlano(prev => prev.filter(p => !maqIds.includes(p.maquinaId)))
-    if (cli) {
-      const recId = cli.id ?? nif
-      import('../services/apiService').then(({ apiClientes }) =>
-        persist(() => apiClientes.remove(recId),
-                { resource: 'clientes', action: 'delete', id: recId })
-      )
-    }
-  }, [clientes, maquinas, manutencoes, reparacoes, persist])
-
-  /**
-   * Elimina todos os clientes e dados relacionados (máquinas, manutenções, relatórios, reparações).
-   * Usa bulk_restore com arrays vazios. Apenas Admin.
-   */
-  const clearAllClientesAndRelated = useCallback(async () => {
-    setRelatoriosReparacao([])
-    setRelatorios([])
-    setManutencoes([])
-    setReparacoes([])
-    setMaquinas([])
-    setClientes([])
-    setPecasPlano([])
-    try {
-      const {
-        apiRelatoriosReparacao, apiRelatorios, apiManutencoes, apiReparacoes, apiMaquinas, apiClientes,
-      } = await import('../services/apiService')
-      await apiRelatoriosReparacao.bulkRestore([])
-      await apiRelatorios.bulkRestore([])
-      await apiManutencoes.bulkRestore([])
-      await apiReparacoes.bulkRestore([])
-      await apiMaquinas.bulkRestore([])
-      await apiClientes.bulkRestore([])
-      saveCache({
-        clientes: [], categorias, subcategorias, checklistItems,
-        maquinas: [], manutencoes: [], relatorios: [],
-        reparacoes: [], relatoriosReparacao: [],
-      })
-      logger.action('DataContext', 'clearAllClientesAndRelated', 'Todos os clientes e dados relacionados eliminados')
-    } catch (err) {
-      logger.error('DataContext', 'clearAllClientesAndRelated', err.message, { stack: err.stack?.slice(0, 400) })
-      throw err
-    }
-  }, [categorias, subcategorias, checklistItems])
-
-  // ── Categorias ────────────────────────────────────────────────────────────
-  const addCategoria = useCallback((c) => {
-    if (!c.nome?.trim()) return null
-    const id = 'cat' + Date.now()
-    const novo = { ...c, id }
-    setCategorias(prev => [...prev, novo])
-    import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.create(novo),
-              { resource: 'categorias', action: 'create', data: novo })
-    )
-    return id
-  }, [persist])
-
-  const updateCategoria = useCallback((id, data) => {
-    setCategorias(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
-    import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.update(id, data),
-              { resource: 'categorias', action: 'update', id, data })
-    )
-  }, [persist])
-
-  const removeCategoria = useCallback((id) => {
-    if (subcategorias.some(s => s.categoriaId === id)) return false
-    setCategorias(prev => prev.filter(c => c.id !== id))
-    import('../services/apiService').then(({ apiCategorias }) =>
-      persist(() => apiCategorias.remove(id),
-              { resource: 'categorias', action: 'delete', id })
-    )
-    return true
-  }, [subcategorias, persist])
-
-  // ── Marcas ───────────────────────────────────────────────────────────────
-  const addMarca = useCallback(async (m) => {
-    const nome = (m?.nome ?? '').trim()
-    if (!nome) return null
-
-    const existing = marcas.find(x => (x.nome ?? '').trim().toLowerCase() === nome.toLowerCase())
-    if (existing?.id != null) return existing.id
-
-    const tempId = `tmp_mk_${Date.now()}`
-    const novo = {
-      id: tempId,
-      nome,
-      logoUrl: (m?.logoUrl ?? '').trim(),
-      corHex: (m?.corHex ?? '').trim(),
-      ativo: m?.ativo ?? true,
-    }
-
-    setMarcas(prev => [...prev, novo].sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
-
-    try {
-      const { apiMarcas } = await import('../services/apiService')
-      // Não enviar "id" no create: em MySQL é tipicamente AUTO_INCREMENT.
-      const payload = { nome: novo.nome, logoUrl: novo.logoUrl, corHex: novo.corHex, ativo: novo.ativo }
-      let created
-      try {
-        created = await apiMarcas.create(payload)
-      } catch (err) {
-        if (!shouldRetryMarcaCreateWithId(err)) throw err
-        // Compatibilidade com esquemas legacy em que "marcas.id" é PK string sem default.
-        const retryId = `mk${Date.now()}`
-        created = await apiMarcas.create({ ...payload, id: retryId })
-      }
-
-      const persisted = normalizeMarca({
-        ...novo,
-        ...(created || {}),
-        id: created?.id ?? created?.ID ?? tempId,
-      })
-
-      setMarcas(prev => prev
-        .map(x => String(x.id) === String(tempId) ? persisted : x)
-        .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
-
-      return persisted.id
-    } catch (err) {
-      setMarcas(prev => prev.filter(x => String(x.id) !== String(tempId)))
-      logger.error('DataContext', 'addMarca', err?.message || 'Falha ao criar marca', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-  }, [marcas])
-
-  const updateMarca = useCallback(async (id, data) => {
-    const before = marcas
-    const atual = before.find(m => String(m.id) === String(id))
-    const merged = normalizeMarca({ ...(atual || {}), ...(data || {}) })
-    setMarcas(prev => prev
-      .map(m => String(m.id) === String(id) ? { ...m, ...merged } : m)
-      .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
-    try {
-      const { apiMarcas } = await import('../services/apiService')
-      let targetId = id
-      const idStr = String(id ?? '')
-      const isLegacyLocalId = !idStr || /^mk\d+$/i.test(idStr) || idStr.startsWith('tmp_mk_')
-
-      if (isLegacyLocalId) {
-        const remote = await apiMarcas.list().catch(() => [])
-        const remoteByName = (remote || []).find(x =>
-          String(x?.nome || '').trim().toLowerCase() === String(merged?.nome || '').trim().toLowerCase(),
-        )
-
-        if (remoteByName?.id != null) {
-          targetId = remoteByName.id
-          await apiMarcas.update(targetId, data)
-        } else {
-          const payloadCreate = {
-            nome: merged.nome || '',
-            logoUrl: merged.logoUrl || '',
-            corHex: merged.corHex || '',
-            ativo: merged.ativo ?? true,
-          }
-          let created
-          try {
-            created = await apiMarcas.create(payloadCreate)
-          } catch (err) {
-            if (!shouldRetryMarcaCreateWithId(err)) throw err
-            const retryId = `mk${Date.now()}`
-            created = await apiMarcas.create({ ...payloadCreate, id: retryId })
-          }
-          targetId = created?.id ?? created?.ID ?? id
-        }
-      } else {
-        await apiMarcas.update(id, data)
-      }
-
-      if (String(targetId) !== String(id)) {
-        setMarcas(prev => prev
-          .map(m => String(m.id) === String(id) ? { ...m, id: targetId } : m)
-          .sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt')))
-      }
-    } catch (err) {
-      setMarcas(before)
-      logger.error('DataContext', 'updateMarca', err?.message || 'Falha ao atualizar marca', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-  }, [marcas])
+  // ── Marcas (slice: context/slices/marcasSlice.js) ─────────────────────────
 
   // ── Técnicos (slice: context/slices/tecnicosSlice.js) ─────────────────────
 
-  // ── Máquinas ──────────────────────────────────────────────────────────────
-  const addMaquina = useCallback(async (m) => {
-    const id = String(Date.now())
-    const { clienteId, ...rest } = m
-    const novo = { ...rest, id, clienteId: m.clienteId ?? m.clienteNif, clienteNif: m.clienteNif ?? clienteId, documentos: m.documentos ?? [] }
-    setMaquinas(prev => [...prev, novo])
-    logger.action('DataContext', 'addMaquina', `Equipamento "${m.marca} ${m.modelo || ''}" adicionado`, { id, clienteNif: novo.clienteNif })
-    try {
-      const { apiMaquinas } = await import('../services/apiService')
-      await persist(
-        () => apiMaquinas.create(novo),
-        { resource: 'maquinas', action: 'create', data: novo },
-        () => setMaquinas(prev => prev.filter(x => String(x.id) !== String(id))),
-        { throwOnFailure: true }
-      )
-    } catch (err) {
-      logger.error('DataContext', 'addMaquina', err?.message || 'Falha ao criar equipamento', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-    return id
-  }, [persist])
-
-  const addDocumentoMaquina = useCallback(async (maquinaId, doc) => {
-    let nextMaq = null
-    let snapshotDocs = null
-    let docId = null
-    let replacedUpload = false
-
-    flushSync(() => {
-      setMaquinas(prev => {
-        const m = prev.find(x => String(x.id) === String(maquinaId))
-        if (!m) return prev
-        snapshotDocs = (m.documentos ?? []).map(d => ({ ...d }))
-        const docs = [...(m.documentos ?? [])]
-        const sigName = doc.uploadFileName
-        const sigSize = doc.uploadFileSize
-        const hasSig =
-          sigName != null &&
-          String(sigName).trim() !== '' &&
-          typeof sigSize === 'number' &&
-          sigSize >= 0
-
-        if (hasSig) {
-          const idx = docs.findIndex(
-            d =>
-              d.tipo === doc.tipo &&
-              d.uploadFileName === sigName &&
-              Number(d.uploadFileSize) === Number(sigSize)
-          )
-          if (idx !== -1) {
-            docId = docs[idx].id
-            docs[idx] = { ...docs[idx], ...doc, id: docId }
-            replacedUpload = true
-            nextMaq = { ...m, documentos: docs }
-            return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
-          }
-        }
-
-        docId = 'doc' + Date.now()
-        nextMaq = { ...m, documentos: [...docs, { ...doc, id: docId }] }
-        return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
-      })
-    })
-
-    if (!nextMaq || snapshotDocs === null) {
-      logger.warn('DataContext', 'addDocumentoMaquina', 'Equipamento não encontrado no estado (id)', { maquinaId })
-      return { ok: false, docId: null, replaced: false }
-    }
-
-    const { apiMaquinas } = await import('../services/apiService')
-    const rollback = () => {
-      setMaquinas(prev =>
-        prev.map(mm =>
-          String(mm.id) === String(maquinaId)
-            ? { ...mm, documentos: (snapshotDocs ?? []).map(d => ({ ...d })) }
-            : mm
-        )
-      )
-    }
-    try {
-      await persist(
-        () => apiMaquinas.update(maquinaId, nextMaq),
-        { resource: 'maquinas', action: 'update', id: maquinaId, data: nextMaq },
-        rollback,
-        { throwOnFailure: true }
-      )
-      return { ok: true, docId, replaced: replacedUpload }
-    } catch (err) {
-      logger.error('DataContext', 'addDocumentoMaquina', err?.message || 'Falha ao gravar documento na API', {
-        stack: err?.stack?.slice(0, 300),
-      })
-      return { ok: false, docId: null, replaced: false }
-    }
-  }, [persist])
-
-  const removeDocumentoMaquina = useCallback(async (maquinaId, docId) => {
-    let snapshotMaq = null
-    let nextMaq = null
-    flushSync(() => {
-      setMaquinas(prev => {
-        const m = prev.find(x => String(x.id) === String(maquinaId))
-        if (!m) return prev
-        snapshotMaq = m
-        nextMaq = {
-          ...m,
-          documentos: (m.documentos ?? []).filter(d => String(d.id) !== String(docId)),
-        }
-        return prev.map(mm => (String(mm.id) === String(maquinaId) ? nextMaq : mm))
-      })
-    })
-    if (!nextMaq || !snapshotMaq) {
-      logger.warn('DataContext', 'removeDocumentoMaquina', 'Equipamento ou documento não encontrado', {
-        maquinaId,
-        docId,
-      })
-      return { ok: false }
-    }
-    const { apiMaquinas } = await import('../services/apiService')
-    const rollback = () => {
-      setMaquinas(prev => prev.map(mm => (String(mm.id) === String(maquinaId) ? snapshotMaq : mm)))
-    }
-    try {
-      await persist(
-        () => apiMaquinas.update(maquinaId, nextMaq),
-        { resource: 'maquinas', action: 'update', id: maquinaId, data: nextMaq },
-        rollback,
-        { throwOnFailure: true }
-      )
-      return { ok: true }
-    } catch (err) {
-      logger.error('DataContext', 'removeDocumentoMaquina', err?.message || 'Falha ao remover documento na API', {
-        stack: err?.stack?.slice(0, 300),
-      })
-      return { ok: false }
-    }
-  }, [persist])
-
-  const updateMaquina = useCallback(async (id, data) => {
-    let snapshot
-    setMaquinas(prev => {
-      snapshot = prev
-      return prev.map(m => String(m.id) === String(id) ? { ...m, ...data } : m)
-    })
-    try {
-      const { apiMaquinas } = await import('../services/apiService')
-      let serverRow = null
-      await persist(
-        async () => {
-          serverRow = await apiMaquinas.update(id, data)
-        },
-        { resource: 'maquinas', action: 'update', id, data },
-        () => { if (snapshot) setMaquinas(snapshot) },
-        { throwOnFailure: true }
-      )
-      if (serverRow && typeof serverRow === 'object') {
-        setMaquinas(prev =>
-          prev.map(m => (String(m.id) === String(id) ? { ...m, ...serverRow } : m)))
-      }
-    } catch (err) {
-      logger.error('DataContext', 'updateMaquina', err?.message || 'Falha ao atualizar equipamento', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-  }, [persist])
+  // ── Máquinas (slice: context/slices/maquinasSlice.js) ─────────────────────
 
   /**
    * Após `setManutencoes`, grava na BD `proximaManut` derivada da agenda (microtask → estado já consolidado).
@@ -817,22 +471,6 @@ export function DataProvider({ children }) {
       updateMaquina(maquinaId, { proximaManut: proxima, ...extraPatch })
     })
   }, [updateMaquina])
-
-  const removeMaquina = useCallback((id) => {
-    const maqManutIds = manutencoes.filter(m => m.maquinaId === id).map(m => m.id)
-    const maqRepIds = reparacoes.filter(r => r.maquinaId === id).map(r => r.id)
-    setMaquinas(prev => prev.filter(m => m.id !== id))
-    setManutencoes(prev => prev.filter(m => m.maquinaId !== id))
-    setRelatorios(prev => prev.filter(r => !maqManutIds.includes(r.manutencaoId)))
-    setReparacoes(prev => prev.filter(r => r.maquinaId !== id))
-    setRelatoriosReparacao(prev => prev.filter(r => !maqRepIds.includes(r.reparacaoId)))
-    setPecasPlano(prev => prev.filter(p => p.maquinaId !== id))
-    logger.action('DataContext', 'removeMaquina', `Máquina ${id} eliminada (cascata: ${maqManutIds.length} manut, ${maqRepIds.length} rep)`, { id })
-    import('../services/apiService').then(({ apiMaquinas }) =>
-      persist(() => apiMaquinas.remove(id),
-              { resource: 'maquinas', action: 'delete', id })
-    )
-  }, [manutencoes, reparacoes, persist])
 
   // ── Manutenções ───────────────────────────────────────────────────────────
   const addManutencao = useCallback((m) => {

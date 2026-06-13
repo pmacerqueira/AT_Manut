@@ -2,7 +2,7 @@
  * Domínio de marcas — lista inicial e merge com dados do servidor.
  * Extraído do DataContext (v1.16.85).
  */
-import { MARCAS_COMPRESSOR, MARCAS_ELEVADOR } from './equipamentoDomain'
+import { MARCAS_COMPRESSOR, MARCAS_ELEVADOR } from './equipamentoDomain.js'
 
 export const INITIAL_MARCAS = [...new Set([...MARCAS_COMPRESSOR, ...MARCAS_ELEVADOR])]
   .sort((a, b) => a.localeCompare(b, 'pt'))
@@ -41,4 +41,58 @@ export function shouldRetryMarcaCreateWithId(err) {
   return msg.includes("duplicate entry '' for key 'primary'")
     || msg.includes("field 'id' doesn't have a default value")
     || msg.includes('null value in column')
+}
+
+export function sortMarcasByNome(marcas) {
+  return [...marcas].sort((a, b) => (a.nome ?? '').localeCompare((b.nome ?? ''), 'pt'))
+}
+
+export function findMarcaByNomeIgnoreCase(marcas, nome) {
+  const key = (nome ?? '').trim().toLowerCase()
+  return marcas.find(x => (x.nome ?? '').trim().toLowerCase() === key)
+}
+
+export function buildNovaMarca(m, tempId = `tmp_mk_${Date.now()}`) {
+  const nome = (m?.nome ?? '').trim()
+  return {
+    id: tempId,
+    nome,
+    logoUrl: (m?.logoUrl ?? '').trim(),
+    corHex: (m?.corHex ?? '').trim(),
+    ativo: m?.ativo ?? true,
+  }
+}
+
+export function mergeMarcaInList(marcas, id, patch) {
+  return sortMarcasByNome(
+    marcas.map(m => (String(m.id) === String(id) ? { ...m, ...patch } : m)),
+  )
+}
+
+export function replaceMarcaIdInList(marcas, oldId, newId) {
+  return sortMarcasByNome(
+    marcas.map(m => (String(m.id) === String(oldId) ? { ...m, id: newId } : m)),
+  )
+}
+
+export function removeMarcaFromList(marcas, id) {
+  return marcas.filter(x => String(x.id) !== String(id))
+}
+
+export function isLegacyLocalMarcaId(id) {
+  const idStr = String(id ?? '')
+  return !idStr || /^mk\d+$/i.test(idStr) || idStr.startsWith('tmp_mk_')
+}
+
+export function buildMarcaApiPayload(marca) {
+  return {
+    nome: marca.nome || '',
+    logoUrl: marca.logoUrl || '',
+    corHex: marca.corHex || '',
+    ativo: marca.ativo ?? true,
+  }
+}
+
+export function resolvePersistedMarcaId(created, fallbackId) {
+  return created?.id ?? created?.ID ?? fallbackId
 }

@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.16.96] — 2026-06-13 — Passo 6+7: slices clientes, marcas, categorias e máquinas
+
+### Refactoring (sem alteração de comportamento)
+- **Passo 6:** `clientesDomain` + `clientesSlice`; `marcasSlice` + helpers em `marcasDomain`.
+- **Passo 7:** `categoriasDomain` + `categoriasSlice` (categorias, subcategorias, checklist); `maquinasDomain` + `maquinasSlice` (equipamentos, documentos, cascata).
+- `DataContext.jsx` delega CRUD a slices; refs para estado actual.
+
+### Correcções (pós-review Bugbot)
+- **`clientesSlice`:** `getReparacoes` em falta no destructuring — `removeCliente` falhava com `ReferenceError`.
+- **`DataContext`:** bloco duplicado `removeMaquina` removido; chave duplicada `getReparacoes` no wiring de `createClientesHandlers`.
+
+### Qualidade
+- **Unit tests:** 85 (+9 domain/slices).
+- **E2E:** specs 03-clientes e 08-equipamentos — 34 passed.
+- **Build:** limpo após correcções Bugbot.
+
+---
+
 ## [1.16.95] — 2026-06-12 — Remoção completa importação SAF-T
 
 ### Decisão

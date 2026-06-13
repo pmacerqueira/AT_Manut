@@ -63,7 +63,14 @@ Próximo passo:
 | `src/domain/persistDomain.js` | `runPersist` — online/offline + fila syncQueue |
 | `src/domain/crudPersistDomain.js` | `persistViaApi`, `schedulePersistViaApi`, mapa recurso → apiService |
 | `src/domain/tecnicosDomain.js` | Entidade técnico (build, sort, merge) |
+| `src/domain/clientesDomain.js` | Entidade cliente (build, cascata ids, merge) |
+| `src/domain/categoriasDomain.js` | Categorias, subcategorias, checklist (regras puras) |
+| `src/domain/maquinasDomain.js` | Equipamentos, documentos, cascata delete |
 | `src/context/slices/tecnicosSlice.js` | CRUD técnicos extraído do DataContext |
+| `src/context/slices/marcasSlice.js` | CRUD marcas extraído do DataContext |
+| `src/context/slices/clientesSlice.js` | CRUD clientes + cascata + clear all |
+| `src/context/slices/categoriasSlice.js` | CRUD categorias / subcategorias / checklist |
+| `src/context/slices/maquinasSlice.js` | CRUD máquinas + documentos |
 | `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, `buildRelatorioManutencaoEmailArgs`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
