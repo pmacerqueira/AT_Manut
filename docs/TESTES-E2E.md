@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **456 testes** em **19 ficheiros** (specs numerados `01–18` + `99-responsive-smoke.spec.js`). Os 6 testes do **spec 18 (SAF-T)** estão **listados** mas **omitidos em tempo de execução** (`test.describe.skip` em `18-import-saft-clientes.spec.js`) até o botão/modal voltar à página Clientes.
-> Última revisão: 2026-04-30 — v1.16.81
+**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **458 testes** em **20 ficheiros** (specs numerados `01–19` + `99-responsive-smoke.spec.js`). Os 6 testes do **spec 18 (SAF-T)** estão **listados** mas **omitidos em tempo de execução** (`test.describe.skip` em `18-import-saft-clientes.spec.js`) até o botão/modal voltar à página Clientes.
+> Última revisão: 2026-06-12 — v1.16.93
 
 ---
 
@@ -27,8 +27,9 @@
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
 | `18-import-saft-clientes.spec.js` | 6 | Importação SAF-T (omitido por `describe.skip` até a UI na página Clientes; cenários mantidos no ficheiro) |
+| `19-domain-agenda.spec.js` | 2 | Cascata delete concluída (B4); recálculo pós-execução persiste API (B5) |
 | `99-responsive-smoke.spec.js` | 5 | Smoke responsivo (mobile / tablet): barra inferior, cartões, calendário |
-| **Total** | **456** | **19 ficheiros** |
+| **Total** | **458** | **20 ficheiros** |
 
 > **Specs 01–09** (139 testes): núcleo da aplicação.
 > **Specs 10–11** (88 testes): alertas, QR, histórico (v1.5–v1.6).
@@ -37,6 +38,7 @@
 > **Specs 14–15** (50 testes): Kaeser.
 > **Specs 16–17** (111 testes): Reparações.
 > **Spec 18** (6 testes listados — **skip** até a UI «Importar SAF-T» regressar): importação SAF-T.
+> **Spec 19** (2 testes): domain agenda — cascata eliminar concluída + persistência recálculo periódicas.
 > **Spec 99** (5 testes): smoke responsivo (opcional em CI; incluído na suite completa por omissão).
 ---
 

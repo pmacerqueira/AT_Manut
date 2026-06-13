@@ -28,6 +28,7 @@ import AgendaCompletaRefreshButton from '../components/AgendaCompletaRefreshButt
 import ActionsOverflow from '../components/ActionsOverflow'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import { manutencoesCategoriaClass } from '../utils/categoriaVisual'
+import { normEntityId } from '../utils/frotaReportHelpers'
 import './Manutencoes.css'
 
 const statusLabel = { pendente: 'Pendente', agendada: 'Agendada', concluida: 'Executada', em_progresso: 'Em progresso', emAtraso: 'Em atraso', proxima: 'Próxima' }
@@ -1539,7 +1540,7 @@ export default function Manutencoes() {
         const futurasCount = isConcluida && mDel.maquinaId
           ? manutencoes.filter(fm =>
               fm.id !== mDel.id &&
-              fm.maquinaId === mDel.maquinaId &&
+              normEntityId(fm.maquinaId) === normEntityId(mDel.maquinaId) &&
               (fm.status === 'pendente' || fm.status === 'agendada') &&
               fm.data > mDel.data
             ).length

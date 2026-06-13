@@ -9,6 +9,18 @@ Política de continuidade:
 
 ---
 
+## [1.16.93] — 2026-06-12 — E2E domain agenda + mock mutável
+
+### Correcções
+- **`Manutencoes.jsx`:** contagem de futuras no modal de eliminação usa `normEntityId` (alinhado com `manutencaoDomain`).
+
+### Qualidade
+- **E2E:** `19-domain-agenda.spec.js` — B4 cascata delete concluída; B5 recálculo persiste delete + bulk_create (**458** listados em 20 ficheiros).
+- **`helpers.js`:** `setupApiMock` com estado mutável para `manutencoes`, `relatorios` e `maquinas` (+ `apiState` para asserts).
+- **Unit tests:** 42 (+1 `recalcularAgendaMaquinaNoAcc`).
+
+---
+
 ## [1.16.92] — 2026-06-13 — Polimento pós-review DataContext split
 
 ### Correcções

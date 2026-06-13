@@ -8,6 +8,7 @@ import {
   periodicidadeEfetivaParaMaquina,
   resolverDataExecucaoParaMaquina,
   recalcularPeriodicasNoEstado,
+  recalcularAgendaMaquinaNoAcc,
 } from '../../src/domain/agendaDomain.js'
 import { INTERVALOS } from '../../src/domain/equipamentoDomain.js'
 
@@ -132,5 +133,33 @@ describe('recalcularPeriodicasNoEstado', () => {
     assert.ok(novaCount >= 1)
     assert.ok(next.some(m => m.maquinaId === 'm1' && m.id !== 'old1'))
     assert.ok(next.some(m => m.id === 'keep'))
+  })
+})
+
+describe('recalcularAgendaMaquinaNoAcc', () => {
+  it('replaces open chain and generates future slots from last execution', () => {
+    const subs = [{ id: 's1', categoriaId: 'c1' }]
+    const cats = [{ id: 'c1', intervaloTipo: 'trimestral' }]
+    const maq = { id: 'm1', subcategoriaId: 's1', ultimaManutencaoData: '2026-01-10' }
+    const acc = [
+      { id: 'c1', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2026-03-01', tecnico: 'Tec' },
+      { id: 'old', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2026-12-01' },
+      { id: 'other', maquinaId: 'm2', status: 'agendada', tipo: 'periodica', data: '2026-12-01' },
+    ]
+    const sameMid = (m, mid) => String(m.maquinaId) === String(mid)
+    const { acc: next, idsRemover, novas, recalculada } = recalcularAgendaMaquinaNoAcc(acc, {
+      maq,
+      subcategorias: subs,
+      categorias: cats,
+      hojeStr: '2026-06-12',
+      intervalos: INTERVALOS,
+      sameMid,
+      idSeed: 8000,
+    })
+    assert.equal(recalculada, true)
+    assert.ok(idsRemover.includes('old'))
+    assert.ok(novas.length >= 1)
+    assert.ok(next.some(m => m.maquinaId === 'm1' && m.id !== 'old'))
+    assert.ok(next.some(m => m.id === 'other'))
   })
 })

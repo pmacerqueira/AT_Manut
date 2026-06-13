@@ -409,18 +409,30 @@ export async function stubEmailPhpEndpoints(page) {
 }
 
 /**
- * Interceta todas as chamadas a /api/data.php e responde com dados mock.
- * @param {Page}   page
- * @param {object} opts
- *   failFetch    — se true, os list/get falham (para testes offline)
- *   customData   — substitui MC parcialmente
+ * @typedef {object} E2eApiState
+ * @property {string[]} [deletedManutencaoIds]
+ * @property {string[]} [deletedRelatorioIds]
+ * @property {object[]} [bulkCreateManutencoes]
  */
-export async function setupApiMock(page, { failFetch = false, customData = {} } = {}) {
+
+/**
+ * Interceta todas as chamadas a /api/data.php e responde com dados mock.
+ * @param {Page} page
+ * @param {object} opts
+ * @param {boolean} [opts.failFetch] — se true, os list/get falham (para testes offline)
+ * @param {object} [opts.customData] — substitui MC parcialmente
+ * @param {E2eApiState} [opts.apiState] — objecto partilhado para assertar deletes/bulk_create no mock
+ */
+export async function setupApiMock(page, { failFetch = false, customData = {}, apiState = null } = {}) {
   await stubEmailPhpEndpoints(page)
   const data = { ...buildMc(), ...customData }
   // Estado mutável para clientes (create/update) — permite testes de importação SAF-T
   const clientesMutable = [...(data.clientes ?? [])]
   const pecasPlanoMutable = [...(data.pecasPlano ?? [])]
+  const manutencoesMutable = [...(data.manutencoes ?? [])]
+  const relatoriosMutable = [...(data.relatorios ?? [])]
+  const maquinasMutable = [...(data.maquinas ?? [])]
+  const track = apiState
 
   await page.route('**/api/data.php', async (route) => {
     const body = route.request().postDataJSON()
@@ -464,6 +476,9 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
       let rows
       if (resource === 'clientes') rows = clientesMutable
       else if (resource === 'pecasPlano') rows = pecasPlanoMutable
+      else if (resource === 'manutencoes') rows = manutencoesMutable
+      else if (resource === 'relatorios') rows = relatoriosMutable
+      else if (resource === 'maquinas') rows = maquinasMutable
       else rows = data[resource] ?? []
       await route.fulfill({
         status: 200, contentType: 'application/json',
@@ -558,6 +573,112 @@ export async function setupApiMock(page, { failFetch = false, customData = {} } 
       return
     }
 
+    // ── manutencoes — estado mutável (CRUD, bulk_create) ──
+    if (resource === 'manutencoes' && action === 'create') {
+      const novo = body?.data
+      if (novo && !manutencoesMutable.some(m => String(m.id) === String(novo.id))) {
+        manutencoesMutable.push(novo)
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: novo ?? {} }),
+      })
+      return
+    }
+    if (resource === 'manutencoes' && action === 'update') {
+      const merged = body?.data
+      const id = body?.id ?? merged?.id
+      const idx = manutencoesMutable.findIndex(m => String(m.id) === String(id))
+      if (idx !== -1 && merged) manutencoesMutable[idx] = { ...manutencoesMutable[idx], ...merged }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+    if (resource === 'manutencoes' && action === 'delete') {
+      const id = body?.id
+      const idx = manutencoesMutable.findIndex(m => String(m.id) === String(id))
+      if (idx !== -1) manutencoesMutable.splice(idx, 1)
+      if (track) {
+        track.deletedManutencaoIds = track.deletedManutencaoIds ?? []
+        track.deletedManutencaoIds.push(String(id))
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: {} }),
+      })
+      return
+    }
+    if (resource === 'manutencoes' && action === 'bulk_create') {
+      const arr = Array.isArray(body?.data) ? body.data : []
+      arr.forEach(item => {
+        if (item && !manutencoesMutable.some(m => String(m.id) === String(item.id))) {
+          manutencoesMutable.push(item)
+        }
+      })
+      if (track) {
+        track.bulkCreateManutencoes = track.bulkCreateManutencoes ?? []
+        track.bulkCreateManutencoes.push(...arr)
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: { count: arr.length } }),
+      })
+      return
+    }
+
+    // ── relatorios — estado mutável (CRUD) ──
+    if (resource === 'relatorios' && action === 'create') {
+      const novo = body?.data
+      if (novo && !relatoriosMutable.some(r => String(r.id) === String(novo.id))) {
+        relatoriosMutable.push(novo)
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: novo ?? {} }),
+      })
+      return
+    }
+    if (resource === 'relatorios' && action === 'update') {
+      const merged = body?.data
+      const id = body?.id ?? merged?.id
+      const idx = relatoriosMutable.findIndex(r => String(r.id) === String(id))
+      if (idx !== -1 && merged) relatoriosMutable[idx] = { ...relatoriosMutable[idx], ...merged }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+    if (resource === 'relatorios' && action === 'delete') {
+      const id = body?.id
+      const idx = relatoriosMutable.findIndex(r => String(r.id) === String(id))
+      if (idx !== -1) relatoriosMutable.splice(idx, 1)
+      if (track) {
+        track.deletedRelatorioIds = track.deletedRelatorioIds ?? []
+        track.deletedRelatorioIds.push(String(id))
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: {} }),
+      })
+      return
+    }
+
+    // ── maquinas — estado mutável (update) ──
+    if (resource === 'maquinas' && action === 'update') {
+      const merged = body?.data
+      const id = body?.id ?? merged?.id
+      const idx = maquinasMutable.findIndex(m => String(m.id) === String(id))
+      if (idx !== -1 && merged) maquinasMutable[idx] = { ...maquinasMutable[idx], ...merged }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: merged ?? {} }),
+      })
+      return
+    }
+
     // ── create / update / delete / bulk_create / bulk_restore (outros) ──
     await route.fulfill({
       status: 200, contentType: 'application/json',
@@ -608,8 +729,11 @@ export function dismissAlertasModal(page) {
  *   path       — rota após /manut (ex: '/' → /manut/, '/clientes' → /manut/clientes)
  *   customData — dados mock customizados para setupApiMock
  */
-export async function loginAdminSemAlertas(page, { path = '/', customData } = {}) {
-  await setupApiMock(page, customData ? { customData } : {})
+export async function loginAdminSemAlertas(page, { path = '/', customData, apiState } = {}) {
+  await setupApiMock(page, {
+    ...(customData ? { customData } : {}),
+    ...(apiState ? { apiState } : {}),
+  })
   await doLoginAdmin(page)
   await dismissAlertasModal(page)
   await page.evaluate(() => localStorage.removeItem('atm_modo_campo'))
@@ -841,6 +965,17 @@ export async function signCanvas(page) {
     await canvas.dispatchEvent('mouseup',   { clientX: box.x + 120, clientY: box.y + 60 })
     await page.waitForTimeout(400)
   }
+}
+
+/** Abre menu «Mais acções» numa linha da tabela de manutenções e clica Eliminar. */
+export async function clickEliminarManutencaoOverflow(page, rowLocator) {
+  const row = rowLocator ?? page.locator('.manutencoes-table tbody tr').first()
+  await row.locator('button.actions-overflow-btn[title="Mais acções"]').click({ timeout: 10000 })
+  await page
+    .locator('.actions-overflow-menu button.danger-item')
+    .filter({ hasText: /eliminar/i })
+    .first()
+    .click({ timeout: 5000 })
 }
 
 export async function expandPrimeiroGrupoManutExecutadas(page) {
