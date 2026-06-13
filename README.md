@@ -94,7 +94,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (456 listados em 19 ficheiros; spec 18 em skip); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (40 testes em `tests/unit/`) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (456 listados em 19 ficheiros; spec 18 em skip); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (41 testes em `tests/unit/`) |
 | Imagens | sharp (optimize-images via script prebuild) + compressão JPEG no browser para fotos de relatórios/equipamentos |
 
 ---

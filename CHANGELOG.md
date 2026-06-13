@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.16.92] — 2026-06-13 — Polimento pós-review DataContext split
+
+### Correcções
+- **`manutencaoDomain`:** cascata ao eliminar concluída usa `normEntityId` (maquinaId number/string).
+- **`recalcularPeriodicasAposExecucao`:** persistência sequencial (delete → bulkCreate), alinhada com `sincronizarAgendaCompleta`.
+
+### Qualidade
+- **Unit tests:** 41 (+1 normEntityId cascade).
+
+---
+
 ## [1.16.91] — 2026-06-13 — Split DataContext: relatorioDomain + manutencaoDomain + agenda
 
 ### Refactoring (sem alteração de comportamento)

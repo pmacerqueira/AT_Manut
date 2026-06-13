@@ -25,4 +25,13 @@ describe('resolverIdsRemoverAoEliminarConcluida', () => {
     assert.ok(idsRemover.has('m2'))
     assert.equal(idsRemover.has('m3'), false)
   })
+
+  it('matches maquinaId with normEntityId (number vs string)', () => {
+    const prev = [
+      { id: 'm1', status: 'concluida', maquinaId: 42, data: '2026-03-01' },
+      { id: 'm2', status: 'agendada', maquinaId: '42', data: '2026-06-01' },
+    ]
+    const { idsRemover } = resolverIdsRemoverAoEliminarConcluida(prev, 'm1')
+    assert.ok(idsRemover.has('m2'))
+  })
 })

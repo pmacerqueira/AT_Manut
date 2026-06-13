@@ -1205,19 +1205,19 @@ export function DataProvider({ children }) {
       })
       novaCount = n
 
-      import('../services/apiService').then(({ apiManutencoes }) => {
-        if (idsRemover.length > 0) {
-          idsRemover.forEach(rid =>
-            persist(() => apiManutencoes.remove(rid),
+      import('../services/apiService').then(async ({ apiManutencoes }) => {
+        try {
+          for (const rid of idsRemover) {
+            await persist(() => apiManutencoes.remove(rid),
                     { resource: 'manutencoes', action: 'delete', id: rid })
-          )
+          }
+          if (novas.length > 0) {
+            await persist(() => apiManutencoes.bulkCreate(novas),
+                    { resource: 'manutencoes', action: 'bulk_create', data: novas })
+          }
+        } catch (err) {
+          logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
         }
-        if (novas.length > 0) {
-          persist(() => apiManutencoes.bulkCreate(novas),
-                  { resource: 'manutencoes', action: 'bulk_create', data: novas })
-        }
-      }).catch(err => {
-        logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
       })
 
       if (novas.length > 0 || idsRemover.length > 0) {

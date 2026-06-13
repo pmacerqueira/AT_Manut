@@ -1,6 +1,9 @@
 /**
  * manutencaoDomain — regras puras sobre linhas de manutenção na agenda.
  */
+import { normEntityId } from '../utils/frotaReportHelpers.js'
+
+const sameMaquinaId = (a, b) => normEntityId(a) === normEntityId(b)
 
 /**
  * IDs a remover ao eliminar uma manutenção (inclui periódicas futuras se a alvo for concluída).
@@ -15,7 +18,7 @@ export function resolverIdsRemoverAoEliminarConcluida(prev, id) {
   if (alvo.status === 'concluida' && alvo.maquinaId) {
     prev.forEach(m => {
       if (m.id === id) return
-      if (m.maquinaId !== alvo.maquinaId) return
+      if (!sameMaquinaId(m.maquinaId, alvo.maquinaId)) return
       if (m.status !== 'pendente' && m.status !== 'agendada') return
       if (m.data > alvo.data) idsRemover.add(m.id)
     })
