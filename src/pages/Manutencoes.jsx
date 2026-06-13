@@ -18,7 +18,6 @@ import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
 import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from '../utils/diasUteis'
-import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { enviarRelatorioEmail } from '../services/emailService'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import { logger } from '../utils/logger'
@@ -559,6 +558,7 @@ export default function Manutencoes() {
         : []
       const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
       const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
+      const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
       const blob = await gerarPdfCompacto({
         relatorio: rel,
         manutencao: m,

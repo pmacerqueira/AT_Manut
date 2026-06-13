@@ -16,7 +16,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin } from './helpers.js'
+import { setupApiMock, doLoginAdmin, e2eHojeYmd } from './helpers.js'
 import { ML, ML_SUMMARY } from './mock-large.js'
 
 test.describe('Performance — Dataset grande (~220 registos)', () => {
@@ -24,9 +24,9 @@ test.describe('Performance — Dataset grande (~220 registos)', () => {
     await setupApiMock(page, { customData: ML })
     await doLoginAdmin(page)
     // Dispensar modal de alertas para não interferir
-    await page.evaluate(() => {
-      localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
-    })
+    await page.evaluate((hoje) => {
+      localStorage.setItem('atm_alertas_dismiss', hoje)
+    }, e2eHojeYmd())
   })
 
   // ── Dashboard ───────────────────────────────────────────────────────────────

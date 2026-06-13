@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-04-30 · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-06-12 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -54,7 +54,10 @@ Próximo passo:
 | Ficheiro | Responsabilidade |
 |----------|-----------------|
 | `src/App.jsx` | Rotas, Layout, ProtectedRoute |
-| `src/context/DataContext.jsx` | Estado global: todas as entidades; CRUD; `recalcularPeriodicasAposExecucao` |
+| `src/context/DataContext.jsx` | Estado global: CRUD; delega lógica pura a `src/domain/` |
+| `src/domain/equipamentoDomain.js` | Constantes e helpers de equipamento (INTERVALOS, KAESER, …) |
+| `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, …) |
+| `src/components/executarManutencao/` | Passos do wizard: `ChecklistStep`, `NotasStep`, `FotosStep`, KAESER |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
 | `src/hooks/usePermissions.js` | `canDelete`, `canEditManutencao`, `isAdmin` |
 | `src/config/alertasConfig.js` | `getDiasAviso()`, `getManutencoesPendentesAlertas()` |

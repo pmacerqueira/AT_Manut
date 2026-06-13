@@ -9,6 +9,22 @@ Política de continuidade:
 
 ---
 
+## [1.16.88] — 2026-06-12 — Simplificação estrutural: agendaDomain, lazy PDF/HTML, wizard split
+
+### Refactoring (sem alteração de comportamento)
+- **`src/domain/agendaDomain.js`:** lógica pura partilhada de geração de periódicas (`gerarManutencoesPeriodicasFuturas`, `isSlotCadeiaPeriodicaAberta`, …) — `DataContext` ~200 linhas mais leve.
+- **Lazy-import:** `gerarPdfRelatorio` em `Manutencoes.jsx` e `ExecutarManutencaoModal.jsx`; `gerarHtmlHistoricoMaquina` em `Equipamentos.jsx` e `Clientes.jsx` — jsPDF/histórico HTML só carregam ao gerar documento.
+- **`ExecutarManutencaoModal`:** passos extraídos para `ChecklistStep`, `NotasStep`, `FotosStep` (continuação do split KAESER v1.16.85).
+
+### Qualidade
+- **Unit tests:** `tests/unit/agendaDomain.test.js` (novo).
+- **E2E:** `13-performance.spec.js` — dismiss de alertas alinhado com `e2eHojeYmd()`.
+
+### Deploy
+- PWA + `data.php` (`search_many` biblioteca NAVEL) em produção.
+
+---
+
 ## [1.16.87] — 2026-06-12 — Contraste legível no modal Alertas de conformidade + E2E datas relativas
 
 ### Correcções

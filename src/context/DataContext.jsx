@@ -6,8 +6,16 @@
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
-import { buildFeriadosSet, encontrarDiaLivre } from '../utils/diasUteis'
-import { minDataManutencaoAberta, STATUS_MANUTENCAO_ABERTA } from '../utils/proximaManutAgenda'
+import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
+import {
+  isSlotCadeiaPeriodicaAberta,
+  buildDiasOcupadosFromManutencoes,
+  calcLimiteMontagemMs,
+  calcLimiteExecucaoMs,
+  gerarManutencoesPeriodicasFuturas,
+  periodicidadeEfetivaParaMaquina,
+  resolverDataExecucaoParaMaquina,
+} from '../domain/agendaDomain'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize } from '../services/syncQueue'
@@ -16,19 +24,6 @@ import { normEntityId } from '../utils/frotaReportHelpers'
 import { getHojeAzores } from '../utils/datasAzores'
 
 const DataContext = createContext(null)
-
-/** Horizonte de geração de periódicas na sincronização / pós-execução (~3 anos). */
-const THREE_YEARS_MS = 3 * 365.25 * 24 * 3600 * 1000
-
-/**
- * Linhas de agenda que pertencem à cadeia periódica e ainda estão abertas.
- * Exclui montagem — não é limpa no recálculo pós-periódica / sincronização global.
- */
-function isSlotCadeiaPeriodicaAberta(m, maquinaId) {
-  if (normEntityId(m.maquinaId) !== normEntityId(maquinaId)) return false
-  if (!STATUS_MANUTENCAO_ABERTA.has(m.status)) return false
-  return m.tipo !== 'montagem'
-}
 
 /**
  * Ao substituir relatórios vindos da API, preserva `enviadoParaCliente` / `ultimoEnvio`
@@ -1114,57 +1109,20 @@ export function DataProvider({ children }) {
   const prepararManutencoesPeriodicas = useCallback((manutencaoMontagem) => {
     const { maquinaId, periodicidade, data: dataBase, tecnico } = manutencaoMontagem
     const intervaloDias = INTERVALOS[periodicidade]?.dias ?? 365
-    const dataBaseMs    = new Date(dataBase).getTime()
-    const limiteMs      = dataBaseMs + 3 * 365.25 * 24 * 3600 * 1000
-
-    // Feriados para todo o período
-    const anoInicio = new Date(dataBase).getFullYear()
-    const anoFim    = new Date(limiteMs).getFullYear()
-    const feriadosSet = buildFeriadosSet(anoInicio, anoFim)
-
-    // Dias já ocupados por manutenções existentes (agendadas ou pendentes)
-    const diasOcupados = new Set(
-      manutencoes
-        .filter(m => m.status === 'agendada' || m.status === 'pendente')
-        .map(m => m.data)
-    )
-
-    const base  = Date.now()
-    const novas = []
-    const conflitos = []
-    let d = new Date(dataBase + 'T12:00:00')
-
-    while (true) {
-      d = new Date(d.getTime() + intervaloDias * 24 * 3600 * 1000)
-      if (d.getTime() > limiteMs) break
-
-      // Ajusta para dia útil (evita fins de semana e feriados)
-      const { data: dAjustada, conflito } = encontrarDiaLivre(d, feriadosSet, diasOcupados)
-      const iso = `${dAjustada.getFullYear()}-${String(dAjustada.getMonth() + 1).padStart(2, '0')}-${String(dAjustada.getDate()).padStart(2, '0')}`
-
-      const idx = novas.length
-      novas.push({
-        id: `mp${base}_${idx + 1}`,
-        maquinaId,
-        tipo: 'periodica',
-        periodicidade,
-        data: iso,
-        tecnico: tecnico || '',
-        status: 'agendada',
-        observacoes: 'Agendamento automático pós-montagem.',
-      })
-
-      if (conflito) {
-        const existentes = manutencoes.filter(m =>
-          (m.status === 'agendada' || m.status === 'pendente') && m.data === iso
-        ).length
-        conflitos.push({ index: idx, data: iso, existentes })
-      }
-
-      // Marcar o dia como ocupado para evitar que futuras iterações colidam entre si
-      diasOcupados.add(iso)
-    }
-
+    const diasOcupados = buildDiasOcupadosFromManutencoes(manutencoes)
+    const { novas, conflitos } = gerarManutencoesPeriodicasFuturas({
+      dataBaseIso: dataBase,
+      periodicidade,
+      intervaloDias,
+      maquinaId,
+      tecnico,
+      limiteMs: calcLimiteMontagemMs(dataBase),
+      diasOcupados,
+      observacoes: 'Agendamento automático pós-montagem.',
+      idSeed: Date.now(),
+      trackConflitos: true,
+      manutencoesForConflitos: manutencoes,
+    })
     return { novas, conflitos }
   }, [manutencoes])
 
@@ -1288,13 +1246,8 @@ export function DataProvider({ children }) {
     if (!periodicidade || !INTERVALOS[periodicidade]) return 0
 
     const hojeStr = getHojeAzores()
-    const hojeNoonMs = new Date(`${hojeStr}T12:00:00`).getTime()
     const intervaloDias = INTERVALOS[periodicidade].dias
-    const dataBaseMs    = new Date(dataExecucao + 'T12:00:00').getTime()
-    const limiteMs      = Math.max(dataBaseMs + THREE_YEARS_MS, hojeNoonMs + THREE_YEARS_MS)
-    const anoInicio     = new Date(dataExecucao).getFullYear()
-    const anoFim        = new Date(limiteMs).getFullYear()
-    const feriadosSet   = buildFeriadosSet(anoInicio, anoFim)
+    const limiteMs = calcLimiteExecucaoMs(dataExecucao, hojeStr)
 
     let novaCount = 0
 
@@ -1302,41 +1255,19 @@ export function DataProvider({ children }) {
       const aRemover = prev.filter(m => isSlotCadeiaPeriodicaAberta(m, maquinaId))
       const idsRemover = new Set(aRemover.map(m => m.id))
       const semFuturas = prev.filter(m => !idsRemover.has(m.id))
-
-      // 2. Dias já ocupados (sem as removidas)
-      const diasOcupados = new Set(
-        semFuturas
-          .filter(m => m.status === 'agendada' || m.status === 'pendente')
-          .map(m => m.data)
-      )
-
-      // 3. Gerar novas manutenções
-      const base  = Date.now()
-      const novas = []
-      let d = new Date(dataExecucao + 'T12:00:00')
-
-      while (true) {
-        d = new Date(d.getTime() + intervaloDias * 24 * 3600 * 1000)
-        if (d.getTime() > limiteMs) break
-        const { data: dAjustada } = encontrarDiaLivre(d, feriadosSet, diasOcupados)
-        const iso = [
-          dAjustada.getFullYear(),
-          String(dAjustada.getMonth() + 1).padStart(2, '0'),
-          String(dAjustada.getDate()).padStart(2, '0'),
-        ].join('-')
-        if (iso < hojeStr) continue
-        novas.push({
-          id:           `mp${base}_${novas.length + 1}`,
-          maquinaId,
-          tipo:         'periodica',
-          periodicidade,
-          data:         iso,
-          tecnico:      tecnico || '',
-          status:       'agendada',
-          observacoes:  'Reagendamento automático pós-execução periódica.',
-        })
-        diasOcupados.add(iso)
-      }
+      const diasOcupados = buildDiasOcupadosFromManutencoes(semFuturas)
+      const { novas } = gerarManutencoesPeriodicasFuturas({
+        dataBaseIso: dataExecucao,
+        periodicidade,
+        intervaloDias,
+        maquinaId,
+        tecnico,
+        limiteMs,
+        diasOcupados,
+        hojeStr,
+        observacoes: 'Reagendamento automático pós-execução periódica.',
+        idSeed: Date.now(),
+      })
 
       novaCount = novas.length
 
@@ -1398,7 +1329,6 @@ export function DataProvider({ children }) {
     agendaCompletaBusyRef.current = true
     try {
       const hojeStr = getHojeAzores()
-      const hojeNoonMs = new Date(`${hojeStr}T12:00:00`).getTime()
       const d = await fetchTodosOsDados()
       const maqs = d.maquinas ?? []
       const categoriasD = d.categorias ?? []
@@ -1406,29 +1336,15 @@ export function DataProvider({ children }) {
       let acc = (d.manutencoes ?? []).map(m => ({ ...m }))
 
       const sameMid = (m, mid) => normEntityId(m.maquinaId) === normEntityId(mid)
-      const periodicidadeEfetiva = (maq) => {
-        let p = maq.periodicidadeManut
-        if (p && INTERVALOS[p]) return p
-        const sub = subcategoriasD.find(s => String(s.id) === String(maq.subcategoriaId))
-        const cat = sub ? categoriasD.find(c => String(c.id) === String(sub.categoriaId)) : null
-        p = cat?.intervaloTipo
-        return p && INTERVALOS[p] ? p : null
-      }
       const idsDeleted = []
       const rowsCreated = []
       let recalculadas = 0
 
       for (const maq of maqs) {
-        const periodicidade = periodicidadeEfetiva(maq)
+        const periodicidade = periodicidadeEfetivaParaMaquina(maq, subcategoriasD, categoriasD)
         if (!periodicidade) continue
 
-        let dataExec = maq.ultimaManutencaoData ? String(maq.ultimaManutencaoData).slice(0, 10) : null
-        const concl = acc.filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
-        if (concl.length > 0) {
-          concl.sort((a, b) => b.data.localeCompare(a.data))
-          const ultimaConcl = concl[0].data
-          if (!dataExec || ultimaConcl > dataExec) dataExec = ultimaConcl
-        }
+        const dataExec = resolverDataExecucaoParaMaquina(maq, acc, sameMid)
         if (!dataExec) continue
 
         recalculadas += 1
@@ -1438,9 +1354,7 @@ export function DataProvider({ children }) {
         acc = acc.filter(m => !idsRemover.has(m.id))
         for (const id of idsRemover) idsDeleted.push(id)
 
-        const diasOcupados = new Set(
-          acc.filter(m => m.status === 'agendada' || m.status === 'pendente').map(m => m.data)
-        )
+        const diasOcupados = buildDiasOcupadosFromManutencoes(acc)
 
         const conclConc = acc
           .filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
@@ -1448,34 +1362,22 @@ export function DataProvider({ children }) {
         const tecnico = conclConc[0]?.tecnico || ''
 
         const intervaloDias = INTERVALOS[periodicidade].dias
-        const dataBaseMs = new Date(dataExec + 'T12:00:00').getTime()
-        const limiteMs = Math.max(dataBaseMs + THREE_YEARS_MS, hojeNoonMs + THREE_YEARS_MS)
-        const anoInicio = new Date(dataExec).getFullYear()
-        const anoFim = new Date(limiteMs).getFullYear()
-        const feriadosSet = buildFeriadosSet(anoInicio, anoFim)
-
+        const limiteMs = calcLimiteExecucaoMs(dataExec, hojeStr)
         const baseId = Date.now() + Math.floor(Math.random() * 1e6)
-        const novas = []
-        let dcur = new Date(dataExec + 'T12:00:00')
-        while (true) {
-          dcur = new Date(dcur.getTime() + intervaloDias * 24 * 3600 * 1000)
-          if (dcur.getTime() > limiteMs) break
-          const { data: dAjustada } = encontrarDiaLivre(dcur, feriadosSet, diasOcupados)
-          const iso = `${dAjustada.getFullYear()}-${String(dAjustada.getMonth() + 1).padStart(2, '0')}-${String(dAjustada.getDate()).padStart(2, '0')}`
-          if (iso < hojeStr) continue
-          novas.push({
-            id: `mp${baseId}_${novas.length}_${Math.random().toString(36).slice(2, 8)}`,
-            maquinaId: maq.id,
-            tipo: 'periodica',
-            periodicidade,
-            data: iso,
-            tecnico,
-            status: 'agendada',
-            observacoes: 'Reagendamento automático (sincronização completa da agenda).',
-            criadoEm: new Date().toISOString(),
-          })
-          diasOcupados.add(iso)
-        }
+        const { novas } = gerarManutencoesPeriodicasFuturas({
+          dataBaseIso: dataExec,
+          periodicidade,
+          intervaloDias,
+          maquinaId: maq.id,
+          tecnico,
+          limiteMs,
+          diasOcupados,
+          hojeStr,
+          observacoes: 'Reagendamento automático (sincronização completa da agenda).',
+          idSeed: baseId,
+          idSuffixRandom: true,
+          incluirCriadoEm: true,
+        })
         acc = [...acc, ...novas]
         rowsCreated.push(...novas)
       }

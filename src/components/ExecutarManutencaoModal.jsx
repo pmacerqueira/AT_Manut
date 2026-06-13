@@ -23,13 +23,11 @@ import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, PenLine, Trash2, Camera, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown, Plus, HelpCircle } from 'lucide-react'
+import { PenLine, Trash2, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown, Plus, HelpCircle } from 'lucide-react'
 import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
-import { gerarPdfCompacto } from '../utils/gerarPdfRelatorio'
 import { isEmailConfigured } from '../config/emailConfig'
-import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { MAX_FOTOS } from '../config/limits'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
@@ -52,6 +50,9 @@ import {
 } from './executarManutencao/execWizardHelpers'
 import KaeserHorasStep from './executarManutencao/KaeserHorasStep'
 import KaeserPecasStep from './executarManutencao/KaeserPecasStep'
+import ChecklistStep from './executarManutencao/ChecklistStep'
+import NotasStep from './executarManutencao/NotasStep'
+import FotosStep from './executarManutencao/FotosStep'
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
@@ -880,6 +881,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           : {}),
       }
       const tecObj = getTecnicoByNome(form.tecnico)
+      const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
       const blob = await gerarPdfCompacto({
         relatorio: tempRel,
         manutencao: manutencaoAtual,
@@ -1978,256 +1980,48 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             />
           )}
 
-          {/* ═══ Checklist ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.checklist) ? 'block' : 'none' }}>
-            {isCorrectionMode && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
-            {!isCorrectionMode && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
+          <ChecklistStep
+            visible={isCorrectionMode || step === W.checklist}
+            isCorrectionMode={isCorrectionMode}
+            preFilledFromLast={preFilledFromLast}
+            items={items}
+            form={form}
+            setForm={setForm}
+            setPreFilledFromLast={setPreFilledFromLast}
+            erroChecklist={erroChecklist}
+            maq={maq}
+            useKaeserPipeline={useKaeserPipeline}
+            isKaeserAbcdMaq={isKaeserAbcdMaq}
+            manutencaoAtual={manutencaoAtual}
+            aplicarTipoKaeserComPecas={aplicarTipoKaeserComPecas}
+          />
 
-            {preFilledFromLast && (
-              <div className="prefill-banner">
-                <History size={15} />
-                <span>Checklist pré-preenchida com base na última execução. Reveja antes de avançar.</span>
-                <button type="button" className="btn-link-checklist" onClick={() => {
-                  const empty = {}
-                  items.forEach(it => { empty[it.id] = '' })
-                  setForm(f => ({ ...f, checklistRespostas: empty }))
-                  setPreFilledFromLast(false)
-                }}>Limpar tudo</button>
-              </div>
-            )}
+          <NotasStep
+            visible={isCorrectionMode || step === W.notas}
+            isCorrectionMode={isCorrectionMode}
+            step={step}
+            stepNotas={W.notas}
+            form={form}
+            setForm={setForm}
+            quickNotes={quickNotes}
+            confirmacaoPendente={confirmacaoPendente}
+            setConfirmacaoPendente={setConfirmacaoPendente}
+            erroChecklist={erroChecklist}
+          />
 
-            <MaquinaDocumentacaoLinks maquina={maq} />
-
-            {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
-            {items.length > 0 && (
-              <div className="checklist-section-wizard">
-                <h3>Checklist de verificação</h3>
-                <span className="checklist-obrigatorio-badge">✱ Preenchimento obrigatório — todos os itens Sim / Não</span>
-                <div className="checklist-quick-actions">
-                  <button type="button" className="btn-link-checklist"
-                    onClick={() => {
-                      const all = {}
-                      items.forEach(it => { all[it.id] = 'sim' })
-                      setForm(f => ({ ...f, checklistRespostas: all }))
-                    }}>
-                    Marcar todos
-                  </button>
-                  <span className="checklist-quick-sep">/</span>
-                  <button type="button" className="btn-link-checklist"
-                    onClick={() => {
-                      const empty = {}
-                      items.forEach(it => { empty[it.id] = '' })
-                      setForm(f => ({ ...f, checklistRespostas: empty }))
-                    }}>
-                    Desmarcar todos
-                  </button>
-                </div>
-                <div className="checklist-respostas">
-                  {items.map((item, i) => (
-                    <div key={item.id} className="checklist-item-row">
-                      <span className="checklist-item-num">{i + 1}.</span>
-                      <span className="checklist-item-texto">{item.texto}</span>
-                      <div className="checklist-item-btns">
-                        <button type="button"
-                          className={`btn-simnao ${form.checklistRespostas[item.id] === 'sim' ? 'active-sim' : ''}`}
-                          onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'sim' } }))}>
-                          Sim
-                        </button>
-                        <button type="button"
-                          className={`btn-simnao ${form.checklistRespostas[item.id] === 'nao' ? 'active-nao' : ''}`}
-                          onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'nao' } }))}>
-                          Não
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(isCorrectionMode || !useKaeserPipeline) && isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem' && (
-              <div className="form-section">
-                <label>
-                  Tipo de manutenção KAESER (A/B/C/D)
-                  {maq?.posicaoKaeser != null && (
-                    <span className="kaeser-ciclo-hint">
-                      Ciclo: {descricaoCicloKaeser(maq.posicaoKaeser)}
-                      {' '}· Próximo ciclo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
-                    </span>
-                  )}
-                  <select
-                    value={form.tipoManutKaeser}
-                    onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
-                  >
-                    <option value="">Periódica (sem plano específico)</option>
-                    {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
-                      <option key={tipo} value={tipo}>
-                        {info.label}
-                        {maq?.posicaoKaeser != null && tipoKaeserNaPosicao(maq.posicaoKaeser) === tipo ? ' ✓ (sugerido)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-
-            {(isCorrectionMode || !useKaeserPipeline) && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser)) && (
-              <div className="form-section">
-                <div className="pecas-checklist-header">
-                  <h3>Consumíveis e peças</h3>
-                  {form.pecasUsadas.length > 0 && (
-                    <div className="pecas-checklist-actions">
-                      <button type="button" className="btn-checklist-all btn-marcar"
-                        onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map(p => ({ ...p, usado: true })) }))}>
-                        ✓ Marcar todos
-                      </button>
-                      <button type="button" className="btn-checklist-all btn-desmarcar"
-                        onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map(p => ({ ...p, usado: false })) }))}>
-                        ✗ Desmarcar todos
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {form.pecasUsadas.length === 0 ? (
-                  <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                    Nenhum plano configurado para este tipo. Adicione consumíveis abaixo ou configure o plano em Equipamentos → Plano de peças.
-                  </p>
-                ) : (
-                  <div className="pecas-checklist-lista">
-                    {form.pecasUsadas.map((p, idx) => (
-                      <label key={p.id ?? idx} className={`peca-checklist-row${p.usado ? ' peca-usada' : ' peca-nao-usada'}`}>
-                        <input type="checkbox" checked={!!p.usado}
-                          onChange={e => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, usado: e.target.checked } : pp) }))}
-                          className="peca-checkbox" />
-                        <span className="peca-checklist-info">
-                          {p.posicao && <span className="peca-pos">{p.posicao}</span>}
-                          {p.codigoArtigo && <span className="peca-codigo">{p.codigoArtigo}</span>}
-                          <span className="peca-desc">{p.descricao || '—'}</span>
-                          <span className="peca-qty-un">{p.quantidade} {p.unidade}</span>
-                        </span>
-                        {p.manual && (
-                          <button type="button" className="icon-btn danger peca-remove-btn"
-                            onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))} title="Remover">
-                            <X size={11} />
-                          </button>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <button type="button" className="btn-link-checklist" style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}
-                  onClick={() => setForm(f => ({ ...f, pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: 'Item manual', quantidade: 1, unidade: 'PÇ', usado: true, manual: true }] }))}>
-                  + Adicionar consumível manualmente
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ═══ Observações ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.notas) ? 'block' : 'none' }}>
-            {isCorrectionMode && <h3 className="admin-edit-section-title">Observações</h3>}
-            {!isCorrectionMode && (
-              <p className="wizard-step-hint">
-                As observações são <strong>obrigatórias</strong>. Use uma nota rápida ou escreva uma nota livre descritiva.
-              </p>
-            )}
-            <label className="form-section">
-              Notas importantes <span className="char-count">({form.notas.length}/300)</span>
-              <textarea
-                value={form.notas}
-                onChange={e => {
-                  setForm(f => ({ ...f, notas: e.target.value.slice(0, 300) }))
-                  if (confirmacaoPendente) setConfirmacaoPendente(null)
-                }}
-                rows={6}
-                className="textarea-full"
-                maxLength={300}
-                placeholder="Descreva o trabalho. Pode tocar numa nota rápida ou escrever texto livre suficiente…"
-              />
-            </label>
-
-            <div className="quick-notes-section">
-              <span className="quick-notes-label">Notas rápidas — toque para acelerar; texto livre também é aceite se for descritivo:</span>
-              <div className="quick-notes-chips">
-                {quickNotes.map((note, i) => {
-                  const isIncluded = form.notas.includes(note)
-                  return (
-                    <button key={i} type="button"
-                      className={`quick-note-chip${isIncluded ? ' quick-note-chip--active' : ''}`}
-                      onClick={() => {
-                        setForm(f => {
-                          const current = f.notas.trim()
-                          const sep = current ? '\n' : ''
-                          return { ...f, notas: (current + sep + note).slice(0, 300) }
-                        })
-                        if (confirmacaoPendente) setConfirmacaoPendente(null)
-                      }}>{isIncluded && '✓ '}{note}</button>
-                  )
-                })}
-              </div>
-            </div>
-            {!isCorrectionMode && step === W.notas && erroChecklist && <p className="form-erro">{erroChecklist}</p>}
-          </div>
-
-          {/* ═══ Fotografias ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.fotos) ? 'block' : 'none' }}>
-            {isCorrectionMode && <h3 className="admin-edit-section-title">Fotografias</h3>}
-            {!isCorrectionMode && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
-            <div className="form-section fotos-section">
-              <div className="fotos-header">
-                <span className="fotos-label">
-                  Fotografias de apoio
-                  <span className="fotos-count"> ({fotos.length}/{MAX_FOTOS})</span>
-                </span>
-                {fotos.length < MAX_FOTOS && !fotoCarregando && (
-                  <div className="fotos-btns">
-                    <input ref={fotoCameraRef} type="file" accept="image/*" capture="environment" className="fotos-input-hidden" onChange={e => { handleFotoChange(e); if (confirmacaoPendente) setConfirmacaoPendente(null) }} />
-                    <button type="button" className="btn-foto" onClick={() => fotoCameraRef.current?.click()}>
-                      <Camera size={15} /> Tirar foto
-                    </button>
-                    <input ref={fotoInputRef} type="file" accept="image/*" multiple className="fotos-input-hidden" onChange={e => { handleFotoChange(e); if (confirmacaoPendente) setConfirmacaoPendente(null) }} />
-                    <button type="button" className="btn-foto btn-foto-gallery" onClick={() => fotoInputRef.current?.click()}>
-                      <FolderOpen size={15} /> Galeria
-                    </button>
-                  </div>
-                )}
-                {fotoCarregando && <span className="fotos-loading">A processar…</span>}
-              </div>
-              <p className="fotos-limite-hint">
-                Máximo de <strong>{MAX_FOTOS}</strong> fotografias por relatório (PDF e envio por email). As imagens são comprimidas no dispositivo.
-                {fotos.length >= MAX_FOTOS && (
-                  <span className="fotos-limite-atingido"> Limite atingido — remova uma foto para adicionar outra.</span>
-                )}
-              </p>
-              {fotos.length > 0 && (
-                <div className="fotos-grid">
-                  {fotos.map((src, idx) => (
-                    <div key={idx} className="foto-thumb">
-                      <img src={src} alt={`Foto ${idx + 1}`} />
-                      <button type="button" className="foto-remover" onClick={() => removerFoto(idx)} aria-label={`Remover foto ${idx + 1}`}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {fotos.length === 0 && <p className="fotos-vazio">Nenhuma fotografia adicionada.</p>}
-            </div>
-            {confirmacaoPendente === 'fotos' && (
-              <div className="wizard-confirm">
-                <AlertTriangle size={16} />
-                <span>Pretende continuar sem fotografias?</span>
-                <div className="wizard-confirm-actions">
-                  <button type="button" className="btn primary btn-sm" onClick={() => { setConfirmacaoPendente(null); setStep(W.tec) }}>
-                    Sim, avançar
-                  </button>
-                  <button type="button" className="btn secondary btn-sm" onClick={() => setConfirmacaoPendente(null)}>
-                    Não
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <FotosStep
+            visible={isCorrectionMode || step === W.fotos}
+            isCorrectionMode={isCorrectionMode}
+            fotos={fotos}
+            fotoCarregando={fotoCarregando}
+            fotoCameraRef={fotoCameraRef}
+            fotoInputRef={fotoInputRef}
+            handleFotoChange={e => { handleFotoChange(e); if (confirmacaoPendente) setConfirmacaoPendente(null) }}
+            removerFoto={removerFoto}
+            confirmacaoPendente={confirmacaoPendente}
+            setConfirmacaoPendente={setConfirmacaoPendente}
+            onConfirmAdvance={() => { setConfirmacaoPendente(null); setStep(W.tec) }}
+          />
 
           {/* ═══ Técnico ═══ */}
           <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.tec) ? 'block' : 'none' }}>

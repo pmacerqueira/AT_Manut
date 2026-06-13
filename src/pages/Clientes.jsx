@@ -14,7 +14,6 @@ import { Plus, Pencil, Trash2, FolderPlus, ChevronRight, ChevronLeft, ArrowLeft,
 
 const ExecutarManutencaoModal = lazy(() => import('../components/ExecutarManutencaoModal'))
 import { gerarRelatorioFrotaPdf } from '../utils/gerarRelatorioFrota'
-import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { safeHttpUrl } from '../utils/sanitize'
@@ -1052,9 +1051,10 @@ export default function Clientes() {
                     <div className="maq-quick-actions">
                       <button type="button" className="btn-quick" onClick={() => navigate(`/agendamento?maquinaId=${maquinaAtual.id}`)}><Calendar size={14} /> Agendar</button>
                       <button type="button" className="btn-quick" onClick={() => navigate(`/equipamentos?qr=${maquinaAtual.id}`)}><QrCode size={14} /> QR</button>
-                      <button type="button" className="btn-quick" onClick={() => {
+                      <button type="button" className="btn-quick" onClick={async () => {
                         const sub = getSubcategoria(maquinaAtual.subcategoriaId)
                         const cat = sub ? getCategoria(sub.categoriaId) : null
+                        const { gerarHtmlHistoricoMaquina } = await import('../utils/gerarHtmlHistoricoMaquina')
                         const html = gerarHtmlHistoricoMaquina({
                           maquina: maquinaAtual,
                           cliente: fichaCliente,

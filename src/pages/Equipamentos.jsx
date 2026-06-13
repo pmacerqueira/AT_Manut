@@ -9,7 +9,6 @@ import '../components/PecasPlanoModal.css'
 import { ArrowLeft, Pencil, Trash2, FolderPlus, Play, QrCode, FileText, PackageOpen, CalendarDays } from 'lucide-react'
 import QrEtiquetaModal from '../components/QrEtiquetaModal'
 import '../components/QrEtiquetaModal.css'
-import { gerarHtmlHistoricoMaquina } from '../utils/gerarHtmlHistoricoMaquina'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { format, isBefore, startOfDay } from 'date-fns'
 import { pt } from 'date-fns/locale'
@@ -153,7 +152,7 @@ export default function Equipamentos() {
 
   const getCliente = (nif) => clientes.find(c => c.nif === nif)
 
-  const handleHistoricoPdf = (maquina) => {
+  const handleHistoricoPdf = async (maquina) => {
     setLoadingHistorico(maquina.id)
     showGlobalLoading()
     try {
@@ -162,6 +161,7 @@ export default function Equipamentos() {
       const cli      = getCliente(maquina.clienteNif)
       const manutsMaq = manutencoes.filter(m => m.maquinaId === maquina.id)
       const repsMaq   = reparacoes.filter(r => r.maquinaId === maquina.id)
+      const { gerarHtmlHistoricoMaquina } = await import('../utils/gerarHtmlHistoricoMaquina')
       const html = gerarHtmlHistoricoMaquina({
         maquina,
         cliente:      cli,
