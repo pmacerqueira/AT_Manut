@@ -10,6 +10,32 @@ export const INTERVALOS = {
   anual: { dias: 365, label: 'Anual' },
 }
 
+/** Fallback quando categoria/subcategoria não resolve intervalo. */
+export const DEFAULT_INTERVALO_DIAS = 90
+
+/**
+ * Dias entre manutenções periódicas a partir da categoria.
+ */
+export function getIntervaloDiasForCategoria(categoriaId, categorias, intervalos = INTERVALOS) {
+  const cat = categorias.find(c => c.id === categoriaId)
+  return cat ? intervalos[cat.intervaloTipo]?.dias ?? DEFAULT_INTERVALO_DIAS : DEFAULT_INTERVALO_DIAS
+}
+
+export function getIntervaloDiasBySubcategoria(subcategoriaId, subcategorias, categorias, intervalos = INTERVALOS) {
+  const sub = subcategorias.find(s => s.id === subcategoriaId)
+  return sub
+    ? getIntervaloDiasForCategoria(sub.categoriaId, categorias, intervalos)
+    : DEFAULT_INTERVALO_DIAS
+}
+
+/** Preferência: periodicidade na ficha da máquina; senão intervalo da subcategoria/categoria. */
+export function getIntervaloDiasByMaquina(maquina, subcategorias, categorias, intervalos = INTERVALOS) {
+  if (maquina?.periodicidadeManut && intervalos[maquina.periodicidadeManut]) {
+    return intervalos[maquina.periodicidadeManut].dias
+  }
+  return getIntervaloDiasBySubcategoria(maquina?.subcategoriaId, subcategorias, categorias, intervalos)
+}
+
 // Subcategorias com contador de horas (compressores e geradores — elevadores não usam)
 export const SUBCATEGORIAS_COM_CONTADOR_HORAS = ['sub5', 'sub6', 'sub7', 'sub10', 'sub11', 'sub14', 'sub15', 'sub16']
 

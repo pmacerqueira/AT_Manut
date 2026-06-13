@@ -16,6 +16,18 @@ import {
 } from '../domain/agendaDomain'
 import { mergeRelatoriosMantendoEnvio, proximoNumeroRelatorioSequencial } from '../domain/relatorioDomain'
 import { resolverIdsRemoverAoEliminarConcluida } from '../domain/manutencaoDomain'
+import {
+  buildBackupPayload,
+  backupFilenameForDate,
+  validateBackupDados,
+  extractRestoreSlices,
+  formatBackupRestoreSuccessMessage,
+  runBackupBulkRestore,
+} from '../domain/backupDomain'
+import { runPersist } from '../domain/persistDomain'
+import { schedulePersistViaApi } from '../domain/crudPersistDomain'
+import { createTecnicosHandlers } from './slices/tecnicosSlice'
+import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
 import { enqueue, processQueue, queueSize } from '../services/syncQueue'
@@ -28,7 +40,12 @@ const DataContext = createContext(null)
 // ── Domínio partilhado (constantes e funções puras) — src/domain/ ──────────
 // O DataContext re-exporta estes símbolos para manter compatíveis os imports
 // existentes (`import { TIPOS_DOCUMENTO } from '../context/DataContext'`).
-import { INTERVALOS } from '../domain/equipamentoDomain'
+import {
+  INTERVALOS,
+  getIntervaloDiasForCategoria,
+  getIntervaloDiasBySubcategoria as resolveIntervaloDiasBySubcategoria,
+  getIntervaloDiasByMaquina as resolveIntervaloDiasByMaquina,
+} from '../domain/equipamentoDomain'
 import {
   INITIAL_MARCAS,
   normalizeMarca,
@@ -241,76 +258,46 @@ export function DataProvider({ children }) {
       .sort((a, b) => a.ordem - b.ordem)
   }, [checklistItems])
 
-  const getIntervaloDias = useCallback((categoriaId) => {
-    const cat = categorias.find(c => c.id === categoriaId)
-    return cat ? INTERVALOS[cat.intervaloTipo]?.dias ?? 90 : 90
-  }, [categorias])
+  const getIntervaloDias = useCallback(
+    (categoriaId) => getIntervaloDiasForCategoria(categoriaId, categorias, INTERVALOS),
+    [categorias],
+  )
 
-  const getIntervaloDiasBySubcategoria = useCallback((subcategoriaId) => {
-    const sub = subcategorias.find(s => s.id === subcategoriaId)
-    return sub ? getIntervaloDias(sub.categoriaId) : 90
-  }, [subcategorias, getIntervaloDias])
+  const getIntervaloDiasBySubcategoria = useCallback(
+    (subcategoriaId) => resolveIntervaloDiasBySubcategoria(subcategoriaId, subcategorias, categorias, INTERVALOS),
+    [subcategorias, categorias],
+  )
 
-  const getIntervaloDiasByMaquina = useCallback((maquina) => {
-    if (maquina?.periodicidadeManut && INTERVALOS[maquina.periodicidadeManut]) {
-      return INTERVALOS[maquina.periodicidadeManut].dias
-    }
-    return getIntervaloDiasBySubcategoria(maquina?.subcategoriaId)
-  }, [getIntervaloDiasBySubcategoria])
+  const getIntervaloDiasByMaquina = useCallback(
+    (maquina) => resolveIntervaloDiasByMaquina(maquina, subcategorias, categorias, INTERVALOS),
+    [subcategorias, categorias],
+  )
 
-  // ── Helper: chama API em background; se offline, enfileira para sync ────────
-  // Assinatura: persist(apiFn, queueDescriptor, rollback?, opts?)
-  //   apiFn          — função async que chama a API
-  //   queueDescriptor — { resource, action, id?, data? } — para enfileirar offline
-  //   rollback        — função chamada em erro de servidor (não em erro de rede)
-  //   opts.throwOnFailure — se true, relança o erro após rollback (para await + UI/toast)
+  const tecnicosRef = useRef([])
+  tecnicosRef.current = tecnicos
+
   const persist = useCallback(async (apiFn, queueDescriptor, rollback, opts = {}) => {
-    const throwOnFailure = opts?.throwOnFailure === true
-    const offline = !navigator.onLine
-
-    if (offline) {
-      // Offline: enfileirar operação para sync posterior
-      if (queueDescriptor) {
-        const result = enqueue(queueDescriptor)
-        if (result.ok) {
-          setSyncPending(prev => prev + 1)
-          logger.info('DataContext', 'persist',
-            `Operação enfileirada offline (${queueDescriptor.resource}/${queueDescriptor.action})`)
-        } else {
-          logger.warn('DataContext', 'persist',
-            `Fila offline cheia — operação ${queueDescriptor.resource}/${queueDescriptor.action} não guardada`)
-          if (rollback) rollback()
-          if (throwOnFailure) {
-            const qe = new Error('Sem ligação: não foi possível enfileirar a operação.')
-            qe.code = 'OFFLINE_QUEUE_FULL'
-            throw qe
-          }
-        }
-      }
-      return
-    }
-
-    try {
-      await apiFn()
-    } catch (err) {
-      const isNetErr = !err.status // erros de rede não têm status HTTP
-      if (isNetErr && queueDescriptor) {
-        // Perdeu ligação durante a chamada — enfileirar
-        const result = enqueue(queueDescriptor)
-        if (result.ok) {
-          setSyncPending(prev => prev + 1)
-          setIsOnline(false)
-        } else {
-          if (rollback) rollback()
-          if (throwOnFailure) throw err
-        }
-      } else {
-        logger.error('DataContext', 'persist', err.message || 'Falha ao guardar dados', { stack: err.stack?.slice(0, 400) })
-        if (rollback) rollback()
-        if (throwOnFailure) throw err
-      }
-    }
+    return runPersist({
+      apiFn,
+      queueDescriptor,
+      rollback,
+      throwOnFailure: opts?.throwOnFailure === true,
+      enqueue,
+      onQueued: () => setSyncPending(prev => prev + 1),
+      onNetworkLost: () => setIsOnline(false),
+      log: logger,
+    })
   }, [])
+
+  const { getTecnicoByNome, addTecnico, updateTecnico, removeTecnico } = useMemo(
+    () => createTecnicosHandlers({
+      getTecnicos: () => tecnicosRef.current,
+      setTecnicos,
+      persist,
+      logger,
+    }),
+    [persist],
+  )
 
   // ── Auto-criar manutenções em falta para máquinas com proximaManut ────────
   const syncManutRef = useRef(false)
@@ -356,19 +343,21 @@ export function DataProvider({ children }) {
     const id = 'sub' + Date.now()
     const novo = { ...s, id }
     setSubcategorias(prev => [...prev, novo])
-    import('../services/apiService').then(({ apiSubcategorias }) =>
-      persist(() => apiSubcategorias.create(novo),
-              { resource: 'subcategorias', action: 'create', data: novo })
-    )
+    schedulePersistViaApi(persist, {
+      resource: 'subcategorias',
+      runWithApi: api => api.create(novo),
+      queueDescriptor: { resource: 'subcategorias', action: 'create', data: novo },
+    })
     return id
   }, [persist])
 
   const updateSubcategoria = useCallback((id, data) => {
     setSubcategorias(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
-    import('../services/apiService').then(({ apiSubcategorias }) =>
-      persist(() => apiSubcategorias.update(id, data),
-              { resource: 'subcategorias', action: 'update', id, data })
-    )
+    schedulePersistViaApi(persist, {
+      resource: 'subcategorias',
+      runWithApi: api => api.update(id, data),
+      queueDescriptor: { resource: 'subcategorias', action: 'update', id, data },
+    })
   }, [persist])
 
   const removeSubcategoria = useCallback((id) => {
@@ -636,70 +625,7 @@ export function DataProvider({ children }) {
     }
   }, [marcas])
 
-  // ── Técnicos ─────────────────────────────────────────────────────────────
-  const getTecnicoByNome = useCallback(
-    (nome) => tecnicos.find(t => t.nome === nome && t.ativo !== false),
-    [tecnicos]
-  )
-
-  const addTecnico = useCallback(async (t) => {
-    const id = 'tec-' + Date.now()
-    const novo = { id, nome: t.nome?.trim(), telefone: t.telefone?.trim() || null, assinaturaDigital: t.assinaturaDigital || null, ativo: true, criadoEm: new Date().toISOString() }
-    setTecnicos(prev => [...prev, novo].sort((a, b) => a.nome.localeCompare(b.nome, 'pt')))
-    try {
-      const { apiTecnicos } = await import('../services/apiService')
-      await persist(
-        () => apiTecnicos.create(novo),
-        { resource: 'tecnicos', action: 'create', data: novo },
-        () => setTecnicos(prev => prev.filter(x => x.id !== id)),
-        { throwOnFailure: true }
-      )
-    } catch (err) {
-      setTecnicos(prev => prev.filter(x => x.id !== id))
-      logger.error('DataContext', 'addTecnico', err?.message || 'Falha ao criar técnico', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-    logger.action('DataContext', 'addTecnico', `Técnico "${novo.nome}" criado`, { id })
-    return id
-  }, [persist])
-
-  const updateTecnico = useCallback(async (id, data) => {
-    const before = tecnicos
-    setTecnicos(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
-    try {
-      const { apiTecnicos } = await import('../services/apiService')
-      await persist(
-        () => apiTecnicos.update(id, data),
-        { resource: 'tecnicos', action: 'update', data: { id, ...data } },
-        () => setTecnicos(before),
-        { throwOnFailure: true }
-      )
-    } catch (err) {
-      setTecnicos(before)
-      logger.error('DataContext', 'updateTecnico', err?.message || 'Falha ao actualizar técnico', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-    logger.action('DataContext', 'updateTecnico', `Técnico "${data.nome || id}" actualizado`, { id })
-  }, [tecnicos, persist])
-
-  const removeTecnico = useCallback(async (id) => {
-    const before = tecnicos
-    setTecnicos(prev => prev.filter(t => t.id !== id))
-    try {
-      const { apiTecnicos } = await import('../services/apiService')
-      await persist(
-        () => apiTecnicos.delete(id),
-        { resource: 'tecnicos', action: 'delete', data: { id } },
-        () => setTecnicos(before),
-        { throwOnFailure: true }
-      )
-    } catch (err) {
-      setTecnicos(before)
-      logger.error('DataContext', 'removeTecnico', err?.message || 'Falha ao eliminar técnico', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
-    logger.action('DataContext', 'removeTecnico', `Técnico removido`, { id })
-  }, [tecnicos, persist])
+  // ── Técnicos (slice: context/slices/tecnicosSlice.js) ─────────────────────
 
   // ── Máquinas ──────────────────────────────────────────────────────────────
   const addMaquina = useCallback(async (m) => {
@@ -1483,8 +1409,8 @@ export function DataProvider({ children }) {
    * As fotos (base64) estão incluídas — o ficheiro pode ser grande.
    */
   const exportarDados = useCallback(() => {
-    const backup = {
-      versao:      '1.3.0',
+    const backup = buildBackupPayload({
+      appVersion: APP_VERSION,
       exportadoEm: new Date().toISOString(),
       dados: {
         clientes,
@@ -1498,14 +1424,13 @@ export function DataProvider({ children }) {
         relatorios,
         pecasPlano,
       },
-    }
+    })
     const json = JSON.stringify(backup, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    const ts   = new Date().toISOString().slice(0, 10)
     a.href     = url
-    a.download = `atmanut_backup_${ts}.json`
+    a.download = backupFilenameForDate()
     a.click()
     URL.revokeObjectURL(url)
   }, [clientes, categorias, subcategorias, checklistItems, marcas, tecnicos, maquinas, manutencoes, relatorios, pecasPlano])
@@ -1516,42 +1441,33 @@ export function DataProvider({ children }) {
    */
   const restaurarDados = useCallback(async (backup) => {
     try {
-      const d = backup?.dados
-      if (!d) return { ok: false, message: 'Ficheiro inválido: campo "dados" em falta.' }
+      const validation = validateBackupDados(backup?.dados)
+      if (!validation.ok) return { ok: false, message: validation.message }
 
-      // Actualiza estado local imediatamente
-      if (Array.isArray(d.clientes))       setClientes(d.clientes)
-      if (Array.isArray(d.categorias))     setCategorias(d.categorias)
-      if (Array.isArray(d.subcategorias))  setSubcategorias(d.subcategorias)
-      if (Array.isArray(d.checklistItems)) setChecklistItems(d.checklistItems)
-      if (Array.isArray(d.marcas))         setMarcas(d.marcas)
-      if (Array.isArray(d.tecnicos))      setTecnicos(d.tecnicos)
-      if (Array.isArray(d.maquinas))       setMaquinas(d.maquinas)
-      if (Array.isArray(d.manutencoes))    setManutencoes(d.manutencoes)
-      if (Array.isArray(d.relatorios))     setRelatorios(d.relatorios)
-      if (Array.isArray(d.pecasPlano))     setPecasPlano(d.pecasPlano)
+      const slices = extractRestoreSlices(backup.dados)
 
-      // Persiste no servidor (substitui todos os dados)
+      if (slices.clientes) setClientes(slices.clientes)
+      if (slices.categorias) setCategorias(slices.categorias)
+      if (slices.subcategorias) setSubcategorias(slices.subcategorias)
+      if (slices.checklistItems) setChecklistItems(slices.checklistItems)
+      if (slices.marcas) setMarcas(slices.marcas)
+      if (slices.tecnicos) setTecnicos(slices.tecnicos)
+      if (slices.maquinas) setMaquinas(slices.maquinas)
+      if (slices.manutencoes) setManutencoes(slices.manutencoes)
+      if (slices.relatorios) setRelatorios(slices.relatorios)
+      if (slices.pecasPlano) setPecasPlano(slices.pecasPlano)
+
       const {
         apiClientes, apiCategorias, apiSubcategorias, apiChecklistItems, apiMarcas, apiTecnicos,
         apiMaquinas, apiManutencoes, apiRelatorios, apiPecasPlano,
       } = await import('../services/apiService')
 
-      await Promise.all([
-        d.clientes       ? apiClientes.bulkRestore(d.clientes)            : Promise.resolve(),
-        d.categorias     ? apiCategorias.bulkRestore(d.categorias)        : Promise.resolve(),
-        d.subcategorias  ? apiSubcategorias.bulkRestore(d.subcategorias)  : Promise.resolve(),
-        d.checklistItems ? apiChecklistItems.bulkRestore(d.checklistItems): Promise.resolve(),
-        d.marcas ? apiMarcas.bulkRestore(d.marcas).catch(() => null)      : Promise.resolve(),
-        d.tecnicos ? apiTecnicos.bulkRestore(d.tecnicos).catch(() => null): Promise.resolve(),
-        d.maquinas       ? apiMaquinas.bulkRestore(d.maquinas)            : Promise.resolve(),
-        d.manutencoes    ? apiManutencoes.bulkRestore(d.manutencoes)      : Promise.resolve(),
-        d.relatorios     ? apiRelatorios.bulkRestore(d.relatorios)        : Promise.resolve(),
-        d.pecasPlano     ? apiPecasPlano.bulkRestore(d.pecasPlano)        : Promise.resolve(),
-      ])
+      await runBackupBulkRestore(backup.dados, {
+        apiClientes, apiCategorias, apiSubcategorias, apiChecklistItems, apiMarcas, apiTecnicos,
+        apiMaquinas, apiManutencoes, apiRelatorios, apiPecasPlano,
+      })
 
-      const dtBackup = backup.exportadoEm ? new Date(backup.exportadoEm).toLocaleString('pt-PT', { timeZone: 'Atlantic/Azores' }) : '—'
-      return { ok: true, message: `Dados restaurados com sucesso (backup de ${dtBackup}).` }
+      return { ok: true, message: formatBackupRestoreSuccessMessage(backup.exportadoEm) }
     } catch (err) {
       logger.error('DataContext', 'restaurarDados', `Erro ao restaurar backup: ${err.message}`, { stack: err.stack?.slice(0, 300) })
       return { ok: false, message: `Erro ao restaurar: ${err.message}` }

@@ -10,6 +10,7 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useData } from '../context/DataContext'
+import { validateBackupDados } from '../domain/backupDomain'
 import { useToast } from '../components/Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import SignaturePad from '../components/SignaturePad'
@@ -155,16 +156,9 @@ export default function Definicoes() {
           return
         }
         const d = backup.dados
-        if (!d || typeof d !== 'object') {
-          showToast('Ficheiro inválido: campo "dados" em falta.', 'error')
-          setImporting(false)
-          hideGlobalLoading()
-          return
-        }
-        const schemaKeys = ['clientes', 'categorias', 'subcategorias', 'checklistItems', 'maquinas', 'manutencoes', 'relatorios']
-        const invalid = schemaKeys.filter(k => d[k] !== undefined && !Array.isArray(d[k]))
-        if (invalid.length > 0) {
-          showToast(`Ficheiro inválido: ${invalid.join(', ')} devem ser arrays.`, 'error')
+        const validation = validateBackupDados(d)
+        if (!validation.ok) {
+          showToast(validation.message, 'error')
           setImporting(false)
           hideGlobalLoading()
           return

@@ -9,6 +9,20 @@ Política de continuidade:
 
 ---
 
+## [1.16.94] — 2026-06-12 — Passo 5: persist + CRUD slice técnicos
+
+### Refactoring (sem alteração de comportamento)
+- **`persistDomain.js`:** `runPersist` (online/offline, fila, rollback).
+- **`crudPersistDomain.js`:** `persistViaApi`, `schedulePersistViaApi`, mapa recurso → API.
+- **`tecnicosDomain.js` + `context/slices/tecnicosSlice.js`:** CRUD técnicos extraído do DataContext.
+- **`backupDomain`:** `runBackupBulkRestore` para import JSON.
+- Subcategorias create/update usam `schedulePersistViaApi`.
+
+### Qualidade
+- **Unit tests:** 65 (+11 persist, técnicos, crud map).
+
+---
+
 ## [1.16.93] — 2026-06-12 — E2E domain agenda + mock mutável
 
 ### Correcções

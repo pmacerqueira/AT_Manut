@@ -55,10 +55,15 @@ Próximo passo:
 |----------|-----------------|
 | `src/App.jsx` | Rotas, Layout, ProtectedRoute |
 | `src/context/DataContext.jsx` | Estado global: CRUD; delega lógica pura a `src/domain/` |
-| `src/domain/equipamentoDomain.js` | Constantes e helpers de equipamento (INTERVALOS, KAESER, …) |
+| `src/domain/equipamentoDomain.js` | Constantes, KAESER, `getIntervaloDias*` (categoria → subcategoria → máquina) |
 | `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, `recalcularPeriodicasNoEstado`, `recalcularAgendaMaquinaNoAcc`, …) |
 | `src/domain/relatorioDomain.js` | `mergeRelatoriosMantendoEnvio`, `proximoNumeroRelatorioSequencial` |
 | `src/domain/manutencaoDomain.js` | `resolverIdsRemoverAoEliminarConcluida` (cascata ao eliminar concluída) |
+| `src/domain/backupDomain.js` | Export/import JSON (`buildBackupPayload`, `validateBackupDados`, `appVersao` + `BACKUP_FORMAT_VERSION`) |
+| `src/domain/persistDomain.js` | `runPersist` — online/offline + fila syncQueue |
+| `src/domain/crudPersistDomain.js` | `persistViaApi`, `schedulePersistViaApi`, mapa recurso → apiService |
+| `src/domain/tecnicosDomain.js` | Entidade técnico (build, sort, merge) |
+| `src/context/slices/tecnicosSlice.js` | CRUD técnicos extraído do DataContext |
 | `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, `buildRelatorioManutencaoEmailArgs`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
