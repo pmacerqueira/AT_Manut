@@ -11,7 +11,7 @@
  *   enviarLembreteEmail        — alertas de manutenção próxima (dados → send-email.php)
  */
 import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
-import { computarProximasDatas } from '../utils/diasUteis'
+import { buildProximasManutencoesManutencao } from '../utils/relatorioManutencaoPayload'
 import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
@@ -200,28 +200,10 @@ export async function enviarRelatorioEmail({
         ? formatDataAzores(proximaManutRaw, true)
         : ''
 
-      // Mesma lógica que gerarPdfCompacto / Obter PDF: próximas datas + declaração no PDF anexo
-      const dataExec = isRepair
-        ? (
-            relatorio?.dataRealizacao ||
-            reparacao?.data ||
-            relatorio?.dataCriacao?.slice(0, 10) ||
-            relatorio?.dataAssinatura?.slice(0, 10) ||
-            ''
-          )
-        : (
-            relatorio?.dataCriacao?.slice(0, 10) ||
-            relatorio?.dataAssinatura?.slice(0, 10) ||
-            manutencao?.data ||
-            ''
-          )
       const periMaq = isRepair ? '' : maquina?.periodicidadeManut
-      const proximasManutencoes =
-        !isRepair && periMaq && dataExec
-          ? computarProximasDatas(dataExec, periMaq, {
-              tecnico: manutencao?.tecnico || relatorio?.tecnico || '',
-            })
-          : []
+      const proximasManutencoes = isRepair
+        ? []
+        : buildProximasManutencoesManutencao({ relatorio, manutencao, maquina })
       const manutencaoTipo = isRepair
         ? 'reparacao'
         : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')

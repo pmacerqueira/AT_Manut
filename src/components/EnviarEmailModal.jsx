@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext'
 import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { enviarRelatorioEmail } from '../services/emailService'
-import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
+import { buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 import { formatDataAzores } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 
@@ -51,23 +51,21 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
     setEnviando(true)
     showGlobalLoading()
     try {
-      const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
-      const tecObj = getTecnicoByNome(manutencao?.tecnico || relatorio?.tecnico)
-      const categoriaNome = categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria)
-      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria)
-
       let sucesso = 0
       for (const dest of dests) {
-        const resultado = await enviarRelatorioEmail({
+        const resultado = await enviarRelatorioEmail(buildRelatorioManutencaoEmailArgs({
           emailDestinatario: dest,
-          relatorio, manutencao, maquina, cliente, checklistItems,
-          subcategoriaNome: sub?.nome || '',
-          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
-          tecnicoObj: tecObj,
+          relatorio,
+          manutencao,
+          maquina,
+          cliente,
           marcas,
-          categoriaNome,
-          declaracaoClienteDepois,
-        })
+          getSubcategoria,
+          getCategoria,
+          getTecnicoByNome,
+          checklistItems,
+          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+        }))
         if (resultado?.ok) sucesso++
         else logger.error('EnviarEmailModal', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
       }

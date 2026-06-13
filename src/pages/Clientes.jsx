@@ -23,7 +23,7 @@ import { useToast } from '../components/Toast'
 import { logger } from '../utils/logger'
 import { enviarRelatorioHtmlEmail, blobToRawBase64 } from '../services/emailService'
 import { getHojeAzores, parseDateLocal } from '../utils/datasAzores'
-import { computarProximasDatas } from '../utils/diasUteis'
+import { buildRelatorioManutencaoPdfArgs } from '../utils/relatorioManutencaoPayload'
 import {
   maquinaPertenceCliente,
   mergeRelatorioPreferNewer,
@@ -36,7 +36,6 @@ import {
   ultimaRegistroParaProxima,
 } from '../utils/frotaReportHelpers'
 import { COPY_DOC_FIO_CONDUTOR, COPY_DOC_PARAFUSO_KAESER, COPY_DOC_TITLE_BOTAO_LISTA } from '../constants/documentacaoEquipamentoCopy'
-import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
 import { resolveDocumentoObrigatorio } from '../utils/documentacaoObrigatoria'
@@ -248,27 +247,17 @@ export default function Clientes() {
     try {
       const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
       const checklistItems = getChecklistBySubcategoria(maquina.subcategoriaId, manut.tipo || 'periodica')
-      const sub = getSubcategoria(maquina.subcategoriaId)
-      const dataExec = rel?.dataCriacao?.slice(0, 10) || rel?.dataAssinatura?.slice(0, 10) || manut?.data || ''
-      const periMaq = maquina?.periodicidadeManut
-      const proximas = (periMaq && dataExec)
-        ? computarProximasDatas(dataExec, periMaq, { tecnico: manut.tecnico || rel?.tecnico || '' })
-        : []
-      const categoriaNome = categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria)
-      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria)
-      const blob = await gerarPdfCompacto({
+      const blob = await gerarPdfCompacto(buildRelatorioManutencaoPdfArgs({
         relatorio: rel,
         manutencao: manut,
         maquina,
         cliente,
-        checklistItems,
-        subcategoriaNome: sub?.nome ?? '',
-        tecnicoObj: getTecnicoByNome(manut.tecnico || rel?.tecnico),
-        proximasManutencoes: proximas,
         marcas,
-        categoriaNome,
-        declaracaoClienteDepois,
-      })
+        getSubcategoria,
+        getCategoria,
+        getTecnicoByNome,
+        checklistItems,
+      }))
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

@@ -23,13 +23,12 @@ import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
-import { PenLine, Trash2, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Eye, History, Save, Bookmark, ChevronLeft, ChevronRight, FileDown, Plus, HelpCircle } from 'lucide-react'
+import { PenLine, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Save, ChevronLeft, ChevronRight, Plus, HelpCircle } from 'lucide-react'
 import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
-import { isEmailConfigured } from '../config/emailConfig'
 import { MAX_FOTOS } from '../config/limits'
-import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
+import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
 import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
 import {
@@ -53,6 +52,10 @@ import KaeserPecasStep from './executarManutencao/KaeserPecasStep'
 import ChecklistStep from './executarManutencao/ChecklistStep'
 import NotasStep from './executarManutencao/NotasStep'
 import FotosStep from './executarManutencao/FotosStep'
+import TecnicoStep from './executarManutencao/TecnicoStep'
+import ClienteStep from './executarManutencao/ClienteStep'
+import AssinaturaStep from './executarManutencao/AssinaturaStep'
+import FinalizarStep from './executarManutencao/FinalizarStep'
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
@@ -143,10 +146,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const kaeserWarnAnualHighDeltaRef = useRef(false)
 
   const maq = maquina
-  const { categoriaNome, declaracaoClienteDepois } = useMemo(() => ({
-    categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
-    declaracaoClienteDepois: declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria),
-  }), [maq, getSubcategoria, getCategoria])
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
@@ -849,7 +848,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
     setPreviewLoading(true)
     try {
-      const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
       const cliente = clientes.find(c => c.nif === maq?.clienteNif) ?? null
       const assinaturaPreview =
         (assinaturaFeita && canvasRef.current?.toDataURL('image/png'))
@@ -880,20 +878,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             })()
           : {}),
       }
-      const tecObj = getTecnicoByNome(form.tecnico)
       const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
-      const blob = await gerarPdfCompacto({
+      const blob = await gerarPdfCompacto(buildRelatorioManutencaoPdfArgs({
         relatorio: tempRel,
         manutencao: manutencaoAtual,
         maquina: maq,
         cliente,
-        checklistItems: items,
-        subcategoriaNome: sub?.nome ?? '',
-        tecnicoObj: tecObj,
         marcas,
-        categoriaNome,
-        declaracaoClienteDepois,
-      })
+        getSubcategoria,
+        getCategoria,
+        getTecnicoByNome,
+        checklistItems: items,
+      }))
       const url = URL.createObjectURL(blob)
       setPreviewPdfUrl(url)
     } catch (err) {
@@ -902,7 +898,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     } finally {
       setPreviewLoading(false)
     }
-  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, signatureClearedByUser, manutencaoAtual, items, getSubcategoria, getTecnicoByNome, showToast, categoriaNome, declaracaoClienteDepois, isKaeserAbcdMaq])
+  }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, signatureClearedByUser, manutencaoAtual, items, getSubcategoria, getCategoria, getTecnicoByNome, marcas, showToast, isKaeserAbcdMaq])
 
   const gravar = (semAssinatura = false, enviarEmailAoGravar = true) => {
     setErroChecklist('')
@@ -1216,21 +1212,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (!emailDestinatario.trim()) return
       setEmailEnviando(true)
       showGlobalLoading()
-      const sub     = maq ? getSubcategoria(maq.subcategoriaId) : null
       const cliente = clientes.find(c => c.nif === maq?.clienteNif) ?? null
       try {
-        const tecObj = getTecnicoByNome(relFinal?.tecnico || manutFinal?.tecnico)
-
-        const resultado = await enviarRelatorioEmail({
+        const resultado = await enviarRelatorioEmail(buildRelatorioManutencaoEmailArgs({
           emailDestinatario: emailDestinatario.trim(),
-          relatorio: relFinal, manutencao: manutFinal, maquina: maq, cliente,
-          checklistItems: items, subcategoriaNome: sub?.nome || '',
-          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
-          tecnicoObj: tecObj,
+          relatorio: relFinal,
+          manutencao: manutFinal,
+          maquina: maq,
+          cliente,
           marcas,
-          categoriaNome,
-          declaracaoClienteDepois,
-        })
+          getSubcategoria,
+          getCategoria,
+          getTecnicoByNome,
+          checklistItems: items,
+          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+        }))
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')
           const dest = emailDestinatario.trim().toLowerCase()
@@ -2023,228 +2019,62 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             onConfirmAdvance={() => { setConfirmacaoPendente(null); setStep(W.tec) }}
           />
 
-          {/* ═══ Técnico ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.tec) ? 'block' : 'none' }}>
-            {isCorrectionMode && <h3 className="admin-edit-section-title">Técnico</h3>}
-            {!isCorrectionMode && <p className="wizard-step-hint">Selecione o técnico responsável pela manutenção.</p>}
-            {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
-            <label className="label-required form-section">
-              <span>Técnico que realizou a manutenção <span className="req-star">*</span></span>
-              <select value={form.tecnico}
-                onChange={e => { setForm(f => ({ ...f, tecnico: e.target.value })); setErroAssinatura('') }}>
-                <option value="">— Selecionar técnico —</option>
-                {nomesTecnicos.map(nome => (
-                  <option key={nome} value={nome}>{nome}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <TecnicoStep
+            visible={isCorrectionMode || step === W.tec}
+            isCorrectionMode={isCorrectionMode}
+            form={form}
+            setForm={setForm}
+            setErroAssinatura={setErroAssinatura}
+            nomesTecnicos={nomesTecnicos}
+            erroAssinatura={erroAssinatura}
+          />
 
-          {/* ═══ Nome do cliente ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.cli) ? 'block' : 'none' }}>
-            {isCorrectionMode && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
-            {!isCorrectionMode && <p className="wizard-step-hint">Indique o nome do cliente responsável pela aceitação do serviço.</p>}
-            {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
+          <ClienteStep
+            visible={isCorrectionMode || step === W.cli}
+            isCorrectionMode={isCorrectionMode}
+            form={form}
+            setForm={setForm}
+            setErroAssinatura={setErroAssinatura}
+            erroAssinatura={erroAssinatura}
+            manutencaoAtual={manutencaoAtual}
+            maq={maq}
+            cli={cli}
+            getSubcategoria={getSubcategoria}
+            getCategoria={getCategoria}
+            onGuardarNomeContacto={guardarNomeContacto}
+          />
 
-            {!isCorrectionMode && (
-              <div className="declaracao-assinatura-box">
-                <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
-                <p className="declaracao-assinatura-texto">
-                  {resolveDeclaracaoClienteForMaquina(
-                    manutencaoAtual?.tipo === 'montagem' ? 'montagem' : 'periodica',
-                    maq,
-                    getSubcategoria,
-                    getCategoria,
-                  )}
-                </p>
-              </div>
-            )}
+          <AssinaturaStep
+            visible={isCorrectionMode || step === W.ass}
+            isCorrectionMode={isCorrectionMode}
+            isAdmin={isAdmin}
+            rel={rel}
+            form={form}
+            setForm={setForm}
+            erroAssinatura={erroAssinatura}
+            assinaturaFeita={assinaturaFeita}
+            canvasRef={canvasRef}
+            startDraw={startDraw}
+            draw={draw}
+            stopDraw={stopDraw}
+            onLimparAssinatura={limparAssinatura}
+            onGuardarAssinaturaContacto={guardarAssinaturaContacto}
+          />
 
-            <label className={`${isCorrectionMode ? '' : 'label-required'} form-section`}>
-              <span>{isCorrectionMode ? 'Nome do cliente que assinou' : 'Nome do cliente que assina'} {!isCorrectionMode && <span className="req-star">*</span>}</span>
-              <div className="campo-com-guardar">
-                <input type="text" value={form.nomeAssinante}
-                  onChange={e => { setForm(f => ({ ...f, nomeAssinante: e.target.value })); setErroAssinatura('') }}
-                  placeholder="Nome completo do responsável"
-                  maxLength={80} />
-                {form.nomeAssinante.trim() && (
-                  <button type="button" className="btn-guardar-contacto" onClick={guardarNomeContacto}
-                    title="Guardar este nome para futuras intervenções deste cliente">
-                    <Bookmark size={14} />
-                    {cli?.nomeContacto === form.nomeAssinante.trim() ? 'Guardado' : 'Guardar'}
-                  </button>
-                )}
-              </div>
-            </label>
-          </div>
-
-          {/* ═══ Assinatura ═══ */}
-          <div className="wizard-step-content" style={{ display: (isCorrectionMode || step === W.ass) ? 'block' : 'none' }}>
-            {isCorrectionMode ? (
-              <>
-                <h3 className="admin-edit-section-title">Assinatura digital</h3>
-                {rel?.assinaturaDigital && !form.limparAssinatura ? (
-                  <div className="admin-edit-assinatura-preview">
-                    <img src={rel.assinaturaDigital} alt="Assinatura do cliente" className="assinatura-preview-img" />
-                    <div className="assinatura-preview-info">
-                      <span className="assinatura-ok">Assinado por: {rel.nomeAssinante || '(sem nome)'}</span>
-                      <button type="button" className="btn danger btn-sm" style={{ marginTop: '0.5rem' }}
-                        onClick={() => setForm(f => ({ ...f, nomeAssinante: '', limparAssinatura: true }))}>
-                        <Trash2 size={13} /> Limpar assinatura
-                      </button>
-                      <span className="form-hint" style={{ display: 'block', marginTop: '0.35rem' }}>
-                        Após limpar, use "Recolher assinatura" para obter nova assinatura do cliente.
-                      </span>
-                    </div>
-                  </div>
-                ) : form.limparAssinatura ? (
-                  <div className="admin-edit-assinatura-cleared">
-                    <p className="form-hint">Assinatura será removida ao guardar. Use depois "Recolher assinatura" no menu da manutenção.</p>
-                    <button type="button" className="btn secondary btn-sm"
-                      onClick={() => setForm(f => ({ ...f, nomeAssinante: rel?.nomeAssinante || '', limparAssinatura: false }))}>
-                      Cancelar remoção
-                    </button>
-                  </div>
-                ) : (
-                  <p className="form-hint">Sem assinatura registada.</p>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="wizard-step-hint">O cliente deve assinar digitalmente para confirmar a aceitação do serviço.</p>
-                {rel?.assinaturaDigital && (
-                  <p className="wizard-step-hint" style={{ marginTop: '0.35rem', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>
-                    Se o relatório já tinha assinatura, ela é reposta abaixo. Use «Limpar assinatura» para o cliente voltar a assinar, se necessário.
-                  </p>
-                )}
-                {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
-
-                <div className="assinatura-canvas-wrap">
-                  <div className="assinatura-canvas-label">
-                    Assinatura digital do cliente {!isAdmin && <span className="req-star">*</span>}
-                  </div>
-                  <canvas
-                    ref={canvasRef}
-                    width={480}
-                    height={140}
-                    className={`assinatura-canvas ${assinaturaFeita ? 'assinatura-canvas--feita' : ''}`}
-                    onMouseDown={startDraw}
-                    onMouseMove={draw}
-                    onMouseUp={stopDraw}
-                    onMouseLeave={stopDraw}
-                    onTouchStart={startDraw}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDraw}
-                  />
-                  <div className="assinatura-canvas-actions">
-                    <button type="button" className="btn-link-checklist assinatura-limpar" onClick={limparAssinatura}>
-                      <Trash2 size={12} /> Limpar assinatura
-                    </button>
-                    {assinaturaFeita && (
-                      <>
-                        <span className="assinatura-ok">✓ Assinatura registada</span>
-                        <button type="button" className="btn-guardar-contacto" onClick={guardarAssinaturaContacto}
-                          title="Guardar esta assinatura para futuras intervenções deste cliente">
-                          <Bookmark size={14} /> Guardar assinatura
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {isAdmin && !assinaturaFeita && (
-                  <p className="wizard-step-hint" style={{ marginTop: '0.75rem', fontStyle: 'italic' }}>
-                    Como Admin, pode avançar sem assinatura e gravar posteriormente.
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* ═══ Finalizar (hidden in admin edit mode) ═══ */}
-          <div className="wizard-step-content" style={{ display: (!isCorrectionMode && step === W.fin) ? 'block' : 'none' }}>
-            <p className="wizard-step-hint">Reveja os dados, pré-visualize o relatório e finalize a manutenção.</p>
-            {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
-
-            <div className="exec-review-panel">
-              <div className="exec-review-header">
-                <CheckCircle2 size={18} />
-                <div>
-                  <strong>Revisão antes de gravar</strong>
-                  <p>Confirme datas, assinatura, próxima manutenção e envio antes de fechar a intervenção.</p>
-                </div>
-              </div>
-              <div className="exec-review-grid">
-                <div><span>Agendada</span><strong>{resumoFinalizacao.dataAgendada ? formatarDataPT(resumoFinalizacao.dataAgendada) : '—'}</strong></div>
-                <div><span>Execução</span><strong>{resumoFinalizacao.dataExecucao ? formatarDataPT(resumoFinalizacao.dataExecucao) : '—'}</strong></div>
-                <div><span>Técnico</span><strong>{resumoFinalizacao.tecnico}</strong></div>
-                <div><span>Assinatura</span><strong>{resumoFinalizacao.assinatura}</strong></div>
-                <div><span>Fotos</span><strong>{resumoFinalizacao.fotos}/{MAX_FOTOS}</strong></div>
-                <div><span>Email</span><strong>{resumoFinalizacao.destinoEmail}</strong></div>
-                <div className="exec-review-wide"><span>Próxima manutenção prevista</span><strong>{resumoFinalizacao.proxima ? formatarDataPT(resumoFinalizacao.proxima) : '—'}</strong></div>
-                <div className="exec-review-wide"><span>Agenda futura</span><strong>{resumoFinalizacao.periodicidade ? `Recalcular a partir de ${resumoFinalizacao.dataExecucao || 'hoje'}` : 'Sem periodicidade definida'}</strong></div>
-              </div>
-            </div>
-
-            {(isAdmin || (manutencaoAtual?.data && manutencaoAtual.data < getHojeAzores())) && (
-              <div className="form-section-historica">
-                <label className="historica-label">
-                  <History size={14} />
-                  Data de realização
-                  <span className="historica-hint">
-                    {isAdmin
-                      ? '(preencher apenas para registos históricos — deixar vazio para usar hoje)'
-                      : '(esta manutenção estava em atraso — pode indicar a data real de execução, ou deixar vazio para usar hoje)'}
-                  </span>
-                  <input type="date" max={getHojeAzores()} value={form.dataRealizacao}
-                    onChange={e => setForm(f => ({ ...f, dataRealizacao: e.target.value }))} />
-                </label>
-                {form.dataRealizacao && (
-                  <p className="historica-aviso">
-                    ⚠ Registo histórico: manutenção, relatório e próxima data serão registados como <strong>{form.dataRealizacao}</strong>
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="form-section email-section">
-              <h3 className="assinatura-titulo"><Mail size={16} /> Envio do comprovativo</h3>
-              <label className="label-required">
-                <span>Email do cliente para envio do relatório</span>
-                <input type="email" value={emailDestinatario}
-                  onChange={e => setEmailDestinatario(e.target.value)}
-                  placeholder="exemplo@empresa.pt" autoComplete="email" />
-                {!isEmailConfigured() && (
-                  <small className="email-config-aviso">
-                    ⚠ Endpoint de email não configurado — o botão abrirá o cliente de email local.
-                  </small>
-                )}
-              </label>
-
-              <button type="button" className="btn-preview" onClick={handlePreviewInline} disabled={previewLoading}>
-                <Eye size={15} /> {previewLoading ? 'A gerar…' : previewPdfUrl ? 'Fechar pré-visualização' : 'Pré-visualizar relatório'}
-              </button>
-            </div>
-
-            {previewPdfUrl && (
-              <div className="wizard-preview">
-                <iframe src={previewPdfUrl} title="Pré-visualização do relatório" className="wizard-preview-iframe" />
-                <div className="wizard-preview-actions">
-                  <button type="button" className="btn secondary btn-sm" onClick={() => window.open(previewPdfUrl, '_blank')}>
-                    <Eye size={14} /> Abrir noutra janela
-                  </button>
-                  <button type="button" className="btn secondary btn-sm" onClick={() => {
-                    const a = document.createElement('a')
-                    a.href = previewPdfUrl
-                    a.download = `relatorio-manutencao.pdf`
-                    a.click()
-                  }}>
-                    <FileDown size={14} /> Transferir PDF
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </div>
+          <FinalizarStep
+            visible={!isCorrectionMode && step === W.fin}
+            isAdmin={isAdmin}
+            manutencaoAtual={manutencaoAtual}
+            form={form}
+            setForm={setForm}
+            erroAssinatura={erroAssinatura}
+            resumoFinalizacao={resumoFinalizacao}
+            emailDestinatario={emailDestinatario}
+            setEmailDestinatario={setEmailDestinatario}
+            previewLoading={previewLoading}
+            previewPdfUrl={previewPdfUrl}
+            onPreviewToggle={handlePreviewInline}
+          />
 
         </div>{/* fim .wizard-body */}
 

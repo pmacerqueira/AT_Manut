@@ -17,9 +17,9 @@ import BulkExecutarModal from '../components/BulkExecutarModal'
 import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, ArrowUp, ArrowDown, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
-import { getFeriadosAno, isFimDeSemana, isFeriado, computarProximasDatas } from '../utils/diasUteis'
+import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
+import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 import { enviarRelatorioEmail } from '../services/emailService'
-import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio'
 import { logger } from '../utils/logger'
 import { parseHorasContadorForm } from '../utils/horasContadorEquipamento'
 import { STORAGE } from '../config/storageKeys'
@@ -495,26 +495,22 @@ export default function Manutencoes() {
     showGlobalLoading()
     try {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
-      const tecObj = getTecnicoByNome(rel?.tecnico || m?.tecnico)
-      const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
-      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
 
       const sucessoDests = []
       for (const dest of dests) {
-        const resultado = await enviarRelatorioEmail({
+        const resultado = await enviarRelatorioEmail(buildRelatorioManutencaoEmailArgs({
           emailDestinatario: dest,
           relatorio: rel,
           manutencao: m,
           maquina: maq,
           cliente,
-          checklistItems,
-          subcategoriaNome: sub?.nome || '',
-          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
-          tecnicoObj: tecObj,
           marcas,
-          categoriaNome,
-          declaracaoClienteDepois,
-        })
+          getSubcategoria,
+          getCategoria,
+          getTecnicoByNome,
+          checklistItems,
+          logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+        }))
         if (resultado?.ok) sucessoDests.push(dest)
         else logger.error('Manutencoes', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
       }
@@ -550,28 +546,18 @@ export default function Manutencoes() {
     showGlobalLoading()
     try {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
-      const tecObj = getTecnicoByNome(m.tecnico || rel?.tecnico)
-      const dataExec = rel?.dataCriacao?.slice(0, 10) || rel?.dataAssinatura?.slice(0, 10) || m?.data || ''
-      const periMaq = maq?.periodicidadeManut
-      const proximas = (periMaq && dataExec)
-        ? computarProximasDatas(dataExec, periMaq, { tecnico: m.tecnico || rel?.tecnico || '' })
-        : []
-      const categoriaNome = categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria)
-      const declaracaoClienteDepois = declaracaoClienteDepoisFromMaquina(maq, getSubcategoria, getCategoria)
       const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
-      const blob = await gerarPdfCompacto({
+      const blob = await gerarPdfCompacto(buildRelatorioManutencaoPdfArgs({
         relatorio: rel,
         manutencao: m,
         maquina: maq,
         cliente,
-        checklistItems,
-        subcategoriaNome: sub?.nome ?? '',
-        tecnicoObj: tecObj,
-        proximasManutencoes: proximas,
         marcas,
-        categoriaNome,
-        declaracaoClienteDepois,
-      })
+        getSubcategoria,
+        getCategoria,
+        getTecnicoByNome,
+        checklistItems,
+      }))
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

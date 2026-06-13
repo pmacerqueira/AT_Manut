@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.16.89] — 2026-06-13 — Wizard completo + payload canónico PDF/email
+
+### Refactoring (sem alteração de comportamento)
+- **`relatorioManutencaoPayload.js`:** fonte única para data de execução, próximas manutenções e metadados de declaração — integrado em `Manutencoes`, `Clientes`, `EnviarEmailModal`, `ExecutarManutencaoModal` e `emailService`.
+- **`ExecutarManutencaoModal`:** passos restantes extraídos — `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep` (continuação do split v1.16.88).
+
+### Correcções
+- Pré-visualização PDF no wizard passa `proximasManutencoes` (antes omitidas no PDF inline).
+
+### Qualidade
+- **Unit tests:** `tests/unit/relatorioManutencaoPayload.test.js` (32 testes unitários no total).
+- **E2E:** `04-manutencoes.spec.js` — 22 passed (1 flaky na 1.ª carga da lista).
+
+### Deploy
+- PWA em `public_html/manut/`.
+
+---
+
 ## [1.16.88] — 2026-06-12 — Simplificação estrutural: agendaDomain, lazy PDF/HTML, wizard split
 
 ### Refactoring (sem alteração de comportamento)
