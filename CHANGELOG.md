@@ -9,6 +9,21 @@ Política de continuidade:
 
 ---
 
+## [1.16.87] — 2026-06-12 — Contraste legível no modal Alertas de conformidade + E2E datas relativas
+
+### Correcções
+- **`AlertaProactivoModal`:** nome do equipamento e do cliente ilegíveis no tema escuro — removido `color: var(--color-gray-900)` (#111827 sobre fundo escuro). Texto principal em `#f8fafc` / peso 700; regras de alta especificidade em `AlertaProactivoModal.css` e `index.css` para ganhar a `body.modo-campo span { color: inherit }`.
+- **Modo campo:** nomes em `#0a0e14` sobre fundos claros; série em `#4b5563`.
+
+### Qualidade (E2E)
+- **`tests/e2e/helpers.js`:** datas relativas (`e2eHojeYmd`, `e2eAddDaysYmd`, `buildMc`, `buildMcDashboardCalendar`, `buildMcForaJanelaAlerta`) — specs **02** e **11** deixam de depender de datas fixas no mock.
+- **`dismissAlertasModal`:** chave de dismiss em formato `yyyy-MM-dd` (Açores).
+
+### Deploy
+- PWA publicada em `public_html/manut/` via `navel-site` → `deploy:at-manut`.
+
+---
+
 ## [1.16.86] — 2026-06-12 — Sanitização de código morto + revisão documental
 
 ### Código morto removido (zero impacto em runtime — Bugbot sem findings)

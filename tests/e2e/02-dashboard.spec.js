@@ -2,13 +2,12 @@
  * 02-dashboard.spec.js — Dashboard: stats, navegação, calendário, painéis de dia
  */
 import { test, expect } from '@playwright/test'
-import { setupApiMock, doLoginAdmin, doLoginTecnico, goTo } from './helpers.js'
+import { loginAdminSemAlertas, doLoginTecnico, setupApiMock, buildMcDashboardCalendar } from './helpers.js'
 
 test.describe('Dashboard — Admin', () => {
 
   test.beforeEach(async ({ page }) => {
-    await setupApiMock(page)
-    await doLoginAdmin(page)
+    await loginAdminSemAlertas(page, { customData: buildMcDashboardCalendar() })
   })
 
   // ── Cards de estatísticas ───────────────────────────────────────────────────
@@ -90,19 +89,14 @@ test.describe('Dashboard — Admin', () => {
   // ── Painel de dia com manutenção ────────────────────────────────────────────
 
   test('Clicar num dia com manutenção abre painel de dia', async ({ page }) => {
-    // Clicar num dia que tenha indicador (cal-status-*) ou simplesmente qualquer dia numerado
-    const dayWithMaint = page.locator('.dashboard-cal-day.cal-status-red, .dashboard-cal-day.cal-status-orange, .dashboard-cal-day.cal-status-green').first()
-
-    if (await dayWithMaint.isVisible()) {
-      await dayWithMaint.click()
-      // Usar apenas .day-panel (o overlay e o painel são 2 elementos — toBeVisible requer 1)
-      await expect(page.locator('.day-panel').first()).toBeVisible({ timeout: 4000 })
-      // Fechar painel
-      await page.keyboard.press('Escape')
-      await page.waitForTimeout(300)
-    } else {
-      test.info().annotations.push({ type: 'note', description: 'Nenhum dia com manutenção visível no mês corrente' })
-    }
+    const dayWithMaint = page.locator(
+      '.dashboard-cal-day.cal-status-red, .dashboard-cal-day.cal-status-orange, .dashboard-cal-day.cal-status-green',
+    ).first()
+    await expect(dayWithMaint).toBeVisible({ timeout: 8000 })
+    await dayWithMaint.click()
+    await expect(page.locator('.day-panel').first()).toBeVisible({ timeout: 4000 })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
   })
 
   test('Clicar num dia vazio abre painel de agendamento', async ({ page }) => {
@@ -127,22 +121,18 @@ test.describe('Dashboard — Admin', () => {
 
   test('Painel de dia permite clicar "Executar" para abrir modal de execução', async ({ page }) => {
     const dayWithPending = page.locator('.dashboard-cal-day.cal-status-red, .dashboard-cal-day.cal-status-orange').first()
+    await expect(dayWithPending).toBeVisible({ timeout: 8000 })
+    await dayWithPending.click()
+    await page.waitForTimeout(500)
 
-    if (await dayWithPending.isVisible()) {
-      await dayWithPending.click()
-      await page.waitForTimeout(500)
-
-      const executeBtn = page.locator('.day-panel .btn-sm, .day-panel button').filter({ hasText: /executar/i }).first()
-      if (await executeBtn.isVisible()) {
-        await executeBtn.click()
-        await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
-        // Fechar modal via Escape ou botão Cancelar dentro do modal
-        await page.keyboard.press('Escape')
-        await page.waitForTimeout(300)
-        if (await page.locator('.modal-overlay').first().isVisible().catch(() => false)) {
-          await page.locator('.modal .form-actions button.secondary, .modal button.secondary').first().click()
-        }
-      }
+    const executeBtn = page.locator('.day-panel .btn-sm, .day-panel button').filter({ hasText: /executar/i }).first()
+    await expect(executeBtn).toBeVisible({ timeout: 5000 })
+    await executeBtn.click()
+    await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    if (await page.locator('.modal-overlay').first().isVisible().catch(() => false)) {
+      await page.locator('.modal .form-actions button.secondary, .modal button.secondary').first().click()
     }
   })
 

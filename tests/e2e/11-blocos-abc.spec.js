@@ -13,44 +13,46 @@ import {
   fillExecucaoModal,
   expectToast,
   MC,
+  buildMc,
+  e2eHojeYmd,
+  e2eAddDaysYmd,
+  buildMcForaJanelaAlerta,
   SELETOR_BOTAO_EDITAR,
 } from './helpers.js'
 
 // ── Dados mock com manutenção próxima (para disparar o modal de alertas) ──────
-// Datas relativas a hoje: `getManutencoesPendentesAlertas` exige m.data >= hojeStr (UTC).
-// Valores fixos em 2026-02 falham quando o calendário real avança (ex.: Mar 2026).
-function addDaysIsoYmd(ymd, deltaDays) {
-  const [y, m, d] = ymd.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10)
-}
-
+// Datas relativas a hoje: `getManutencoesPendentesAlertas` exige m.data >= hojeStr.
 function getMcComAlerta() {
-  const hojeStr = new Date().toISOString().slice(0, 10)
-  const dProxSemEmail = addDaysIsoYmd(hojeStr, 2)
-  const dProxBettencourt = addDaysIsoYmd(hojeStr, 3)
-  const dMt20Longe = addDaysIsoYmd(hojeStr, 25)
+  const hojeStr = e2eHojeYmd()
+  const dProxSemEmail = e2eAddDaysYmd(hojeStr, 2)
+  const dProxBettencourt = e2eAddDaysYmd(hojeStr, 3)
+  const dForaJanela = e2eAddDaysYmd(hojeStr, 25)
+  const mc = buildMc()
   return {
-    ...MC,
+    ...mc,
     clientes: [
-      MC.clientes[0],  // Mecânica Bettencourt (com email)
-      {               // Empresa sem email — para testar badge e aviso no modal
+      mc.clientes[0],
+      {
         id: 'cli2', nif: '522222222', nome: 'Empresa Sem Email Lda',
         morada: 'Rua do Porto', codigoPostal: '9500-100',
         localidade: 'Ponta Delgada', telefone: '296000001', email: '',
       },
-      MC.clientes[1],
+      mc.clientes[1],
     ],
     maquinas: [
-      ...MC.maquinas,
+      ...mc.maquinas,
       {
         id: 'm04', clienteNif: '522222222', subcategoriaId: 'sub1',
         periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EV-2P',
         numeroSerie: 'NAV-004', anoFabrico: 2022, documentos: [],
-        proximaManut: dProxSemEmail, ultimaManutencaoData: addDaysIsoYmd(hojeStr, -365),
+        proximaManut: dProxSemEmail, ultimaManutencaoData: e2eAddDaysYmd(hojeStr, -365),
       },
     ],
     manutencoes: [
-      ...MC.manutencoes.map(m => m.id === 'mt20' ? { ...m, data: dMt20Longe } : m),
+      // mt16/mt20 fora da janela de 7 dias — só mt_prox* disparam o modal (C19: count=1 Bettencourt)
+      ...mc.manutencoes.map(m =>
+        (m.id === 'mt16' || m.id === 'mt20') ? { ...m, data: dForaJanela } : m,
+      ),
       {
         id: 'mt_prox1', maquinaId: 'm01', tipo: 'periodica',
         data: dProxBettencourt, tecnico: '',
@@ -91,7 +93,12 @@ async function loginAdminSemAlertas(page, customData) {
   await setupApiMock(page, { customData: customData ?? getMcComAlerta() })
   await doLoginAdmin(page)
   await page.evaluate(() => {
-    const hoje = new Date().toISOString().slice(0, 10)
+    const hoje = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Atlantic/Azores',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
     localStorage.setItem('atm_alertas_dismiss', hoje)
   })
 }
@@ -113,7 +120,7 @@ test.describe('Bloco A — Email obrigatório em clientes', () => {
   })
 
   test('A1 — Badge "Sem email" visível para cliente sem email', async ({ page }) => {
-    const badge = page.locator('.sem-email-aviso').first()
+    const badge = page.locator('tbody tr').filter({ hasText: /Sem Email/i }).locator('.sem-email-aviso').first()
     await expect(badge).toBeVisible({ timeout: 12000 })
     await expect(badge).toContainText(/sem email/i)
   })
@@ -499,8 +506,7 @@ test.describe('Bloco C — Modal de alertas proactivos', () => {
   })
 
   test('C13 — Modal NÃO aparece se manutenções estão fora do prazo de aviso', async ({ page }) => {
-    // Usar MC base COM diasAviso=3 — mt20 está a 7 dias → fora do prazo
-    await setupApiMock(page, { customData: MC })
+    await setupApiMock(page, { customData: buildMcForaJanelaAlerta(3) })
     await doLoginAdmin(page)
     await page.evaluate(() => {
       localStorage.removeItem('atm_alertas_dismiss')
@@ -615,7 +621,9 @@ test.describe('Integração — Fluxos combinados A+B+C', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(800)
 
-    await expect(page.locator('.sem-email-aviso').first()).toBeVisible()
+    await expect(
+      page.locator('tbody tr').filter({ hasText: /Sem Email/i }).locator('.sem-email-aviso').first(),
+    ).toBeVisible()
   })
 
   test('I2 — Definir 14 dias de aviso → config persiste', async ({ page }) => {

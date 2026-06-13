@@ -2472,3 +2472,19 @@ body.modo-campo .categoria-card svg {
   color: #334155;
   opacity: 0.9;
 }
+
+/* Alertas de conformidade: nome cliente/equipamento legível (não gray-900 nem inherit) */
+.alerta-overlay .alerta-modal .alerta-grupo-header .alerta-grupo-nome,
+.alerta-overlay .alerta-modal .alerta-item-info .alerta-item-maquina {
+  color: #f8fafc;
+  font-weight: 700;
+}
+body.modo-campo .alerta-overlay .alerta-modal .alerta-grupo-header .alerta-grupo-nome,
+body.modo-campo .alerta-overlay .alerta-modal .alerta-item-info .alerta-item-maquina,
+body.modo-campo .alerta-overlay .alerta-modal .alerta-item-data {
+  color: #0a0e14;
+  font-weight: 700;
+}
+body.modo-campo .alerta-overlay .alerta-modal .alerta-item-serie {
+  color: #4b5563;
+}

@@ -29,9 +29,27 @@ export function makeMockJWT(role) {
 export const ADMIN_TOKEN   = makeMockJWT('admin')
 export const TECNICO_TOKEN = makeMockJWT('tecnico')
 
+// ── Datas relativas (alinhado com getHojeAzores / alertasConfig) ─────────────
+
+/** Hoje yyyy-MM-dd no fuso Atlantic/Azores (igual à app). */
+export function e2eHojeYmd() {
+  return new Date().toLocaleDateString('en-CA', {
+    timeZone: 'Atlantic/Azores',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+/** Soma dias civis a uma data ISO yyyy-MM-dd. */
+export function e2eAddDaysYmd(ymd, deltaDays) {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10)
+}
+
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
-export const MC = {
+const MC_STATIC = {
   clientes: [
     {
       id: 'cli1', nif: '511234567', nome: 'Mecânica Bettencourt Lda',
@@ -64,69 +82,6 @@ export const MC = {
     { id: 'ch2m02', subcategoriaId: 'sub2', tipo: 'montagem', grupo: 'electrica', ordem: 2, texto: 'Ligação eléctrica conforme especificações' },
     { id: 'ch2m03', subcategoriaId: 'sub2', tipo: 'montagem', grupo: 'teste', ordem: 3, texto: 'Teste final de subida e descida' },
   ],
-  maquinas: [
-    {
-      id: 'm01', clienteNif: '511234567', subcategoriaId: 'sub1',
-      periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EV-4P',
-      numeroSerie: 'NAV-001', anoFabrico: 2021, documentos: [],
-      proximaManut: '2026-01-15', ultimaManutencaoData: '2025-12-10',
-    },
-    {
-      id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub2',
-      periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EH-2C',
-      numeroSerie: 'NAV-002', anoFabrico: 2025, documentos: [],
-      proximaManut: null, ultimaManutencaoData: null,
-    },
-    {
-      id: 'm03', clienteNif: '511234567', subcategoriaId: 'sub5',
-      periodicidadeManut: 'trimestral', marca: 'KAESER', modelo: 'Sigma 7',
-      numeroSerie: 'KS-003', anoFabrico: 2023, documentos: [],
-      proximaManut: null, ultimaManutencaoData: null,
-    },
-  ],
-  manutencoes: [
-    // mt01: concluída com relatório (assinado)
-    {
-      id: 'mt01', maquinaId: 'm01', tipo: 'periodica',
-      data: '2025-12-10', tecnico: 'Aurélio Almeida',
-      status: 'concluida', observacoes: 'Revisão anual OK.',
-    },
-    // mt11: pendente em atraso — para executar nos testes
-    {
-      id: 'mt11', maquinaId: 'm01', tipo: 'periodica',
-      data: '2026-01-15', tecnico: '',
-      status: 'pendente', observacoes: 'Em atraso.',
-    },
-    // mt16: agendada (próxima)
-    {
-      id: 'mt16', maquinaId: 'm01', tipo: 'periodica',
-      data: '2026-06-15', tecnico: 'Aldevino Costa',
-      status: 'agendada', observacoes: '',
-    },
-    // mt20: montagem pendente (data afastada para não disparar modal de alertas nos testes)
-    {
-      id: 'mt20', maquinaId: 'm02', tipo: 'montagem',
-      data: '2026-04-01', tecnico: '',
-      status: 'pendente', observacoes: '',
-    },
-  ],
-  relatorios: [
-    {
-      id: 'rr01', manutencaoId: 'mt01',
-      numeroRelatorio: '2025.MP.00001',
-      dataCriacao:   '2025-12-10T09:00:00.000Z',
-      dataAssinatura:'2025-12-10T11:00:00.000Z',
-      tecnico: 'Aurélio Almeida',
-      nomeAssinante: 'João Bettencourt',
-      assinadoPeloCliente: true,
-      assinaturaDigital: null,
-      checklistRespostas: { ch1: 'sim', ch2: 'sim', ch3: 'sim' },
-      notas: 'Tudo em conformidade.',
-      fotos: [],
-      ultimoEnvio: '2025-12-10T12:00:00.000Z',
-    },
-  ],
-
   tecnicos: [
     { id: 'tec1', nome: 'Aurélio Almeida', ativo: true },
     { id: 'tec2', nome: 'Paulo Medeiros', ativo: true },
@@ -136,7 +91,7 @@ export const MC = {
   /** Plano de consumíveis por máquina (API `pecasPlano`); mutável em `setupApiMock`. */
   pecasPlano: [],
 
-  // ── Reparações ─────────────────────────────────────────────────────────────
+  // ── Reparações (datas fixas — specs 16/17 usam Fevereiro 2026 e nºs ES-2026-*) ──
   reparacoes: [
     // rep01: pendente — para testar criação e execução
     {
@@ -260,6 +215,120 @@ export const MC = {
   ],
 }
 
+/**
+ * Mock canónico com datas de manutenção relativas a «hoje» (Açores).
+ * Evita regressões quando o calendário real avança (ex.: mt16 fixa em 2026-06-15).
+ * @param {object} overrides — substitui slices do mock (ex.: `customData` em setupApiMock)
+ */
+export function buildMc(overrides = {}) {
+  const hoje = e2eHojeYmd()
+  const dConcluida = e2eAddDaysYmd(hoje, -180)
+  const dAtraso = e2eAddDaysYmd(hoje, -5)
+  const dProxima = e2eAddDaysYmd(hoje, 10)
+  const dMontagem = e2eAddDaysYmd(hoje, 25)
+  const anoConcl = dConcluida.slice(0, 4)
+
+  const base = {
+    ...MC_STATIC,
+    maquinas: [
+      {
+        id: 'm01', clienteNif: '511234567', subcategoriaId: 'sub1',
+        periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EV-4P',
+        numeroSerie: 'NAV-001', anoFabrico: 2021, documentos: [],
+        proximaManut: dProxima, ultimaManutencaoData: dConcluida,
+      },
+      {
+        id: 'm02', clienteNif: '511234567', subcategoriaId: 'sub2',
+        periodicidadeManut: 'anual', marca: 'Navel', modelo: 'EH-2C',
+        numeroSerie: 'NAV-002', anoFabrico: 2025, documentos: [],
+        proximaManut: null, ultimaManutencaoData: null,
+      },
+      {
+        id: 'm03', clienteNif: '511234567', subcategoriaId: 'sub5',
+        periodicidadeManut: 'trimestral', marca: 'KAESER', modelo: 'Sigma 7',
+        numeroSerie: 'KS-003', anoFabrico: 2023, documentos: [],
+        proximaManut: null, ultimaManutencaoData: null,
+      },
+    ],
+    manutencoes: [
+      {
+        id: 'mt01', maquinaId: 'm01', tipo: 'periodica',
+        data: dConcluida, tecnico: 'Aurélio Almeida',
+        status: 'concluida', observacoes: 'Revisão anual OK.',
+      },
+      {
+        id: 'mt11', maquinaId: 'm01', tipo: 'periodica',
+        data: dAtraso, tecnico: '',
+        status: 'pendente', observacoes: 'Em atraso.',
+      },
+      {
+        id: 'mt16', maquinaId: 'm01', tipo: 'periodica',
+        data: dProxima, tecnico: 'Aldevino Costa',
+        status: 'agendada', observacoes: '',
+      },
+      {
+        id: 'mt20', maquinaId: 'm02', tipo: 'montagem',
+        data: dMontagem, tecnico: '',
+        status: 'pendente', observacoes: '',
+      },
+    ],
+    relatorios: [
+      {
+        id: 'rr01', manutencaoId: 'mt01',
+        numeroRelatorio: `${anoConcl}.MP.00001`,
+        dataCriacao: `${dConcluida}T09:00:00.000Z`,
+        dataAssinatura: `${dConcluida}T11:00:00.000Z`,
+        tecnico: 'Aurélio Almeida',
+        nomeAssinante: 'João Bettencourt',
+        assinadoPeloCliente: true,
+        assinaturaDigital: null,
+        checklistRespostas: { ch1: 'sim', ch2: 'sim', ch3: 'sim' },
+        notas: 'Tudo em conformidade.',
+        fotos: [],
+        ultimoEnvio: `${dConcluida}T12:00:00.000Z`,
+      },
+    ],
+  }
+
+  return { ...base, ...overrides }
+}
+
+/** Instância por defeito (datas calculadas ao carregar o módulo). */
+export const MC = buildMc()
+
+/**
+ * Mock com manutenções visíveis no calendário do mês corrente (Dashboard spec 02).
+ */
+export function buildMcDashboardCalendar() {
+  const hoje = e2eHojeYmd()
+  const mc = buildMc()
+  const dCalAtraso = e2eAddDaysYmd(hoje, -2)
+  const dCalProxima = e2eAddDaysYmd(hoje, 2)
+  return buildMc({
+    manutencoes: mc.manutencoes.map(m => {
+      if (m.id === 'mt11') return { ...m, data: dCalAtraso }
+      if (m.id === 'mt16') return { ...m, data: dCalProxima }
+      return m
+    }),
+  })
+}
+
+/**
+ * Mock sem manutenções dentro de uma janela de aviso curta (spec 11 — C13).
+ * @param {number} diasAviso — dias de aviso configurados no teste
+ */
+export function buildMcForaJanelaAlerta(diasAviso = 3) {
+  const hoje = e2eHojeYmd()
+  const fora = e2eAddDaysYmd(hoje, diasAviso + 5)
+  const mc = buildMc()
+  return buildMc({
+    manutencoes: mc.manutencoes.map(m => {
+      if (m.id === 'mt16' || m.id === 'mt20') return { ...m, data: fora }
+      return m
+    }),
+  })
+}
+
 // ── Mock API ──────────────────────────────────────────────────────────────────
 
 /** Único destinatário permitido nos E2E (evita emails a fichas mock / clientes reais). */
@@ -348,7 +417,7 @@ export async function stubEmailPhpEndpoints(page) {
  */
 export async function setupApiMock(page, { failFetch = false, customData = {} } = {}) {
   await stubEmailPhpEndpoints(page)
-  const data = { ...MC, ...customData }
+  const data = { ...buildMc(), ...customData }
   // Estado mutável para clientes (create/update) — permite testes de importação SAF-T
   const clientesMutable = [...(data.clientes ?? [])]
   const pecasPlanoMutable = [...(data.pecasPlano ?? [])]
@@ -521,7 +590,13 @@ export async function doLoginTecnico(page) { return doLogin(page, { username: 'A
  */
 export function dismissAlertasModal(page) {
   return page.evaluate(() => {
-    localStorage.setItem('atm_alertas_dismiss', new Date().toDateString())
+    const hoje = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Atlantic/Azores',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    localStorage.setItem('atm_alertas_dismiss', hoje)
   })
 }
 
