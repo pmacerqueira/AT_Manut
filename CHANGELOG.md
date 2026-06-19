@@ -9,6 +9,18 @@ Política de continuidade:
 
 ---
 
+## [1.16.99] — 2026-06-12 — Consumíveis editáveis, contraste e colunas lista
+
+### Correcções
+- **`ChecklistStep.jsx`:** linhas manuais de consumíveis com campos editáveis (código, descrição, qtd, unidade) em vez de texto fixo «Item manual»; nova linha começa vazia; em «Corrigir relatório» KAESER A/B/C/D evita painel duplicado só-leitura (usa tabela editável do topo).
+- **`Manutencoes.css`:** contraste no checklist de consumíveis — código em `--color-accent`, descrição em `--color-text`; inputs das linhas manuais legíveis no tema escuro.
+
+### Melhorias UX
+- **`Manutencoes.jsx` / CSS:** coluna Equipamento na lista «Executadas» em 3 linhas (categoria / nome / n.º série), sem truncagem agressiva.
+- **`ExecutarManutencaoModal.jsx` / `KaeserPecasStep.jsx`:** coluna Un. alargada no painel de correcção e passo Consumíveis KAESER.
+
+---
+
 ## [1.16.98] — 2026-06-19 — Corrigir envio de email de relatórios PDF
 
 ### Correcções

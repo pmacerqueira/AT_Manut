@@ -50,11 +50,21 @@
   font-weight: 500;
 }
 
-/* Equipamento: nome, Nº Série e Cliente em linhas compactas */
+/* Equipamento: categoria, nome e Nº Série em 3 linhas (sem truncar) */
 .equip-desc-block {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.12rem;
+  line-height: 1.3;
+}
+.equip-desc-block .equip-cat {
+  font-size: 0.82em;
+  color: var(--color-text-muted);
+}
+.equip-desc-block .equip-nome {
+  font-size: 0.95em;
+  font-weight: 600;
+  word-break: break-word;
 }
 .equip-desc-block strong {
   font-size: 0.95em;
@@ -64,6 +74,15 @@
 }
 .equip-desc-block .equip-cliente {
   font-size: 0.9em;
+}
+
+/* Célula equipamento: várias linhas (não aplicar ellipsis da dt-compact) */
+.manutencoes-table .dt-compact td.col-equipamento,
+.manutencoes-table .dt-compact th.col-equipamento {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  vertical-align: top;
 }
 
 /* Datas: agendada + execução em duas linhas */
@@ -675,6 +694,7 @@ body.modo-campo .num-servico {
   gap: 0.4rem;
   min-width: 0;
   flex-wrap: wrap;
+  color: var(--color-text);
 }
 
 .peca-pos {
@@ -682,20 +702,23 @@ body.modo-campo .num-servico {
   font-size: 0.73rem;
   color: var(--color-text-muted);
   flex-shrink: 0;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-elevated);
   padding: 0.05rem 0.3rem;
   border-radius: 3px;
+  border: 1px solid var(--color-border);
 }
 
 .peca-codigo {
   font-family: monospace;
   font-size: 0.76rem;
-  color: var(--color-primary);
+  color: var(--color-accent);
+  font-weight: 600;
   flex-shrink: 0;
 }
 
 .peca-desc {
   flex: 1;
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -709,10 +732,64 @@ body.modo-campo .num-servico {
   font-weight: 600;
 }
 
+.peca-checklist-row.peca-nao-usada .peca-codigo,
+.peca-checklist-row.peca-nao-usada .peca-desc,
+.peca-checklist-row.peca-nao-usada .peca-qty-un {
+  color: inherit;
+}
+
 .peca-remove-btn {
   flex-shrink: 0;
   padding: 2px 4px !important;
   margin-left: auto;
+}
+
+.peca-checklist-row.peca-manual-row {
+  cursor: default;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.peca-checklist-manual-fields {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+  align-items: center;
+}
+
+.peca-manual-codigo {
+  flex: 0 1 7.5rem;
+  min-width: 5.5rem;
+}
+
+.peca-manual-desc {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+}
+
+.peca-manual-qty {
+  flex: 0 0 3.75rem;
+  width: 3.75rem;
+  text-align: center;
+}
+
+.peca-manual-un {
+  flex: 0 0 5.5rem;
+  min-width: 5.5rem;
+}
+
+.peca-checklist-manual-fields .kaeser-peca-cell,
+.peca-checklist-manual-fields .kaeser-peca-un-select {
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+}
+
+.peca-checklist-manual-fields .kaeser-peca-cell::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1;
 }
 
 @media (max-width: 540px) {
@@ -1071,6 +1148,26 @@ body.modo-campo .num-servico {
 }
 .kaeser-pecas-table {
   min-width: 100%;
+  table-layout: auto;
+}
+.kaeser-pecas-table .col-peca-qtd {
+  width: 4.75rem;
+  min-width: 4.75rem;
+  max-width: 4.75rem;
+}
+.kaeser-pecas-table .col-peca-un {
+  width: 6.25rem;
+  min-width: 6.25rem;
+  max-width: 6.25rem;
+  overflow: visible;
+}
+.kaeser-pecas-table .col-peca-act {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  max-width: 2.75rem;
+  text-align: center;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
 }
 .kaeser-pecas-table .kaeser-peca-cell {
   width: 100%;
@@ -1078,6 +1175,28 @@ body.modo-campo .num-servico {
   box-sizing: border-box;
   font-size: 0.9rem;
   padding: 0.35rem 0.45rem;
+}
+.kaeser-pecas-table .kaeser-peca-qty {
+  text-align: center;
+}
+.kaeser-pecas-table .kaeser-peca-un-select {
+  display: block;
+  width: 100%;
+  min-width: 5.5rem;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.35rem 1.85rem 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  background-color: var(--color-bg-elevated, var(--color-surface));
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: auto;
+}
+.kaeser-pecas-table .kaeser-peca-un-select:focus-visible {
+  outline: 2px solid var(--color-primary, #1ab8f0);
+  outline-offset: 1px;
 }
 
 .kaeser-help-btn {

@@ -22,6 +22,17 @@ export default function ChecklistStep({
   manutencaoAtual,
   aplicarTipoKaeserComPecas,
 }) {
+  const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem')
+  /** Em «Corrigir relatório» KAESER A/B/C/D o modal já tem tabela editável — evitar duplicar lista só-leitura. */
+  const showPecasConsumiveis = !(isCorrectionMode && isKaeserPeriodicExec)
+    && (isCorrectionMode || !useKaeserPipeline)
+    && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser))
+
+  const updatePeca = (idx, patch) => setForm(f => ({
+    ...f,
+    pecasUsadas: f.pecasUsadas.map((pp, i) => (i === idx ? { ...pp, ...patch } : pp)),
+  }))
+
   return (
     <div className="wizard-step-content" style={{ display: visible ? 'block' : 'none' }}>
       {isCorrectionMode && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
@@ -115,7 +126,7 @@ export default function ChecklistStep({
         </div>
       )}
 
-      {(isCorrectionMode || !useKaeserPipeline) && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser)) && (
+      {showPecasConsumiveis && (
         <div className="form-section">
           <div className="pecas-checklist-header">
             <h3>Consumíveis e peças</h3>
@@ -139,28 +150,66 @@ export default function ChecklistStep({
           ) : (
             <div className="pecas-checklist-lista">
               {form.pecasUsadas.map((p, idx) => (
-                <label key={p.id ?? idx} className={`peca-checklist-row${p.usado ? ' peca-usada' : ' peca-nao-usada'}`}>
-                  <input type="checkbox" checked={!!p.usado}
-                    onChange={e => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, usado: e.target.checked } : pp) }))}
-                    className="peca-checkbox" />
-                  <span className="peca-checklist-info">
-                    {p.posicao && <span className="peca-pos">{p.posicao}</span>}
-                    {p.codigoArtigo && <span className="peca-codigo">{p.codigoArtigo}</span>}
-                    <span className="peca-desc">{p.descricao || '—'}</span>
-                    <span className="peca-qty-un">{p.quantidade} {p.unidade}</span>
-                  </span>
-                  {p.manual && (
+                p.manual ? (
+                  <div key={p.id ?? idx} className={`peca-checklist-row peca-manual-row${p.usado ? ' peca-usada' : ' peca-nao-usada'}`}>
+                    <input type="checkbox" checked={!!p.usado}
+                      onChange={e => updatePeca(idx, { usado: e.target.checked })}
+                      className="peca-checkbox" aria-label={`Utilizado: ${p.descricao || p.codigoArtigo || 'artigo manual'}`} />
+                    <div className="peca-checklist-manual-fields">
+                      <input type="text" className="peca-manual-codigo kaeser-peca-cell" placeholder="Código"
+                        value={p.codigoArtigo ?? ''}
+                        onChange={e => updatePeca(idx, { codigoArtigo: e.target.value })} />
+                      <input type="text" className="peca-manual-desc kaeser-peca-cell" placeholder="Descrição do artigo"
+                        value={p.descricao ?? ''}
+                        onChange={e => updatePeca(idx, { descricao: e.target.value })} />
+                      <input type="number" min={0} step={0.5} className="peca-manual-qty kaeser-peca-cell kaeser-peca-qty"
+                        value={p.quantidadeUsada ?? p.quantidade ?? 1}
+                        aria-label="Quantidade"
+                        onChange={e => {
+                          const q = Math.max(0, parseFloat(e.target.value) || 0)
+                          updatePeca(idx, { quantidadeUsada: q, quantidade: q, usado: q > 0 })
+                        }} />
+                      <select className="kaeser-peca-un-select peca-manual-un" value={p.unidade || 'PÇ'} aria-label="Unidade"
+                        onChange={e => updatePeca(idx, { unidade: e.target.value })}>
+                        {['PÇ', 'TER', 'L', 'KG', 'M', 'UN'].map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
                     <button type="button" className="icon-btn danger peca-remove-btn"
-                      onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))} title="Remover">
+                      onClick={() => setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) }))} title="Remover" aria-label="Remover linha">
                       <X size={11} />
                     </button>
-                  )}
-                </label>
+                  </div>
+                ) : (
+                  <label key={p.id ?? idx} className={`peca-checklist-row${p.usado ? ' peca-usada' : ' peca-nao-usada'}`}>
+                    <input type="checkbox" checked={!!p.usado}
+                      onChange={e => updatePeca(idx, { usado: e.target.checked })}
+                      className="peca-checkbox" />
+                    <span className="peca-checklist-info">
+                      {p.posicao && <span className="peca-pos">{p.posicao}</span>}
+                      {p.codigoArtigo && <span className="peca-codigo">{p.codigoArtigo}</span>}
+                      <span className="peca-desc">{p.descricao || '—'}</span>
+                      <span className="peca-qty-un">{p.quantidadeUsada ?? p.quantidade} {p.unidade}</span>
+                    </span>
+                  </label>
+                )
               ))}
             </div>
           )}
           <button type="button" className="btn-link-checklist" style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}
-            onClick={() => setForm(f => ({ ...f, pecasUsadas: [...f.pecasUsadas, { id: 'manual_' + Date.now(), posicao: '', codigoArtigo: '', descricao: 'Item manual', quantidade: 1, unidade: 'PÇ', usado: true, manual: true }] }))}>
+            onClick={() => setForm(f => ({
+              ...f,
+              pecasUsadas: [...f.pecasUsadas, {
+                id: 'manual_' + Date.now(),
+                posicao: '',
+                codigoArtigo: '',
+                descricao: '',
+                quantidadeUsada: 1,
+                quantidade: 1,
+                unidade: 'PÇ',
+                usado: true,
+                manual: true,
+              }],
+            }))}>
             + Adicionar consumível manualmente
           </button>
         </div>

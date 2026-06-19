@@ -22,14 +22,14 @@ export default function KaeserPecasStep({
           <p className="text-muted">Nenhum consumível no plano para este tipo. Adicione linhas manualmente ou configure o plano em Equipamentos.</p>
         ) : (
           <table className="data-table kaeser-pecas-table">
-            <thead><tr><th>Cód.</th><th>Descrição</th><th>Qtd</th><th>Un.</th><th /></tr></thead>
+            <thead><tr><th>Cód.</th><th>Descrição</th><th className="col-peca-qtd">Qtd</th><th className="col-peca-un">Un.</th><th className="col-peca-act" aria-label="Acções" /></tr></thead>
             <tbody>
               {form.pecasUsadas.map((p, idx) => (
                 <tr key={p.id ?? `k-${idx}`}>
                   <td><input className="kaeser-peca-cell" value={p.codigoArtigo ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, codigoArtigo: e.target.value } : pp) })) }} /></td>
                   <td><input className="kaeser-peca-cell" value={p.descricao ?? ''} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, descricao: e.target.value } : pp) })) }} /></td>
-                  <td style={{ width: '5rem' }}>
-                    <input type="number" min={0} step={0.5} className="kaeser-peca-cell"
+                  <td className="col-peca-qtd">
+                    <input type="number" min={0} step={0.5} className="kaeser-peca-cell kaeser-peca-qty"
                       value={p.quantidadeUsada ?? p.quantidade ?? 0}
                       onChange={e => {
                         const q = Math.max(0, parseFloat(e.target.value) || 0)
@@ -38,12 +38,12 @@ export default function KaeserPecasStep({
                       }}
                     />
                   </td>
-                  <td style={{ width: '4rem' }}>
-                    <select value={p.unidade || 'PÇ'} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, unidade: e.target.value } : pp) })) }}>
+                  <td className="col-peca-un">
+                    <select className="kaeser-peca-un-select" value={p.unidade || 'PÇ'} aria-label={`Unidade da linha ${idx + 1}`} onChange={e => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.map((pp, i) => i === idx ? { ...pp, unidade: e.target.value } : pp) })) }}>
                       {['PÇ', 'TER', 'L', 'KG', 'M', 'UN'].map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </td>
-                  <td>
+                  <td className="col-peca-act">
                     <button type="button" className="icon-btn danger" aria-label="Remover linha" onClick={() => { setKaeserPecasDirty(true); setForm(f => ({ ...f, pecasUsadas: f.pecasUsadas.filter((_, i) => i !== idx) })) }}><X size={14} /></button>
                   </td>
                 </tr>

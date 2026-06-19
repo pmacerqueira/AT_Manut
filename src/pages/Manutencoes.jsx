@@ -673,7 +673,10 @@ export default function Manutencoes() {
     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
     const catEquip = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
     const catClass = manutencoesCategoriaClass(catEquip?.nome)
-    const desc = maq ? `${sub?.nome || ''} — ${maq.marca} ${maq.modelo}`.trim() || 'N/A' : 'N/A'
+    const equipCategoria = catEquip?.nome || '—'
+    const equipNome = maq
+      ? [sub?.nome, `${maq.marca} ${maq.modelo}`.trim()].filter(Boolean).join(' — ') || 'N/A'
+      : 'N/A'
     const rel = getRelatorioByManutencao(m.id)
     const dataExecucao = rel?.dataAssinatura || rel?.dataCriacao
     const isConcluida = m.status === 'concluida'
@@ -692,16 +695,17 @@ export default function Manutencoes() {
             {dias != null ? (dias > 0 ? `+${dias}` : dias === 0 ? 'Hoje' : `${dias}`) : '—'}
           </td>
         )}
-        <td data-label="Equipamento" className="col-lg col-equipamento col-truncate">
+        <td data-label="Equipamento" className="col-lg col-equipamento">
           <div className="equip-desc-block">
-            <strong>{desc}</strong>
+            <span className="equip-cat">{equipCategoria}</span>
+            <span className="equip-nome">{equipNome}</span>
             <span
               className="text-muted equip-num-serie equip-num-serie-link"
               role="button" tabIndex={0}
               title="Abrir ficha do equipamento"
               onClick={() => maq && navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`)}
               onKeyDown={(e) => { if (e.key === 'Enter' && maq) navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
-            >Nº Série: {maq?.numeroSerie}</span>
+            >Nº Série: {maq?.numeroSerie || '—'}</span>
           </div>
         </td>
         <td data-label="Cliente" className="col-md col-cliente col-truncate">{getCliente(maq?.clienteNif)?.nome || '—'}</td>
@@ -1100,7 +1104,7 @@ export default function Manutencoes() {
                   </th>
                 )}
                 {showDiasColumn && <th className="col-xs col-dias">Dias</th>}
-                <th className="col-lg col-equipamento col-truncate">
+                <th className="col-lg col-equipamento">
                   Equipamento
                 </th>
                 <th className="col-md col-cliente col-truncate">Cliente</th>
@@ -1141,7 +1145,7 @@ export default function Manutencoes() {
                   const grupoRow = (
                     <tr key={`grp-${grupo.grupoKey}`} className="exec-grupo-cli-row">
                       {bulkMode && <td className="col-bulk-check" />}
-                      <td data-label="" className="col-lg col-equipamento col-truncate exec-grupo-dash">—</td>
+                      <td data-label="" className="col-lg col-equipamento exec-grupo-dash">—</td>
                       <td data-label="Cliente" className="col-md col-cliente exec-grupo-cli-cell">
                         <button
                           type="button"
