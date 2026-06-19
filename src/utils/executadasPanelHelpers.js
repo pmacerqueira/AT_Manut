@@ -1,5 +1,5 @@
 import { startOfDay, startOfMonth, subDays, subMonths } from 'date-fns'
-import { parseDateLocal } from './datasAzores'
+import { parseDateLocal } from './datasAzores.js'
 
 export const EXEC_VIEW_GRUPOS = 'grupos'
 export const EXEC_VIEW_CRONO = 'cronologico'
