@@ -9,7 +9,20 @@ Política de continuidade:
 
 ---
 
-## [1.17.2] — 2026-06-12 — Notas adicionais uma por linha nos relatórios
+## [1.17.3] — 2026-06-12 — Email e PDF FPDF alinhados ao browser + corpo HTML enriquecido
+
+### Funcionalidades
+- **PDF FPDF (`send-email.php`):** resumo executivo, dados do serviço alargados (NIF, morada, tipo, periodicidade, agendamento, horas), pontos de atenção e título de checklist alinhados a `gerarPdfCompacto`.
+- **`emailService.js`:** envia `resumo_executivo_json` calculado no browser (`buildResumoExecutivoEmailPayload`) — fonte única com o PDF jsPDF.
+- **Corpo HTML do email:** preheader de pré-visualização; mini-tabela das 4 próximas intervenções; consumíveis/peças utilizadas; CTA de contacto (técnico + telefones NAVEL); versão `text/plain` completa.
+
+### Qualidade
+- Testes unitários: 113 a passar (`relatorioPdfResumo`, `execWizardHelpers`, etc.).
+
+### Documentação
+- `README.md`, `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `docs/INDEX.md`, `docs/TESTES-E2E.md`, `docs/ROADMAP.md`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`, `servidor-cpanel/INSTRUCOES_CPANEL.md` — alinhados a v1.17.3 (PDF/email, contagens de testes).
+
+---
 
 ### Correcções
 - **PDF / email / vista HTML:** secção «Notas adicionais» com **uma nota por linha** (jsPDF ignorava `\n`; relatórios legados com notas rápidas concatenadas são separados automaticamente).

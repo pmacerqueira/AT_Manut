@@ -18,7 +18,7 @@ import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } fr
 import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
-import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
+import { buildResumoExecutivoEmailPayload } from '../utils/relatorioPdfResumo'
 import { notasRelatorioParaTexto } from '../components/executarManutencao/execWizardHelpers'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
@@ -196,15 +196,24 @@ export async function enviarRelatorioEmail({
         if (rawB64.length > 0) photosJson = JSON.stringify(rawB64)
       }
 
-      // Data da próxima manutenção agendada (da ficha da máquina) — texto informativo no email
+      // Data da próxima manutenção (computada em tempo real; fallback: ficha da máquina)
       const proximaManutRaw = isRepair ? '' : (maquina?.proximaManut ?? '')
-      const proximaManutFmt = proximaManutRaw
-        ? formatDataAzores(proximaManutRaw, true)
-        : ''
 
       const proximasManutencoes = isRepair
         ? []
         : buildProximasManutencoesManutencao({ relatorio, manutencao, maquina })
+      const resumoExec = buildResumoExecutivoEmailPayload({
+        relatorio,
+        manutencao,
+        maquina,
+        cliente,
+        checklistItems: itemsResolvidos,
+        proximasManutencoes,
+        isReparacao: isRepair,
+        reparacao: isRepair ? relatorio : null,
+      })
+      const proximaManutFmt = resumoExec.proximaDataFmt
+        || (proximaManutRaw ? formatDataAzores(proximaManutRaw, true) : '')
       const periMaq = isRepair ? '' : resolvePeriodicidadeManutencao({ maquina, manutencao })
       const manutencaoTipo = isRepair
         ? 'reparacao'
@@ -273,6 +282,12 @@ export async function enviarRelatorioEmail({
         /** Texto completo resolvido no browser (override categoria + canónico) — fonte única para FPDF */
         declaracao_texto: declaracaoTexto,
         horas_leitura_contador: horasContadorEmail,
+        resumo_executivo_json: JSON.stringify(resumoExec),
+        cliente_nif: resumoExec.clienteNif,
+        cliente_morada: resumoExec.moradaCliente,
+        tipo_intervencao: resumoExec.tipoIntervencao,
+        periodicidade_label: resumoExec.periodicidadeLabel,
+        data_agendamento: resumoExec.dataAgendamento,
         ...(isRepair
           ? {
               reparacao_numero_aviso: String(relatorio?.numeroAviso ?? '').trim(),

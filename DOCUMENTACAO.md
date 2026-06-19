@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-06-13
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-06-12
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (92 testes) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (113 testes) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -137,7 +137,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │
 │   ├── utils/
 │   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios HTML (frota, histórico)
-│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — grelha fotos A4, email anexo
+│   │   ├── gerarPdfRelatorio.js        # PDF individual (jsPDF) — resumo executivo, grelha fotos A4
+│   │   ├── relatorioPdfResumo.js       # Veredito, bullets, não conformidades (PDF + payload email)
 │   │   ├── relatorioManutencaoPayload.js # Payload canónico PDF/email manutenção (data exec, próximas, declaração)
 │   │   ├── comprimirImagemRelatorio.js # Compressão JPEG das fotos no browser (relatórios)
 │   │   ├── gerarHtmlHistoricoMaquina.js # HTML do histórico completo por máquina
@@ -166,13 +167,9 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   ├── INSTRUCOES_CPANEL.md
 │   └── MIGRACAO_MYSQL.md
 │
-├── tests/e2e/
-│   ├── helpers.js                      # Utilitários partilhados + dados mock (MC, incluindo reparações)
-│   ├── 01-auth.spec.js … 09-edge-cases.spec.js   # Núcleo (139 testes ao correr `--list`)
-│   ├── 10-etapas-evolucao.spec.js … 17-reparacoes-avancado.spec.js
-│   ├── 19-domain-agenda.spec.js        # Domain agenda (2 testes)
-│   ├── 99-responsive-smoke.spec.js     # Smoke mobile/tablet (5 testes)
-│   └── Total suite: ver `docs/TESTES-E2E.md` (452 testes · 19 ficheiros)
+├── tests/
+│   ├── e2e/                            # Playwright — ver docs/TESTES-E2E.md (452 testes · 19 ficheiros)
+│   └── unit/                           # Node test runner — npm run test:unit (113 testes)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
@@ -366,21 +363,25 @@ Após execução de qualquer manutenção (montagem ou periódica):
 
 ### Estrutura do PDF de relatório (`gerarPdfCompacto`)
 
-Ordem canónica das secções — **não alterar** (ver `.cursor/rules/at-manut-workflow.mdc`):
+Ordem canónica das secções — **não alterar** a sequência declaração → próximas → assinaturas (ver `.cursor/rules/at-manut-workflow.mdc`). Desde **v1.17.3**, o bloco inicial inclui resumo e identificação alargada (browser jsPDF e FPDF no email alinhados via `resumo_executivo_json`).
 
 | # | Secção | Condicional? |
 |---|--------|-------------|
 | 1 | Cabeçalho (logo, contactos) | Não |
 | 2 | Tipo de serviço + nº relatório | Não |
-| 3 | Dados (cliente, equipamento, data, técnico) | Não |
-| 4 | Checklist de verificação | Se existir |
-| 5 | Notas adicionais | Se existirem |
-| 6 | Fotos (menção textual) | Se existirem |
-| 7 | Consumíveis e peças | Se existirem |
-| 8 | Declaração de aceitação do cliente | **Sempre** |
-| 9 | Próximas manutenções agendadas | Se periódica |
-| 10 | Assinaturas (técnico + cliente) | **Sempre — último conteúdo** |
-| 11 | Rodapé (todas as páginas) | Não |
+| 3 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) |
+| 4 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante) | Não |
+| 5 | **Pontos de atenção** (não conformidades) | Se existirem |
+| 6 | Checklist de verificação (título «DETALHE…» se houve não conformidades) | Se existir |
+| 7 | Notas adicionais (uma por linha) | Se existirem |
+| 8 | Fotos (documentação fotográfica, grelha A4) | Se existirem |
+| 9 | Consumíveis e peças | Se existirem |
+| 10 | Declaração de aceitação do cliente | **Sempre** |
+| 11 | Próximas manutenções agendadas | Se periódica |
+| 12 | Assinaturas (técnico + cliente) | **Sempre — último conteúdo** |
+| 13 | Rodapé (todas as páginas) | Não |
+
+**Fontes:** `gerarPdfRelatorio.js`, `relatorioPdfResumo.js`, `servidor-cpanel/send-email.php` (FPDF), `emailService.js` (`buildResumoExecutivoEmailPayload`).
 
 ### Cálculo das datas futuras no PDF/email
 
@@ -417,8 +418,10 @@ As datas mostradas na secção "Próximas Manutenções Agendadas" são **comput
 - **`api/send-email.php`** (e `send-report.php`) — envio de correio.
 
 **Tipos de email (`send-email.php`):**
-- `relatorio` — PDF após execução (manutenção ou reparação)
+- `relatorio` — PDF FPDF + corpo HTML após execução (manutenção ou reparação). O browser envia JSON estruturado (`resumo_executivo_json`, checklist, fotos base64, próximas datas, peças, declaração). Corpo HTML (v1.17.3+): preheader, resumo executivo, dados alargados, não conformidades, notas, peças utilizadas, mini-tabela de próximas datas, CTA de contacto, versão `text/plain` completa.
 - `lembrete` — lembrete de conformidade (cron)
+
+Ver também: `servidor-cpanel/INSTRUCOES_CPANEL.md`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`.
 
 ---
 

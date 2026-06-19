@@ -22,8 +22,8 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | **Agendamento** | Pipeline cascata (Cliente → Categoria → Equipamento → Data + Técnico) | ✅ |
 | **Calendário** | Visualização mensal de manutenções | ✅ |
 | **Relatório de frota** | HTML / PDF / email com filtro por período e painel de destinatários | ✅ |
-| **Relatórios** | PDF individual por manutenção — download directo sem diálogo de impressão | ✅ |
-| **Email** | Painel de destinatários (cliente / admin / outro) em todos os pontos de envio | ✅ |
+| **Relatórios** | PDF individual por manutenção — resumo executivo, dados alargados, pontos de atenção | ✅ |
+| **Email** | Corpo HTML enriquecido (preheader, próximas datas, peças, CTA) + PDF FPDF alinhado ao browser | ✅ |
 | **Alertas automáticos** | Cron job diário no cPanel — envia lembretes X dias antes do vencimento | ✅ |
 | **Pesquisa global** | `Ctrl+K` — pesquisa instantânea em clientes, máquinas e manutenções | ✅ |
 | **Leitor QR** | Câmara abre ficha da máquina directamente ao ler o QR Code | ✅ |
@@ -94,7 +94,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 listados em 19 ficheiros); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (92 testes em `tests/unit/`) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 listados em 19 ficheiros); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (113 testes em `tests/unit/`) |
 | Imagens | sharp (optimize-images via script prebuild) + compressão JPEG no browser para fotos de relatórios/equipamentos |
 
 ---

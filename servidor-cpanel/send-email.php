@@ -157,6 +157,7 @@ define('REPLY_TO',   'comercial@navel.pt');
 /** Alinhar com `src/constants/empresa.js` (frontend) — única fonte de verdade para copy/paste PHP */
 define('ATM_RAZAO_SOCIAL', 'José Gonçalves Cerqueira (NAVEL-AÇORES), Lda.');
 define('ATM_MARCA_CURTA', 'NAVEL-AÇORES');
+define('ATM_TELEFONES_GERAIS', '296 205 290 / 296 630 120');
 
 function _dbg($msg) {
     @error_log(date('Y-m-d H:i:s') . " [DBG] $msg\n", 3, __DIR__ . '/atm_debug.log');
@@ -239,6 +240,12 @@ $rep_desc_avaria        = isset($_data['reparacao_descricao_avaria']) ? trim((st
 $rep_trabalho           = isset($_data['reparacao_trabalho_realizado']) ? trim((string)$_data['reparacao_trabalho_realizado']) : '';
 $rep_horas_mo           = isset($_data['reparacao_horas_mao_obra']) ? trim((string)$_data['reparacao_horas_mao_obra']) : '';
 $horas_leitura_contador = isset($_data['horas_leitura_contador']) ? trim((string)$_data['horas_leitura_contador']) : '';
+$resumo_executivo_json  = isset($_data['resumo_executivo_json']) ? (string)$_data['resumo_executivo_json'] : '';
+$cliente_nif            = $g('cliente_nif');
+$cliente_morada         = $g('cliente_morada');
+$tipo_intervencao       = $g('tipo_intervencao');
+$periodicidade_label    = $g('periodicidade_label');
+$data_agendamento       = $g('data_agendamento');
 
 // Auth
 if ($token !== AUTH_TOKEN) {
@@ -406,6 +413,47 @@ $nNao = count(array_filter($checklist, function ($i) {
     return $r === 'nao' || $r === 'NOK';
 }));
 
+// Resumo executivo (fonte unica: browser / gerarPdfCompacto)
+$resumo_exec = [];
+if ($resumo_executivo_json !== '') {
+    $dec = json_decode($resumo_executivo_json, true);
+    if (is_array($dec)) {
+        $resumo_exec = $dec;
+    }
+}
+if (empty($resumo_exec)) {
+    $resumo_exec = atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao);
+}
+if ($cliente_nif !== '' && empty($resumo_exec['clienteNif'])) {
+    $resumo_exec['clienteNif'] = $cliente_nif;
+}
+if ($cliente_morada !== '' && empty($resumo_exec['moradaCliente'])) {
+    $resumo_exec['moradaCliente'] = $cliente_morada;
+}
+if ($tipo_intervencao !== '' && empty($resumo_exec['tipoIntervencao'])) {
+    $resumo_exec['tipoIntervencao'] = $tipo_intervencao;
+}
+if ($periodicidade_label !== '' && empty($resumo_exec['periodicidadeLabel'])) {
+    $resumo_exec['periodicidadeLabel'] = $periodicidade_label;
+}
+if ($data_agendamento !== '' && empty($resumo_exec['dataAgendamento'])) {
+    $resumo_exec['dataAgendamento'] = $data_agendamento;
+}
+$veredito_key      = $resumo_exec['veredito'] ?? 'conforme';
+$veredito_style    = atm_veredito_style_php($veredito_key);
+$veredito_label    = $resumo_exec['vereditoLabel'] ?? $veredito_style['label'];
+$resumo_bullets    = is_array($resumo_exec['bullets'] ?? null) ? $resumo_exec['bullets'] : [];
+$nao_conformes     = is_array($resumo_exec['naoConformes'] ?? null) ? $resumo_exec['naoConformes'] : [];
+$nNa_resumo        = (int)($resumo_exec['nNa'] ?? 0);
+$proxima_resumo_fmt = $resumo_exec['proximaDataFmt'] ?? '';
+$proxima_resumo_tec = $resumo_exec['proximaTecnico'] ?? '';
+$morada_cliente    = $resumo_exec['moradaCliente'] ?? '';
+$cliente_nif_res   = $resumo_exec['clienteNif'] ?? '';
+$tipo_interv_res   = $resumo_exec['tipoIntervencao'] ?? '';
+$peri_label_res    = $resumo_exec['periodicidadeLabel'] ?? '';
+$data_agend_res    = $resumo_exec['dataAgendamento'] ?? '';
+$proxima_email_fmt = $proxima_resumo_fmt !== '' ? $proxima_resumo_fmt : $proxima_manut;
+
 // Próximas manutenções + peças (JSON — alinhado com gerarPdfCompacto)
 $proximas_list = [];
 if ($proximas_manut_json) {
@@ -502,6 +550,101 @@ function fmt_data_iso_br($iso) {
     $p = explode('-', substr($iso, 0, 10));
     if (count($p) !== 3) return '-';
     return $p[2] . '/' . $p[1] . '/' . $p[0];
+}
+
+/** Estilo do veredito (alinhado a relatorioPdfResumo.js). */
+function atm_veredito_style_php($veredito) {
+    $map = [
+        'conforme'     => ['label' => 'CONFORME', 'fill' => [236, 253, 245], 'border' => [16, 185, 129], 'text' => [6, 95, 70]],
+        'reservas'     => ['label' => 'CONFORME COM RESERVAS', 'fill' => [254, 243, 199], 'border' => [245, 158, 11], 'text' => [146, 64, 14]],
+        'nao_conforme' => ['label' => 'NAO CONFORME', 'fill' => [254, 226, 226], 'border' => [239, 68, 68], 'text' => [153, 27, 27]],
+    ];
+    return $map[$veredito] ?? $map['conforme'];
+}
+
+/** Fallback quando a app ainda nao envia resumo_executivo_json. */
+function atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao) {
+    $naoConf = [];
+    foreach ($checklist as $i => $item) {
+        $r = $item['resp'] ?? '';
+        if ($r === 'nao' || $r === 'NOK') {
+            $naoConf[] = ['index' => $i + 1, 'texto' => $item['texto'] ?? ''];
+        }
+    }
+    $nNa = count(array_filter($checklist, function ($i) {
+        $r = $i['resp'] ?? '';
+        return $r === 'N/A';
+    }));
+    $veredito = 'conforme';
+    if (count($checklist) > 0 || $nNao > 0) {
+        if ($nNao === 0) {
+            $veredito = 'conforme';
+        } elseif ($nNao > $nSim) {
+            $veredito = 'nao_conforme';
+        } else {
+            $veredito = 'reservas';
+        }
+    }
+    $bullets = [];
+    foreach ($naoConf as $nc) {
+        $t = mb_substr($nc['texto'] ?? '', 0, 90, 'UTF-8');
+        $bullets[] = 'Nao conforme (' . $nc['index'] . '): ' . $t;
+    }
+    if ($notas !== '') {
+        foreach (preg_split('/\r?\n/', trim($notas)) as $line) {
+            if (count($bullets) >= 3) {
+                break;
+            }
+            $line = trim($line);
+            if ($line !== '') {
+                $bullets[] = $line;
+            }
+        }
+    }
+    return [
+        'veredito' => $veredito,
+        'nSim' => $nSim,
+        'nNao' => $nNao,
+        'nNa' => $nNa,
+        'bullets' => $bullets,
+        'naoConformes' => $naoConf,
+        'proximaDataFmt' => '',
+        'proximaTecnico' => '',
+        'clienteNif' => '',
+        'moradaCliente' => '',
+        'periodicidadeLabel' => '',
+        'tipoIntervencao' => '',
+        'dataAgendamento' => '',
+    ];
+}
+
+/** href tel: a partir de número com espaços ou barras. */
+function atm_tel_href($tel) {
+    $digits = preg_replace('/[^\d+]/', '', (string)$tel);
+    return $digits !== '' ? 'tel:' . $digits : '';
+}
+
+/** Peça/consumível considerado utilizado no relatório. */
+function atm_peca_foi_usada($p) {
+    if (!is_array($p)) {
+        return false;
+    }
+    if (isset($p['usado'])) {
+        return (bool)$p['usado'];
+    }
+    return (float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0;
+}
+
+/** Linha legível para peça no email (texto simples ou HTML esc). */
+function atm_peca_linha_label($p) {
+    $cod = trim((string)($p['codigo'] ?? $p['codigoArtigo'] ?? ''));
+    $desc = trim((string)($p['descricao'] ?? ''));
+    $lin = ($cod !== '' ? $cod . ' — ' : '') . $desc;
+    $qtd = trim((string)($p['quantidade'] ?? '') . ' ' . (string)($p['unidade'] ?? ''));
+    if ($qtd !== '') {
+        $lin .= ' (' . $qtd . ')';
+    }
+    return $lin !== '' ? $lin : 'Item sem descrição';
 }
 
 // -- Helper: converte UTF-8 (dados do formulario) para Latin-1 (FPDF) --------
@@ -780,12 +923,71 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->Line($M, $pdf->GetY(), $W - $M, $pdf->GetY());
     $pdf->Ln(5);
 
+    // Resumo executivo (alinhado a gerarPdfCompacto)
+    if ($manutencao_tipo !== 'reparacao') {
+        $pad = 3;
+        $fill = $veredito_style['fill'];
+        $border = $veredito_style['border'];
+        $textCol = $veredito_style['text'];
+        $bulletH = count($resumo_bullets) * 4.2;
+        $extraH = $proxima_resumo_fmt !== '' ? 5 : 0;
+        $boxH = 22 + $bulletH + $extraH + $pad;
+        if ($pdf->GetY() + $boxH > 275) {
+            $pdf->AddPage();
+        }
+        $y0 = $pdf->GetY();
+        $pdf->SetFillColor($fill[0], $fill[1], $fill[2]);
+        $pdf->SetDrawColor($border[0], $border[1], $border[2]);
+        $pdf->RoundedRect($M, $y0, $cW, $boxH, 2, 'FD');
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor($textCol[0], $textCol[1], $textCol[2]);
+        $pdf->SetXY($M + $pad + 2, $y0 + 4);
+        $pdf->Cell(0, 5, 'RESUMO EXECUTIVO — ' . f($veredito_label), 0, 1);
+        $pdf->SetFont('Arial', '', 8.5);
+        $pdf->SetTextColor(55, 65, 81);
+        $contagem = f($nSim . ' conforme  /  ' . $nNao . ' nao conforme' . ($nNa_resumo ? '  /  ' . $nNa_resumo . ' N/A' : ''));
+        $pdf->SetX($M + $pad + 2);
+        $pdf->Cell(0, 4, $contagem, 0, 1);
+        $yBul = $pdf->GetY();
+        foreach ($resumo_bullets as $b) {
+            $pdf->SetX($M + $pad + 2);
+            $pdf->MultiCell($cW - $pad * 2 - 4, 4.2, f('• ' . $b), 0, 'L');
+        }
+        if ($proxima_resumo_fmt !== '') {
+            $pdf->SetFont('Arial', 'B', 8.5);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M + $pad + 2);
+            $proxTxt = f($proxima_resumo_fmt . ($proxima_resumo_tec !== '' ? '  •  ' . $proxima_resumo_tec : ''));
+            $pdf->Cell(44, 4, 'Proxima manutencao prevista:', 0, 0);
+            $pdf->SetFont('Arial', '', 8.5);
+            $pdf->Cell(0, 4, $proxTxt, 0, 1);
+        }
+        $pdf->SetY($y0 + $boxH + 4);
+    }
+
     // Dados do servico (etiquetas em ASCII, valores via f() do POST)
     $data_row_label = ($manutencao_tipo === 'reparacao') ? 'DATA DE REALIZACAO' : 'DATA EXECUCAO';
     $rows = [
         ['CLIENTE',        f($to_name)],
-        ['EQUIPAMENTO',    f($equipamento)],
     ];
+    if ($cliente_nif_res !== '') {
+        $rows[] = ['NIF', f($cliente_nif_res)];
+    }
+    if ($morada_cliente !== '' && $morada_cliente !== '—' && $morada_cliente !== '-') {
+        $rows[] = ['LOCAL / INSTALACAO', f($morada_cliente)];
+    }
+    $rows[] = ['EQUIPAMENTO', f($equipamento)];
+    if ($manutencao_tipo !== 'reparacao') {
+        if ($tipo_interv_res !== '') {
+            $rows[] = ['TIPO DE INTERVENCAO', f($tipo_interv_res)];
+        }
+        if ($peri_label_res !== '') {
+            $rows[] = ['PERIODICIDADE', f($peri_label_res)];
+        }
+        if ($data_agend_res !== '') {
+            $rows[] = ['DATA DE AGENDAMENTO', f($data_agend_res)];
+        }
+    }
     if ($manutencao_tipo !== 'reparacao' && $horas_leitura_contador !== '' && is_numeric($horas_leitura_contador)) {
         $rows[] = ['HORAS NO CONTADOR (ACUMULADAS)', f($horas_leitura_contador) . ' h'];
     }
@@ -855,13 +1057,37 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         ? ['pecas', 'fotos', 'notas', 'checklist']
         : ['checklist', 'notas', 'fotos', 'pecas'];
 
+    // Pontos de atencao (nao conformidades) — antes do detalhe da checklist
+    if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
+        if ($pdf->GetY() > 248) {
+            $pdf->AddPage();
+        }
+        $pdf->SetFillColor(254, 243, 199);
+        $pdf->SetDrawColor(245, 158, 11);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetTextColor(146, 64, 14);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 7, 'PONTOS DE ATENCAO — NAO CONFORMIDADES', 0, 1);
+        $pdf->SetFont('Arial', '', 8.5);
+        $pdf->SetTextColor(55, 65, 81);
+        foreach ($nao_conformes as $nc) {
+            $line = ($nc['index'] ?? '') . '. ' . ($nc['texto'] ?? '');
+            $pdf->SetX($M + 2);
+            $pdf->MultiCell($cW - 4, 4.5, f($line), 0, 'L');
+        }
+        $pdf->Ln(4);
+    }
+
     foreach ($atm_section_order as $atm_sec) {
         if ($atm_sec === 'checklist') {
             if (count($checklist) > 0) {
                 $pdf->SetFont('Arial', 'B', 10);
                 $pdf->SetTextColor(30, 58, 95);
                 $pdf->SetX($M);
-                $pdf->Cell(0, 7, 'CHECKLIST DE VERIFICACAO', 0, 1);
+                $titulo_chk = count($nao_conformes) > 0
+                    ? 'DETALHE DA VERIFICACAO (CHECKLIST COMPLETA)'
+                    : 'CHECKLIST DE VERIFICACAO';
+                $pdf->Cell(0, 7, $titulo_chk, 0, 1);
                 $pdf->SetFont('Arial', '', 8);
                 $pdf->SetTextColor(107, 114, 128);
                 $pdf->SetX($M);
@@ -1230,8 +1456,37 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
 // Cabeçalho só em texto: imagens data: no corpo falham ou degradam no Outlook; o PDF anexo traz o logo Navel com qualidade.
 $esc   = 'htmlspecialchars';
 $tipo_h = $esc($tipo);
+
+// Preheader — texto de pré-visualização em telemóveis (oculto no corpo visível)
+$preheader_bits = ['Relatório ' . $num_rel];
+if ($manutencao_tipo !== 'reparacao') {
+    $preheader_bits[] = $veredito_label;
+    if ($nNao > 0) {
+        $preheader_bits[] = $nNao . ' não conforme';
+    }
+}
+if ($proxima_email_fmt !== '') {
+    $preheader_bits[] = 'próxima ' . $proxima_email_fmt;
+}
+$preheader_txt = implode(' · ', $preheader_bits);
+$preheader_pad = str_repeat(' &#847; ', 100);
+
+// Peças utilizadas (resumo no corpo — documento completo no PDF)
+$pecas_usadas_email = [];
+foreach ($pecas_list as $p) {
+    if (atm_peca_foi_usada($p)) {
+        $pecas_usadas_email[] = $p;
+    }
+}
+
+// Próximas intervenções (máx. 4 linhas no corpo)
+$proximas_email_rows = array_slice($proximas_list, 0, 4);
+
 $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
+<div style="display:none;font-size:1px;color:#f3f4f6;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">'
+     . $esc($preheader_txt) . $preheader_pad
+     . '</div>
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0;background:#f3f4f6;">
 <tr><td align="center">
 <table width="580" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
@@ -1249,13 +1504,59 @@ $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
   </td></tr>
   <tr><td style="padding:16px 24px;">';
 
+// Resumo executivo no corpo (scan rapido antes do PDF)
+if ($manutencao_tipo !== 'reparacao') {
+    $vf = $veredito_style['fill'];
+    $vb = $veredito_style['border'];
+    $vt = $veredito_style['text'];
+    $html .= '<div style="background:rgb(' . $vf[0] . ',' . $vf[1] . ',' . $vf[2] . ');border:1px solid rgb(' . $vb[0] . ',' . $vb[1] . ',' . $vb[2] . ');border-radius:8px;padding:12px 14px;margin-bottom:14px;">'
+           . '<div style="font-size:13px;font-weight:800;color:rgb(' . $vt[0] . ',' . $vt[1] . ',' . $vt[2] . ');margin-bottom:6px;">Resumo executivo — ' . $esc($veredito_label) . '</div>'
+           . '<div style="font-size:12px;color:#374151;margin-bottom:6px;">'
+           . $esc($nSim . ' conforme · ' . $nNao . ' não conforme' . ($nNa_resumo ? ' · ' . $nNa_resumo . ' N/A' : ''))
+           . '</div>';
+    if (count($resumo_bullets) > 0) {
+        $html .= '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
+        foreach (array_slice($resumo_bullets, 0, 3) as $b) {
+            $html .= '<li style="margin-bottom:3px;">' . $esc($b) . '</li>';
+        }
+        $html .= '</ul>';
+    }
+    if ($proxima_resumo_fmt !== '') {
+        $html .= '<div style="margin-top:8px;font-size:12px;color:#1e3a5f;"><strong>Próxima manutenção prevista:</strong> '
+               . $esc($proxima_resumo_fmt)
+               . ($proxima_resumo_tec !== '' ? ' · ' . $esc($proxima_resumo_tec) : '')
+               . '</div>';
+    }
+    $html .= '</div>';
+}
+
 $drows = [
     ['Cliente',       $to_name],
-    ['Equipamento',   $equipamento],
-    ['Data execu&ccedil;&atilde;o', $data_real],
-    ['T&eacute;cnico', $tecnico],
-    ['Assinado por',  $assinado_por],
 ];
+if ($cliente_nif_res !== '') {
+    $drows[] = ['NIF', $cliente_nif_res];
+}
+if ($morada_cliente !== '' && $morada_cliente !== '—' && $morada_cliente !== '-') {
+    $drows[] = ['Local / instalação', $morada_cliente];
+}
+$drows[] = ['Equipamento',   $equipamento];
+if ($manutencao_tipo !== 'reparacao') {
+    if ($tipo_interv_res !== '') {
+        $drows[] = ['Tipo de intervenção', $tipo_interv_res];
+    }
+    if ($peri_label_res !== '') {
+        $drows[] = ['Periodicidade', $peri_label_res];
+    }
+    if ($data_agend_res !== '') {
+        $drows[] = ['Data de agendamento', $data_agend_res];
+    }
+    if ($horas_leitura_contador !== '' && is_numeric($horas_leitura_contador)) {
+        $drows[] = ['Horas no contador', $horas_leitura_contador . ' h'];
+    }
+}
+$drows[] = ['Data execu&ccedil;&atilde;o', $data_real];
+$drows[] = ['T&eacute;cnico', $tecnico];
+$drows[] = ['Assinado por',  $assinado_por];
 if (count($checklist) > 0) {
     $drows[] = ['Checklist', $nSim . ' conforme / ' . $nNao . ' nao conforme (' . count($checklist) . ' itens)'];
 }
@@ -1269,10 +1570,55 @@ foreach ($drows as $i => [$l, $v]) {
 }
 $html .= '</table></td></tr>';
 
+// Pontos de atencao (nao conformidades)
+if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
+    $html .= '<tr><td style="padding:0 24px 12px;">'
+           . '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px;">'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pontos de aten&ccedil;&atilde;o — n&atilde;o conformidades</div>'
+           . '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
+    foreach ($nao_conformes as $nc) {
+        $html .= '<li style="margin-bottom:4px;"><strong>' . $esc((string)($nc['index'] ?? '')) . '.</strong> '
+               . $esc($nc['texto'] ?? '') . '</li>';
+    }
+    $html .= '</ul></div></td></tr>';
+}
+
 if ($notas) {
-    $html .= '<tr><td style="padding:0 24px 12px;"><div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:13px;color:#374151;">'
+    $html .= '<tr><td style="padding:0 24px 12px;">'
+           . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;margin-bottom:6px;">Notas adicionais</div>'
+           . '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:13px;color:#374151;line-height:1.5;">'
            . nl2br($esc($notas)) . '</div></td></tr>';
 }
+
+// Consumíveis e peças substituídas
+if (count($pecas_usadas_email) > 0) {
+    $html .= '<tr><td style="padding:0 24px 12px;">'
+           . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;margin-bottom:8px;">'
+           . 'Consum&iacute;veis e pe&ccedil;as utilizadas (' . count($pecas_usadas_email) . ')</div>'
+           . '<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">';
+    foreach ($pecas_usadas_email as $i => $p) {
+        $bg = ($i % 2 === 1) ? 'background:#f9fafb;' : 'background:#fff;';
+        $html .= '<tr style="' . $bg . '"><td style="padding:8px 10px;font-size:12px;color:#374151;">'
+               . '<span style="color:#16a34a;font-weight:700;margin-right:6px;">&#10003;</span>'
+               . $esc(atm_peca_linha_label($p))
+               . '</td></tr>';
+    }
+    $html .= '</table></td></tr>';
+} elseif (count($pecas_list) > 0) {
+    $usadas_cnt = 0;
+    foreach ($pecas_list as $p) {
+        if (atm_peca_foi_usada($p)) {
+            $usadas_cnt++;
+        }
+    }
+    $html .= '<tr><td style="padding:0 24px 12px;">'
+           . '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:12px;color:#6b7280;">'
+           . 'Plano de consum&iacute;veis: ' . count($pecas_list) . ' linha(s) registada(s)'
+           . ($usadas_cnt > 0 ? ', ' . $usadas_cnt . ' utilizada(s) no servi&ccedil;o' : '')
+           . '. Detalhe completo no PDF em anexo.'
+           . '</div></td></tr>';
+}
+
 if ($pdf_data) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;color:#1d4ed8;font-weight:700;font-size:12px;">'
@@ -1309,17 +1655,59 @@ $html .= '<tr><td style="padding:0 24px 12px;">'
        . '<div style="color:#374151;font-size:12px;">' . $sig_txt_email . '</div>'
        . '</div></td></tr>';
 
-// Próxima manutenção agendada
-if ($proxima_manut) {
-    $html .= '<tr><td style="padding:0 24px 16px;">'
+// Próximas intervenções previstas (mini-tabela — alinhada ao PDF)
+if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
+    $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:12px;">'
-           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:4px;">Pr&oacute;xima interven&ccedil;&atilde;o agendada</div>'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pr&oacute;ximas interven&ccedil;&otilde;es previstas</div>'
+           . '<table width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;">'
+           . '<tr style="color:#92400e;font-size:10px;text-transform:uppercase;">'
+           . '<td style="padding:4px 6px;width:42%;">Data</td>'
+           . '<td style="padding:4px 6px;">T&eacute;cnico</td>'
+           . '</tr>';
+    foreach ($proximas_email_rows as $i => $pm) {
+        $bg = ($i % 2 === 1) ? 'background:#fffbeb;' : '';
+        $data_pm = fmt_data_iso_br($pm['data'] ?? '');
+        $tec_pm = trim((string)($pm['tecnico'] ?? ''));
+        if ($tec_pm === '') {
+            $tec_pm = $proxima_resumo_tec !== '' ? $proxima_resumo_tec : '—';
+        }
+        $html .= '<tr style="' . $bg . '">'
+               . '<td style="padding:6px;font-weight:700;">' . $esc($data_pm) . '</td>'
+               . '<td style="padding:6px;">' . $esc($tec_pm) . '</td>'
+               . '</tr>';
+    }
+    $html .= '</table>'
+           . '<div style="margin-top:10px;font-size:11px;color:#6b7280;line-height:1.5;">'
+           . 'Datas calculadas a partir da periodicidade do equipamento. '
+           . 'Para reagendar, contacte os nossos servi&ccedil;os.'
+           . '</div></div></td></tr>';
+} elseif ($proxima_email_fmt) {
+    $html .= '<tr><td style="padding:0 24px 12px;">'
+           . '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:12px;">'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:4px;">Pr&oacute;xima interven&ccedil;&atilde;o prevista</div>'
            . '<div style="color:#374151;font-size:12px;">'
-           . 'A pr&oacute;xima interven&ccedil;&atilde;o para este equipamento encontra-se agendada para '
-           . '<strong>' . $esc($proxima_manut) . '</strong>. '
-           . 'Caso pretenda agendar essa manut&eacute;n&ccedil;&atilde;o para nova data, queira por favor contactar os nossos servi&ccedil;os.'
+           . '<strong>' . $esc($proxima_email_fmt) . '</strong>'
+           . ($proxima_resumo_tec !== '' ? ' (t&eacute;cnico: <strong>' . $esc($proxima_resumo_tec) . '</strong>)' : '')
            . '</div></div></td></tr>';
 }
+
+// CTA de contacto (técnico + NAVEL)
+$cta_tel_href = atm_tel_href($tecnico_tel);
+$html .= '<tr><td style="padding:0 24px 16px;">'
+       . '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;text-align:center;">'
+       . '<div style="font-weight:700;color:#1e3a5f;font-size:13px;margin-bottom:8px;">Precisa de reagendar ou esclarecer d&uacute;vidas?</div>'
+       . '<div style="font-size:13px;color:#374151;line-height:1.6;">'
+       . 'T&eacute;cnico: <strong>' . $esc($tecnico) . '</strong>';
+if ($tecnico_tel !== '') {
+    $html .= ' &middot; <a href="' . $esc($cta_tel_href) . '" style="color:#0d6efd;font-weight:700;text-decoration:none;">'
+           . $esc($tecnico_tel) . '</a>';
+}
+$html .= '</div>'
+       . '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.6;">'
+       . ATM_MARCA_CURTA . ': <strong>' . ATM_TELEFONES_GERAIS . '</strong>'
+       . ' &middot; <a href="mailto:' . REPLY_TO . '" style="color:#0d6efd;text-decoration:none;">' . REPLY_TO . '</a>'
+       . '</div></div></td></tr>';
 
 $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255,255,.65);font-size:10px;text-align:center;line-height:1.9;">'
        . 'Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL-A&Ccedil;ORES), Lda.<br>'
@@ -1328,12 +1716,75 @@ $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255
        . '</table></td></tr></table></body></html>';
 
 $text = "Exmo(a) Sr(a) " . $to_name . ",\r\n\r\n"
-      . "Enviamos o relatorio de " . $tipo . " N. " . $num_rel . ".\r\n\r\n"
-      . "Equipamento: " . $equipamento . "\r\n"
-      . "Data: " . $data_real . "\r\n"
-      . "Tecnico: " . $tecnico . "\r\n"
-      . ($pdf_data ? "O relatorio em PDF encontra-se em anexo.\r\n" : "")
-      . "\r\n" . ATM_MARCA_CURTA . " — www.navel.pt";
+      . "Relatorio de " . $tipo . " N. " . $num_rel . "\r\n\r\n";
+
+if ($manutencao_tipo !== 'reparacao') {
+    $text .= "RESULTADO: " . $veredito_label . "\r\n"
+           . $nSim . " conforme / " . $nNao . " nao conforme"
+           . ($nNa_resumo ? " / " . $nNa_resumo . " N/A" : "") . "\r\n";
+    if (count($resumo_bullets) > 0) {
+        $text .= "\r\nResumo:\r\n";
+        foreach (array_slice($resumo_bullets, 0, 3) as $b) {
+            $text .= "- " . $b . "\r\n";
+        }
+    }
+}
+
+$text .= "\r\nCliente: " . $to_name . "\r\n";
+if ($cliente_nif_res !== '') {
+    $text .= "NIF: " . $cliente_nif_res . "\r\n";
+}
+$text .= "Equipamento: " . $equipamento . "\r\n"
+      . "Data de execucao: " . $data_real . "\r\n"
+      . "Tecnico: " . $tecnico;
+if ($tecnico_tel !== '') {
+    $text .= " (" . $tecnico_tel . ")";
+}
+$text .= "\r\n";
+if ($assinado_por !== '') {
+    $text .= "Assinado por: " . $assinado_por . "\r\n";
+}
+
+if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
+    $text .= "\r\nPontos de atencao (nao conformidades):\r\n";
+    foreach ($nao_conformes as $nc) {
+        $text .= ($nc['index'] ?? '') . ". " . ($nc['texto'] ?? '') . "\r\n";
+    }
+}
+
+if ($notas !== '') {
+    $text .= "\r\nNotas adicionais:\r\n" . $notas . "\r\n";
+}
+
+if (count($pecas_usadas_email) > 0) {
+    $text .= "\r\nConsumiveis e pecas utilizadas:\r\n";
+    foreach ($pecas_usadas_email as $p) {
+        $text .= "- " . atm_peca_linha_label($p) . "\r\n";
+    }
+}
+
+if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
+    $text .= "\r\nProximas intervencoes previstas:\r\n";
+    foreach ($proximas_email_rows as $pm) {
+        $data_pm = fmt_data_iso_br($pm['data'] ?? '');
+        $tec_pm = trim((string)($pm['tecnico'] ?? ''));
+        $text .= "- " . $data_pm . ($tec_pm !== '' ? " (" . $tec_pm . ")" : '') . "\r\n";
+    }
+} elseif ($proxima_email_fmt !== '') {
+    $text .= "\r\nProxima intervencao prevista: " . $proxima_email_fmt;
+    if ($proxima_resumo_tec !== '') {
+        $text .= " (" . $proxima_resumo_tec . ")";
+    }
+    $text .= "\r\n";
+}
+
+$text .= "\r\nContacto: " . ATM_TELEFONES_GERAIS . " | " . REPLY_TO . "\r\n";
+
+if ($pdf_data) {
+    $text .= "\r\nO relatorio completo em PDF encontra-se em anexo.\r\n";
+}
+
+$text .= "\r\n" . ATM_MARCA_CURTA . " — www.navel.pt";
 
 // -- MIME --------------------------------------------------------------------
 $outer = '----=_NavelOuter_' . md5(uniqid());

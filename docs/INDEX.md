@@ -35,7 +35,7 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 ## Domínio específico (referência)
 | Ficheiro | Conteúdo |
 |----------|----------|
-| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST e compressão de fotografias |
+| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST, compressão; corpo HTML do email (v1.17.3+) |
 | [`docs/CRON-ALERTAS.md`](CRON-ALERTAS.md) | Lembretes automáticos |
 | [`docs/KAESER-IMPORT-PDF-ESTRATEGIA.md`](KAESER-IMPORT-PDF-ESTRATEGIA.md) | PDF Kaeser |
 | [`docs/TESTE-OFFLINE-MANUAL.md`](TESTE-OFFLINE-MANUAL.md) | Modo offline |

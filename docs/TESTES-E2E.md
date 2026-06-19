@@ -419,4 +419,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-06-13 — v1.16.97 (passo 8 slices manutenções/reparações; 92 testes unitários)*
+*Última actualização: 2026-06-12 — v1.17.3 (113 testes unitários; PDF/email alinhados)*

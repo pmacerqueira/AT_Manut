@@ -1,7 +1,7 @@
 # AT_Manut — Continuidade entre Agentes e Memória Operacional
 
 > Documento canónico para manter continuidade quando muda o agente/modelo no Cursor.
-> Última revisão: 2026-03-12.
+> Última revisão: 2026-06-12.
 
 ---
 

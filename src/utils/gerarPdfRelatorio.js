@@ -14,6 +14,10 @@ import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
 import {
+  buildResumoExecutivoMeta,
+  formatDataRelatorioPdf,
+} from './relatorioPdfResumo'
+import {
   INTERVALOS_KAESER,
   SUBCATEGORIAS_COM_CONTADOR_HORAS,
   descricaoCicloKaeser,
@@ -240,6 +244,16 @@ export async function gerarPdfCompacto({
 }) {
   const isReparacao = relatorioKind === 'reparacao'
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
+  const resumoMeta = buildResumoExecutivoMeta({
+    relatorio,
+    manutencao,
+    maquina,
+    cliente,
+    checklistItems,
+    proximasManutencoes,
+    isReparacao,
+    reparacao,
+  })
   const { jsPDF } = await import('jspdf')
 
   const pdf  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -340,18 +354,28 @@ export async function gerarPdfCompacto({
     SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maquina.subcategoriaId)
   const horasPdf = horasContadorParaRelatorio(maquina, isReparacao ? null : manutencao, null, relatorio)
   const horasPdfLabel = horasPdf != null ? `${horasPdf} h` : '\u2014'
+  const moradaCliente = resumoMeta.moradaCliente
   const dataRows = isReparacao
     ? [
         ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
+        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
         ['EQUIPAMENTO',       equipDesc],
         ['DATA DE REALIZA\u00c7\u00c3O', dataRealizacaoFmt],
         ['T\u00c9CNICO',      relatorio?.tecnico ?? '\u2014'],
       ]
     : [
         ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
+        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
         ['EQUIPAMENTO',       equipDesc],
         ...(equipComContadorHoras
           ? [['HORAS NO CONTADOR (ACUMULADAS)', horasPdfLabel]]
+          : []),
+        ['TIPO DE INTERVEN\u00c7\u00c3O', resumoMeta.tipoIntervencao],
+        ['PERIODICIDADE',     resumoMeta.periodicidadeLabel],
+        ...(resumoMeta.dataAgendIso
+          ? [['DATA DE AGENDAMENTO', formatDataRelatorioPdf(resumoMeta.dataAgendIso)]]
           : []),
         ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
         ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
@@ -387,6 +411,111 @@ export async function gerarPdfCompacto({
     valLines.forEach((ln, li) => { pdf.text(ln, dataValueX, y + li * dataLineH) })
     y += rowH
   })
+
+  function renderResumoExecutivo() {
+    if (isReparacao) {
+      if (!resumoMeta.bullets.length) return
+      if (y > 248) { pdf.addPage(); y = 20 }
+      pdf.setFillColor(243, 244, 246)
+      pdf.setDrawColor(30, 58, 95)
+      pdf.setLineWidth(0.5)
+      const pad = 5
+      const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`• ${b}`, cW - pad * 2))
+      const boxH = 12 + bulletLines.length * 4.2 + pad
+      if (y + boxH > 275) { pdf.addPage(); y = 20 }
+      pdf.rect(M, y - 3, cW, boxH, 'FD')
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+      pdf.text('RESUMO DA INTERVEN\u00c7\u00c3O', M + pad, y + 2)
+      y += 8
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      bulletLines.forEach((ln) => {
+        pdf.text(ln, M + pad, y)
+        y += 4.2
+      })
+      y += pad + 2
+      return
+    }
+
+    const style = resumoMeta.vereditoStyle
+    if (!style) return
+    if (y > 245) { pdf.addPage(); y = 20 }
+
+    const pad = 5
+    const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`• ${b}`, cW - pad * 2 - 4))
+    let extraH = 0
+    if (resumoMeta.proximaData) extraH += 5
+    const contagemLine = `${resumoMeta.nSim} conforme \u2022 ${resumoMeta.nNao} n\u00e3o conforme` +
+      (resumoMeta.nNa ? ` \u2022 ${resumoMeta.nNa} N/A` : '')
+    const boxH = 22 + bulletLines.length * 4.2 + extraH + pad
+    if (y + boxH > 275) { pdf.addPage(); y = 20 }
+
+    pdf.setFillColor(...style.fill)
+    pdf.setDrawColor(...style.border)
+    pdf.setLineWidth(0.8)
+    pdf.rect(M, y - 3, cW, boxH, 'FD')
+
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...style.text)
+    pdf.text(style.label, M + pad, y + 3)
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    pdf.text(contagemLine, M + pad, y + 9)
+    y += 13
+
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    bulletLines.forEach((ln) => {
+      pdf.text(ln, M + pad + 2, y)
+      y += 4.2
+    })
+
+    if (resumoMeta.proximaData) {
+      pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+      pdf.text('Pr\u00f3xima manuten\u00e7\u00e3o prevista:', M + pad + 2, y + 1)
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      const proxTxt = `${formatDataRelatorioPdf(resumoMeta.proximaData)}` +
+        (resumoMeta.proximaTecnico ? ` \u2022 ${resumoMeta.proximaTecnico}` : '')
+      pdf.text(proxTxt, M + pad + 48, y + 1)
+      y += 5
+    }
+    y += pad + 2
+  }
+
+  function renderPontosAtencao() {
+    if (isReparacao || resumoMeta.naoConformes.length === 0) return
+    if (y > 248) { pdf.addPage(); y = 20 }
+
+    pdf.setFillColor(255, 251, 235)
+    pdf.setDrawColor(217, 119, 6)
+    pdf.setLineWidth(0.6)
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 83, 9)
+    pdf.text('PONTOS DE ATEN\u00c7\u00c3O (N\u00c3O CONFORMIDADES)', M, y)
+    y += 6
+
+    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal')
+    resumoMeta.naoConformes.forEach((nc) => {
+      const line = `${nc.index}. ${nc.texto}`
+      const wrapped = pdf.splitTextToSize(line, cW - 6)
+      const blockH = wrapped.length * 4.2 + 2
+      if (y + blockH > 275) { pdf.addPage(); y = 20 }
+      pdf.setTextColor(55, 65, 81)
+      wrapped.forEach((ln, li) => { pdf.text(ln, M + 3, y + li * 4.2) })
+      y += blockH
+    })
+    if (relatorio?.notas?.trim()) {
+      const hint = pdf.splitTextToSize(
+        `Observa\u00e7\u00f5es registadas: ${linhasNotasRelatorio(relatorio.notas).join(' | ')}`,
+        cW - 6,
+      )
+      if (y + hint.length * 4 > 275) { pdf.addPage(); y = 20 }
+      pdf.setFont('helvetica', 'italic'); pdf.setTextColor(107, 114, 128)
+      hint.forEach((ln, li) => { pdf.text(ln, M + 3, y + li * 4) })
+      y += hint.length * 4 + 2
+    }
+    y += 4
+    pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3)
+    pdf.line(M, y, W - M, y); y += 5
+  }
+
+  renderResumoExecutivo()
+  renderPontosAtencao()
 
   if (!isReparacao && relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
     if (y > 248) { pdf.addPage(); y = 20 }
@@ -455,7 +584,10 @@ export async function gerarPdfCompacto({
     if (checklistItems.length === 0) return
     if (y > 260) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    pdf.text('CHECKLIST DE VERIFICA\u00c7\u00c3O', M, y); y += 6
+    const tituloChecklist = resumoMeta.naoConformes.length > 0
+      ? 'DETALHE DA VERIFICA\u00c7\u00c3O (CHECKLIST COMPLETA)'
+      : 'CHECKLIST DE VERIFICA\u00c7\u00c3O'
+    pdf.text(tituloChecklist, M, y); y += 6
 
     const valsCh = Object.values(relatorio?.checklistRespostas ?? {})
     const nSim = valsCh.filter(v => v === 'sim' || v === 'OK').length

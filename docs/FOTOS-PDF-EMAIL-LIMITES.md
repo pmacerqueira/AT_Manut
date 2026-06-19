@@ -48,7 +48,13 @@ Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdf
 
 | Ficheiro | Notas |
 |----------|--------|
-| `servidor-cpanel/send-email.php` | `ATM_MAX_FOTOS_RELATORIO` = **6** após parse de `photos_json`; PDF com grelha 4 colunas e `imageFitContain`; galeria no HTML do email a **4 colunas** (largura ~132px). |
+| `servidor-cpanel/send-email.php` | `ATM_MAX_FOTOS_RELATORIO` = **6** após parse de `photos_json`; PDF FPDF alinhado a `gerarPdfCompacto` (resumo, dados alargados, pontos de atenção); grelha 4 colunas no PDF; galeria no HTML do email a **4 colunas** (largura ~132px). |
+
+### Corpo HTML do email (v1.17.3+)
+
+Secções no corpo (antes do PDF anexo): **preheader** (pré-visualização móvel), resumo executivo, tabela de dados, pontos de atenção, notas (uma por linha), peças utilizadas, aviso de PDF, fotos, assinatura, mini-tabela das **4 próximas datas**, CTA de contacto (técnico + NAVEL). Versão **text/plain** espelha o conteúdo essencial.
+
+Payload canónico: `emailService.js` → `resumo_executivo_json` + `proximas_manutencoes_json` + `pecas_usadas_json` (ver `relatorioPdfResumo.js`).
 
 **Deploy:** sempre que a lógica de fotos/PDF no email mudar, é obrigatório **fazer upload deste ficheiro** para o servidor (não vai no `dist_upload.zip` da app React).
 
@@ -84,4 +90,4 @@ Se o envio de relatório falhar com corpo grande, verificar no cPanel: `post_max
 
 ## Changelog
 
-Resumo por versão: `CHANGELOG.md` (entradas **1.16.9**–**1.16.11**).
+Resumo por versão: `CHANGELOG.md` (entradas **1.17.x** e anteriores).
