@@ -252,6 +252,6 @@ Importação em massa de clientes via JSON SAF-T/Gestor.32 — **eliminada**; cl
 
 ---
 
-*Última actualização estrutural: 2026-06-12 — v1.17.3; 113 testes unitários.*
+*Última actualização estrutural: 2026-06-12 — v1.17.5; 114 testes unitários.*
 
 > **Roadmap detalhado:** Ver `docs/ROADMAP-EVOLUCAO-2026.md` para análise de potencial e próximas etapas passo-a-passo.

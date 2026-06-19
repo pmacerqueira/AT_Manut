@@ -92,9 +92,9 @@ Resposta esperada (é o comportamento correcto — só aceita POST):
 Depois, na app AT_Manut, executar uma manutenção e clicar
 **"Gravar e enviar email"** — deve chegar um email a `no-reply@navel.pt`.
 
-### Corpo do email de relatório (v1.17.3+)
+### Corpo do email de relatório (v1.17.5)
 
-O PHP gera **multipart** (text/plain + text/html + PDF). O HTML inclui: preheader, resumo executivo, dados do serviço, não conformidades, notas, peças utilizadas, fotos (até 6), assinatura, tabela das 4 próximas datas e CTA de contacto. O browser envia `resumo_executivo_json` calculado em `relatorioPdfResumo.js` — manter PWA e `send-email.php` na mesma versão.
+O PHP gera **multipart** (`text/plain` + `text/html` + PDF). Encoding: texto fixo em UTF-8; dados dinâmicos com `atm_html_esc()`; partes texto em **base64** (acentos correctos em Outlook/Gmail). O HTML inclui: preheader, resumo executivo, dados do serviço, não conformidades, notas (uma por linha), peças utilizadas, fotos (até 6), assinatura, tabela das 4 próximas datas e CTA de contacto. O browser envia `resumo_executivo_json` e `quick_notes_json` — manter PWA e `send-email.php` na mesma versão.
 
 ---
 

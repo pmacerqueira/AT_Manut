@@ -427,29 +427,43 @@ await page.waitForTimeout(500)
 
 **REGRA ABSOLUTA — não alterar a ordem das secções.** Qualquer alteração à estrutura do PDF deve preservar esta sequência exacta. Incumprimento desta regra provocou múltiplos ciclos de regressão em 2026-03-19.
 
-### Ordem das secções (definitiva desde v1.16.0):
+### Ordem das secções (definitiva desde v1.17.5 — manutenção)
+
+**Corpo principal:**
 
 ```
 1. Cabeçalho azul (logo, contactos)
 2. Tipo de serviço + número do relatório
-3. Dados do serviço (cliente, equipamento, data, técnico, assinante)
-4. Checklist de verificação
-5. Notas adicionais
-6. Fotos (secção "Documentação fotográfica": grelha até 4 por linha em A4, proporção preservada; máx. 6 imagens por relatório; nova página se a linha não couber)
-7. Consumíveis e peças (condicional — só se existirem)
-8. Declaração de aceitação e compromisso do cliente
-9. Próximas manutenções agendadas (tabela)
-10. Bloco de assinaturas (técnico + cliente) ← ÚLTIMO conteúdo antes do rodapé
-11. Rodapé (em todas as páginas)
+3. Resumo executivo (manutenção — não reparação)
+4. Dados do serviço (cliente, equipamento, NIF, periodicidade, horas, data, técnico, assinante)
+5. Pontos de atenção (não conformidades — se existirem)
+6. Checklist de verificação — página dedicada, caber numa A4
+7. Notas adicionais — uma nota por linha (linhasNotasRelatorio)
+8. Fotos (secção "Documentação fotográfica": grelha até 4 por linha em A4; máx. 6 imagens)
+9. Consumíveis e peças (condicional)
 ```
 
-### Regras de paginação:
-- Cada secção verifica `if (y > N) { pdf.addPage(); y = 20 }` antes de renderizar
-- A declaração e as próximas podem ficar na mesma página se couberem
-- As assinaturas são SEMPRE o último bloco de conteúdo (o cliente lê tudo, depois assina)
+**Página final dedicada (`pdf.addPage()`):**
 
-### Razão da regra:
-A ordem "declaração → próximas → assinaturas" é lógica do ponto de vista legal/documental: o cliente lê o relatório, a declaração de compromisso e as próximas datas, e SÓ DEPOIS assina confirmando que viu tudo.
+```
+10. Próximas manutenções agendadas — lista completa (compressão dinâmica de altura de linha)
+11. Declaração de aceitação e compromisso do cliente — imediatamente antes das assinaturas
+12. Bloco de assinaturas (técnico + cliente) ← ÚLTIMO conteúdo antes do rodapé
+13. Rodapé (em todas as páginas)
+```
+
+**Reparação:** corpo = peças → fotos → notas → checklist; fecho = declaração → assinaturas (sem próximas).
+
+**Paridade servidor:** `servidor-cpanel/send-email.php` (FPDF) deve espelhar a mesma ordem e regras de paginação.
+
+### Regras de paginação:
+- Checklist: `SetAutoPageBreak(false)` na página da checklist; fonte/altura de linha compactas
+- Notas: cada linha separada; legado com notas rápidas embutidas é normalizado em `linhasNotasRelatorio`
+- Página final: próximas + declaração + assinaturas tentam ficar juntas; altura de linha da tabela de próximas reduz-se (7→4 mm) para caber a lista completa
+- As assinaturas são SEMPRE o último bloco de conteúdo
+
+### Razão da regra (v1.17.5):
+O cliente vê primeiro o **planeamento futuro** (próximas datas), depois a **declaração legal**, e só no fim **assina** confirmando que leu tudo. A declaração fica sempre imediatamente antes das assinaturas.
 
 ## ⚠ CÁLCULO DE DATAS FUTURAS — Próximas Manutenções
 
@@ -493,8 +507,11 @@ Nesta sessão, múltiplas correcções foram revertidas acidentalmente por ediç
 1. **Antes de editar `gerarPdfRelatorio.js`:** ler o ficheiro completo e verificar a ordem das secções contra a lista canónica acima.
 2. **Nunca mover blocos de código** sem verificar que TODAS as secções mantêm a ordem correcta.
 3. **Testar o PDF visualmente** após qualquer alteração ao ficheiro — confirmar que:
-   - A declaração aparece ANTES das assinaturas
-   - As próximas manutenções aparecem ANTES das assinaturas
-   - As fotos aparecem logo após as notas
+   - A checklist cabe numa página A4
+   - As notas aparecem uma por linha
+   - As próximas manutenções aparecem na página final (lista completa)
+   - A declaração aparece imediatamente ANTES das assinaturas
+   - As fotos aparecem logo após as notas (manutenção)
    - As datas começam no trimestre correcto (data de execução + periodicidade)
-4. **Não confiar na extracção de texto de PDFs** — o Read tool pode não capturar todo o texto de PDFs gerados por jsPDF. Confirmar sempre com screenshot visual.
+4. **Corpo HTML do email:** texto fixo UTF-8 + `atm_html_esc()` nos dados dinâmicos; não reintroduzir entidades HTML estáticas (`&ccedil;`, etc.)
+5. **Não confiar na extracção de texto de PDFs** — o Read tool pode não capturar todo o texto de PDFs gerados por jsPDF. Confirmar sempre com screenshot visual.

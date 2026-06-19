@@ -1,6 +1,6 @@
 # Fotografias nos relatórios — limites, PDF, email e deploy
 
-Documento de **memória operacional** para agentes e desenvolvimento futuro (v1.16.11+).
+Documento de **memória operacional** para agentes e desenvolvimento futuro (v1.16.11+; layout PDF/email v1.17.5).
 
 ---
 
@@ -33,14 +33,29 @@ Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdf
 
 | Ficheiro | Função |
 |----------|--------|
-| `src/utils/gerarPdfRelatorio.js` | `gerarPdfCompacto`, `addImageFitInBoxMm`, `normalizeRelatorioFotos` |
+| `src/utils/gerarPdfRelatorio.js` | `gerarPdfCompacto`, `addImageFitInBoxMm`, `normalizeRelatorioFotos`, `renderChecklistSection` |
+
+### Ordem canónica (manutenção — v1.17.5)
+
+Corpo principal: cabeçalho → tipo/nº → resumo executivo → dados → pontos de atenção → **checklist (1 página A4)** → **notas (lista)** → fotos → consumíveis/peças.
+
+**Página final dedicada:** próximas manutenções (lista completa) → declaração → assinaturas → rodapé.
+
+Reparação: peças → fotos → notas → checklist no corpo; declaração + assinaturas no fecho.
+
+Detalhe completo: `DOCUMENTACAO.md` § Estrutura do PDF e `.cursor/rules/at-manut-workflow.mdc`.
+
+### Fotos no PDF
 
 - Secção **“Documentação fotográfica”**: grelha de **até 4 fotos por linha** em A4 (largura útil `cW`), espaçamento em mm, **proporção preservada** (`addImageFitInBoxMm` = contain).
 - **Nova página** se a linha de miniaturas não couber (`y + cellH > limiar`).
 - `getImageProperties` / `addImage` em `try/catch` — foto inválida não derruba o PDF.
 - URLs `http(s)` nas fotos: resolução via `loadImageAsDataUrl` (proxy CORS quando necessário).
 
-**Ordem canónica das secções** do PDF: ver `.cursor/rules/at-manut-workflow.mdc` (secção 6 actualizada para grelha + máx. 6).
+### Notas
+
+- `linhasNotasRelatorio()` em `execWizardHelpers.js` — uma nota por linha; separa legado com notas rápidas concatenadas.
+- Espelho PHP: `atm_linhas_notas_relatorio()` em `send-email.php`.
 
 ---
 
@@ -48,15 +63,22 @@ Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdf
 
 | Ficheiro | Notas |
 |----------|--------|
-| `servidor-cpanel/send-email.php` | `ATM_MAX_FOTOS_RELATORIO` = **6** após parse de `photos_json`; PDF FPDF alinhado a `gerarPdfCompacto` (resumo, dados alargados, pontos de atenção); grelha 4 colunas no PDF; galeria no HTML do email a **4 colunas** (largura ~132px). |
+| `servidor-cpanel/send-email.php` | `ATM_MAX_FOTOS_RELATORIO` = **6**; PDF FPDF alinhado a `gerarPdfCompacto`; função `f()` normaliza Unicode → Latin-1 (evita mojibake); rótulos da tabela de dados com coluna alargada + `MultiCell`; grelha 4 colunas no PDF; galeria no HTML do email a **4 colunas**. |
 
-### Corpo HTML do email (v1.17.3+)
+### Corpo HTML do email (v1.17.5)
 
-Secções no corpo (antes do PDF anexo): **preheader** (pré-visualização móvel), resumo executivo, tabela de dados, pontos de atenção, notas (uma por linha), peças utilizadas, aviso de PDF, fotos, assinatura, mini-tabela das **4 próximas datas**, CTA de contacto (técnico + NAVEL). Versão **text/plain** espelha o conteúdo essencial.
+- **Encoding:** texto estático em **UTF-8 literal** no PHP; valores do formulário/BD via `atm_html_esc()` (`htmlspecialchars`, UTF-8). Evita entidades visíveis (`&ccedil;`, `&atilde;`) em clientes que não interpretam HTML entities.
+- **MIME:** `Content-Transfer-Encoding: base64` em `text/plain` e `text/html`.
+- **Secções:** preheader (pré-visualização móvel), resumo executivo, tabela de dados, pontos de atenção, notas (uma por linha), peças utilizadas, aviso de PDF, fotos, assinatura, mini-tabela das **4 próximas datas**, CTA de contacto (técnico + NAVEL). Versão **text/plain** espelha o essencial.
 
-Payload canónico: `emailService.js` → `resumo_executivo_json` + `proximas_manutencoes_json` + `pecas_usadas_json` (ver `relatorioPdfResumo.js`).
+Payload canónico: `emailService.js` → `resumo_executivo_json` + `proximas_manutencoes_json` + `pecas_usadas_json` + `quick_notes_json` (ver `relatorioPdfResumo.js`).
 
-**Deploy:** sempre que a lógica de fotos/PDF no email mudar, é obrigatório **fazer upload deste ficheiro** para o servidor (não vai no `dist_upload.zip` da app React).
+**Deploy:** sempre que a lógica de fotos/PDF/HTML no email mudar, é obrigatório **fazer upload deste ficheiro** para o servidor (não vai no `dist_upload.zip` da app React).
+
+```powershell
+cd c:\Cursor_Projetos\NAVEL\navel-site
+node scripts/cpanel-deploy.mjs --file="…\AT_Manut\servidor-cpanel\send-email.php" --remote="public_html/api" --yes
+```
 
 ---
 
@@ -67,18 +89,22 @@ Payload canónico: `emailService.js` → `resumo_executivo_json` + `proximas_man
 
 ---
 
-## Testes E2E relacionados
+## Testes relacionados
+
+### E2E
 
 - `tests/e2e/09-edge-cases.spec.js` — “Limite de 6 fotos é respeitado” (contador `0/6`).
 - `tests/e2e/17-reparacoes-avancado.spec.js` — “Limite de 6 fotos…”, “Contador… 0/6”, toast ao exceder.
-
-Comando útil:
 
 ```powershell
 npx playwright test tests/e2e/09-edge-cases.spec.js tests/e2e/17-reparacoes-avancado.spec.js --grep "Limite de 6 fotos"
 ```
 
 No modal de **reparação** existem **dois** `input[type="file"]` (câmara com `capture` e galeria com `multiple`). Nos testes Playwright, usar `input[type="file"][multiple]` para evitar *strict mode violation*.
+
+### Unitários
+
+- `tests/unit/execWizardHelpers.test.js` — `linhasNotasRelatorio` (newline, legado, notas rápidas embutidas).
 
 ---
 

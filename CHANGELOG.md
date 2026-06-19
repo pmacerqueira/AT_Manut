@@ -18,7 +18,10 @@ Política de continuidade:
 - **`linhasNotasRelatorio()` / `emailService.js`:** notas rápidas embutidas separadas automaticamente; `quick_notes_json` no payload.
 
 ### Qualidade
-- Teste unitário novo em `execWizardHelpers.test.js` (notas embutidas).
+- Teste unitário novo em `execWizardHelpers.test.js` (notas embutidas). Total: **114** testes unitários.
+
+### Documentação
+- `README.md`, `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `docs/INDEX.md`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`, `docs/TESTES-E2E.md`, `docs/ROADMAP.md`, `servidor-cpanel/INSTRUCOES_CPANEL.md`, `.cursor/rules/at-manut-workflow.mdc` — alinhados a v1.17.5 (ordem PDF, HTML UTF-8, checklist/notas).
 
 ### Deploy
 - PWA `public_html/manut/` + `public_html/api/send-email.php`.

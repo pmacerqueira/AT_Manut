@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (113 testes) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (114 testes) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -169,7 +169,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │
 ├── tests/
 │   ├── e2e/                            # Playwright — ver docs/TESTES-E2E.md (452 testes · 19 ficheiros)
-│   └── unit/                           # Node test runner — npm run test:unit (113 testes)
+│   └── unit/                           # Node test runner — npm run test:unit (114 testes)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
@@ -363,25 +363,27 @@ Após execução de qualquer manutenção (montagem ou periódica):
 
 ### Estrutura do PDF de relatório (`gerarPdfCompacto`)
 
-Ordem canónica das secções — **não alterar** a sequência declaração → próximas → assinaturas (ver `.cursor/rules/at-manut-workflow.mdc`). Desde **v1.17.3**, o bloco inicial inclui resumo e identificação alargada (browser jsPDF e FPDF no email alinhados via `resumo_executivo_json`).
+Ordem canónica — **não alterar** sem rever `.cursor/rules/at-manut-workflow.mdc` e testar PDF browser + FPDF email. Desde **v1.17.5**, o bloco de fecho vive numa **página final dedicada**: **próximas manutenções (lista completa) → declaração → assinaturas**.
 
-| # | Secção | Condicional? |
-|---|--------|-------------|
-| 1 | Cabeçalho (logo, contactos) | Não |
-| 2 | Tipo de serviço + nº relatório | Não |
-| 3 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) |
-| 4 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante) | Não |
-| 5 | **Pontos de atenção** (não conformidades) | Se existirem |
-| 6 | Checklist de verificação (título «DETALHE…» se houve não conformidades) | Se existir |
-| 7 | Notas adicionais (uma por linha) | Se existirem |
-| 8 | Fotos (documentação fotográfica, grelha A4) | Se existirem |
-| 9 | Consumíveis e peças | Se existirem |
-| 10 | Declaração de aceitação do cliente | **Sempre** |
-| 11 | Próximas manutenções agendadas | Se periódica |
-| 12 | Assinaturas (técnico + cliente) | **Sempre — último conteúdo** |
-| 13 | Rodapé (todas as páginas) | Não |
+| # | Secção | Condicional? | Notas (v1.17.5) |
+|---|--------|-------------|-----------------|
+| 1 | Cabeçalho (logo, contactos) | Não | |
+| 2 | Tipo de serviço + nº relatório | Não | |
+| 3 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) | Desde v1.17.3 |
+| 4 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante) | Não | Rótulos com `MultiCell` no FPDF (evita sobreposição) |
+| 5 | **Pontos de atenção** (não conformidades) | Se existirem | |
+| 6 | Checklist de verificação | Se existir | **Uma página A4** (fonte/linha compactas) |
+| 7 | Notas adicionais | Se existirem | **Uma nota por linha** (`linhasNotasRelatorio`) |
+| 8 | Fotos (documentação fotográfica, grelha A4) | Se existirem | Máx. 6 |
+| 9 | Consumíveis e peças | Se existirem | |
+| 10 | **Página final:** Próximas manutenções agendadas | Se periódica | Lista completa, sem cortes por página |
+| 11 | Declaração de aceitação do cliente | **Sempre** | Imediatamente **antes** das assinaturas |
+| 12 | Assinaturas (técnico + cliente) | **Sempre** | Último conteúdo antes do rodapé |
+| 13 | Rodapé (todas as páginas) | Não | `APP_FOOTER_TEXT` |
 
-**Fontes:** `gerarPdfRelatorio.js`, `relatorioPdfResumo.js`, `servidor-cpanel/send-email.php` (FPDF), `emailService.js` (`buildResumoExecutivoEmailPayload`).
+**Reparação:** corpo principal com ordem **peças → fotos → notas → checklist**; declaração + assinaturas no fecho (sem tabela de próximas).
+
+**Fontes:** `gerarPdfRelatorio.js`, `relatorioPdfResumo.js`, `execWizardHelpers.js` (`linhasNotasRelatorio`), `servidor-cpanel/send-email.php` (FPDF + HTML), `emailService.js`.
 
 ### Cálculo das datas futuras no PDF/email
 
@@ -418,7 +420,7 @@ As datas mostradas na secção "Próximas Manutenções Agendadas" são **comput
 - **`api/send-email.php`** (e `send-report.php`) — envio de correio.
 
 **Tipos de email (`send-email.php`):**
-- `relatorio` — PDF FPDF + corpo HTML após execução (manutenção ou reparação). O browser envia JSON estruturado (`resumo_executivo_json`, checklist, fotos base64, próximas datas, peças, declaração). Corpo HTML (v1.17.3+): preheader, resumo executivo, dados alargados, não conformidades, notas, peças utilizadas, mini-tabela de próximas datas, CTA de contacto, versão `text/plain` completa.
+- `relatorio` — PDF FPDF + corpo HTML após execução (manutenção ou reparação). O browser envia JSON estruturado (`resumo_executivo_json`, checklist, fotos base64, próximas datas, peças, declaração, `quick_notes_json`). **Corpo HTML (v1.17.5):** texto fixo em UTF-8 literal; dados dinâmicos via `atm_html_esc()`; MIME `base64` em `text/plain` + `text/html` (acentos correctos, sem `&ccedil;` visível); preheader, resumo, dados, não conformidades, notas (lista), peças, fotos, mini-tabela de 4 próximas datas, CTA de contacto.
 - `lembrete` — lembrete de conformidade (cron)
 
 Ver também: `servidor-cpanel/INSTRUCOES_CPANEL.md`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`.

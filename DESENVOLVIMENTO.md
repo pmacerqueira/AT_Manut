@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-06-12 · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-06-12 (v1.17.5 — PDF/email layout) · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -75,7 +75,8 @@ Próximo passo:
 | `src/context/slices/maquinasSlice.js` | CRUD máquinas + documentos |
 | `src/context/slices/manutencoesSlice.js` | CRUD manutenções, relatórios, agenda periódica, sync agenda completa |
 | `src/context/slices/reparacoesSlice.js` | CRUD reparações + relatórios de reparação |
-| `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep`; helpers em `execWizardHelpers.js` |
+| `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep` |
+| `src/components/executarManutencao/execWizardHelpers.js` | Wizard helpers; **`linhasNotasRelatorio()`** — uma nota por linha (incl. legado com notas rápidas embutidas) |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, próximas datas) |
 | `src/utils/relatorioPdfResumo.js` | Resumo executivo, veredito, não conformidades (`buildResumoExecutivoMeta`, `buildResumoExecutivoEmailPayload`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
@@ -102,10 +103,10 @@ Próximo passo:
 | Modo campo | `Definicoes.jsx`, `index.css` (`.modo-campo`), `App.jsx`, `Layout.jsx` |
 | Indicador de armazenamento | `Definicoes.jsx`, `Definicoes.css` |
 | Histórico HTML máquina | `gerarHtmlHistoricoMaquina.js`, `Equipamentos.jsx`, `Clientes.jsx` |
-| Relatório individual PDF | `gerarPdfRelatorio.js`, `relatorioPdfResumo.js`, `relatorioManutencaoPayload.js`, `relatorioBaseStyles.js` |
+| Relatório individual PDF | `gerarPdfRelatorio.js` (`gerarPdfCompacto`), `relatorioPdfResumo.js`, `relatorioManutencaoPayload.js`, `execWizardHelpers.js`, `relatorioBaseStyles.js` |
 | Relatório de frota | `gerarRelatorioFrotaHtml.js`, `gerarRelatorioFrota.js`, `frotaReportHelpers.js`, `Clientes.jsx` |
-| Relatório de reparação (email/PDF) | `servidor-cpanel/send-email.php` (HTML + FPDF), `gerarPdfRelatorio.js` |
-| Envio de email (manutenção, lembretes) | `emailService.js` (`resumo_executivo_json`), `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` |
+| Relatório de reparação (email/PDF) | `servidor-cpanel/send-email.php` (FPDF + HTML), `gerarPdfRelatorio.js` |
+| Envio de email (manutenção, lembretes) | `emailService.js` (`resumo_executivo_json`, `quick_notes_json`), `EnviarEmailModal.jsx`, `servidor-cpanel/send-email.php` (`atm_html_esc`, `atm_linhas_notas_relatorio`) |
 | Envio HTML + PDF opcional (frota, reparação, etc.) | `emailService.js` (`enviarRelatorioHtmlEmail`, `blobToRawBase64`), `servidor-cpanel/api/send-report.php` |
 | Alertas automáticos (cron) | `servidor-cpanel/cron-alertas.php`, `docs/CRON-ALERTAS.md` |
 | Agendamento novo (pipeline) | `Agendamento.jsx` |
@@ -286,7 +287,7 @@ const addXxx = useCallback((data) => {
 npm run dev                 # http://localhost:5173
 
 # Testes unitários (domain + slices)
-npm run test:unit            # 113 testes em tests/unit/
+npm run test:unit            # 114 testes em tests/unit/
 
 # Testes — suite E2E completa (452 listados)
 npm run test:e2e             # equivalente: npx playwright test tests/e2e/
