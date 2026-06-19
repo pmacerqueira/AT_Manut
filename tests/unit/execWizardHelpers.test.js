@@ -25,6 +25,18 @@ describe('linhasNotasRelatorio', () => {
     )
   })
 
+  it('separa notas rápidas embutidas (texto livre antes de notas conhecidas)', () => {
+    const legado = 'Consumíveis substituídos conforme planoEquipamento em bom estado geralSem observações adicionais'
+    assert.deepEqual(
+      linhasNotasRelatorio(legado, QUICK_NOTES_DEFAULT),
+      [
+        'Consumíveis substituídos conforme plano',
+        'Equipamento em bom estado geral',
+        'Sem observações adicionais',
+      ],
+    )
+  })
+
   it('mantém texto livre único', () => {
     const livre = 'Intervenção com ajuste fino no sistema hidráulico do elevador.'
     assert.deepEqual(linhasNotasRelatorio(livre), [livre])

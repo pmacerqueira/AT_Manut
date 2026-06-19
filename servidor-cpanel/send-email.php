@@ -211,6 +211,7 @@ $data_real       = $g('data_realizacao');
 $tecnico         = $g('tecnico');
 $assinado_por    = $g('assinado_por');
 $notas           = $g('notas');
+$quick_notes_json = $g('quick_notes_json');
 $checklist_json  = $g('checklist_json');
 $photos_json     = $g('photos_json');
 $n_fotos         = (int)($_data['n_fotos'] ?? 0);
@@ -413,6 +414,9 @@ $nNao = count(array_filter($checklist, function ($i) {
     return $r === 'nao' || $r === 'NOK';
 }));
 
+$quick_notes_list = atm_get_quick_notes_list($quick_notes_json);
+$nota_linhas_pdf = atm_linhas_notas_relatorio($notas, $quick_notes_list);
+
 // Resumo executivo (fonte unica: browser / gerarPdfCompacto)
 $resumo_exec = [];
 if ($resumo_executivo_json !== '') {
@@ -422,7 +426,7 @@ if ($resumo_executivo_json !== '') {
     }
 }
 if (empty($resumo_exec)) {
-    $resumo_exec = atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao);
+    $resumo_exec = atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao, $quick_notes_list);
 }
 if ($cliente_nif !== '' && empty($resumo_exec['clienteNif'])) {
     $resumo_exec['clienteNif'] = $cliente_nif;
@@ -563,7 +567,7 @@ function atm_veredito_style_php($veredito) {
 }
 
 /** Fallback quando a app ainda nao envia resumo_executivo_json. */
-function atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao) {
+function atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao, $quick_notes_list = null) {
     $naoConf = [];
     foreach ($checklist as $i => $item) {
         $r = $item['resp'] ?? '';
@@ -591,7 +595,7 @@ function atm_build_resumo_fallback($checklist, $notas, $nSim, $nNao) {
         $bullets[] = 'Nao conforme (' . $nc['index'] . '): ' . $t;
     }
     if ($notas !== '') {
-        foreach (preg_split('/\r?\n/', trim($notas)) as $line) {
+        foreach (atm_linhas_notas_relatorio($notas, $quick_notes_list) as $line) {
             if (count($bullets) >= 3) {
                 break;
             }
@@ -635,6 +639,135 @@ function atm_peca_foi_usada($p) {
     return (float)($p['quantidadeUsada'] ?? $p['quantidade'] ?? 0) > 0;
 }
 
+/** Notas rápidas por defeito — alinhado a execWizardHelpers.js (QUICK_NOTES_DEFAULT). */
+const ATM_QUICK_NOTES_DEFAULT = [
+    'Equipamento em bom estado geral',
+    'Desgaste normal, dentro do esperado',
+    'Necessita acompanhamento na próxima visita',
+    'Cliente informado de anomalia',
+    'Peça substituída preventivamente',
+    'Ruído anormal detetado — monitorizar',
+    'Lubrificação efetuada em todos os pontos',
+    'Alinhamento verificado e corrigido',
+    'Filtros substituídos conforme plano',
+    'Sem observações adicionais',
+];
+
+function atm_get_quick_notes_list($json) {
+    if ($json) {
+        $decoded = json_decode($json, true);
+        if (is_array($decoded) && count($decoded) > 0) {
+            $out = [];
+            foreach ($decoded as $q) {
+                if (is_string($q) && trim($q) !== '') {
+                    $out[] = $q;
+                }
+            }
+            if (count($out) > 0) {
+                return $out;
+            }
+        }
+    }
+    return ATM_QUICK_NOTES_DEFAULT;
+}
+
+/**
+ * Divide notas do relatório (uma nota rápida ou parágrafo por linha).
+ * Alinhado a linhasNotasRelatorio() no frontend.
+ */
+function atm_linhas_notas_relatorio($notas, $quick_notes_list = null) {
+    $raw = trim((string)($notas ?? ''));
+    if ($raw === '') {
+        return [];
+    }
+    if (preg_match('/\r?\n/', $raw)) {
+        $lines = preg_split('/\r?\n/', $raw);
+        $out = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                $out[] = $line;
+            }
+        }
+        return $out;
+    }
+
+    $list = is_array($quick_notes_list) && count($quick_notes_list) > 0
+        ? $quick_notes_list
+        : ATM_QUICK_NOTES_DEFAULT;
+    $filtered = [];
+    foreach ($list as $q) {
+        if (is_string($q) && trim($q) !== '') {
+            $filtered[] = $q;
+        }
+    }
+    if (count($filtered) === 0) {
+        return [$raw];
+    }
+
+    usort($filtered, function ($a, $b) {
+        return mb_strlen($b, 'UTF-8') - mb_strlen($a, 'UTF-8');
+    });
+
+    $parts = [];
+    $remaining = $raw;
+    while ($remaining !== '') {
+        $prefix_match = null;
+        foreach ($filtered as $q) {
+            if (mb_strpos($remaining, $q, 0, 'UTF-8') === 0) {
+                $prefix_match = $q;
+                break;
+            }
+        }
+        if ($prefix_match !== null) {
+            $parts[] = $prefix_match;
+            $remaining = substr($remaining, strlen($prefix_match));
+            continue;
+        }
+
+        $best_idx = -1;
+        $best_note = null;
+        foreach ($filtered as $q) {
+            $idx = mb_strpos($remaining, $q, 0, 'UTF-8');
+            if ($idx === false) {
+                continue;
+            }
+            if ($best_idx === -1 || $idx < $best_idx
+                || ($idx === $best_idx && mb_strlen($q, 'UTF-8') > mb_strlen($best_note ?? '', 'UTF-8'))) {
+                $best_idx = $idx;
+                $best_note = $q;
+            }
+        }
+
+        if ($best_note !== null && $best_idx >= 0) {
+            if ($best_idx > 0) {
+                $free = trim(mb_substr($remaining, 0, $best_idx, 'UTF-8'));
+                if ($free !== '') {
+                    $parts[] = $free;
+                }
+            }
+            $parts[] = $best_note;
+            $remaining = mb_substr($remaining, $best_idx + mb_strlen($best_note, 'UTF-8'), null, 'UTF-8');
+            continue;
+        }
+
+        $tail = trim($remaining);
+        if ($tail !== '') {
+            $parts[] = $tail;
+        }
+        break;
+    }
+
+    return array_values(array_filter($parts, function ($p) {
+        return trim((string)$p) !== '';
+    }));
+}
+
+/** Escape para corpo HTML — UTF-8 nativo (evita &ccedil; / &atilde; visíveis no cliente). */
+function atm_html_esc($value) {
+    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
 /** Linha legível para peça no email (texto simples ou HTML esc). */
 function atm_peca_linha_label($p) {
     $cod = trim((string)($p['codigo'] ?? $p['codigoArtigo'] ?? ''));
@@ -651,6 +784,8 @@ function atm_peca_linha_label($p) {
 function f($s) {
     $s = (string)($s ?? '');
     if ($s === '') return '';
+    // FPDF usa Latin-1: normalizar pontuação Unicode antes de iconv (evita mojibake tipo "â€"")
+    $s = str_replace(['—', '–', '−', '•', '·', '…'], [' - ', '-', '-', '- ', '- ', '...'], $s);
     if (function_exists('iconv')) {
         $r = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $s);
         if ($r !== false) return $r;
@@ -770,6 +905,56 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $x2 * $k, ($h - $y2) * $k, $x3 * $k, ($h - $y3) * $k));
         }
 
+        /** Linhas necessárias para MultiCell com largura $w (FPDF tutorial). */
+        function NbLines($w, $txt) {
+            $cw = &$this->CurrentFont['cw'];
+            if ($w == 0) {
+                $w = $this->w - $this->rMargin - $this->x;
+            }
+            $wmax = ($w - 2 * $this->cMargin) * 1000 / $this->FontSize;
+            $s = str_replace("\r", '', (string)$txt);
+            $nb = strlen($s);
+            if ($nb > 0 && $s[$nb - 1] === "\n") {
+                $nb--;
+            }
+            $sep = -1;
+            $i = 0;
+            $j = 0;
+            $l = 0;
+            $nl = 1;
+            while ($i < $nb) {
+                $c = $s[$i];
+                if ($c === "\n") {
+                    $i++;
+                    $sep = -1;
+                    $j = $i;
+                    $l = 0;
+                    $nl++;
+                    continue;
+                }
+                if ($c === ' ') {
+                    $sep = $i;
+                }
+                $l += $cw[$c] ?? 0;
+                if ($l > $wmax) {
+                    if ($sep === -1) {
+                        if ($i === $j) {
+                            $i++;
+                        }
+                    } else {
+                        $i = $sep + 1;
+                    }
+                    $sep = -1;
+                    $j = $i;
+                    $l = 0;
+                    $nl++;
+                } else {
+                    $i++;
+                }
+            }
+            return $nl;
+        }
+
         /**
          * Imagem centrada em zona maxW x maxH (mm), proporção preservada (object-fit: contain).
          */
@@ -844,7 +1029,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $this->Cell($txW, 4, f(ATM_RAZAO_SOCIAL), 0, 0, 'R');
             $this->SetFont('Arial', '', 7);
             $this->SetXY($M, 13);
-            $this->Cell($txW, 4, f("Pico d'Agua Park • www.navel.pt"), 0, 0, 'R');
+            $this->Cell($txW, 4, f("Pico d'Agua Park  |  www.navel.pt"), 0, 0, 'R');
             $this->SetXY($M, 19);
             $this->Cell($txW, 4, f('São Miguel–Açores'), 0, 0, 'R');
             $this->SetFont('Arial', 'I', 6.5);
@@ -864,9 +1049,9 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $this->SetFillColor(30, 58, 95);
             $this->Rect(0, $yF, $W, 14, 'F');
             $this->SetTextColor(160, 180, 210);
-            $footerText = f(ATM_RAZAO_SOCIAL . ' — Todos os direitos reservados');
+            $footerText = f(ATM_RAZAO_SOCIAL . ' - Todos os direitos reservados');
             if ($this->appVersion) {
-                $footerText .= ' · v' . $this->appVersion;
+                $footerText .= ' | v' . $this->appVersion;
             }
             $this->SetFont('Arial', '', 6);
             $this->SetXY($M, $yF + 3);
@@ -942,7 +1127,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetTextColor($textCol[0], $textCol[1], $textCol[2]);
         $pdf->SetXY($M + $pad + 2, $y0 + 4);
-        $pdf->Cell(0, 5, 'RESUMO EXECUTIVO — ' . f($veredito_label), 0, 1);
+        $pdf->Cell(0, 5, f('RESUMO EXECUTIVO - ' . $veredito_label), 0, 1);
         $pdf->SetFont('Arial', '', 8.5);
         $pdf->SetTextColor(55, 65, 81);
         $contagem = f($nSim . ' conforme  /  ' . $nNao . ' nao conforme' . ($nNa_resumo ? '  /  ' . $nNa_resumo . ' N/A' : ''));
@@ -951,13 +1136,13 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $yBul = $pdf->GetY();
         foreach ($resumo_bullets as $b) {
             $pdf->SetX($M + $pad + 2);
-            $pdf->MultiCell($cW - $pad * 2 - 4, 4.2, f('• ' . $b), 0, 'L');
+            $pdf->MultiCell($cW - $pad * 2 - 4, 4.2, f('- ' . $b), 0, 'L');
         }
         if ($proxima_resumo_fmt !== '') {
             $pdf->SetFont('Arial', 'B', 8.5);
             $pdf->SetTextColor(30, 58, 95);
             $pdf->SetX($M + $pad + 2);
-            $proxTxt = f($proxima_resumo_fmt . ($proxima_resumo_tec !== '' ? '  •  ' . $proxima_resumo_tec : ''));
+            $proxTxt = f($proxima_resumo_fmt . ($proxima_resumo_tec !== '' ? '  |  ' . $proxima_resumo_tec : ''));
             $pdf->Cell(44, 4, 'Proxima manutencao prevista:', 0, 0);
             $pdf->SetFont('Arial', '', 8.5);
             $pdf->Cell(0, 4, $proxTxt, 0, 1);
@@ -1003,19 +1188,40 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $rows[] = ['HORAS MAO-DE-OBRA', f($rep_horas_mo) . ' h'];
         }
     }
-    $pdf->SetFont('Arial', '', 9);
+    // Dados do servico — colunas alinhadas a gerarPdfCompacto (rotulos longos com quebra)
+    $data_label_col_w = 72;
+    $data_value_x = $M + 74;
+    $data_value_w = max(24, $cW - 74 - 2);
+    $data_line_h = 4.5;
     foreach ($rows as $i => [$label, $val]) {
+        if ($pdf->GetY() > 265) {
+            $pdf->AddPage();
+        }
+        $y0 = $pdf->GetY();
+
+        $pdf->SetFont('Arial', 'B', 8);
+        $nLabelLines = $pdf->NbLines($data_label_col_w, $label);
+        $pdf->SetFont('Arial', '', 9);
+        $nValLines = $pdf->NbLines($data_value_w, $val);
+        $nLines = max($nLabelLines, $nValLines, 1);
+        $rowH = max(8, ($nLines - 1) * $data_line_h + 7);
+
         if ($i % 2 === 1) {
             $pdf->SetFillColor(248, 249, 250);
-            $pdf->Rect($M, $pdf->GetY(), $cW, 8, 'F');
+            $pdf->Rect($M, $y0, $cW, $rowH, 'F');
         }
-        $pdf->SetX($M + 1);
+
         $pdf->SetTextColor(107, 114, 128);
         $pdf->SetFont('Arial', 'B', 8);
-        $pdf->Cell(52, 8, $label, 0, 0);
+        $pdf->SetXY($M + 1, $y0);
+        $pdf->MultiCell($data_label_col_w, $data_line_h, $label, 0, 'L');
+
         $pdf->SetTextColor(17, 24, 39);
         $pdf->SetFont('Arial', '', 9);
-        $pdf->MultiCell($cW - 53, 8, $val, 0, 'L');
+        $pdf->SetXY($data_value_x, $y0);
+        $pdf->MultiCell($data_value_w, $data_line_h, $val, 0, 'L');
+
+        $pdf->SetY($y0 + $rowH);
     }
     $pdf->SetDrawColor(220, 220, 220);
     $pdf->SetLineWidth(0.3);
@@ -1067,7 +1273,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetTextColor(146, 64, 14);
         $pdf->SetX($M);
-        $pdf->Cell(0, 7, 'PONTOS DE ATENCAO — NAO CONFORMIDADES', 0, 1);
+        $pdf->Cell(0, 7, f('PONTOS DE ATENCAO - NAO CONFORMIDADES'), 0, 1);
         $pdf->SetFont('Arial', '', 8.5);
         $pdf->SetTextColor(55, 65, 81);
         foreach ($nao_conformes as $nc) {
@@ -1081,6 +1287,39 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     foreach ($atm_section_order as $atm_sec) {
         if ($atm_sec === 'checklist') {
             if (count($checklist) > 0) {
+                // Página A4 dedicada — checklist completa sem cortes entre páginas
+                $pdf->AddPage();
+                $y_chk_max = 272;
+                $y_chk_start = $pdf->GetY();
+                $chk_header_h = 14;
+                $chk_num_w = 7;
+                $chk_badge_w = 14;
+                $chk_text_w = $cW - $chk_num_w - $chk_badge_w - 2;
+
+                $chk_font = 8.5;
+                $chk_line_h = 3.8;
+                $chk_min_row = 5.5;
+                foreach ([8.5, 8, 7.5, 7, 6.5, 6] as $try_font) {
+                    $line_h = round($try_font * 0.45, 1);
+                    $min_row = max(5, $line_h + 1.5);
+                    $need_h = $chk_header_h;
+                    $pdf->SetFont('Arial', '', $try_font);
+                    foreach ($checklist as $item) {
+                        $texto_try = f($item['texto'] ?? '');
+                        $n_lines = max(1, $pdf->NbLines($chk_text_w, $texto_try));
+                        $need_h += max($min_row, $n_lines * $line_h + 1);
+                    }
+                    $need_h += 3;
+                    if ($need_h <= ($y_chk_max - $y_chk_start)) {
+                        $chk_font = $try_font;
+                        $chk_line_h = $line_h;
+                        $chk_min_row = $min_row;
+                        break;
+                    }
+                }
+
+                $pdf->SetAutoPageBreak(false);
+
                 $pdf->SetFont('Arial', 'B', 10);
                 $pdf->SetTextColor(30, 58, 95);
                 $pdf->SetX($M);
@@ -1093,9 +1332,9 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $pdf->SetX($M);
                 $pdf->Cell(0, 5, $nSim . ' conforme  /  ' . $nNao . ' nao conforme  (' . count($checklist) . ' itens)', 0, 1);
                 $pdf->Ln(1);
-                $pdf->SetFont('Arial', '', 8.5);
+
                 foreach ($checklist as $i => $item) {
-                    $resp  = $item['resp'] ?? '';
+                    $resp = $item['resp'] ?? '';
                     if ($resp === 'sim' || $resp === 'OK') {
                         $badge = 'SIM';
                     } elseif ($resp === 'nao' || $resp === 'NOK') {
@@ -1105,15 +1344,28 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                     } else {
                         $badge = '-';
                     }
+
+                    $texto = f($item['texto'] ?? '');
+                    $pdf->SetFont('Arial', '', $chk_font);
+                    $n_lines = max(1, $pdf->NbLines($chk_text_w, $texto));
+                    $row_h = max($chk_min_row, $n_lines * $chk_line_h + 1);
+                    $y0 = $pdf->GetY();
+
                     if ($i % 2 === 0) {
                         $pdf->SetFillColor(249, 250, 251);
-                        $pdf->Rect($M, $pdf->GetY(), $cW, 7, 'F');
+                        $pdf->Rect($M, $y0, $cW, $row_h, 'F');
                     }
-                    $pdf->SetX($M + 1);
+
                     $pdf->SetTextColor(107, 114, 128);
-                    $pdf->Cell(6, 7, ($i + 1) . '.', 0, 0);
+                    $pdf->SetFont('Arial', 'B', $chk_font);
+                    $pdf->SetXY($M + 1, $y0);
+                    $pdf->Cell($chk_num_w, $chk_line_h, ($i + 1) . '.', 0, 0, 'T');
+
+                    $pdf->SetFont('Arial', '', $chk_font);
                     $pdf->SetTextColor(55, 65, 81);
-                    $pdf->Cell($cW - 20, 7, f(mb_substr($item['texto'] ?? '', 0, 80, 'UTF-8')), 0, 0);
+                    $pdf->SetXY($M + 1 + $chk_num_w, $y0);
+                    $pdf->MultiCell($chk_text_w, $chk_line_h, $texto, 0, 'L');
+
                     if ($resp === 'sim' || $resp === 'OK') {
                         $pdf->SetTextColor(22, 163, 74);
                     } elseif ($resp === 'nao' || $resp === 'NOK') {
@@ -1121,14 +1373,18 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                     } else {
                         $pdf->SetTextColor(107, 114, 128);
                     }
-                    $pdf->SetFont('Arial', 'B', 8.5);
-                    $pdf->Cell(14, 7, $badge, 0, 1, 'R');
-                    $pdf->SetFont('Arial', '', 8.5);
+                    $pdf->SetFont('Arial', 'B', $chk_font);
+                    $pdf->SetXY($W - $M - $chk_badge_w, $y0);
+                    $pdf->Cell($chk_badge_w, $chk_line_h, $badge, 0, 0, 'R');
+
+                    $pdf->SetY($y0 + $row_h);
                 }
+
+                $pdf->SetAutoPageBreak(true, 18);
                 $pdf->Ln(3);
             }
         } elseif ($atm_sec === 'notas') {
-            if ($notas) {
+            if (count($nota_linhas_pdf) > 0) {
                 if ($pdf->GetY() > 250) {
                     $pdf->AddPage();
                 }
@@ -1138,8 +1394,15 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $pdf->Cell(0, 7, 'NOTAS ADICIONAIS', 0, 1);
                 $pdf->SetFont('Arial', '', 9);
                 $pdf->SetTextColor(55, 65, 81);
-                $pdf->SetX($M);
-                $pdf->MultiCell($cW, 5.5, f($notas), 0, 'L');
+                $nota_line_h = 5;
+                $nota_gap = 2;
+                foreach ($nota_linhas_pdf as $idx => $line) {
+                    $pdf->SetX($M);
+                    $pdf->MultiCell($cW, $nota_line_h, f($line), 0, 'L');
+                    if ($idx < count($nota_linhas_pdf) - 1) {
+                        $pdf->Ln($nota_gap);
+                    }
+                }
                 $pdf->Ln(3);
             }
         } elseif ($atm_sec === 'fotos') {
@@ -1274,40 +1537,52 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         }
     }
 
-    // Declaração de aceitação (antes das assinaturas — igual ao PDF do browser)
-    {
-        if ($pdf->GetY() > 210) $pdf->AddPage();
-        $decl_txt = ($declaracao_texto !== '')
-            ? $declaracao_texto
-            : texto_declaracao_cliente($manutencao_tipo, $declaracao_legislacao);
-        $pdf->SetFillColor(243, 244, 246);
-        $pdf->SetDrawColor(30, 58, 95);
-        $pdf->SetLineWidth(0.8);
-        $pdf->SetFont('Arial', 'B', 8);
-        $pdf->SetTextColor(30, 58, 95);
-        $pdf->SetX($M);
-        $pdf->Cell(0, 6, 'DECLARACAO DE ACEITACAO E COMPROMISSO DO CLIENTE', 0, 1);
-        $pdf->SetFont('Arial', '', 7);
-        $pdf->SetTextColor(55, 65, 81);
-        $pdf->SetX($M);
-        $pdf->MultiCell($cW, 3.6, f($decl_txt), 0, 'L');
-        $pdf->Ln(4);
-    }
+    // ── Página final: próximas (lista completa) + declaração + assinaturas ──
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(false);
+    $y_closing_max = 272;
 
-    // Próximas manutenções agendadas
     $peri_labels = ['trimestral' => 'Trimestral', 'semestral' => 'Semestral', 'anual' => 'Anual', 'mensal' => 'Mensal'];
     $proximas_filtradas = array_values(array_filter($proximas_list, function ($pm) {
         return !empty($pm['data']);
     }));
     $peri_maq = $periodicidade_maquina;
+
+    $decl_txt = ($declaracao_texto !== '')
+        ? $declaracao_texto
+        : texto_declaracao_cliente($manutencao_tipo, $declaracao_legislacao);
+    $decl_txt_f = f($decl_txt);
+    $pdf->SetFont('Arial', '', 7);
+    $decl_line_h = 3.6;
+    $decl_n_lines = $pdf->NbLines($cW - 12, $decl_txt_f);
+    $decl_box_h = 10 + $decl_n_lines * $decl_line_h + 6;
+    $has_tec_sig_preview = ($tecnico_sig_bin !== null);
+    $has_cli_sig_preview = ($assinatura_bin !== null);
+    $sig_box_h_preview = ($has_tec_sig_preview || $has_cli_sig_preview) ? 42 : 24;
+
     if ($manutencao_tipo !== 'reparacao' && (count($proximas_filtradas) > 0 || $peri_maq !== '')) {
-        if ($pdf->GetY() > 230) $pdf->AddPage();
         if (count($proximas_filtradas) > 0) {
+            $n_prox = count($proximas_filtradas);
+            $reserved_after = $decl_box_h + $sig_box_h_preview + 14;
+            $avail_table = max(50, $y_closing_max - $pdf->GetY() - $reserved_after);
+            $prox_row_h = 7;
+            $prox_font = 8;
+            foreach ([7, 6.5, 6, 5.5, 5, 4.5, 4] as $try_h) {
+                $need_h = 6 + 7 + 2 + $n_prox * $try_h + 4;
+                if ($need_h <= $avail_table) {
+                    $prox_row_h = $try_h;
+                    break;
+                }
+            }
+            if ($prox_row_h <= 5) {
+                $prox_font = 7;
+            }
+
             $pdf->SetFont('Arial', 'B', 9);
             $pdf->SetTextColor(30, 58, 95);
             $pdf->SetX($M);
             $pdf->Cell(0, 6, 'PROXIMAS MANUTENCOES AGENDADAS', 0, 1);
-            $pdf->SetFont('Arial', 'B', 7.5);
+            $pdf->SetFont('Arial', 'B', max(7, $prox_font - 0.5));
             $pdf->SetTextColor(30, 58, 95);
             $pdf->SetX($M);
             $pdf->Cell(10, 6, 'N.', 0, 0);
@@ -1317,25 +1592,25 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $pdf->SetDrawColor(209, 213, 219);
             $pdf->Line($M, $pdf->GetY(), $W - $M, $pdf->GetY());
             $pdf->Ln(1);
-            $pdf->SetFont('Arial', '', 8);
+            $pdf->SetFont('Arial', '', $prox_font);
             foreach ($proximas_filtradas as $i => $pm) {
-                if ($pdf->GetY() > 270) $pdf->AddPage();
+                $y_row = $pdf->GetY();
                 if ($i % 2 === 0) {
                     $pdf->SetFillColor(249, 250, 251);
-                    $pdf->Rect($M, $pdf->GetY() - 1, $cW, 7, 'F');
+                    $pdf->Rect($M, $y_row - 0.5, $cW, $prox_row_h, 'F');
                 }
                 $pp = $pm['periodicidade'] ?? '';
                 $lab = isset($peri_labels[$pp]) ? $peri_labels[$pp] : (isset($peri_labels[$peri_maq]) ? $peri_labels[$peri_maq] : (($pm['tipo'] ?? '') !== '' ? f($pm['tipo']) : '-'));
                 $pdf->SetX($M + 2);
                 $pdf->SetTextColor(107, 114, 128);
-                $pdf->Cell(10, 7, (string)($i + 1), 0, 0);
+                $pdf->Cell(10, $prox_row_h, (string)($i + 1), 0, 0);
                 $pdf->SetTextColor(17, 24, 39);
-                $pdf->Cell(40, 7, fmt_data_iso_br($pm['data']), 0, 0);
+                $pdf->Cell(40, $prox_row_h, fmt_data_iso_br($pm['data']), 0, 0);
                 $pdf->SetTextColor(55, 65, 81);
-                $pdf->Cell(45, 7, f($lab), 0, 0);
+                $pdf->Cell(45, $prox_row_h, f($lab), 0, 0);
                 $pdf->SetTextColor(107, 114, 128);
                 $tec_pm = $pm['tecnico'] ?? '';
-                $pdf->Cell(0, 7, f($tec_pm !== '' ? $tec_pm : 'A designar'), 0, 1);
+                $pdf->Cell(0, $prox_row_h, f($tec_pm !== '' ? $tec_pm : 'A designar'), 0, 1);
             }
             $pdf->Ln(4);
         } else {
@@ -1355,8 +1630,26 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         }
     }
 
+    // Declaração de aceitação — imediatamente antes das assinaturas
+    if ($pdf->GetY() + $decl_box_h + $sig_box_h_preview + 6 > $y_closing_max) {
+        $pdf->AddPage();
+    }
+    $y_decl = $pdf->GetY();
+    $pdf->SetFillColor(243, 244, 246);
+    $pdf->SetDrawColor(30, 58, 95);
+    $pdf->SetLineWidth(0.8);
+    $pdf->Rect($M, $y_decl, $cW, $decl_box_h, 'FD');
+    $pdf->SetFont('Arial', 'B', 8);
+    $pdf->SetTextColor(30, 58, 95);
+    $pdf->SetXY($M + 6, $y_decl + 4);
+    $pdf->Cell(0, 6, 'DECLARACAO DE ACEITACAO E COMPROMISSO DO CLIENTE', 0, 1);
+    $pdf->SetFont('Arial', '', 7);
+    $pdf->SetTextColor(55, 65, 81);
+    $pdf->SetXY($M + 6, $y_decl + 11);
+    $pdf->MultiCell($cW - 12, $decl_line_h, $decl_txt_f, 0, 'L');
+    $pdf->SetY($y_decl + $decl_box_h + 4);
+
     // Bloco de assinaturas — técnico (esquerda) + cliente (direita)
-    if ($pdf->GetY() > 220) $pdf->AddPage();
     $halfW = ($cW - 4) / 2;
     $hasTecSig = ($tecnico_sig_bin !== null);
     $hasCliSig = ($assinatura_bin !== null);
@@ -1430,6 +1723,8 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     }
     $pdf->SetY($y0 + $boxH + 3);
 
+    $pdf->SetAutoPageBreak(true, 18);
+
     _dbg("PDF Output()");
     $pdf_data = $pdf->Output('S');
     _dbg("PDF OK " . strlen($pdf_data) . " bytes");
@@ -1454,8 +1749,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
 
 // -- HTML do email -----------------------------------------------------------
 // Cabeçalho só em texto: imagens data: no corpo falham ou degradam no Outlook; o PDF anexo traz o logo Navel com qualidade.
-$esc   = 'htmlspecialchars';
-$tipo_h = $esc($tipo);
+$tipo_h = atm_html_esc($tipo);
 
 // Preheader — texto de pré-visualização em telemóveis (oculto no corpo visível)
 $preheader_bits = ['Relatório ' . $num_rel];
@@ -1469,7 +1763,7 @@ if ($proxima_email_fmt !== '') {
     $preheader_bits[] = 'próxima ' . $proxima_email_fmt;
 }
 $preheader_txt = implode(' · ', $preheader_bits);
-$preheader_pad = str_repeat(' &#847; ', 100);
+$preheader_pad = str_repeat("\u{200C} ", 120);
 
 // Peças utilizadas (resumo no corpo — documento completo no PDF)
 $pecas_usadas_email = [];
@@ -1482,10 +1776,10 @@ foreach ($pecas_list as $p) {
 // Próximas intervenções (máx. 4 linhas no corpo)
 $proximas_email_rows = array_slice($proximas_list, 0, 4);
 
-$html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
+$html  = '<!DOCTYPE html><html lang="pt"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
 <div style="display:none;font-size:1px;color:#f3f4f6;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">'
-     . $esc($preheader_txt) . $preheader_pad
+     . atm_html_esc($preheader_txt) . $preheader_pad
      . '</div>
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0;background:#f3f4f6;">
 <tr><td align="center">
@@ -1493,14 +1787,14 @@ $html  = '<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"></head>
   <tr><td bgcolor="#1e3a5f" style="background-color:#1e3a5f;background:linear-gradient(135deg,#1e3a5f,#0d6efd);padding:18px 24px;">
     <!-- Cabeçalho em tabela (sem imagem) — máxima compatibilidade em clientes de email -->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
-      <tr><td align="left" valign="top" style="padding:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;font-weight:bold;">Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL-A&Ccedil;ORES), Lda.</td></tr>
-      <tr><td align="left" valign="top" style="padding:0 0 4px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;"><a href="https://www.navel.pt" target="_blank" rel="noopener noreferrer" style="color:#ffffff !important;text-decoration:underline;">Pico d&#39;Agua Park &#8226; www.navel.pt</a></td></tr>
-      <tr><td align="left" valign="top" style="padding:0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;">S&atilde;o Miguel&ndash;A&ccedil;ores</td></tr>
+      <tr><td align="left" valign="top" style="padding:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;font-weight:bold;">' . atm_html_esc(ATM_RAZAO_SOCIAL) . '</td></tr>
+      <tr><td align="left" valign="top" style="padding:0 0 4px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;"><a href="https://www.navel.pt" target="_blank" rel="noopener noreferrer" style="color:#ffffff !important;text-decoration:underline;">Pico d\'Agua Park · www.navel.pt</a></td></tr>
+      <tr><td align="left" valign="top" style="padding:0;font-family:Arial,sans-serif;font-size:11px;line-height:1.45;color:#ffffff;">São Miguel–Açores</td></tr>
     </table>
   </td></tr>
   <tr><td style="padding:20px 24px 8px;border-bottom:3px solid #0d6efd;">
-    <div style="font-size:17px;font-weight:700;color:#1e3a5f;">Relat&oacute;rio de ' . $tipo_h . '</div>
-    <div style="font-size:22px;font-weight:800;color:#0d6efd;font-family:monospace;margin-top:4px;">' . $esc($num_rel) . '</div>
+    <div style="font-size:17px;font-weight:700;color:#1e3a5f;">Relatório de ' . $tipo_h . '</div>
+    <div style="font-size:22px;font-weight:800;color:#0d6efd;font-family:monospace;margin-top:4px;">' . atm_html_esc($num_rel) . '</div>
   </td></tr>
   <tr><td style="padding:16px 24px;">';
 
@@ -1510,21 +1804,21 @@ if ($manutencao_tipo !== 'reparacao') {
     $vb = $veredito_style['border'];
     $vt = $veredito_style['text'];
     $html .= '<div style="background:rgb(' . $vf[0] . ',' . $vf[1] . ',' . $vf[2] . ');border:1px solid rgb(' . $vb[0] . ',' . $vb[1] . ',' . $vb[2] . ');border-radius:8px;padding:12px 14px;margin-bottom:14px;">'
-           . '<div style="font-size:13px;font-weight:800;color:rgb(' . $vt[0] . ',' . $vt[1] . ',' . $vt[2] . ');margin-bottom:6px;">Resumo executivo — ' . $esc($veredito_label) . '</div>'
+           . '<div style="font-size:13px;font-weight:800;color:rgb(' . $vt[0] . ',' . $vt[1] . ',' . $vt[2] . ');margin-bottom:6px;">Resumo executivo — ' . atm_html_esc($veredito_label) . '</div>'
            . '<div style="font-size:12px;color:#374151;margin-bottom:6px;">'
-           . $esc($nSim . ' conforme · ' . $nNao . ' não conforme' . ($nNa_resumo ? ' · ' . $nNa_resumo . ' N/A' : ''))
+           . atm_html_esc($nSim . ' conforme · ' . $nNao . ' não conforme' . ($nNa_resumo ? ' · ' . $nNa_resumo . ' N/A' : ''))
            . '</div>';
     if (count($resumo_bullets) > 0) {
         $html .= '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
         foreach (array_slice($resumo_bullets, 0, 3) as $b) {
-            $html .= '<li style="margin-bottom:3px;">' . $esc($b) . '</li>';
+            $html .= '<li style="margin-bottom:3px;">' . atm_html_esc($b) . '</li>';
         }
         $html .= '</ul>';
     }
     if ($proxima_resumo_fmt !== '') {
         $html .= '<div style="margin-top:8px;font-size:12px;color:#1e3a5f;"><strong>Próxima manutenção prevista:</strong> '
-               . $esc($proxima_resumo_fmt)
-               . ($proxima_resumo_tec !== '' ? ' · ' . $esc($proxima_resumo_tec) : '')
+               . atm_html_esc($proxima_resumo_fmt)
+               . ($proxima_resumo_tec !== '' ? ' · ' . atm_html_esc($proxima_resumo_tec) : '')
                . '</div>';
     }
     $html .= '</div>';
@@ -1554,8 +1848,8 @@ if ($manutencao_tipo !== 'reparacao') {
         $drows[] = ['Horas no contador', $horas_leitura_contador . ' h'];
     }
 }
-$drows[] = ['Data execu&ccedil;&atilde;o', $data_real];
-$drows[] = ['T&eacute;cnico', $tecnico];
+$drows[] = ['Data execução', $data_real];
+$drows[] = ['Técnico', $tecnico];
 $drows[] = ['Assinado por',  $assinado_por];
 if (count($checklist) > 0) {
     $drows[] = ['Checklist', $nSim . ' conforme / ' . $nNao . ' nao conforme (' . count($checklist) . ' itens)'];
@@ -1565,8 +1859,8 @@ $html .= '<table width="100%" cellpadding="0" cellspacing="0">';
 foreach ($drows as $i => [$l, $v]) {
     $bg = ($i % 2 === 1) ? 'background:#f9fafb;' : '';
     $html .= '<tr style="' . $bg . '"><td style="padding:6px 8px;width:38%;color:#6b7280;font-size:11px;text-transform:uppercase;">'
-           . $l . '</td><td style="padding:6px 8px;color:#111827;font-size:13px;">'
-           . $esc((string)$v) . '</td></tr>';
+           . atm_html_esc($l) . '</td><td style="padding:6px 8px;color:#111827;font-size:13px;">'
+           . atm_html_esc((string)$v) . '</td></tr>';
 }
 $html .= '</table></td></tr>';
 
@@ -1574,33 +1868,37 @@ $html .= '</table></td></tr>';
 if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px;">'
-           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pontos de aten&ccedil;&atilde;o — n&atilde;o conformidades</div>'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pontos de atenção — não conformidades</div>'
            . '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
     foreach ($nao_conformes as $nc) {
-        $html .= '<li style="margin-bottom:4px;"><strong>' . $esc((string)($nc['index'] ?? '')) . '.</strong> '
-               . $esc($nc['texto'] ?? '') . '</li>';
+        $html .= '<li style="margin-bottom:4px;"><strong>' . atm_html_esc((string)($nc['index'] ?? '')) . '.</strong> '
+               . atm_html_esc($nc['texto'] ?? '') . '</li>';
     }
     $html .= '</ul></div></td></tr>';
 }
 
-if ($notas) {
+if (count($nota_linhas_pdf) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;margin-bottom:6px;">Notas adicionais</div>'
-           . '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:13px;color:#374151;line-height:1.5;">'
-           . nl2br($esc($notas)) . '</div></td></tr>';
+           . '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 10px 10px 22px;font-size:13px;color:#374151;line-height:1.5;">'
+           . '<ul style="margin:0;padding:0;list-style:disc;">';
+    foreach ($nota_linhas_pdf as $line) {
+        $html .= '<li style="margin:0 0 6px 0;">' . atm_html_esc($line) . '</li>';
+    }
+    $html .= '</ul></div></td></tr>';
 }
 
 // Consumíveis e peças substituídas
 if (count($pecas_usadas_email) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;margin-bottom:8px;">'
-           . 'Consum&iacute;veis e pe&ccedil;as utilizadas (' . count($pecas_usadas_email) . ')</div>'
+           . 'Consumíveis e peças utilizadas (' . count($pecas_usadas_email) . ')</div>'
            . '<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">';
     foreach ($pecas_usadas_email as $i => $p) {
         $bg = ($i % 2 === 1) ? 'background:#f9fafb;' : 'background:#fff;';
         $html .= '<tr style="' . $bg . '"><td style="padding:8px 10px;font-size:12px;color:#374151;">'
-               . '<span style="color:#16a34a;font-weight:700;margin-right:6px;">&#10003;</span>'
-               . $esc(atm_peca_linha_label($p))
+               . '<span style="color:#16a34a;font-weight:700;margin-right:6px;">✓</span>'
+               . atm_html_esc(atm_peca_linha_label($p))
                . '</td></tr>';
     }
     $html .= '</table></td></tr>';
@@ -1613,8 +1911,8 @@ if (count($pecas_usadas_email) > 0) {
     }
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:12px;color:#6b7280;">'
-           . 'Plano de consum&iacute;veis: ' . count($pecas_list) . ' linha(s) registada(s)'
-           . ($usadas_cnt > 0 ? ', ' . $usadas_cnt . ' utilizada(s) no servi&ccedil;o' : '')
+           . 'Plano de consumíveis: ' . count($pecas_list) . ' linha(s) registada(s)'
+           . ($usadas_cnt > 0 ? ', ' . $usadas_cnt . ' utilizada(s) no serviço' : '')
            . '. Detalhe completo no PDF em anexo.'
            . '</div></td></tr>';
 }
@@ -1622,14 +1920,14 @@ if (count($pecas_usadas_email) > 0) {
 if ($pdf_data) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;color:#1d4ed8;font-weight:700;font-size:12px;">'
-           . 'Relat&oacute;rio PDF em anexo'
+           . 'Relatório PDF em anexo'
            . '</div></td></tr>';
 }
 
 // Galeria de fotos
 if (count($photos) > 0) {
     $html .= '<tr><td style="padding:0 24px 14px;">';
-    $html .= '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#92400e;margin-bottom:8px;">Fotografias do servi&ccedil;o (' . count($photos) . ')</div>';
+    $html .= '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#92400e;margin-bottom:8px;">Fotografias do serviço (' . count($photos) . ')</div>';
     $html .= '<table cellpadding="0" cellspacing="4" style="border-collapse:separate;"><tr>';
     foreach ($photos as $idx => $thumb) {
         if ($idx > 0 && $idx % 4 === 0) {
@@ -1643,15 +1941,15 @@ if (count($photos) > 0) {
 // Bloco de assinatura com nome e data completa
 $sig_txt_email = '';
 if ($assinado_por) {
-    $sig_txt_email .= 'Assinado por <strong>' . $esc($assinado_por) . '</strong>';
-    if ($data_real) $sig_txt_email .= ', em ' . $esc($data_real);
+    $sig_txt_email .= 'Assinado por <strong>' . atm_html_esc($assinado_por) . '</strong>';
+    if ($data_real) $sig_txt_email .= ', em ' . atm_html_esc($data_real);
     $sig_txt_email .= '. Assinatura arquivada no sistema.';
 } else {
-    $sig_txt_email = 'Relat&oacute;rio assinado digitalmente. Assinatura arquivada no sistema.';
+    $sig_txt_email = 'Relatório assinado digitalmente. Assinatura arquivada no sistema.';
 }
 $html .= '<tr><td style="padding:0 24px 12px;">'
        . '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;">'
-       . '<div style="color:#16a34a;font-weight:700;font-size:12px;margin-bottom:4px;">Relat&oacute;rio assinado digitalmente</div>'
+       . '<div style="color:#16a34a;font-weight:700;font-size:12px;margin-bottom:4px;">Relatório assinado digitalmente</div>'
        . '<div style="color:#374151;font-size:12px;">' . $sig_txt_email . '</div>'
        . '</div></td></tr>';
 
@@ -1659,11 +1957,11 @@ $html .= '<tr><td style="padding:0 24px 12px;">'
 if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:12px;">'
-           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pr&oacute;ximas interven&ccedil;&otilde;es previstas</div>'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Próximas intervenções previstas</div>'
            . '<table width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;">'
            . '<tr style="color:#92400e;font-size:10px;text-transform:uppercase;">'
            . '<td style="padding:4px 6px;width:42%;">Data</td>'
-           . '<td style="padding:4px 6px;">T&eacute;cnico</td>'
+           . '<td style="padding:4px 6px;">Técnico</td>'
            . '</tr>';
     foreach ($proximas_email_rows as $i => $pm) {
         $bg = ($i % 2 === 1) ? 'background:#fffbeb;' : '';
@@ -1673,22 +1971,22 @@ if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
             $tec_pm = $proxima_resumo_tec !== '' ? $proxima_resumo_tec : '—';
         }
         $html .= '<tr style="' . $bg . '">'
-               . '<td style="padding:6px;font-weight:700;">' . $esc($data_pm) . '</td>'
-               . '<td style="padding:6px;">' . $esc($tec_pm) . '</td>'
+               . '<td style="padding:6px;font-weight:700;">' . atm_html_esc($data_pm) . '</td>'
+               . '<td style="padding:6px;">' . atm_html_esc($tec_pm) . '</td>'
                . '</tr>';
     }
     $html .= '</table>'
            . '<div style="margin-top:10px;font-size:11px;color:#6b7280;line-height:1.5;">'
            . 'Datas calculadas a partir da periodicidade do equipamento. '
-           . 'Para reagendar, contacte os nossos servi&ccedil;os.'
+           . 'Para reagendar, contacte os nossos serviços.'
            . '</div></div></td></tr>';
 } elseif ($proxima_email_fmt) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:12px;">'
-           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:4px;">Pr&oacute;xima interven&ccedil;&atilde;o prevista</div>'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:4px;">Próxima intervenção prevista</div>'
            . '<div style="color:#374151;font-size:12px;">'
-           . '<strong>' . $esc($proxima_email_fmt) . '</strong>'
-           . ($proxima_resumo_tec !== '' ? ' (t&eacute;cnico: <strong>' . $esc($proxima_resumo_tec) . '</strong>)' : '')
+           . '<strong>' . atm_html_esc($proxima_email_fmt) . '</strong>'
+           . ($proxima_resumo_tec !== '' ? ' (técnico: <strong>' . atm_html_esc($proxima_resumo_tec) . '</strong>)' : '')
            . '</div></div></td></tr>';
 }
 
@@ -1696,22 +1994,22 @@ if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
 $cta_tel_href = atm_tel_href($tecnico_tel);
 $html .= '<tr><td style="padding:0 24px 16px;">'
        . '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;text-align:center;">'
-       . '<div style="font-weight:700;color:#1e3a5f;font-size:13px;margin-bottom:8px;">Precisa de reagendar ou esclarecer d&uacute;vidas?</div>'
+       . '<div style="font-weight:700;color:#1e3a5f;font-size:13px;margin-bottom:8px;">Precisa de reagendar ou esclarecer dúvidas?</div>'
        . '<div style="font-size:13px;color:#374151;line-height:1.6;">'
-       . 'T&eacute;cnico: <strong>' . $esc($tecnico) . '</strong>';
+       . 'Técnico: <strong>' . atm_html_esc($tecnico) . '</strong>';
 if ($tecnico_tel !== '') {
-    $html .= ' &middot; <a href="' . $esc($cta_tel_href) . '" style="color:#0d6efd;font-weight:700;text-decoration:none;">'
-           . $esc($tecnico_tel) . '</a>';
+    $html .= ' · <a href="' . atm_html_esc($cta_tel_href) . '" style="color:#0d6efd;font-weight:700;text-decoration:none;">'
+           . atm_html_esc($tecnico_tel) . '</a>';
 }
 $html .= '</div>'
        . '<div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.6;">'
        . ATM_MARCA_CURTA . ': <strong>' . ATM_TELEFONES_GERAIS . '</strong>'
-       . ' &middot; <a href="mailto:' . REPLY_TO . '" style="color:#0d6efd;text-decoration:none;">' . REPLY_TO . '</a>'
+       . ' · <a href="mailto:' . REPLY_TO . '" style="color:#0d6efd;text-decoration:none;">' . REPLY_TO . '</a>'
        . '</div></div></td></tr>';
 
 $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255,255,.65);font-size:10px;text-align:center;line-height:1.9;">'
-       . 'Jos&eacute; Gon&ccedil;alves Cerqueira (NAVEL-A&Ccedil;ORES), Lda.<br>'
-       . "Pico d'Agua Park &mdash; www.navel.pt"
+       . atm_html_esc(ATM_RAZAO_SOCIAL) . '<br>'
+       . "Pico d'Agua Park · www.navel.pt"
        . '</td></tr>'
        . '</table></td></tr></table></body></html>';
 
@@ -1753,7 +2051,10 @@ if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
 }
 
 if ($notas !== '') {
-    $text .= "\r\nNotas adicionais:\r\n" . $notas . "\r\n";
+    $text .= "\r\nNotas adicionais:\r\n";
+    foreach ($nota_linhas_pdf as $line) {
+        $text .= '- ' . $line . "\r\n";
+    }
 }
 
 if (count($pecas_usadas_email) > 0) {
@@ -1794,14 +2095,18 @@ $fname = preg_replace('/[^a-zA-Z0-9._\-]/', '_', 'relatorio_' . $num_rel . '.pdf
 
 if ($pdf_data) {
     $pdf_b64 = chunk_split(base64_encode($pdf_data), 76, "\r\n");
+    $text_b64 = chunk_split(base64_encode($text), 76, "\r\n");
+    $html_b64 = chunk_split(base64_encode($html), 76, "\r\n");
     $body    = "--$outer\r\nContent-Type: multipart/alternative; boundary=\"$inner\"\r\n\r\n";
-    $body   .= "--$inner\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n$text\r\n";
-    $body   .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n$html\r\n--$inner--\r\n\r\n";
+    $body   .= "--$inner\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n$text_b64\r\n";
+    $body   .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n$html_b64\r\n--$inner--\r\n\r\n";
     $body   .= "--$outer\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"$fname\"\r\n\r\n$pdf_b64\r\n--$outer--\r\n";
     $hdr     = "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$outer\"\r\n";
 } else {
-    $body  = "--$inner\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n$text\r\n";
-    $body .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n$html\r\n--$inner--\r\n";
+    $text_b64 = chunk_split(base64_encode($text), 76, "\r\n");
+    $html_b64 = chunk_split(base64_encode($html), 76, "\r\n");
+    $body  = "--$inner\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n$text_b64\r\n";
+    $body .= "--$inner\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n$html_b64\r\n--$inner--\r\n";
     $hdr   = "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"$inner\"\r\n";
 }
 $hdr .= "From: =?UTF-8?B?" . base64_encode(ATM_RAZAO_SOCIAL) . "?= <" . FROM_EMAIL . ">\r\n"

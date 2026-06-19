@@ -86,13 +86,36 @@ export function linhasNotasRelatorio(notas, quickNotesList) {
   let remaining = raw
 
   while (remaining.length > 0) {
-    const match = byLen.find(q => remaining.startsWith(q))
-    if (match) {
-      parts.push(match)
-      remaining = remaining.slice(match.length)
+    const prefixMatch = byLen.find(q => remaining.startsWith(q))
+    if (prefixMatch) {
+      parts.push(prefixMatch)
+      remaining = remaining.slice(prefixMatch.length)
       continue
     }
-    parts.push(remaining.trim())
+
+    let bestIdx = -1
+    let bestNote = null
+    for (const q of byLen) {
+      const idx = remaining.indexOf(q)
+      if (idx === -1) continue
+      if (bestIdx === -1 || idx < bestIdx || (idx === bestIdx && q.length > bestNote.length)) {
+        bestIdx = idx
+        bestNote = q
+      }
+    }
+
+    if (bestNote !== null && bestIdx >= 0) {
+      if (bestIdx > 0) {
+        const free = remaining.slice(0, bestIdx).trim()
+        if (free) parts.push(free)
+      }
+      parts.push(bestNote)
+      remaining = remaining.slice(bestIdx + bestNote.length)
+      continue
+    }
+
+    const tail = remaining.trim()
+    if (tail) parts.push(tail)
     break
   }
 

@@ -20,7 +20,7 @@ import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { buildResumoExecutivoEmailPayload } from '../utils/relatorioPdfResumo'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
-import { notasRelatorioParaTexto } from '../components/executarManutencao/execWizardHelpers'
+import { notasRelatorioParaTexto, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
 
@@ -263,7 +263,8 @@ export async function enviarRelatorioEmail({
         assinado_por:     relatorio?.nomeAssinante ?? '',
         data_assinatura:  relatorio?.dataAssinatura ?? '',
         assinatura_digital: assinaturaB64,
-        notas:            notasRelatorioParaTexto(relatorio?.notas ?? ''),
+        notas:            notasRelatorioParaTexto(relatorio?.notas ?? '', getQuickNotes()),
+        quick_notes_json: JSON.stringify(getQuickNotes()),
         checklist_json:   checklistJson,
         photos_json:      photosJson,
         n_fotos:          fotosOriginais.length,

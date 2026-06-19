@@ -12,7 +12,7 @@ import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
-import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
+import { linhasNotasRelatorio, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
 import {
   buildResumoExecutivoMeta,
   formatDataRelatorioPdf,
@@ -582,7 +582,42 @@ export async function gerarPdfCompacto({
 
   function renderChecklistSection() {
     if (checklistItems.length === 0) return
-    if (y > 260) { pdf.addPage(); y = 20 }
+
+    // Página A4 dedicada — checklist completa numa única folha
+    pdf.addPage()
+    y = 20
+    const yMax = 274
+    const headerBlockH = 13
+
+    const textLeftCl = M + 8
+    const badgeReserveMm = 18
+    const textoItemMaxW = Math.max(40, W - M - badgeReserveMm - textLeftCl)
+
+    const fontCandidates = [
+      { fs: 8.5, lineMm: 3.65, rowGap: 3, stripeTop: 3.95, stripeBot: 1.85 },
+      { fs: 8, lineMm: 3.35, rowGap: 2.5, stripeTop: 3.5, stripeBot: 1.5 },
+      { fs: 7.5, lineMm: 3.1, rowGap: 2, stripeTop: 3.2, stripeBot: 1.3 },
+      { fs: 7, lineMm: 2.85, rowGap: 1.6, stripeTop: 2.9, stripeBot: 1.1 },
+      { fs: 6.5, lineMm: 2.65, rowGap: 1.2, stripeTop: 2.6, stripeBot: 0.9 },
+    ]
+
+    let chosen = fontCandidates[fontCandidates.length - 1]
+    for (const cand of fontCandidates) {
+      pdf.setFontSize(cand.fs)
+      let needH = headerBlockH
+      for (const item of checklistItems) {
+        const linhasTxt = pdf.splitTextToSize(String(item.texto ?? ''), textoItemMaxW)
+        const lastBaseline = cand.lineMm + (linhasTxt.length - 1) * cand.lineMm
+        const textoBlockBottom = lastBaseline + 2.9
+        const rowH = textoBlockBottom + cand.rowGap
+        needH += rowH
+      }
+      if (needH <= yMax - y) {
+        chosen = cand
+        break
+      }
+    }
+
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     const tituloChecklist = resumoMeta.naoConformes.length > 0
       ? 'DETALHE DA VERIFICA\u00c7\u00c3O (CHECKLIST COMPLETA)'
@@ -595,31 +630,17 @@ export async function gerarPdfCompacto({
     pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
     pdf.text(`${nSim} conforme \u2022 ${nNao} n\u00e3o conforme \u2022 ${checklistItems.length} itens`, M, y); y += 5
 
-    const textLeftCl = M + 8
-    /** Coluna SIM/NÃO alinhada \u00e0 direita; reserva espa\u00e7o para n\u00e3o cortar o texto antes do estado. */
-    const badgeReserveMm = 18
-    const textoItemMaxW = Math.max(40, W - M - badgeReserveMm - textLeftCl)
-
-    pdf.setFontSize(8.5)
+    pdf.setFontSize(chosen.fs)
     checklistItems.forEach((item, i) => {
       const texto = String(item.texto ?? '')
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
       const linhasTxt = pdf.splitTextToSize(texto, textoItemMaxW)
-
-      /** Espaço entre linhas (~8.5 pt), alinhado a outros blocos do PDF compacto */
-      const checklistLineMm = 3.65
-      /** Folha seguinte at\u00e9 o texto (todas as linhas) caber acima do rodap\u00e9 seguro */
-      while (true) {
-        const textoBlockBottomTry = y + (linhasTxt.length - 1) * checklistLineMm + 2.9
-        if (textoBlockBottomTry <= 274) break
-        pdf.addPage()
-        y = 20
-      }
+      const checklistLineMm = chosen.lineMm
       const lastBaseline = y + (linhasTxt.length - 1) * checklistLineMm
       const textoBlockBottom = lastBaseline + 2.9
 
-      const stripePadTop = 3.95
-      const stripePadBot = 1.85
+      const stripePadTop = chosen.stripeTop
+      const stripePadBot = chosen.stripeBot
       const rowTop = y - stripePadTop
       const zebraH = textoBlockBottom - rowTop + stripePadBot
 
@@ -653,14 +674,14 @@ export async function gerarPdfCompacto({
       pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...rgb)
       pdf.text(badge, W - M - 2, y, { align: 'right' })
 
-      y = textoBlockBottom + 3
+      y = textoBlockBottom + chosen.rowGap
     })
     y += 4
   }
 
   function renderNotasSection() {
     if (!relatorio?.notas) return
-    const notaLinhas = linhasNotasRelatorio(relatorio.notas)
+    const notaLinhas = linhasNotasRelatorio(relatorio.notas, getQuickNotes())
     if (notaLinhas.length === 0) return
     if (y > 240) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
@@ -806,68 +827,68 @@ export async function gerarPdfCompacto({
     renderPecasSection()
   }
 
-  // ── Declaração de aceitação do cliente ──────────────────────────────────────
-  {
-    if (y > 220) { pdf.addPage(); y = 20 }
-    pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
-    const declTipo = isReparacao
-      ? 'reparacao'
-      : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
-    const declText = resolveDeclaracaoCliente(declTipo, categoriaNome, declaracaoClienteDepois)
-    const declPad = 6
-    const declTextW = cW - declPad * 2
-    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
-    const declLines = pdf.splitTextToSize(declText, declTextW)
-    const declLineH = 3.6
-    const declBoxH = 10 + declLines.length * declLineH + declPad
-    if (y + declBoxH > 270) { pdf.addPage(); y = 20 }
-    pdf.rect(M, y - 4, cW, declBoxH, 'FD')
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    pdf.text('DECLARA\u00c7\u00c3O DE ACEITA\u00c7\u00c3O E COMPROMISSO DO CLIENTE', M + declPad, y + 1)
-    y += 8
-    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-    declLines.forEach((line) => {
-      pdf.text(line, M + declPad, y)
-      y += declLineH
-    })
-    y += declPad + 4
-  }
+  // ── Página final: próximas (lista completa) + declaração + assinaturas ─────
+  pdf.addPage()
+  y = 20
+  const yClosingMax = 274
 
-  // ── Próximas manutenções agendadas (omitir em relatórios de reparação) ─────
   if (!isReparacao) {
     const proximas = (proximasManutencoes ?? []).filter(pm => pm.data).sort((a, b) => a.data.localeCompare(b.data))
     const periMaqVal = maquina?.periodicidadeManut
     const periLabels = { trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual', mensal: 'Mensal' }
     const resolvePeriodicidade = (pm) => periLabels[pm.periodicidade] || periLabels[periMaqVal] || pm.tipo || '\u2014'
 
+    const declTipoPreview = manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'
+    const declTextPreview = resolveDeclaracaoCliente(declTipoPreview, categoriaNome, declaracaoClienteDepois)
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
+    const declLinesPreview = pdf.splitTextToSize(declTextPreview, cW - 12)
+    const declBoxHPreview = 10 + declLinesPreview.length * 3.6 + 6
+    const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
+    const reservedAfter = declBoxHPreview + sigBoxHPreview + 14
+
     if (proximas.length > 0 || periMaqVal) {
-      if (y > 250) { pdf.addPage(); y = 20 }
       const fmtD = (d) => { const s = String(d ?? '').slice(0, 10).split('-'); return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : '\u2014' }
       pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.5)
 
       if (proximas.length > 0) {
-        const tblH = 8 + proximas.length * 7 + 6
-        if (y + tblH > 270) { pdf.addPage(); y = 20 }
+        const availTable = Math.max(50, yClosingMax - y - reservedAfter)
+        const rowCandidates = [
+          { fs: 8, rowMm: 7, headFs: 7.5 },
+          { fs: 7.5, rowMm: 6.5, headFs: 7 },
+          { fs: 7, rowMm: 6, headFs: 6.5 },
+          { fs: 7, rowMm: 5.5, headFs: 6.5 },
+          { fs: 6.5, rowMm: 5, headFs: 6 },
+          { fs: 6.5, rowMm: 4.5, headFs: 6 },
+          { fs: 6, rowMm: 4, headFs: 5.5 },
+        ]
+        let chosen = rowCandidates[rowCandidates.length - 1]
+        for (const cand of rowCandidates) {
+          const needH = 6 + 7 + proximas.length * cand.rowMm + 6
+          if (needH <= availTable) {
+            chosen = cand
+            break
+          }
+        }
+
         pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
         pdf.text('PR\u00d3XIMAS MANUTEN\u00c7\u00d5ES AGENDADAS', M, y); y += 6
 
         pdf.setFillColor(30, 58, 95); pdf.rect(M, y - 3.5, cW, 7, 'F')
-        pdf.setFontSize(7.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(chosen.headFs); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255)
         pdf.text('N.\u00ba', M + 2, y)
         pdf.text('Data prevista', M + 14, y)
         pdf.text('Periodicidade', M + 60, y)
         pdf.text('T\u00e9cnico', M + 110, y)
         y += 5
 
-        pdf.setFontSize(8); pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(chosen.fs); pdf.setFont('helvetica', 'normal')
         proximas.forEach((pm, i) => {
-          if (y > 270) { pdf.addPage(); y = 20 }
-          if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, 7, 'F') }
+          if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, cW, chosen.rowMm, 'F') }
           pdf.setTextColor(107, 114, 128); pdf.text(String(i + 1), M + 2, y)
           pdf.setTextColor(17, 24, 39); pdf.text(fmtD(pm.data), M + 14, y)
           pdf.setTextColor(55, 65, 81); pdf.text(resolvePeriodicidade(pm), M + 60, y)
           pdf.setTextColor(107, 114, 128); pdf.text(pm.tecnico ?? 'A designar', M + 110, y)
-          y += 7
+          y += chosen.rowMm
         })
         y += 4
       } else {
@@ -884,8 +905,34 @@ export async function gerarPdfCompacto({
     }
   }
 
+  // ── Declaração de aceitação — imediatamente antes das assinaturas ───────────
+  {
+    const declTipo = isReparacao
+      ? 'reparacao'
+      : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
+    const declText = resolveDeclaracaoCliente(declTipo, categoriaNome, declaracaoClienteDepois)
+    const declPad = 6
+    const declTextW = cW - declPad * 2
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
+    const declLines = pdf.splitTextToSize(declText, declTextW)
+    const declLineH = 3.6
+    const declBoxH = 10 + declLines.length * declLineH + declPad
+    const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
+    if (y + declBoxH + sigBoxHPreview + 8 > yClosingMax) { pdf.addPage(); y = 20 }
+    pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
+    pdf.rect(M, y - 4, cW, declBoxH, 'FD')
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('DECLARA\u00c7\u00c3O DE ACEITA\u00c7\u00c3O E COMPROMISSO DO CLIENTE', M + declPad, y + 1)
+    y += 8
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    declLines.forEach((line) => {
+      pdf.text(line, M + declPad, y)
+      y += declLineH
+    })
+    y += declPad + 4
+  }
+
   // ── Bloco de assinaturas (técnico + cliente) ──
-  if (y > 230) { pdf.addPage(); y = 20 }
 
   const halfW = (cW - 4) / 2
   const hasTecSig = !!(tecnicoObj?.assinaturaDigital)

@@ -9,6 +9,22 @@ Política de continuidade:
 
 ---
 
+## [1.17.5] — 2026-06-12 — PDF/email: layout final, notas e HTML UTF-8
+
+### Correcções
+- **PDF FPDF (`send-email.php`):** encoding Latin-1 sem mojibake (`—`, `•`, `·`); coluna de rótulos alargada + `MultiCell` (evita sobreposição em «HORAS NO CONTADOR»); checklist numa página A4; notas adicionais uma por linha; ordem final **próximas manutenções → declaração → assinaturas**; lista completa de próximas na última página.
+- **PDF browser (`gerarPdfRelatorio.js`):** mesma ordem de secções, checklist compacta numa página, notas em lista, bloco de fecho na última página.
+- **Corpo HTML do email:** texto fixo em UTF-8 literal; dados dinâmicos via `atm_html_esc()`; MIME `base64` em `text/plain` e `text/html` (acentos correctos, sem `&ccedil;` visível).
+- **`linhasNotasRelatorio()` / `emailService.js`:** notas rápidas embutidas separadas automaticamente; `quick_notes_json` no payload.
+
+### Qualidade
+- Teste unitário novo em `execWizardHelpers.test.js` (notas embutidas).
+
+### Deploy
+- PWA `public_html/manut/` + `public_html/api/send-email.php`.
+
+---
+
 ## [1.17.4] — 2026-06-12 — Correcção envio email (import em falta)
 
 ### Correcções
