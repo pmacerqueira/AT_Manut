@@ -52,6 +52,7 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
     showGlobalLoading()
     try {
       let sucesso = 0
+      let ultimoErro = ''
       for (const dest of dests) {
         const resultado = await enviarRelatorioEmail(buildRelatorioManutencaoEmailArgs({
           emailDestinatario: dest,
@@ -67,7 +68,10 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
           logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
         }))
         if (resultado?.ok) sucesso++
-        else logger.error('EnviarEmailModal', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
+        else {
+          ultimoErro = resultado?.message ?? 'Erro ao enviar.'
+          logger.error('EnviarEmailModal', 'enviarEmail', ultimoErro, { dest })
+        }
       }
 
       if (sucesso > 0) {
@@ -90,7 +94,7 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
           { destinatarios: destsArr })
         onClose()
       } else {
-        setErro('Não foi possível enviar o email. Tente novamente.')
+        setErro(ultimoErro || 'Não foi possível enviar o email. Tente novamente.')
       }
     } catch (err) {
       setErro(err.message || 'Erro ao enviar email.')

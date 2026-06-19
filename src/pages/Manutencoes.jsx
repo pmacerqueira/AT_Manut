@@ -690,6 +690,7 @@ export default function Manutencoes() {
       const checklistItems = maq ? getChecklistBySubcategoria(maq.subcategoriaId, m.tipo || 'periodica') : []
 
       const sucessoDests = []
+      let ultimoErro = ''
       for (const dest of dests) {
         const resultado = await enviarRelatorioEmail(buildRelatorioManutencaoEmailArgs({
           emailDestinatario: dest,
@@ -705,7 +706,10 @@ export default function Manutencoes() {
           logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
         }))
         if (resultado?.ok) sucessoDests.push(dest)
-        else logger.error('Manutencoes', 'enviarEmail', resultado?.message ?? 'Erro', { dest })
+        else {
+          ultimoErro = resultado?.message ?? 'Erro ao enviar.'
+          logger.error('Manutencoes', 'enviarEmail', ultimoErro, { dest })
+        }
       }
       const sucesso = sucessoDests.length
       if (sucesso > 0) {
@@ -725,7 +729,7 @@ export default function Manutencoes() {
         setModalEmail(null)
         setEmailOutro('')
       } else {
-        showToast('Não foi possível enviar o email. Tente novamente.', 'error', 4000)
+        showToast(ultimoErro || 'Não foi possível enviar o email. Tente novamente.', 'error', 4000)
       }
     } catch (err) {
       showToast(err?.message || 'Erro ao enviar email.', 'error', 4000)

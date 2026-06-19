@@ -9,7 +9,13 @@ Política de continuidade:
 
 ---
 
-## [1.17.3] — 2026-06-12 — Email e PDF FPDF alinhados ao browser + corpo HTML enriquecido
+## [1.17.4] — 2026-06-12 — Correcção envio email (import em falta)
+
+### Correcções
+- **`emailService.js`:** reposto import de `horasContadorParaRelatorio` — removido por engano em v1.17.3; causava `ReferenceError` antes do POST a `send-email.php` (toast genérico «Não foi possível enviar»).
+- **`EnviarEmailModal.jsx` / `Manutencoes.jsx`:** mensagem de erro do servidor/cliente visível quando todos os destinatários falham.
+
+---
 
 ### Funcionalidades
 - **PDF FPDF (`send-email.php`):** resumo executivo, dados do serviço alargados (NIF, morada, tipo, periodicidade, agendamento, horas), pontos de atenção e título de checklist alinhados a `gerarPdfCompacto`.
