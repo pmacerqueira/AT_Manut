@@ -87,7 +87,9 @@
 .checklist-resp { width: 4rem; text-align: center; }
 
 .notas-section { }
-.notas-texto { margin: 0; padding: 0.75rem; background: var(--color-bg-elevated); border-radius: var(--radius); font-size: 0.9em; line-height: 1.5; white-space: pre-wrap; }
+.notas-texto { margin: 0; padding: 0.75rem; background: var(--color-bg-elevated); border-radius: var(--radius); font-size: 0.9em; line-height: 1.5; }
+.notas-texto .notas-linha { margin: 0 0 0.45rem; }
+.notas-texto .notas-linha:last-child { margin-bottom: 0; }
 
 .doc-links-relatorio { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .doc-links-relatorio .doc-link { display: inline-flex; align-items: center; gap: 0.2rem; }

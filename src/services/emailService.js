@@ -19,6 +19,7 @@ import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
+import { notasRelatorioParaTexto } from '../components/executarManutencao/execWizardHelpers'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
 
@@ -252,7 +253,7 @@ export async function enviarRelatorioEmail({
         assinado_por:     relatorio?.nomeAssinante ?? '',
         data_assinatura:  relatorio?.dataAssinatura ?? '',
         assinatura_digital: assinaturaB64,
-        notas:            relatorio?.notas ?? '',
+        notas:            notasRelatorioParaTexto(relatorio?.notas ?? ''),
         checklist_json:   checklistJson,
         photos_json:      photosJson,
         n_fotos:          fotosOriginais.length,

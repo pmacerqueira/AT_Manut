@@ -12,6 +12,7 @@ import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
+import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
 import {
   INTERVALOS_KAESER,
   SUBCATEGORIAS_COM_CONTADOR_HORAS,
@@ -527,12 +528,22 @@ export async function gerarPdfCompacto({
 
   function renderNotasSection() {
     if (!relatorio?.notas) return
+    const notaLinhas = linhasNotasRelatorio(relatorio.notas)
+    if (notaLinhas.length === 0) return
     if (y > 240) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     pdf.text('NOTAS ADICIONAIS', M, y); y += 6
     pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-    const lines = pdf.splitTextToSize(relatorio.notas, cW)
-    pdf.text(lines, M, y); y += lines.length * 5 + 5
+    const lineH = 5
+    const gapEntreNotas = 2
+    notaLinhas.forEach((nota, idx) => {
+      const wrapped = pdf.splitTextToSize(nota, cW)
+      const blockH = wrapped.length * lineH + (idx < notaLinhas.length - 1 ? gapEntreNotas : 0)
+      if (y + blockH > 280) { pdf.addPage(); y = 20 }
+      pdf.text(wrapped, M, y)
+      y += wrapped.length * lineH + gapEntreNotas
+    })
+    y += 3
   }
 
   async function renderFotosSection() {

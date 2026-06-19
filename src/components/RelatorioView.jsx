@@ -6,6 +6,7 @@ import { useData } from '../context/DataContext'
 import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
+import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import './RelatorioView.css'
 
@@ -84,7 +85,11 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
       {relatorio.notas && (
         <section className="relatorio-section notas-section">
           <h3>Notas importantes</h3>
-          <p className="notas-texto">{relatorio.notas}</p>
+          <div className="notas-texto">
+            {linhasNotasRelatorio(relatorio.notas).map((line, i) => (
+              <p key={i} className="notas-linha">{line}</p>
+            ))}
+          </div>
         </section>
       )}
 

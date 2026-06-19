@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.17.2] — 2026-06-12 — Notas adicionais uma por linha nos relatórios
+
+### Correcções
+- **PDF / email / vista HTML:** secção «Notas adicionais» com **uma nota por linha** (jsPDF ignorava `\n`; relatórios legados com notas rápidas concatenadas são separados automaticamente).
+- **`linhasNotasRelatorio()`** em `execWizardHelpers.js` — split por newline ou reconhecimento de notas rápidas conhecidas.
+
+### Qualidade
+- Testes unitários: `execWizardHelpers.test.js` (105 testes unitários total).
+
+---
+
 ## [1.17.1] — 2026-06-12 — Horas acumuladas no cabeçalho dos relatórios
 
 ### Correcções

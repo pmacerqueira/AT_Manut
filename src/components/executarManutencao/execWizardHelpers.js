@@ -60,6 +60,50 @@ export function notasCumpremMinimoObservacoes(notas, quickNotesList) {
   return t.length >= OBSERVACOES_TEXTO_LIVRE_MIN && /\s/.test(t)
 }
 
+/**
+ * Divide notas do relatório em linhas (uma nota rápida ou parágrafo por linha).
+ * Com `\n` explícito faz split; legado sem separador tenta partir notas rápidas conhecidas.
+ * @param {string} notas
+ * @param {string[]|null|undefined} [quickNotesList]
+ * @returns {string[]}
+ */
+export function linhasNotasRelatorio(notas, quickNotesList) {
+  const raw = String(notas ?? '').trim()
+  if (!raw) return []
+
+  if (/\r?\n/.test(raw)) {
+    return raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  }
+
+  const list = (Array.isArray(quickNotesList) && quickNotesList.length > 0
+    ? quickNotesList
+    : QUICK_NOTES_DEFAULT
+  ).filter(q => typeof q === 'string' && q.trim())
+  if (list.length === 0) return [raw]
+
+  const byLen = [...list].sort((a, b) => b.length - a.length)
+  const parts = []
+  let remaining = raw
+
+  while (remaining.length > 0) {
+    const match = byLen.find(q => remaining.startsWith(q))
+    if (match) {
+      parts.push(match)
+      remaining = remaining.slice(match.length)
+      continue
+    }
+    parts.push(remaining.trim())
+    break
+  }
+
+  return parts.filter(Boolean)
+}
+
+/** Texto normalizado com uma nota por linha (PDF/email). */
+export function notasRelatorioParaTexto(notas, quickNotesList) {
+  return linhasNotasRelatorio(notas, quickNotesList).join('\n')
+}
+
 /** Snapshot estável para comparar se o utilizador alterou o assistente (cancelar com confirmação). */
 export function snapshotExecCancelState({
   form,
