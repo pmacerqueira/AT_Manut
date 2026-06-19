@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { useData } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { getHojeAzores, nowISO, formatDataAzores } from '../utils/datasAzores'
+import { getHojeAzores, nowISO, formatDataAzores, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { logger } from '../utils/logger'
 import { isEmailConfigured } from '../config/emailConfig'
 import { safeHttpUrl } from '../utils/sanitize'
@@ -400,6 +400,21 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     if (erros.length > 0) {
       showToast(erros[0], 'warning')
       return
+    }
+
+    if (isAdmin && form.dataRealizacao) {
+      const vReal = validarDataExecucaoNaoFutura(form.dataRealizacao)
+      if (!vReal.ok) {
+        showToast(vReal.message, 'warning')
+        return
+      }
+    }
+    if (isAdmin && form.dataEmissao) {
+      const vEm = validarDataExecucaoNaoFutura(form.dataEmissao)
+      if (!vEm.ok) {
+        showToast('A data de emissão do relatório não pode ser no futuro (superior a hoje).', 'warning')
+        return
+      }
     }
 
     showGlobalLoading()

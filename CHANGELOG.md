@@ -9,6 +9,20 @@ Política de continuidade:
 
 ---
 
+## [1.17.6] — 2026-06-12 — Validar data de execução (não futura)
+
+### Correcções
+- **`validarDataExecucaoNaoFutura()`** (`datasAzores.js`) — impede gravar data de execução/realização posterior a hoje (Açores); evita linhas incorrectas no topo de «Manutenções executadas» (ex. ano 2027 em vez de 2026).
+- Validação aplicada em: wizard manutenção (`dataRealizacao`, `adminDataExecucao`), edição admin na lista, execução em massa, conclusão de reparação (admin). Campo admin «Data de execução» com `max=hoje`.
+
+### Qualidade
+- `tests/unit/datasAzores.test.js` — 117 testes unitários no total.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.5] — 2026-06-12 — PDF/email: layout final, notas e HTML UTF-8
 
 ### Correcções

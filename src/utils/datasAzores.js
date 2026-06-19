@@ -15,6 +15,25 @@ export function getHojeAzores() {
 }
 
 /**
+ * Valida data de execução/realização (yyyy-MM-dd): não pode ser posterior a hoje (Açores).
+ * @param {string} ymd
+ * @param {{ hojeAzores?: string }} [opts]
+ * @returns {{ ok: true, ymd: string } | { ok: false, message: string }}
+ */
+export function validarDataExecucaoNaoFutura(ymd, opts = {}) {
+  const raw = String(ymd ?? '').trim().slice(0, 10)
+  if (!raw) return { ok: false, message: 'Indique a data de execução.' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return { ok: false, message: 'Data de execução inválida.' }
+  }
+  const hoje = opts.hojeAzores ?? getHojeAzores()
+  if (raw > hoje) {
+    return { ok: false, message: 'A data de execução não pode ser no futuro (superior a hoje).' }
+  }
+  return { ok: true, ymd: raw }
+}
+
+/**
  * Momento actual em ISO (UTC) — para gravar timestamps.
  * O instante é universal; a exibição usa sempre Atlantic/Azores.
  */

@@ -21,7 +21,7 @@ import {
 import { KAESER_INTERVALO_HORAS_REF, KAESER_ANUAL_MIN_DIAS, KAESER_DELTA_H_WARNING_ANUAL } from '../constants/kaeserCiclo.js'
 import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
 import { format, addDays } from 'date-fns'
-import { getHojeAzores, nowISO } from '../utils/datasAzores'
+import { getHojeAzores, nowISO, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
 import { PenLine, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Save, ChevronLeft, ChevronRight, Plus, HelpCircle } from 'lucide-react'
 import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
@@ -937,6 +937,22 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
 
+    if (exFormGravar) {
+      const vEx = validarDataExecucaoNaoFutura(exFormGravar)
+      if (!vEx.ok) {
+        showToast(vEx.message, 'warning')
+        return
+      }
+    }
+    const drGravar = (form.dataRealizacao || '').trim()
+    if (drGravar) {
+      const vDr = validarDataExecucaoNaoFutura(drGravar)
+      if (!vDr.ok) {
+        showToast(vDr.message, 'warning')
+        return
+      }
+    }
+
     if (!isCorrectionMode) {
       if (!confirmaEquipamentoSerie) {
         showToast('Confirme o equipamento (número de série) antes de gravar.', 'warning')
@@ -1368,6 +1384,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
     if (!execNova) {
       showToast('Indique a data de execução do relatório.', 'warning')
+      return
+    }
+
+    const vExecNova = validarDataExecucaoNaoFutura(execNova)
+    if (!vExecNova.ok) {
+      showToast(vExecNova.message, 'warning')
       return
     }
 
@@ -1809,6 +1831,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   Data de execução (relatório)
                   <input
                     type="date"
+                    max={getHojeAzores()}
                     value={form.adminDataExecucao}
                     onChange={e => setForm(f => ({ ...f, adminDataExecucao: e.target.value }))}
                   />

@@ -16,7 +16,7 @@ import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
 import BulkExecutarModal from '../components/BulkExecutarModal'
 import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, ArrowUp, ArrowDown, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ChevronRight, ChevronDown, LayoutList, Users, ChevronsDown, ChevronsUp } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
-import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
+import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import {
   EXEC_VIEW_GRUPOS,
   EXEC_VIEW_CRONO,
@@ -383,6 +383,13 @@ export default function Manutencoes() {
     if (!isAdmin && !validarDataManut(form.data)) {
       showToast('A data escolhida não é dia útil. Selecione outro dia.', 'warning')
       return
+    }
+    if (modal === 'edit' && isAdmin && form.status === 'concluida' && form.dataExecucao) {
+      const vExec = validarDataExecucaoNaoFutura(form.dataExecucao)
+      if (!vExec.ok) {
+        showToast(vExec.message, 'warning')
+        return
+      }
     }
     const { equipamentoId, maquinaId, ...rest } = form
     const mId = maquinaId ?? equipamentoId

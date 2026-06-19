@@ -8,7 +8,7 @@ import { useData } from '../context/DataContext'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import { usePermissions } from '../hooks/usePermissions'
 import { logger } from '../utils/logger'
-import { getHojeAzores, nowISO } from '../utils/datasAzores'
+import { getHojeAzores, nowISO, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { addDays } from 'date-fns'
 import { PenLine, Trash2, CheckCircle2, Bookmark, X } from 'lucide-react'
 
@@ -169,6 +169,14 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     if (!semAssinatura && !assinaturaFeita) {
       showToast('A assinatura digital é obrigatória.', 'warning')
       return
+    }
+
+    if (form.dataRealizacao) {
+      const vDr = validarDataExecucaoNaoFutura(form.dataRealizacao)
+      if (!vDr.ok) {
+        showToast(vDr.message, 'warning')
+        return
+      }
     }
 
     setProcessando(true)
