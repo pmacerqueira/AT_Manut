@@ -9,6 +9,23 @@ Política de continuidade:
 
 ---
 
+## [1.17.1] — 2026-06-12 — Horas acumuladas no cabeçalho dos relatórios
+
+### Correcções
+- **Cabeçalho PDF/HTML/email:** linha «HORAS NO CONTADOR (ACUMULADAS)» em equipamentos com contador (entre EQUIPAMENTO e DATA DE EXECUÇÃO); usa snapshot `horasLeituraContador`, manutenção ou ficha via `horasContadorParaRelatorio`.
+- **`RelatorioView.jsx`:** passou a usar a cadeia canónica de horas (antes só lia `manutencao.horasServico`).
+- **Pré-visualização PDF** no modal de execução inclui horas do formulário antes de gravar.
+- **`send-email.php`:** campo `horas_leitura_contador` no PDF FPDF do email.
+
+### Melhorias UX
+- Campo **obrigatório** com referência **«Manutenção anterior (data): X h»** ao lado do input (`HorasContadorInput.jsx`) — passo verificação, KAESER e modo correcção.
+- Helper `horasContadorManutencaoAnterior()` para a leitura da intervenção anterior.
+
+### Qualidade
+- Testes unitários: `horasContadorEquipamento.test.js` (101 testes unitários total).
+
+---
+
 ## [1.17.0] — 2026-06-12 — Painel executadas: vista cronológica, filtros e polish
 
 ### Novas funcionalidades (Manutenções executadas)

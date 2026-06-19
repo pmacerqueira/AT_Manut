@@ -34,6 +34,7 @@ import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImag
 import {
   horasContadorNaFicha,
   horasContadorNaManutencao,
+  horasContadorManutencaoAnterior,
   parseHorasContadorForm,
 } from '../utils/horasContadorEquipamento.js'
 import { normEntityId } from '../utils/frotaReportHelpers'
@@ -48,6 +49,7 @@ import {
   snapshotExecCancelState,
 } from './executarManutencao/execWizardHelpers'
 import KaeserHorasStep from './executarManutencao/KaeserHorasStep'
+import HorasContadorInput from './executarManutencao/HorasContadorInput'
 import KaeserPecasStep from './executarManutencao/KaeserPecasStep'
 import ChecklistStep from './executarManutencao/ChecklistStep'
 import NotasStep from './executarManutencao/NotasStep'
@@ -182,6 +184,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (hm == null || hr == null || Number(hm) === Number(hr)) return null
     return { last, hm, hr }
   }, [maq, manutencoes])
+
+  /** Horas da intervenção concluída imediatamente anterior (referência ao lado do campo). */
+  const horasReferenciaManutencaoAnterior = useMemo(() => {
+    if (!maq?.id) return null
+    const excluirId = manutencaoAtual?.status === 'concluida' ? manutencaoAtual.id : null
+    return horasContadorManutencaoAnterior(manutencoes, maq.id, {
+      excluirManutencaoId: excluirId,
+      getRelatorioByManutencao,
+    })
+  }, [maq?.id, manutencoes, manutencaoAtual?.id, manutencaoAtual?.status, getRelatorioByManutencao])
 
   const W = useMemo(() => {
     if (useKaeserPipeline) {
@@ -857,6 +869,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const previewDataCriacao = dataExecPreview
         ? `${dataExecPreview}T12:00:00.000Z`
         : (rel?.dataCriacao ?? nowISO())
+      const hPreview = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
       const tempRel = {
         ...rel,
         checklistRespostas: form.checklistRespostas,
@@ -868,6 +881,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         assinaturaDigital: assinaturaPreview,
         dataAssinatura: rel?.dataAssinatura ?? previewDataCriacao,
         dataCriacao: (form.adminDataExecucao || form.dataRealizacao) ? previewDataCriacao : (rel?.dataCriacao ?? nowISO()),
+        ...(hPreview != null && { horasLeituraContador: hPreview }),
         ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
         ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
         ...(isKaeserAbcdMaq && form.tipoManutKaeser
@@ -885,7 +899,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
       const blob = await gerarPdfCompacto(buildRelatorioManutencaoPdfArgs({
         relatorio: tempRel,
-        manutencao: manutencaoAtual,
+        manutencao: hPreview != null && manutencaoAtual
+          ? { ...manutencaoAtual, horasServico: hPreview, horasTotais: hPreview }
+          : manutencaoAtual,
         maquina: maq,
         cliente,
         marcas,
@@ -1744,22 +1760,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </label>
               {temContadorHoras && !useKaeserPipeline && (
                 <div className="form-section">
-                  <label>
-                    Horas no contador (acumuladas) <span className="req-star">*</span>
-                    <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 400 }}>
-                      Leitura acumulada no equipamento (actualiza a ficha ao concluir).
-                    </span>
-                    <input
-                      className="wizard-input-horas-compact"
-                      type="number"
-                      min={0}
-                      step={1}
-                      required
-                      value={form.horasServico}
-                      onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                      placeholder="Ex: 3050"
-                    />
-                  </label>
+                  <HorasContadorInput
+                    value={form.horasServico}
+                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                    horasAnterior={horasReferenciaManutencaoAnterior}
+                  />
                 </div>
               )}
               {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
@@ -1812,21 +1817,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               </div>
               {isCorrectionMode && temContadorHoras && (
                 <div className="form-section" style={{ marginTop: '0.75rem' }}>
-                  <label>
-                    Horas no contador (acumuladas)
-                    <span className="form-hint" style={{ display: 'block', marginTop: '0.25rem', fontWeight: 400 }}>
-                      Uma única leitura do equipamento; actualiza a intervenção e a ficha ao guardar.
-                    </span>
-                    <input
-                      className="wizard-input-horas-compact"
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={form.horasServico}
-                      onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                      placeholder="Ex: 6000"
-                    />
-                  </label>
+                  <HorasContadorInput
+                    value={form.horasServico}
+                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                    horasAnterior={horasReferenciaManutencaoAnterior}
+                    hint="Uma única leitura do equipamento; actualiza a intervenção e a ficha ao guardar."
+                    placeholder="Ex: 6000"
+                  />
                 </div>
               )}
             </div>
@@ -1955,6 +1952,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               setForm={setForm}
               showToast={showToast}
               conflitoHorasFichaVsUltimoRel={conflitoHorasFichaVsUltimoRel}
+              horasReferenciaManutencaoAnterior={horasReferenciaManutencaoAnterior}
               fallbackUltimaManutDataKaeser={fallbackUltimaManutDataKaeser}
               temManutencaoConcluidaNaMaq={temManutencaoConcluidaNaMaq}
               kaeserAuditoriaRef={kaeserAuditoriaRef}

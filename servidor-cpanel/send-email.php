@@ -238,6 +238,7 @@ $rep_num_aviso          = isset($_data['reparacao_numero_aviso']) ? trim((string
 $rep_desc_avaria        = isset($_data['reparacao_descricao_avaria']) ? trim((string)$_data['reparacao_descricao_avaria']) : '';
 $rep_trabalho           = isset($_data['reparacao_trabalho_realizado']) ? trim((string)$_data['reparacao_trabalho_realizado']) : '';
 $rep_horas_mo           = isset($_data['reparacao_horas_mao_obra']) ? trim((string)$_data['reparacao_horas_mao_obra']) : '';
+$horas_leitura_contador = isset($_data['horas_leitura_contador']) ? trim((string)$_data['horas_leitura_contador']) : '';
 
 // Auth
 if ($token !== AUTH_TOKEN) {
@@ -784,10 +785,13 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $rows = [
         ['CLIENTE',        f($to_name)],
         ['EQUIPAMENTO',    f($equipamento)],
-        [$data_row_label,  f($data_real)],
-        ['TECNICO',        f($tecnico)],
-        ['ASSINADO POR',   f($assinado_por)],
     ];
+    if ($manutencao_tipo !== 'reparacao' && $horas_leitura_contador !== '' && is_numeric($horas_leitura_contador)) {
+        $rows[] = ['HORAS NO CONTADOR (ACUMULADAS)', f($horas_leitura_contador) . ' h'];
+    }
+    $rows[] = [$data_row_label,  f($data_real)];
+    $rows[] = ['TECNICO',        f($tecnico)];
+    $rows[] = ['ASSINADO POR',   f($assinado_por)];
     if ($manutencao_tipo === 'reparacao') {
         if ($rep_num_aviso !== '') {
             $rows[] = ['N. AVISO / PEDIDO', f(mb_substr(strip_tags(str_replace(["\r", "\n", "\0"], ' ', $rep_num_aviso)), 0, 200, 'UTF-8'))];

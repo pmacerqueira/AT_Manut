@@ -18,6 +18,7 @@ import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } fr
 import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
+import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { logger } from '../utils/logger'
 import { marcarAlertaEnviado } from '../config/alertasConfig'
 
@@ -211,6 +212,13 @@ export async function enviarRelatorioEmail({
       const declaracaoTexto = resolveDeclaracaoCliente(manutencaoTipo, categoriaNome, declaracaoClienteDepois)
       const pecasUsadas = relatorioParsed.pecasUsadas
 
+      const horasContadorEmail = isRepair
+        ? ''
+        : (() => {
+            const h = horasContadorParaRelatorio(maquina, manutencao, null, relatorio)
+            return h != null ? String(h) : ''
+          })()
+
       const { navelLogoB64, brandLogoB64 } = await getHeaderLogosB64ForEmail({ maquina, marcas })
 
       // Enviamos um JSON body (Content-Type: application/json).
@@ -263,6 +271,7 @@ export async function enviarRelatorioEmail({
         declaracao_legislacao: declaracaoLegislacao,
         /** Texto completo resolvido no browser (override categoria + canónico) — fonte única para FPDF */
         declaracao_texto: declaracaoTexto,
+        horas_leitura_contador: horasContadorEmail,
         ...(isRepair
           ? {
               reparacao_numero_aviso: String(relatorio?.numeroAviso ?? '').trim(),

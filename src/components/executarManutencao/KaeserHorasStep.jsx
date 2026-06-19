@@ -13,6 +13,7 @@ import {
 } from '../../constants/kaeserCiclo.js'
 import { sugerirFaseKaeser } from '../../utils/sugerirFaseKaeser.js'
 import { getHojeAzores } from '../../utils/datasAzores'
+import HorasContadorInput from './HorasContadorInput'
 
 export default function KaeserHorasStep({
   maq,
@@ -20,6 +21,7 @@ export default function KaeserHorasStep({
   setForm,
   showToast,
   conflitoHorasFichaVsUltimoRel,
+  horasReferenciaManutencaoAnterior = null,
   fallbackUltimaManutDataKaeser,
   temManutencaoConcluidaNaMaq,
   kaeserAuditoriaRef,
@@ -57,40 +59,31 @@ export default function KaeserHorasStep({
         </div>
       )}
       <div className="form-section">
-        <label>
-          Horas no contador (acumuladas) <span className="req-star">*</span>
-          <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 400 }}>
-            Valor acumulado no compressor — usado para Δh e para a sugestão de fase A/B/C/D.
-          </span>
-          <input
-            className="wizard-input-horas-compact"
-            type="number"
-            min={0}
-            step={1}
-            required
-            value={form.horasServico}
-            onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-            onBlur={() => {
-              const hs = parseInt(String(form.horasServico).trim(), 10)
-              if (!Number.isFinite(hs) || hs < 0) return
-              const sug = sugerirFaseKaeser({
-                maquina: maq,
-                horasServicoAtuais: hs,
-                dataExecucao: getHojeAzores(),
-                fallbackUltimaData: fallbackUltimaManutDataKaeser,
-                contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
-              })
-              kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
-              if (kaeserIntervencaoAnual) return
-              setForm(f => ({
-                ...f,
-                tipoManutKaeser: f.tipoManutKaeser || sug.tipoPreSelecao,
-                pecasUsadas: f.tipoManutKaeser ? f.pecasUsadas : pecasDoPlanoKaeser(sug.tipoPreSelecao),
-              }))
-            }}
-            placeholder="Ex: 6200"
-          />
-        </label>
+        <HorasContadorInput
+          value={form.horasServico}
+          onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+          horasAnterior={horasReferenciaManutencaoAnterior}
+          hint="Valor acumulado no compressor — usado para Δh e para a sugestão de fase A/B/C/D."
+          placeholder="Ex: 6200"
+          onBlur={() => {
+            const hs = parseInt(String(form.horasServico).trim(), 10)
+            if (!Number.isFinite(hs) || hs < 0) return
+            const sug = sugerirFaseKaeser({
+              maquina: maq,
+              horasServicoAtuais: hs,
+              dataExecucao: getHojeAzores(),
+              fallbackUltimaData: fallbackUltimaManutDataKaeser,
+              contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
+            })
+            kaeserAuditoriaRef.current = { tipoSugerido: sug.tipoPreSelecao, motivo: sug.motivoPrincipal }
+            if (kaeserIntervencaoAnual) return
+            setForm(f => ({
+              ...f,
+              tipoManutKaeser: f.tipoManutKaeser || sug.tipoPreSelecao,
+              pecasUsadas: f.tipoManutKaeser ? f.pecasUsadas : pecasDoPlanoKaeser(sug.tipoPreSelecao),
+            }))
+          }}
+        />
       </div>
       <div className="form-section" style={{ marginTop: '0.25rem' }}>
         <label className="kaeser-anual-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.95rem' }}>

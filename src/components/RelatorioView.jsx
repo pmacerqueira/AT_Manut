@@ -5,14 +5,17 @@ import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { useData } from '../context/DataContext'
 import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
-import { horasContadorNaManutencao } from '../utils/horasContadorEquipamento'
+import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
+import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
 import './RelatorioView.css'
 
 export default function RelatorioView({ relatorio, manutencao, maquina, cliente, checklistItems = [] }) {
   const { getSubcategoria, getCategoria } = useData()
   if (!relatorio) return null
   const items = resolveChecklist(relatorio, checklistItems)
-  const horasContador = horasContadorNaManutencao(manutencao)
+  const equipComContadorHoras = maquina &&
+    SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maquina.subcategoriaId)
+  const horasContador = horasContadorParaRelatorio(maquina, manutencao, null, relatorio)
 
   const dataCriacaoFormatada = relatorio.dataCriacao
     ? formatDataHoraAzores(relatorio.dataCriacao)
@@ -52,8 +55,8 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
               : '—'
         }</p>
         <p><strong>Técnico:</strong> {relatorio?.tecnico ?? manutencao?.tecnico ?? '—'}</p>
-        {horasContador != null && (
-          <p><strong>Horas no contador:</strong> {horasContador} h</p>
+        {equipComContadorHoras && (
+          <p><strong>Horas no contador (acumuladas):</strong> {horasContador != null ? `${horasContador} h` : '—'}</p>
         )}
       </section>
 

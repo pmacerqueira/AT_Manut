@@ -14,6 +14,7 @@ import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import {
   INTERVALOS_KAESER,
+  SUBCATEGORIAS_COM_CONTADOR_HORAS,
   descricaoCicloKaeser,
   proximaPosicaoKaeser,
 } from '../context/DataContext'
@@ -334,7 +335,10 @@ export async function gerarPdfCompacto({
   pdf.line(M, y, W - M, y); y += 7
 
   // ── Dados do serviço ──────────────────────────────────────────────────────
+  const equipComContadorHoras = !isReparacao && maquina &&
+    SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maquina.subcategoriaId)
   const horasPdf = horasContadorParaRelatorio(maquina, isReparacao ? null : manutencao, null, relatorio)
+  const horasPdfLabel = horasPdf != null ? `${horasPdf} h` : '\u2014'
   const dataRows = isReparacao
     ? [
         ['CLIENTE',           cliente?.nome ?? '\u2014'],
@@ -345,15 +349,15 @@ export async function gerarPdfCompacto({
     : [
         ['CLIENTE',           cliente?.nome ?? '\u2014'],
         ['EQUIPAMENTO',       equipDesc],
+        ...(equipComContadorHoras
+          ? [['HORAS NO CONTADOR (ACUMULADAS)', horasPdfLabel]]
+          : []),
         ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
         ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
         ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
       ]
   if (isReparacao && relatorio?.numeroAviso?.trim()) {
     dataRows.push(['N.\u00ba AVISO / PEDIDO', relatorio.numeroAviso.trim()])
-  }
-  if (horasPdf != null) {
-    dataRows.push(['HORAS NO CONTADOR (ACUMULADAS)', `${horasPdf} h`])
   }
   if (isReparacao && relatorio?.horasMaoObra != null && relatorio.horasMaoObra !== '') {
     dataRows.push(['HORAS DE M\u00c3O-DE-OBRA', `${relatorio.horasMaoObra} h`])
