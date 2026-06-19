@@ -9,6 +9,23 @@ Política de continuidade:
 
 ---
 
+## [1.17.0] — 2026-06-12 — Painel executadas: vista cronológica, filtros e polish
+
+### Novas funcionalidades (Manutenções executadas)
+- **Vista «Últimas 30»:** lista cronológica plana (todos os clientes) alternável com agrupamento por cliente.
+- **Filtro por período:** chips 7 dias, 30 dias, este mês, 3 meses e intervalo personalizado (data de execução).
+- **Filtros técnico e categoria** de equipamento; chip rápido **Por enviar** (email ao cliente).
+- **Expandir / recolher todos** os grupos de clientes.
+- **Auto-expandir** até 5 clientes quando a pesquisa reduz a lista.
+- **Resumo no grupo colapsado:** última data, último equipamento, contagem «por enviar».
+- **Destaque** do termo pesquisado; contador «X de Y clientes · Z intervenções».
+- **Preferências guardadas** (`localStorage`): modo de vista, ordenação, período, técnico, categoria.
+
+### Qualidade
+- Testes unitários: `executadasPanelHelpers.test.js`.
+
+---
+
 ## [1.16.99] — 2026-06-12 — Consumíveis editáveis, contraste e colunas lista
 
 ### Correcções

@@ -18,6 +18,7 @@ export const STORAGE = {
   ALERTAS_DISMISS: 'atm_alertas_dismiss',
   ALERTAS_ENVIADOS: 'atm_alertas_enviados',
   MANUTENCOES_FILTER: 'atm_manutencoes_filter',
+  EXEC_PANEL_PREFS: 'atm_exec_panel_prefs',
   QUICK_NOTES: 'atm_quick_notes',
   /** Mensagem one-shot para mostrar no ecrã de login (ex.: horário restrito técnico) */
   LOGIN_NOTICE: 'atm_login_notice',

@@ -14,9 +14,21 @@ import RelatorioView from '../components/RelatorioView'
 import ExecutarManutencaoModal from '../components/ExecutarManutencaoModal'
 import RecolherAssinaturaModal from '../components/RecolherAssinaturaModal'
 import BulkExecutarModal from '../components/BulkExecutarModal'
-import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, ArrowUp, ArrowDown, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Lock, FileSignature, FileText, Paperclip, X, Play, FileDown, ArrowLeft, ArrowUp, ArrowDown, Mail, MailCheck, Undo2, Clock, Archive, CheckSquare, MoreHorizontal, Search, ChevronRight, ChevronDown, LayoutList, Users, ChevronsDown, ChevronsUp } from 'lucide-react'
 import { format, addDays, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns'
 import { getHojeAzores, formatDataHoraCurtaAzores, formatDataAzores, parseDateLocal } from '../utils/datasAzores'
+import {
+  EXEC_VIEW_GRUPOS,
+  EXEC_VIEW_CRONO,
+  EXEC_CRONO_LIMIT,
+  EXEC_PERIODOS,
+  getExecPeriodoRange,
+  manutencaoDentroPeriodo,
+  loadExecPanelPrefs,
+  saveExecPanelPrefs,
+  labelEquipamentoManut,
+} from '../utils/executadasPanelHelpers'
+import HighlightMatch from '../components/HighlightMatch'
 import { getFeriadosAno, isFimDeSemana, isFeriado } from '../utils/diasUteis'
 import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 import { enviarRelatorioEmail } from '../services/emailService'
@@ -48,6 +60,28 @@ const calcDiasAtraso = (dataStr) => {
   const hoje = startOfDay(new Date())
   const d = startOfDay(parseDateLocal(dataStr))
   return differenceInCalendarDays(hoje, d)
+}
+
+/** Data/timestamp de execução do relatório (assinatura → criação → data agendada). */
+function getExecucaoDataManut(m, getRelatorioByManutencao) {
+  const rel = getRelatorioByManutencao(m.id)
+  return rel?.dataAssinatura || rel?.dataCriacao || m.data
+}
+
+function getExecucaoTsManut(m, getRelatorioByManutencao) {
+  const t = parseDateLocal(getExecucaoDataManut(m, getRelatorioByManutencao)).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+function getInitialExecPanelPrefs() {
+  const p = loadExecPanelPrefs(STORAGE.EXEC_PANEL_PREFS)
+  return {
+    viewMode: p.viewMode === EXEC_VIEW_CRONO ? EXEC_VIEW_CRONO : EXEC_VIEW_GRUPOS,
+    sortDate: p.sortDate === 'asc' ? 'asc' : 'desc',
+    periodo: EXEC_PERIODOS.some(x => x.id === p.periodo) ? p.periodo : 'todos',
+    filtroTecnico: typeof p.filtroTecnico === 'string' ? p.filtroTecnico : 'todos',
+    filtroCategoria: typeof p.filtroCategoria === 'string' ? p.filtroCategoria : 'todos',
+  }
 }
 
 export default function Manutencoes() {
@@ -126,10 +160,17 @@ export default function Manutencoes() {
   const [modalBulk, setModalBulk] = useState(null)
 
   // ── Filtros para executadas ──────────────────────────────────────────────
-  const [execPesquisa, setExecPesquisa]     = useState('')
+  const execPrefsInit = useMemo(() => getInitialExecPanelPrefs(), [])
+  const [execPesquisa, setExecPesquisa] = useState('')
   const [execFiltroEmail, setExecFiltroEmail] = useState('todos') // 'todos' | 'enviado' | 'por_enviar'
+  const [execViewMode, setExecViewMode] = useState(execPrefsInit.viewMode)
+  const [execPeriodo, setExecPeriodo] = useState(execPrefsInit.periodo)
+  const [execPeriodoCustomFrom, setExecPeriodoCustomFrom] = useState('')
+  const [execPeriodoCustomTo, setExecPeriodoCustomTo] = useState('')
+  const [execFiltroTecnico, setExecFiltroTecnico] = useState(execPrefsInit.filtroTecnico)
+  const [execFiltroCategoria, setExecFiltroCategoria] = useState(execPrefsInit.filtroCategoria)
   /** Ordenação do bloco executadas pela data de execução do relatório (assinatura / criação). */
-  const [execSortExecDate, setExecSortExecDate] = useState('desc') // 'desc' = mais recente primeiro
+  const [execSortExecDate, setExecSortExecDate] = useState(execPrefsInit.sortDate)
   const toggleExecSortExecDate = useCallback(() => {
     setExecSortExecDate((s) => (s === 'desc' ? 'asc' : 'desc'))
   }, [])
@@ -142,6 +183,33 @@ export default function Manutencoes() {
       else next.add(grupoKey)
       return next
     })
+  }, [])
+  const expandirTodosGruposExec = useCallback((grupos) => {
+    setExecGruposExpandidos(new Set((grupos || []).map(g => g.grupoKey)))
+  }, [])
+  const recolherTodosGruposExec = useCallback(() => {
+    setExecGruposExpandidos(new Set())
+  }, [])
+
+  useEffect(() => {
+    saveExecPanelPrefs(STORAGE.EXEC_PANEL_PREFS, {
+      viewMode: execViewMode,
+      sortDate: execSortExecDate,
+      periodo: execPeriodo,
+      filtroTecnico: execFiltroTecnico,
+      filtroCategoria: execFiltroCategoria,
+    })
+  }, [execViewMode, execSortExecDate, execPeriodo, execFiltroTecnico, execFiltroCategoria])
+
+  const resetExecFiltros = useCallback(() => {
+    setExecPesquisa('')
+    setExecFiltroEmail('todos')
+    setExecPeriodo('todos')
+    setExecPeriodoCustomFrom('')
+    setExecPeriodoCustomTo('')
+    setExecFiltroTecnico('todos')
+    setExecFiltroCategoria('todos')
+    setExecSortExecDate('desc')
   }, [])
 
   useEffect(() => {
@@ -393,12 +461,62 @@ export default function Manutencoes() {
     }),
   [manutencoesExecutadas, getRelatorioByManutencao])
 
-  const execFiltroAtivo = !!(execPesquisa.trim() || execFiltroEmail !== 'todos')
+  const execPeriodoRange = useMemo(
+    () => getExecPeriodoRange(execPeriodo, execPeriodoCustomFrom, execPeriodoCustomTo),
+    [execPeriodo, execPeriodoCustomFrom, execPeriodoCustomTo],
+  )
+
+  const execFiltroAtivo = !!(
+    execPesquisa.trim()
+    || execFiltroEmail !== 'todos'
+    || execPeriodo !== 'todos'
+    || execFiltroTecnico !== 'todos'
+    || execFiltroCategoria !== 'todos'
+  )
+
+  const tecnicosExecutadas = useMemo(() => {
+    const set = new Set(nomesTecnicos)
+    for (const m of manutencoesExecutadas) {
+      const rel = getRelatorioByManutencao(m.id)
+      const t = (rel?.tecnico || m.tecnico || '').trim()
+      if (t) set.add(t)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt'))
+  }, [manutencoesExecutadas, nomesTecnicos, getRelatorioByManutencao])
+
+  const categoriasComExecutadas = useMemo(() => {
+    const ids = new Set()
+    for (const m of manutencoesExecutadas) {
+      const maq = getMaquina(m.maquinaId)
+      const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+      if (sub?.categoriaId) ids.add(sub.categoriaId)
+    }
+    return categorias.filter(c => ids.has(c.id)).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt'))
+  }, [manutencoesExecutadas, categorias, maquinas, getSubcategoria]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const executadasFiltradas = useMemo(() => {
     let lista = manutencoesExecutadasOrdenadas
 
-    // 1. Filtro de email ao cliente
+    if (execPeriodoRange) {
+      lista = lista.filter(m => manutencaoDentroPeriodo(getExecucaoTsManut(m, getRelatorioByManutencao), execPeriodoRange))
+    }
+
+    if (execFiltroTecnico !== 'todos') {
+      lista = lista.filter(m => {
+        const rel = getRelatorioByManutencao(m.id)
+        const t = (rel?.tecnico || m.tecnico || '').trim()
+        return t === execFiltroTecnico
+      })
+    }
+
+    if (execFiltroCategoria !== 'todos') {
+      lista = lista.filter(m => {
+        const maq = getMaquina(m.maquinaId)
+        const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+        return sub?.categoriaId === execFiltroCategoria
+      })
+    }
+
     if (execFiltroEmail === 'enviado') {
       lista = lista.filter(m => {
         const rel = getRelatorioByManutencao(m.id)
@@ -411,34 +529,42 @@ export default function Manutencoes() {
       })
     }
 
-    // 2. Pesquisa por texto
     if (execPesquisa.trim()) {
       const q = execPesquisa.trim().toLowerCase()
       lista = lista.filter(m => {
         const maq = getMaquina(m.maquinaId)
         const cli = getCliente(maq?.clienteNif)
         const rel = getRelatorioByManutencao(m.id)
+        const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
+        const cat = sub?.categoriaId ? getCategoria(sub.categoriaId) : null
         const haystack = [
           cli?.nome, maq?.marca, maq?.modelo, maq?.numeroSerie,
           m.tecnico, rel?.tecnico, rel?.numeroRelatorio,
+          sub?.nome, cat?.nome,
         ].filter(Boolean).join(' ').toLowerCase()
         return haystack.includes(q)
       })
     }
 
     return lista
-  }, [manutencoesExecutadasOrdenadas, execPesquisa, execFiltroEmail, getRelatorioByManutencao, maquinas, clientes]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    manutencoesExecutadasOrdenadas,
+    execPesquisa,
+    execFiltroEmail,
+    execPeriodoRange,
+    execFiltroTecnico,
+    execFiltroCategoria,
+    getRelatorioByManutencao,
+    maquinas,
+    clientes,
+    getSubcategoria,
+    getCategoria,
+  ]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const executadasFiltradasComSort = useMemo(() => {
     const list = [...executadasFiltradas]
-    const getExecTs = (m) => {
-      const rel = getRelatorioByManutencao(m.id)
-      const d = rel?.dataAssinatura || rel?.dataCriacao || m.data
-      const t = parseDateLocal(d).getTime()
-      return Number.isFinite(t) ? t : 0
-    }
     list.sort((a, b) => {
-      const diff = getExecTs(b) - getExecTs(a)
+      const diff = getExecucaoTsManut(b, getRelatorioByManutencao) - getExecucaoTsManut(a, getRelatorioByManutencao)
       return execSortExecDate === 'desc' ? diff : -diff
     })
     return list
@@ -460,17 +586,83 @@ export default function Manutencoes() {
           clienteNif: rawNif ?? '',
           nome: cli?.nome ?? (grupoKey === '__sem_cliente__' ? 'Sem cliente' : '—'),
           manutencoes: [],
+          ultimaExecucaoTs: 0,
+          ultimaExecucaoData: null,
+          ultimoEquipLabel: '—',
+          ultimoEquipSerie: '',
+          porEnviarEmail: 0,
         })
       }
-      map.get(grupoKey).manutencoes.push(m)
+      const grupo = map.get(grupoKey)
+      grupo.manutencoes.push(m)
+      const rel = getRelatorioByManutencao(m.id)
+      if (!rel?.enviadoParaCliente?.email) grupo.porEnviarEmail += 1
+      const ts = getExecucaoTsManut(m, getRelatorioByManutencao)
+      if (ts >= grupo.ultimaExecucaoTs) {
+        grupo.ultimaExecucaoTs = ts
+        grupo.ultimaExecucaoData = getExecucaoDataManut(m, getRelatorioByManutencao)
+        const eq = labelEquipamentoManut(maq, getSubcategoria)
+        grupo.ultimoEquipLabel = eq.label
+        grupo.ultimoEquipSerie = eq.serie
+      }
     }
-    return [...map.values()].sort((a, b) =>
-      (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' }))
-  }, [filter, executadasFiltradasComSort, maquinaIdFiltroUrl, maquinas, clientes])
+    return [...map.values()].sort((a, b) => {
+      const diff = b.ultimaExecucaoTs - a.ultimaExecucaoTs
+      const byDate = execSortExecDate === 'desc' ? diff : -diff
+      if (byDate !== 0) return byDate
+      return (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' })
+    })
+  }, [filter, executadasFiltradasComSort, maquinaIdFiltroUrl, maquinas, clientes, execSortExecDate, getRelatorioByManutencao, getSubcategoria])
+
+  const totalGruposExecutadas = useMemo(() => {
+    if (filter !== 'executadas') return 0
+    const keys = new Set()
+    for (const m of manutencoesExecutadasOrdenadas) {
+      const maq = maquinas.find(x => x.id === m.maquinaId)
+      const rawNif = maq?.clienteNif
+      keys.add(rawNif ? String(rawNif) : '__sem_cliente__')
+    }
+    return keys.size
+  }, [filter, manutencoesExecutadasOrdenadas, maquinas])
+
+  const executadasVistaCronologica = useMemo(() => {
+    if (filter !== 'executadas' || execViewMode !== EXEC_VIEW_CRONO) return null
+    let list = executadasFiltradasComSort
+    if (maquinaIdFiltroUrl) list = list.filter(m => m.maquinaId === maquinaIdFiltroUrl)
+    return list.slice(0, EXEC_CRONO_LIMIT)
+  }, [filter, execViewMode, executadasFiltradasComSort, maquinaIdFiltroUrl])
 
   useEffect(() => {
-    setExecGruposExpandidos(new Set())
-  }, [execPesquisa, execFiltroEmail, maquinaIdFiltroUrl, filter])
+    if (filter !== 'executadas' || execViewMode !== EXEC_VIEW_GRUPOS) {
+      setExecGruposExpandidos(new Set())
+      return
+    }
+    const grupos = gruposExecutadasPorCliente
+    if (!grupos?.length) {
+      setExecGruposExpandidos(new Set())
+      return
+    }
+    if (execPesquisa.trim() && grupos.length <= 5) {
+      setExecGruposExpandidos(new Set(grupos.map(g => g.grupoKey)))
+      return
+    }
+    if (!execPesquisa.trim()) {
+      setExecGruposExpandidos(new Set())
+    }
+  }, [
+    execPesquisa,
+    execFiltroEmail,
+    execPeriodo,
+    execPeriodoCustomFrom,
+    execPeriodoCustomTo,
+    execFiltroTecnico,
+    execFiltroCategoria,
+    maquinaIdFiltroUrl,
+    filter,
+    execSortExecDate,
+    execViewMode,
+    gruposExecutadasPorCliente,
+  ])
 
   // Ordenação: mais dias em atraso primeiro (diasAtraso desc) → próximas por data asc
   const manutencoesOrdenadas = useMemo(() =>
@@ -638,14 +830,19 @@ export default function Manutencoes() {
     tituloPagina = 'Manutenções próximas'
     subtituloPagina = `${manutencoesProximas.length} manutenção(ões) agendadas para hoje e dias seguintes, ordenadas por data`
   } else if (filter === 'executadas') {
-    listaParaMostrar = executadasFiltradasComSort
+    listaParaMostrar = execViewMode === EXEC_VIEW_CRONO && executadasVistaCronologica
+      ? executadasVistaCronologica
+      : executadasFiltradasComSort
     tituloPagina = 'Manutenções executadas'
     {
       const baseCount = execFiltroAtivo
         ? `${executadasFiltradasComSort.length} de ${manutencoesExecutadasOrdenadas.length} manutenção(ões) executadas`
         : `${manutencoesExecutadasOrdenadas.length} manutenção(ões) já executadas com sucesso`
-      const ordemExec = execSortExecDate === 'desc' ? 'execução mais recente primeiro' : 'execução mais antiga primeiro'
-      subtituloPagina = `${baseCount}. Agrupado por cliente (ordem alfabética): expanda cada linha para ver as manutenções (${ordemExec}).`
+      const ordemExec = execSortExecDate === 'desc' ? 'última execução mais recente primeiro' : 'última execução mais antiga primeiro'
+      const vistaTxt = execViewMode === EXEC_VIEW_CRONO
+        ? `vista cronológica (últimas ${EXEC_CRONO_LIMIT} intervenções)`
+        : `agrupado por cliente (ordem por ${ordemExec})`
+      subtituloPagina = `${baseCount}. ${vistaTxt}. Pesquise pelo nome ou filtre por período.`
     }
   } else {
     listaParaMostrar = mostrarTodas
@@ -697,18 +894,20 @@ export default function Manutencoes() {
         )}
         <td data-label="Equipamento" className="col-lg col-equipamento">
           <div className="equip-desc-block">
-            <span className="equip-cat">{equipCategoria}</span>
-            <span className="equip-nome">{equipNome}</span>
+            <span className="equip-cat"><HighlightMatch text={equipCategoria} query={execPesquisa} /></span>
+            <span className="equip-nome"><HighlightMatch text={equipNome} query={execPesquisa} /></span>
             <span
               className="text-muted equip-num-serie equip-num-serie-link"
               role="button" tabIndex={0}
               title="Abrir ficha do equipamento"
               onClick={() => maq && navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`)}
               onKeyDown={(e) => { if (e.key === 'Enter' && maq) navigate(`/equipamentos?maquina=${encodeURIComponent(maq.id)}`) }}
-            >Nº Série: {maq?.numeroSerie || '—'}</span>
+            >Nº Série: <HighlightMatch text={maq?.numeroSerie || '—'} query={execPesquisa} /></span>
           </div>
         </td>
-        <td data-label="Cliente" className="col-md col-cliente col-truncate">{getCliente(maq?.clienteNif)?.nome || '—'}</td>
+        <td data-label="Cliente" className="col-md col-cliente col-truncate">
+          <HighlightMatch text={getCliente(maq?.clienteNif)?.nome || '—'} query={execPesquisa} />
+        </td>
         <td data-label="Tipo" className="col-sm col-tipo col-truncate">
           <span>{m.tipo === 'montagem' ? 'Montagem' : 'Manutenção Peri.'}</span>
           {isConcluida && rel?.numeroRelatorio && (
@@ -837,13 +1036,13 @@ export default function Manutencoes() {
           </div>
 
           <div className="mc-title">
-            {equipSub && <span className="mc-sub">{equipSub}</span>}
-            <strong>{equipNome}</strong>
+            {equipSub && <span className="mc-sub"><HighlightMatch text={equipSub} query={execPesquisa} /></span>}
+            <strong><HighlightMatch text={equipNome} query={execPesquisa} /></strong>
           </div>
 
           <div className="mc-cliente-linha">
             <span className="mc-cliente-label">Cliente:</span>
-            <span className="mc-cliente-nome">{cliente?.nome || '—'}</span>
+            <span className="mc-cliente-nome"><HighlightMatch text={cliente?.nome || '—'} query={execPesquisa} /></span>
           </div>
 
           <div className="mc-info">
@@ -932,7 +1131,7 @@ export default function Manutencoes() {
     )
   }
 
-  const useListaExecutadasAgrupada = filter === 'executadas' && Array.isArray(gruposExecutadasPorCliente)
+  const useListaExecutadasAgrupada = filter === 'executadas' && execViewMode === EXEC_VIEW_GRUPOS && Array.isArray(gruposExecutadasPorCliente)
   /** Na vista só executadas, «dias até agendada» não aplica — todas são concluídas. */
   const showDiasColumn = filter !== 'executadas'
 
@@ -1008,6 +1207,15 @@ export default function Manutencoes() {
                 <button type="button" className="exec-search-clear" onClick={() => setExecPesquisa('')} aria-label="Limpar pesquisa"><X size={12} aria-hidden /></button>
               )}
             </div>
+            {filter === 'executadas' && execFiltroAtivo && (
+              <div className="exec-filter-counter" aria-live="polite">
+                <strong>{gruposExecutadasPorCliente?.length ?? 0}</strong>
+                <span> de {totalGruposExecutadas} clientes</span>
+                <span className="exec-filter-counter-sep">·</span>
+                <strong>{executadasFiltradasComSort.length}</strong>
+                <span> intervenções</span>
+              </div>
+            )}
             <div className="exec-filter-side">
               <div className="exec-email-filter">
                 <select value={execFiltroEmail} onChange={e => setExecFiltroEmail(e.target.value)} aria-label="Filtrar por relatório enviado por email ao cliente">
@@ -1017,20 +1225,111 @@ export default function Manutencoes() {
                 </select>
               </div>
               {execFiltroAtivo && (
-                <button
-                  type="button"
-                  className="exec-filter-reset"
-                  onClick={() => { setExecPesquisa(''); setExecFiltroEmail('todos'); setExecSortExecDate('desc') }}
-                >Limpar filtros</button>
+                <button type="button" className="exec-filter-reset" onClick={resetExecFiltros}>
+                  Limpar filtros
+                </button>
               )}
             </div>
           </div>
+
+          {filter === 'executadas' && (
+            <>
+              <div className="exec-filter-row exec-filter-row--chips" role="toolbar" aria-label="Vista e período">
+                <div className="exec-view-toggle" role="group" aria-label="Modo de visualização">
+                  <button
+                    type="button"
+                    className={`exec-chip${execViewMode === EXEC_VIEW_GRUPOS ? ' exec-chip--active' : ''}`}
+                    onClick={() => setExecViewMode(EXEC_VIEW_GRUPOS)}
+                    title="Agrupar por cliente"
+                  >
+                    <Users size={14} aria-hidden /> Por cliente
+                  </button>
+                  <button
+                    type="button"
+                    className={`exec-chip${execViewMode === EXEC_VIEW_CRONO ? ' exec-chip--active' : ''}`}
+                    onClick={() => setExecViewMode(EXEC_VIEW_CRONO)}
+                    title={`Últimas ${EXEC_CRONO_LIMIT} intervenções de todos os clientes`}
+                  >
+                    <LayoutList size={14} aria-hidden /> Últimas {EXEC_CRONO_LIMIT}
+                  </button>
+                </div>
+                <div className="exec-period-chips" role="group" aria-label="Filtrar por período de execução">
+                  {EXEC_PERIODOS.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`exec-chip${execPeriodo === p.id ? ' exec-chip--active' : ''}`}
+                      onClick={() => setExecPeriodo(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className={`exec-chip exec-chip--email${execFiltroEmail === 'por_enviar' ? ' exec-chip--active exec-chip--warn' : ''}`}
+                  onClick={() => setExecFiltroEmail(v => v === 'por_enviar' ? 'todos' : 'por_enviar')}
+                  title="Mostrar só relatórios ainda não enviados ao cliente"
+                >
+                  <Mail size={14} aria-hidden /> Por enviar
+                </button>
+              </div>
+
+              {execPeriodo === 'custom' && (
+                <div className="exec-filter-row exec-filter-row--custom-dates">
+                  <label className="exec-custom-date-label">
+                    De
+                    <input type="date" value={execPeriodoCustomFrom} onChange={e => setExecPeriodoCustomFrom(e.target.value)} />
+                  </label>
+                  <label className="exec-custom-date-label">
+                    Até
+                    <input type="date" value={execPeriodoCustomTo} onChange={e => setExecPeriodoCustomTo(e.target.value)} />
+                  </label>
+                </div>
+              )}
+
+              <div className="exec-filter-row exec-filter-row--selects">
+                <label className="exec-select-label">
+                  Técnico
+                  <select value={execFiltroTecnico} onChange={e => setExecFiltroTecnico(e.target.value)} aria-label="Filtrar por técnico">
+                    <option value="todos">Todos</option>
+                    {tecnicosExecutadas.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+                <label className="exec-select-label">
+                  Equipamento
+                  <select value={execFiltroCategoria} onChange={e => setExecFiltroCategoria(e.target.value)} aria-label="Filtrar por tipo de equipamento">
+                    <option value="todos">Todas as categorias</option>
+                    {categoriasComExecutadas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                </label>
+                {execViewMode === EXEC_VIEW_GRUPOS && gruposExecutadasPorCliente?.length > 0 && (
+                  <div className="exec-grupo-bulk-actions">
+                    <button type="button" className="exec-chip exec-chip--sm" onClick={() => expandirTodosGruposExec(gruposExecutadasPorCliente)}>
+                      <ChevronsDown size={14} aria-hidden /> Expandir todos
+                    </button>
+                    <button type="button" className="exec-chip exec-chip--sm" onClick={recolherTodosGruposExec}>
+                      <ChevronsUp size={14} aria-hidden /> Recolher todos
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {execViewMode === EXEC_VIEW_CRONO && executadasFiltradasComSort.length > 0 && (
+                <p className="exec-crono-hint text-muted">
+                  A mostrar as {Math.min(EXEC_CRONO_LIMIT, executadasFiltradasComSort.length)} intervenções mais recentes
+                  {executadasFiltradasComSort.length > EXEC_CRONO_LIMIT ? ` (de ${executadasFiltradasComSort.length} filtradas)` : ''}.
+                </p>
+              )}
+            </>
+          )}
+
           <div className="exec-sort-exec-date-mobile" role="group" aria-label="Ordenar lista de executadas por data de execução">
             <button
               type="button"
               className="exec-sort-exec-date-mobile-btn"
               onClick={toggleExecSortExecDate}
-              title={execSortExecDate === 'desc' ? 'Ordem: execução mais recente primeiro — clicar para mais antiga primeiro' : 'Ordem: execução mais antiga primeiro — clicar para mais recente primeiro'}
+              title={execSortExecDate === 'desc' ? 'Ordenar pela execução mais recente primeiro' : 'Ordenar pela execução mais antiga primeiro'}
               aria-label={execSortExecDate === 'desc' ? 'Ordenação por data de execução: descendente. Clicar para ascendente.' : 'Ordenação por data de execução: ascendente. Clicar para descendente.'}
             >
               {execSortExecDate === 'desc' ? <ArrowDown size={15} aria-hidden /> : <ArrowUp size={15} aria-hidden />}
@@ -1062,7 +1361,23 @@ export default function Manutencoes() {
                   onClick={() => toggleExecGrupoCliente(grupo.grupoKey)}
                 >
                   <span className="exec-grupo-mobile-chev">{expanded ? <ChevronDown size={18} aria-hidden /> : <ChevronRight size={18} aria-hidden />}</span>
-                  <span className="exec-grupo-mobile-nome"><strong>{grupo.nome}</strong></span>
+                  <span className="exec-grupo-mobile-nome">
+                    <strong><HighlightMatch text={grupo.nome} query={execPesquisa} /></strong>
+                    {grupo.ultimoEquipLabel && grupo.ultimoEquipLabel !== '—' && (
+                      <span className="exec-grupo-mobile-equip text-muted">
+                        <HighlightMatch text={grupo.ultimoEquipLabel} query={execPesquisa} />
+                        {grupo.ultimoEquipSerie ? ` · S/N ${grupo.ultimoEquipSerie}` : ''}
+                      </span>
+                    )}
+                  </span>
+                  {grupo.ultimaExecucaoData && (
+                    <span className="exec-grupo-mobile-data" title="Última execução neste cliente">
+                      {formatDataHoraCurtaAzores(grupo.ultimaExecucaoData)}
+                    </span>
+                  )}
+                  {grupo.porEnviarEmail > 0 && (
+                    <span className="badge exec-grupo-por-enviar" title="Relatórios por enviar ao cliente">{grupo.porEnviarEmail} por enviar</span>
+                  )}
                   <span className="badge exec-grupo-count">{grupo.manutencoes.length}</span>
                 </button>
                 {expanded && (
@@ -1122,7 +1437,7 @@ export default function Manutencoes() {
                         type="button"
                         className="th-data-exec-sort-btn"
                         onClick={toggleExecSortExecDate}
-                        title={execSortExecDate === 'desc' ? 'Ordem: execução mais recente primeiro — clicar para mais antiga primeiro' : 'Ordem: execução mais antiga primeiro — clicar para mais recente primeiro'}
+                        title={execSortExecDate === 'desc' ? 'Ordenar clientes pela última execução (mais recente primeiro)' : 'Ordenar clientes pela última execução (mais antiga primeiro)'}
                         aria-label={execSortExecDate === 'desc' ? 'Ordenação por data de execução: descendente. Clicar para ascendente.' : 'Ordenação por data de execução: ascendente. Clicar para descendente.'}
                       >
                         {execSortExecDate === 'desc' ? <ArrowDown size={13} aria-hidden strokeWidth={2.5} /> : <ArrowUp size={13} aria-hidden strokeWidth={2.5} />}
@@ -1145,7 +1460,15 @@ export default function Manutencoes() {
                   const grupoRow = (
                     <tr key={`grp-${grupo.grupoKey}`} className="exec-grupo-cli-row">
                       {bulkMode && <td className="col-bulk-check" />}
-                      <td data-label="" className="col-lg col-equipamento exec-grupo-dash">—</td>
+                      <td data-label="Equipamento" className="col-lg col-equipamento exec-grupo-equip-cell">
+                        {grupo.ultimoEquipLabel && grupo.ultimoEquipLabel !== '—' ? (
+                          <span className="exec-grupo-ultimo-equip" title={grupo.ultimoEquipSerie ? `Último equipamento — S/N ${grupo.ultimoEquipSerie}` : 'Último equipamento intervencionado'}>
+                            <HighlightMatch text={grupo.ultimoEquipLabel} query={execPesquisa} />
+                          </span>
+                        ) : (
+                          <span className="text-muted exec-grupo-dash">—</span>
+                        )}
+                      </td>
                       <td data-label="Cliente" className="col-md col-cliente exec-grupo-cli-cell">
                         <button
                           type="button"
@@ -1159,16 +1482,38 @@ export default function Manutencoes() {
                             {expanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                           </span>
                           <span className="exec-grupo-cli-nome-wrap">
-                            <strong className="exec-grupo-cli-nome">{grupo.nome}</strong>
+                            <strong className="exec-grupo-cli-nome"><HighlightMatch text={grupo.nome} query={execPesquisa} /></strong>
                           </span>
                           <span className="badge exec-grupo-count" title={`${grupo.manutencoes.length} intervenção(ões)`}>{grupo.manutencoes.length}</span>
                         </button>
                       </td>
                       <td className="col-sm col-tipo col-truncate text-muted exec-grupo-dash" data-label="Tipo">—</td>
-                      <td className="col-md col-data col-nowrap text-muted exec-grupo-dash" data-label="Data">—</td>
+                      <td className="col-md col-data col-nowrap exec-grupo-data-cell" data-label="Data">
+                        {grupo.ultimaExecucaoData ? (
+                          <span className="exec-grupo-ultima-data" title="Última execução neste cliente">
+                            {formatDataHoraCurtaAzores(grupo.ultimaExecucaoData)}
+                          </span>
+                        ) : (
+                          <span className="text-muted exec-grupo-dash">—</span>
+                        )}
+                      </td>
                       <td className="col-sm col-tecnico col-truncate text-muted exec-grupo-dash" data-label="Técnico">—</td>
-                      <td className="col-sm col-status col-badges text-muted exec-grupo-dash" data-label="Status">—</td>
-                      {(mostrarTodas || filter === 'executadas') && <td className="col-email-status col-email text-muted exec-grupo-dash" data-label="Email">—</td>}
+                      <td className="col-sm col-status col-badges exec-grupo-dash" data-label="Status">
+                        {grupo.porEnviarEmail > 0 ? (
+                          <span className="badge exec-grupo-por-enviar" title="Relatórios por enviar ao cliente">{grupo.porEnviarEmail} por enviar</span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      {(mostrarTodas || filter === 'executadas') && (
+                        <td className="col-email-status col-email exec-grupo-dash" data-label="Email">
+                          {grupo.porEnviarEmail > 0 ? (
+                            <span className="email-dot email-dot--pending" title={`${grupo.porEnviarEmail} por enviar`} aria-hidden />
+                          ) : (
+                            <span className="email-dot email-dot--sent" title="Todos enviados" aria-hidden />
+                          )}
+                        </td>
+                      )}
                       <td className="col-actions exec-grupo-dash" />
                     </tr>
                   )
