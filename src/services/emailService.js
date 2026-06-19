@@ -11,7 +11,7 @@
  *   enviarLembreteEmail        — alertas de manutenção próxima (dados → send-email.php)
  */
 import { formatDataHoraAzores, formatDataAzores } from '../utils/datasAzores'
-import { buildProximasManutencoesManutencao } from '../utils/relatorioManutencaoPayload'
+import { buildProximasManutencoesManutencao, resolvePeriodicidadeManutencao } from '../utils/relatorioManutencaoPayload'
 import { getHeaderLogosB64ForEmail } from '../utils/gerarPdfRelatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
 import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } from '../config/emailConfig'
@@ -203,6 +203,7 @@ export async function enviarRelatorioEmail({
       const proximasManutencoes = isRepair
         ? []
         : buildProximasManutencoesManutencao({ relatorio, manutencao, maquina })
+      const periMaq = isRepair ? '' : resolvePeriodicidadeManutencao({ maquina, manutencao })
       const manutencaoTipo = isRepair
         ? 'reparacao'
         : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')

@@ -9,6 +9,13 @@ Política de continuidade:
 
 ---
 
+## [1.16.98] — 2026-06-19 — Corrigir envio de email de relatórios PDF
+
+### Correcções
+- **`emailService.js`:** `periMaq is not defined` ao montar o payload JSON — variável omitida na refactor `relatorioManutencaoPayload`; restaurado via `resolvePeriodicidadeManutencao()`. O erro ocorria antes do `fetch` ao PHP (toast genérico de rede).
+
+---
+
 ## [1.16.97] — 2026-06-13 — Passo 8: slices manutenções e reparações
 
 ### Refactoring (sem alteração de comportamento)
