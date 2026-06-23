@@ -9,6 +9,16 @@ Política de continuidade:
 
 ---
 
+## [1.17.7] — 2026-06-23 — PDF pré-visualização alinhado ao email
+
+### Correcções
+- **`gerarPdfCompacto` (`gerarPdfRelatorio.js`):** primeira página igual ao PDF FPDF do email — resumo executivo antes dos dados do serviço; caixa do resumo com `y` após `boxH` (sem overlap); removida secção «PLANO DE MANUTENÇÃO» da página 1 (só existia na pré-visualização); horas no contador após tipo/período; título «CONSUMÍVEIS E PEÇAS» alinhado ao servidor.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.6] — 2026-06-12 — Validar data de execução (não futura)
 
 ### Correcções

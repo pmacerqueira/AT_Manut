@@ -18,13 +18,9 @@ import {
   formatDataRelatorioPdf,
 } from './relatorioPdfResumo'
 import {
-  INTERVALOS_KAESER,
   SUBCATEGORIAS_COM_CONTADOR_HORAS,
-  descricaoCicloKaeser,
-  proximaPosicaoKaeser,
 } from '../context/DataContext'
 import {
-  relatorioIncluiResumoPlanoNoPdf,
   relatorioObrigaBlocoConsumiveisPlano,
   relatorioIncluiSecaoConsumiveisContador,
 } from './relatorioBlocosEquipamento'
@@ -349,68 +345,11 @@ export async function gerarPdfCompacto({
   pdf.setDrawColor(13, 110, 253); pdf.setLineWidth(0.5)
   pdf.line(M, y, W - M, y); y += 7
 
-  // ── Dados do serviço ──────────────────────────────────────────────────────
   const equipComContadorHoras = !isReparacao && maquina &&
     SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maquina.subcategoriaId)
   const horasPdf = horasContadorParaRelatorio(maquina, isReparacao ? null : manutencao, null, relatorio)
   const horasPdfLabel = horasPdf != null ? `${horasPdf} h` : '\u2014'
   const moradaCliente = resumoMeta.moradaCliente
-  const dataRows = isReparacao
-    ? [
-        ['CLIENTE',           cliente?.nome ?? '\u2014'],
-        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
-        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
-        ['EQUIPAMENTO',       equipDesc],
-        ['DATA DE REALIZA\u00c7\u00c3O', dataRealizacaoFmt],
-        ['T\u00c9CNICO',      relatorio?.tecnico ?? '\u2014'],
-      ]
-    : [
-        ['CLIENTE',           cliente?.nome ?? '\u2014'],
-        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
-        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
-        ['EQUIPAMENTO',       equipDesc],
-        ...(equipComContadorHoras
-          ? [['HORAS NO CONTADOR (ACUMULADAS)', horasPdfLabel]]
-          : []),
-        ['TIPO DE INTERVEN\u00c7\u00c3O', resumoMeta.tipoIntervencao],
-        ['PERIODICIDADE',     resumoMeta.periodicidadeLabel],
-        ...(resumoMeta.dataAgendIso
-          ? [['DATA DE AGENDAMENTO', formatDataRelatorioPdf(resumoMeta.dataAgendIso)]]
-          : []),
-        ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
-        ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
-        ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
-      ]
-  if (isReparacao && relatorio?.numeroAviso?.trim()) {
-    dataRows.push(['N.\u00ba AVISO / PEDIDO', relatorio.numeroAviso.trim()])
-  }
-  if (isReparacao && relatorio?.horasMaoObra != null && relatorio.horasMaoObra !== '') {
-    dataRows.push(['HORAS DE M\u00c3O-DE-OBRA', `${relatorio.horasMaoObra} h`])
-  }
-  if (isReparacao) {
-    dataRows.push(['ASSINADO POR', relatorio?.nomeAssinante ?? '\u2014'])
-  }
-
-  pdf.setFontSize(9)
-  /** Largura máx. da coluna de rótulos (mm) — evita sobrepor o valor (ex.: «HORAS NO CONTADOR (ACUMULADAS)»). */
-  const dataLabelColW = 72
-  const dataValueX = M + 74
-  const dataValueMaxW = Math.max(24, W - M - dataValueX - 2)
-  const dataLineH = 4.5
-  dataRows.forEach(([label, val], i) => {
-    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
-    const labelLines = pdf.splitTextToSize(label, dataLabelColW)
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
-    const valLines = pdf.splitTextToSize(String(val), dataValueMaxW)
-    const nLines = Math.max(labelLines.length, valLines.length, 1)
-    const rowH = Math.max(7.5, (nLines - 1) * dataLineH + 7)
-    if (i % 2 === 1) { pdf.setFillColor(248, 249, 250); pdf.rect(M, y - 4, cW, rowH, 'F') }
-    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
-    labelLines.forEach((ln, li) => { pdf.text(ln, M + 1, y + li * dataLineH) })
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
-    valLines.forEach((ln, li) => { pdf.text(ln, dataValueX, y + li * dataLineH) })
-    y += rowH
-  })
 
   function renderResumoExecutivo() {
     if (isReparacao) {
@@ -420,19 +359,20 @@ export async function gerarPdfCompacto({
       pdf.setDrawColor(30, 58, 95)
       pdf.setLineWidth(0.5)
       const pad = 5
-      const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`• ${b}`, cW - pad * 2))
+      const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`- ${b}`, cW - pad * 2))
       const boxH = 12 + bulletLines.length * 4.2 + pad
       if (y + boxH > 275) { pdf.addPage(); y = 20 }
-      pdf.rect(M, y - 3, cW, boxH, 'FD')
+      const y0 = y - 3
+      pdf.rect(M, y0, cW, boxH, 'FD')
       pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-      pdf.text('RESUMO DA INTERVEN\u00c7\u00c3O', M + pad, y + 2)
-      y += 8
+      pdf.text('RESUMO DA INTERVEN\u00c7\u00c3O', M + pad, y0 + 5)
+      let yTxt = y0 + 11
       pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
       bulletLines.forEach((ln) => {
-        pdf.text(ln, M + pad, y)
-        y += 4.2
+        pdf.text(ln, M + pad, yTxt)
+        yTxt += 4.2
       })
-      y += pad + 2
+      y = y0 + boxH + 4
       return
     }
 
@@ -441,7 +381,7 @@ export async function gerarPdfCompacto({
     if (y > 245) { pdf.addPage(); y = 20 }
 
     const pad = 5
-    const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`• ${b}`, cW - pad * 2 - 4))
+    const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`- ${b}`, cW - pad * 2 - 4))
     let extraH = 0
     if (resumoMeta.proximaData) extraH += 5
     const contagemLine = `${resumoMeta.nSim} conforme \u2022 ${resumoMeta.nNao} n\u00e3o conforme` +
@@ -449,33 +389,35 @@ export async function gerarPdfCompacto({
     const boxH = 22 + bulletLines.length * 4.2 + extraH + pad
     if (y + boxH > 275) { pdf.addPage(); y = 20 }
 
+    const y0 = y - 3
     pdf.setFillColor(...style.fill)
     pdf.setDrawColor(...style.border)
     pdf.setLineWidth(0.8)
-    pdf.rect(M, y - 3, cW, boxH, 'FD')
+    pdf.rect(M, y0, cW, boxH, 'FD')
 
-    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...style.text)
-    pdf.text(style.label, M + pad, y + 3)
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-    pdf.text(contagemLine, M + pad, y + 9)
-    y += 13
+    pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...style.text)
+    pdf.text(`RESUMO EXECUTIVO - ${style.label}`, M + pad + 2, y0 + 5)
+    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    pdf.text(contagemLine, M + pad + 2, y0 + 11)
 
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    let yTxt = y0 + 16
+    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
     bulletLines.forEach((ln) => {
-      pdf.text(ln, M + pad + 2, y)
-      y += 4.2
+      pdf.text(ln, M + pad + 2, yTxt)
+      yTxt += 4.2
     })
 
     if (resumoMeta.proximaData) {
       pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-      pdf.text('Pr\u00f3xima manuten\u00e7\u00e3o prevista:', M + pad + 2, y + 1)
+      pdf.text('Pr\u00f3xima manuten\u00e7\u00e3o prevista:', M + pad + 2, yTxt + 1)
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
       const proxTxt = `${formatDataRelatorioPdf(resumoMeta.proximaData)}` +
-        (resumoMeta.proximaTecnico ? ` \u2022 ${resumoMeta.proximaTecnico}` : '')
-      pdf.text(proxTxt, M + pad + 48, y + 1)
-      y += 5
+        (resumoMeta.proximaTecnico ? `  |  ${resumoMeta.proximaTecnico}` : '')
+      pdf.text(proxTxt, M + pad + 46, yTxt + 1)
+      yTxt += 5
     }
-    y += pad + 2
+
+    y = y0 + boxH + 4
   }
 
   function renderPontosAtencao() {
@@ -515,49 +457,69 @@ export async function gerarPdfCompacto({
   }
 
   renderResumoExecutivo()
-  renderPontosAtencao()
 
-  if (!isReparacao && relatorioIncluiResumoPlanoNoPdf(maquina, manutencao)) {
-    if (y > 248) { pdf.addPage(); y = 20 }
-    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    pdf.text('PLANO DE MANUTEN\u00c7\u00c3O (FABRICANTE / N.\u00ba DE S\u00c9RIE)', M, y)
-    y += 5
-    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-    const tipoEf = relatorio?.tipoManutKaeser ?? ''
-    const infoTipo = tipoEf && INTERVALOS_KAESER[tipoEf] ? INTERVALOS_KAESER[tipoEf].label : ''
-    const linhasPlano = []
-    if (horasPdf != null) {
-      linhasPlano.push(`Horas no contador (acumuladas): ${horasPdf} h`)
-    }
-    if (tipoEf) linhasPlano.push(`Tipo efectivo nesta interven\u00e7\u00e3o: ${tipoEf}${infoTipo ? ` (${infoTipo})` : ''}`)
-    else linhasPlano.push('Tipo efectivo nesta interven\u00e7\u00e3o: \u2014 (n\u00e3o indicado no relat\u00f3rio)')
-    const pos = maquina?.posicaoKaeser
-    if (pos != null) {
-      linhasPlano.push(`Ciclo na ficha (refer\u00eancia): ${descricaoCicloKaeser(pos)}`)
-      linhasPlano.push(`Seguinte no ciclo (12 anos): ${descricaoCicloKaeser(proximaPosicaoKaeser(pos))}`)
-    } else {
-      linhasPlano.push('Posi\u00e7\u00e3o no ciclo A/B/C/D: a definir na ficha / primeira execu\u00e7\u00e3o com plano.')
-    }
-    if (relatorio?.tipoManutKaeserSugerido || relatorio?.sugestaoFaseMotivo) {
-      const sug = relatorio.tipoManutKaeserSugerido ?? ''
-      const mot = relatorio.sugestaoFaseMotivo ?? ''
-      let aud = 'Auditoria de sugest\u00e3o'
-      if (sug) aud += `: sugerido ${sug}`
-      if (mot) aud += ` (${mot})`
-      linhasPlano.push(aud)
-    }
-    linhasPlano.forEach((line) => {
-      const wrapped = pdf.splitTextToSize(line, cW)
-      if (y + wrapped.length * 4 > 270) { pdf.addPage(); y = 20 }
-      pdf.text(wrapped, M, y)
-      y += wrapped.length * 4 + 1
-    })
-    y += 3
+  // ── Dados do serviço (após resumo — alinhado a send-email.php FPDF) ───────
+  const dataRows = isReparacao
+    ? [
+        ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
+        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
+        ['EQUIPAMENTO',       equipDesc],
+        ['DATA DE REALIZA\u00c7\u00c3O', dataRealizacaoFmt],
+        ['T\u00c9CNICO',      relatorio?.tecnico ?? '\u2014'],
+      ]
+    : [
+        ['CLIENTE',           cliente?.nome ?? '\u2014'],
+        ...(resumoMeta.clienteNif ? [['NIF', resumoMeta.clienteNif]] : []),
+        ...(moradaCliente !== '\u2014' ? [['LOCAL / INSTALA\u00c7\u00c3O', moradaCliente]] : []),
+        ['EQUIPAMENTO',       equipDesc],
+        ['TIPO DE INTERVEN\u00c7\u00c3O', resumoMeta.tipoIntervencao],
+        ['PERIODICIDADE',     resumoMeta.periodicidadeLabel],
+        ...(resumoMeta.dataAgendIso
+          ? [['DATA DE AGENDAMENTO', formatDataRelatorioPdf(resumoMeta.dataAgendIso)]]
+          : []),
+        ...(equipComContadorHoras
+          ? [['HORAS NO CONTADOR (ACUMULADAS)', horasPdfLabel]]
+          : []),
+        ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
+        ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
+        ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
+      ]
+  if (isReparacao && relatorio?.numeroAviso?.trim()) {
+    dataRows.push(['N.\u00ba AVISO / PEDIDO', relatorio.numeroAviso.trim()])
+  }
+  if (isReparacao && relatorio?.horasMaoObra != null && relatorio.horasMaoObra !== '') {
+    dataRows.push(['HORAS DE M\u00c3O-DE-OBRA', `${relatorio.horasMaoObra} h`])
+  }
+  if (isReparacao) {
+    dataRows.push(['ASSINADO POR', relatorio?.nomeAssinante ?? '\u2014'])
   }
 
-  y += 3
+  pdf.setFontSize(9)
+  const dataLabelColW = 72
+  const dataValueX = M + 74
+  const dataValueMaxW = Math.max(24, W - M - dataValueX - 2)
+  const dataLineH = 4.5
+  dataRows.forEach(([label, val], i) => {
+    if (y > 265) { pdf.addPage(); y = 20 }
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
+    const labelLines = pdf.splitTextToSize(label, dataLabelColW)
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    const valLines = pdf.splitTextToSize(String(val), dataValueMaxW)
+    const nLines = Math.max(labelLines.length, valLines.length, 1)
+    const rowH = Math.max(7.5, (nLines - 1) * dataLineH + 7)
+    if (i % 2 === 1) { pdf.setFillColor(248, 249, 250); pdf.rect(M, y - 4, cW, rowH, 'F') }
+    pdf.setFont('helvetica', 'bold'); pdf.setTextColor(107, 114, 128)
+    labelLines.forEach((ln, li) => { pdf.text(ln, M + 1, y + li * dataLineH) })
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    valLines.forEach((ln, li) => { pdf.text(ln, dataValueX, y + li * dataLineH) })
+    y += rowH
+  })
+
   pdf.setDrawColor(220, 220, 220); pdf.setLineWidth(0.3)
-  pdf.line(M, y, W - M, y); y += 7
+  pdf.line(M, y, W - M, y); y += 5
+
+  renderPontosAtencao()
 
   const obrigaBlocoPecas = !isReparacao && relatorioObrigaBlocoConsumiveisPlano(maquina, manutencao)
   const secaoConsumiveisContador = relatorioIncluiSecaoConsumiveisContador(maquina, manutencao)
@@ -752,14 +714,9 @@ export async function gerarPdfCompacto({
     if (!obrigaBlocoPecas && pecasRaw.length === 0 && !secaoConsumiveisContador) return
     if (y > 220) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    const subTit = relatorio?.tipoManutKaeser && INTERVALOS_KAESER[relatorio.tipoManutKaeser]
-      ? ` \u2014 Tipo ${relatorio.tipoManutKaeser}`
-      : ''
-    const tituloConsumiveis = obrigaBlocoPecas
-      ? `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`
-      : (secaoConsumiveisContador
-        ? (isReparacao ? 'PE\u00c7AS E MATERIAIS (INTERVEN\u00c7\u00c3O)' : 'CONSUM\u00cdVEIS E PE\u00c7AS (INTERVEN\u00c7\u00c3O)')
-        : (isReparacao ? 'PE\u00c7AS E MATERIAIS UTILIZADOS' : `CONSUM\u00cdVEIS E PE\u00c7AS (PLANO FABRICANTE)${subTit}`))
+    const tituloConsumiveis = obrigaBlocoPecas || secaoConsumiveisContador
+      ? 'CONSUM\u00cdVEIS E PE\u00c7AS'
+      : (isReparacao ? 'PE\u00c7AS E MATERIAIS UTILIZADOS' : 'CONSUM\u00cdVEIS E PE\u00c7AS')
     pdf.text(tituloConsumiveis, M, y); y += 6
 
     const normalizar = (p) => 'usado' in p ? p : { ...p, usado: (p.quantidadeUsada ?? p.quantidade ?? 0) > 0 }
