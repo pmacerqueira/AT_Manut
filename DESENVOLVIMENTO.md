@@ -287,7 +287,7 @@ const addXxx = useCallback((data) => {
 npm run dev                 # http://localhost:5173
 
 # Testes unitários (domain + slices)
-npm run test:unit            # 114 testes em tests/unit/
+npm run test:unit            # 125 testes em tests/unit/
 
 # Testes — suite E2E completa (452 listados)
 npm run test:e2e             # equivalente: npx playwright test tests/e2e/

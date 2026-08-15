@@ -467,29 +467,34 @@ O cliente vê primeiro o **planeamento futuro** (próximas datas), depois a **de
 
 ## ⚠ CÁLCULO DE DATAS FUTURAS — Próximas Manutenções
 
-### Regra para PDF e Email (desde v1.16.0, payload centralizado v1.16.89+):
-As datas das próximas manutenções mostradas no PDF e no email HTML são **SEMPRE COMPUTADAS em tempo real** a partir de:
-- `dataExecucao` = data de criação do relatório (`rel.dataCriacao`) ou data de assinatura (`rel.dataAssinatura`) ou data da manutenção (`m.data`); no wizard, `form.dataRealizacao` / `form.adminDataExecucao` alimentam a pré-visualização
-- `periodicidade` = `maquina.periodicidadeManut` ou `manutencao.periodicidade` (montagem antes de copiar para a ficha)
+> **Documento canónico alargado:** [`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](mdc:docs/AGENDA-PERIODICA-E-PROXIMAS.md)
 
-**NÃO usar registos da base de dados** para as próximas manutenções no PDF/email. Os registos na BD podem estar desactualizados devido a race conditions na persistência assíncrona.
+### Regra para PDF e Email (payload `relatorioManutencaoPayload.js`, v1.16.89+; paridade agenda v1.17.9+)
 
-### Camada canónica: `relatorioManutencaoPayload.js` (v1.16.89+)
+**Data de execução** (corpo do relatório): `rel.dataCriacao` → `rel.dataAssinatura` → `manutencao.data`.
+
+**Próximas manutenções** — duas fontes, por ordem:
+
+1. **Manutenção concluída** + lista `manutencoes` disponível → **`listProximasAgendaPeriodicas`** (slots abertos na BD, até 12). Espelha conflitos entre equipamentos e dias úteis já aplicados na agenda.
+2. **Caso contrário** (wizard antes de gravar, montagem, sem slots abertos) → **`computarProximasDatas()`** a partir de `dataExecucao` + `periodicidade`.
+
+**Não** chamar `computarProximasDatas` directamente nos componentes — usar sempre `buildProximasManutencoesManutencao` / `buildRelatorioManutencaoPdfArgs`.
+
+**Callers:** passar **`manutencoes`** (estado DataContext) em PDF e email.
+
+### Agenda (BD) — geração e sync (`agendaDomain.js`, v1.17.8+)
+
+- `deveIncluirSlotPeriodicoAntesDeHoje`: não saltar o **primeiro** trimestre em atraso ≤ 1 período (ex. exec Abr → Jul em falta em Ago).
+- `sincronizarAgendaCompleta` / `recalcularPeriodicasAposExecucao` usam a mesma função de geração.
+- `maquinas.proximaManut` = `minDataManutencaoAberta` após recálculo.
+
+### Camada canónica: `relatorioManutencaoPayload.js`
 ```js
 import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 
-// PDF: buildRelatorioManutencaoPdfArgs({ relatorio, manutencao, maquina, cliente, ... })
-// Email: buildRelatorioManutencaoEmailArgs({ emailDestinatario, relatorio, manutencao, ... })
+// PDF/email: incluir manutencoes: lista do DataContext
+buildRelatorioManutencaoPdfArgs({ relatorio, manutencao, maquina, cliente, manutencoes, ... })
 ```
-
-Internamente usa `computarProximasDatas()` em `src/utils/diasUteis.js` (12 datas futuras, dias úteis).
-
-### Callers que usam o payload (não chamar `computarProximasDatas` directamente em manutenção):
-1. `Manutencoes.jsx` → `handleAbrirPdf`, `handleEnviarEmail`
-2. `Clientes.jsx` → `handleDownloadPdfManutencao`
-3. `EnviarEmailModal.jsx` → `handleSubmit`
-4. `ExecutarManutencaoModal.jsx` → `handlePreviewInline`, envio ao gravar
-5. `emailService.js` → `enviarRelatorioEmail` (manutenção/montagem)
 
 ### Recálculo no servidor (base de dados):
 A função `recalcularPeriodicasAposExecucao()` em `DataContext.jsx` recria os registos futuros no estado e persiste-os no MySQL. É chamada:
@@ -499,6 +504,11 @@ A função `recalcularPeriodicasAposExecucao()` em `DataContext.jsx` recria os r
 ### Bug histórico corrigido (v1.16.0):
 - O auto-preenchimento de `dataRealizacao` para manutenções em atraso usava a **data original de agendamento** (`m.data`) em vez da **data actual** (`getHojeAzores()`). Isto fazia com que o recálculo periódico usasse a data errada como base.
 - Corrigido em `ExecutarManutencaoModal.jsx` linha ~245: `dataRealizacao` agora pré-preenche com `getHojeAzores()` para manutenções em atraso.
+
+### Bugs históricos corrigidos (v1.17.8–1.17.10 — AUTO ELGE):
+- Sync tardia saltava trimestre em atraso imediato (`iso < hojeStr` cego).
+- PDF/email divergiam da agenda (só `computarProximasDatas`, ignorava conflitos entre máquinas).
+- PHP `COUNT(*)+1` na numeração de relatórios → colisão `uq_numero_relat` (usar `MAX+1`).
 
 ## ⚠ PREVENÇÃO DE REGRESSÕES — Lições de 2026-03-19
 

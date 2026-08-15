@@ -9,6 +9,25 @@ Política de continuidade:
 
 ---
 
+## [1.17.10] — 2026-08-15 — Review agenda/PDF + numeração relatórios PHP
+
+### Correcções
+- **`data.php`:** numeração `AAAA.MP.NNNNN` / `MT` passa de `COUNT(*)+1` para **`MAX(sufixo)+1`** (`atm_proximo_numero_relatorio_sequencial`) — evita colisão `uq_numero_relat` quando há buracos na série.
+- **`bulk_create` relatórios:** resolve prefixo MT/MP a partir de `manutencaoId` (antes fixava MP).
+- **`seed-elge-jul2026.mjs`:** recálculo via `recalcularPeriodicasNoEstado` (sem duplicar lógica).
+
+### Qualidade
+- **`tests/unit/agendaProximasParity.test.js`** — paridade agenda ↔ PDF, trimestre em atraso, fallback computar.
+- **125** testes unitários (`npm run test:unit`).
+
+### Documentação
+- **`docs/AGENDA-PERIODICA-E-PROXIMAS.md`** (canónico); actualizados `INDEX.md`, `PLANO-FLUXOS-EXECUCAO.md`, `MANUT-APP-INSIGHTS.md`, `TESTES-E2E.md`, `.cursor/rules/at-manut-workflow.mdc`.
+
+### Deploy
+- API `public_html/api/data.php` (+ PWA se build fechado separadamente).
+
+---
+
 ## [1.17.9] — 2026-08-15 — PDF/email: próximas datas espelham agenda recalculada
 
 ### Correcções

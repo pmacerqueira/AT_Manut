@@ -35,6 +35,7 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 ## Domínio específico (referência)
 | Ficheiro | Conteúdo |
 |----------|----------|
+| **[`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](AGENDA-PERIODICA-E-PROXIMAS.md)** | **Canónico:** agenda trimestral, sync, paridade PDF/email, numeração relatórios |
 | [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST, compressão; PDF (checklist, fecho); corpo HTML UTF-8 (v1.17.5) |
 | [`docs/CRON-ALERTAS.md`](CRON-ALERTAS.md) | Lembretes automáticos |
 | [`docs/KAESER-IMPORT-PDF-ESTRATEGIA.md`](KAESER-IMPORT-PDF-ESTRATEGIA.md) | PDF Kaeser |
@@ -46,6 +47,7 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 - [`docs/ROADMAP-EVOLUCAO-2026.md`](ROADMAP-EVOLUCAO-2026.md)
 - [`docs/PLANO-QUESTIONARIO-SUGESTAO-MANUT.md`](PLANO-QUESTIONARIO-SUGESTAO-MANUT.md)
 - [`docs/PLANO-FLUXOS-EXECUCAO.md`](PLANO-FLUXOS-EXECUCAO.md)
+- **[`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](AGENDA-PERIODICA-E-PROXIMAS.md)** — agenda + PDF (incidente AUTO ELGE, v1.17.8+)
 
 ## Regras de manutenção
 1. Um tema = uma fonte canónica; nos restantes, só link.

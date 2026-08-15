@@ -75,6 +75,20 @@ O workspace `c:\Cursor_Projetos\NAVEL` contém vários projectos independentes (
 
 ---
 
+## 7) Handoff — Agenda periódica AUTO ELGE (2026-08-15)
+
+**Problema:** trimestre Jul/2026 em falta; PDF com datas diferentes da agenda.
+
+**Causas:** (1) `gerarManutencoesPeriodicasFuturas` saltava slots passados sem excepção de atraso ≤1 período; (2) PDF usava só `computarProximasDatas` (ignorava conflitos entre elevadores); (3) PHP `COUNT(*)+1` na numeração de relatórios.
+
+**Correcções:** v1.17.8 (`deveIncluirSlotPeriodicoAntesDeHoje`), v1.17.9 (paridade PDF), v1.17.10 (PHP MAX+1, testes `agendaProximasParity.test.js`).
+
+**Doc canónica:** [`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](AGENDA-PERIODICA-E-PROXIMAS.md) — consultar antes de alterar agenda, sync ou secção «próximas» do PDF.
+
+**Verificação rápida:** `maquinas.proximaManut` = 1.ª linha aberta na lista = 1.ª data no PDF (manutenção concluída).
+
+---
+
 ## 6) Política de limpeza documental
 
 - Conteúdo redundante deve ser removido ou substituído por referência ao documento canónico.

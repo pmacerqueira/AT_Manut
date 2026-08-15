@@ -315,6 +315,11 @@ MC = {
 
 ## Problemas técnicos documentados e resoluções
 
+### Trimestre em falta após «Sincronizar agenda» + PDF divergente da lista (AUTO ELGE, v1.17.8–1.17.9)
+**Problema:** Execução trimestral em Abr/2026; em Ago/2026 Jul/2026 não existia na agenda. PDF «Próximas manutenções» mostrava datas diferentes das linhas agendadas (ex. 29/10 vs 04/11).
+**Causa:** (1) Filtro `iso < hojeStr` cego em `gerarManutencoesPeriodicasFuturas`; (2) `buildProximasManutencoesManutencao` só usava `computarProximasDatas` (sem conflitos cross-máquina); (3) PHP `COUNT(*)+1` para `numero_relatorio`.
+**Solução:** `deveIncluirSlotPeriodicoAntesDeHoje`; paridade agenda via `listProximasAgendaPeriodicas` quando concluída; `atm_proximo_numero_relatorio_sequencial` (MAX+1). Doc: `docs/AGENDA-PERIODICA-E-PROXIMAS.md`. Unit: `agendaProximasParity.test.js`.
+
 ### Emails durante E2E (send-email / send-report) — bloqueio automático
 **Problema:** O mock só interceptava `data.php`. Em dev, o `emailService` chama URLs absolutas em `navel.pt`, pelo que os testes podiam disparar **correio real** para fichas mock ou clientes (ex.: `geral@mecanicabettencourt.pt`).
 **Solução (dupla):** (1) `stubEmailPhpEndpoints` em `helpers.js` intercepta `send-email.php` / `send-report.php` e, se o body JSON tiver `auth_token`, responde com **`route.fulfill`** (200 JSON mock) — **não há pedido HTTP ao PHP** na maioria dos testes. Testes que registarem `page.route` **depois** de `setupApiMock` prevalecem (LIFO), ex. C16/C17. (2) No servidor, `send-email.php` e `send-report.php` forçam destinatário para **`comercial@navel.pt`** quando `Origin`/`Referer` é localhost — rede de segurança se algum fluxo escapar ao Playwright. Ver `INSTRUCOES_CPANEL.md` (`ATM_DEV_SANDBOX_EMAIL`). O mesmo stub é usado em `tests/offline-sync-test.spec.js`.

@@ -61,6 +61,8 @@ Objetivo: **mínimo percurso** sem **redundâncias** que façam perder o context
 ## Referências de código
 
 - `src/utils/proximaManutAgenda.js` — regras de agenda “aberta”.
+- `src/domain/agendaDomain.js` — geração/recálculo de slots periódicos (`deveIncluirSlotPeriodicoAntesDeHoje`).
+- `docs/AGENDA-PERIODICA-E-PROXIMAS.md` — paridade agenda ↔ PDF/email.
 - `src/context/DataContext.jsx` — `scheduleSyncProximaParaMaquinas`, `recalcularPeriodicasAposExecucao`.
 - `src/components/ExecutarManutencaoModal.jsx` — fluxo de execução / criar hoje / escolha múltipla.
 - `src/pages/Manutencoes.jsx` — `executar`, `editar`, `maquinaId`, filtros.

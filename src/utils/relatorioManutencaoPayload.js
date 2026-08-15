@@ -34,18 +34,18 @@ export function buildProximasManutencoesManutencao({ relatorio, manutencao, maqu
   if (!periMaq || !dataExec) return []
 
   const maquinaId = manutencao?.maquinaId ?? maquina?.id
-  if (manutencao?.status === 'concluida' && Array.isArray(manutencoes) && maquinaId) {
-    const fromAgenda = listProximasAgendaPeriodicas(maquinaId, manutencoes)
-    if (fromAgenda.length > 0) {
-      return fromAgenda.map(m => ({
-        data: m.data,
-        periodicidade: m.periodicidade || periMaq,
-        tecnico: m.tecnico || tecnico,
-      }))
-    }
+  const fromAgenda = (manutencao?.status === 'concluida' && Array.isArray(manutencoes) && maquinaId)
+    ? listProximasAgendaPeriodicas(maquinaId, manutencoes)
+    : []
+  if (fromAgenda.length > 0) {
+    return fromAgenda.map(m => ({
+      data: m.data,
+      periodicidade: m.periodicidade || periMaq,
+      tecnico: m.tecnico || tecnico,
+    }))
   }
 
-  return computarProximasDatas(dataExec, periMaq, { tecnico })
+  return computarProximasDatas(dataExec, periMaq, { tecnico, count: 12 })
 }
 
 /**

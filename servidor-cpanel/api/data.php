@@ -773,6 +773,31 @@ try {
  * Relatório + maquina_id da manutenção (JOIN read-only).
  * Permite ao front associar relatórios ao equipamento na frota mesmo com joins frágeis em ids.
  */
+/**
+ * Próximo número sequencial AAAA.TP.NNNNN (MAX+1, não COUNT — evita colisões com buracos na série).
+ */
+function atm_proximo_numero_relatorio_sequencial(PDO $pdo, int $ano, string $tipoPrefix): string {
+    $pattern = $ano . '.' . $tipoPrefix . '.%';
+    $sc = $pdo->prepare(
+        'SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(numero_relatorio, \'.\', -1) AS UNSIGNED)), 0) + 1
+         FROM relatorios WHERE numero_relatorio LIKE ?'
+    );
+    $sc->execute([$pattern]);
+    $cnt = (int)$sc->fetchColumn();
+    return sprintf('%s.%s.%05d', $ano, $tipoPrefix, $cnt);
+}
+
+/** Resolve prefixo MT/MP para numeração de relatório de manutenção. */
+function atm_tipo_prefix_relatorio_manutencao(PDO $pdo, ?string $manutencaoId): string {
+    if (!$manutencaoId) {
+        return 'MP';
+    }
+    $sm = $pdo->prepare('SELECT tipo FROM manutencoes WHERE id = ?');
+    $sm->execute([$manutencaoId]);
+    $m = $sm->fetch();
+    return ($m && $m['tipo'] === 'montagem') ? 'MT' : 'MP';
+}
+
 function atm_fetch_relatorio_row_with_maquina(PDO $pdo, string $relId): ?array {
     $stmt = $pdo->prepare(
         'SELECT r.*, m.maquina_id AS manutencao_maquina_id FROM relatorios r ' .
@@ -1392,19 +1417,9 @@ switch ($action) {
 
         // Geração especial de número de relatório no servidor
         if ($resource === 'relatorios' && empty($data['numeroRelatorio'])) {
-            // Determinar o tipo (MT ou MP) a partir da manutenção associada
-            $tipo = 'MP';
-            if (!empty($data['manutencaoId'])) {
-                $sm = $pdo->prepare("SELECT tipo FROM manutencoes WHERE id = ?");
-                $sm->execute([$data['manutencaoId']]);
-                $m = $sm->fetch();
-                if ($m && $m['tipo'] === 'montagem') $tipo = 'MT';
-            }
-            $ano  = date('Y');
-            $sc   = $pdo->prepare("SELECT COUNT(*) FROM relatorios WHERE numero_relatorio LIKE ?");
-            $sc->execute(["$ano.$tipo.%"]);
-            $cnt  = (int)$sc->fetchColumn() + 1;
-            $data['numeroRelatorio'] = sprintf('%s.%s.%05d', $ano, $tipo, $cnt);
+            $tipo = atm_tipo_prefix_relatorio_manutencao($pdo, $data['manutencaoId'] ?? null);
+            $ano  = (int)date('Y');
+            $data['numeroRelatorio'] = atm_proximo_numero_relatorio_sequencial($pdo, $ano, $tipo);
         }
 
         if ($resource === 'categorias' && isset($data['nome'])) {
@@ -1608,12 +1623,9 @@ switch ($action) {
                 }
                 // Geração de número de relatório se necessário
                 if ($resource === 'relatorios' && empty($data['numeroRelatorio'])) {
-                    $tipo = 'MP';
-                    $ano  = date('Y');
-                    $sc   = $pdo->prepare("SELECT COUNT(*) FROM relatorios WHERE numero_relatorio LIKE ?");
-                    $sc->execute(["$ano.$tipo.%"]);
-                    $cnt  = (int)$sc->fetchColumn() + 1;
-                    $data['numeroRelatorio'] = sprintf('%s.%s.%05d', $ano, $tipo, $cnt);
+                    $tipo = atm_tipo_prefix_relatorio_manutencao($pdo, $data['manutencaoId'] ?? null);
+                    $ano  = (int)date('Y');
+                    $data['numeroRelatorio'] = atm_proximo_numero_relatorio_sequencial($pdo, $ano, $tipo);
                 }
                 $dataSql = normalize_payload_for_sql($data);
                 [$cols, $params] = js_to_row($dataSql, $allowed);

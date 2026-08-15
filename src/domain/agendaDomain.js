@@ -193,7 +193,8 @@ export function recalcularPeriodicasNoEstado(prev, {
 }
 
 /**
- * Um equipamento na sincronização completa da agenda: remove cadeia aberta e gera novas ≥ hoje.
+ * Um equipamento na sincronização completa da agenda: remove cadeia aberta e gera novas
+ * (inclui 1.º trimestre em atraso ≤1 período — ver `deveIncluirSlotPeriodicoAntesDeHoje`).
  * @returns {{ acc: object[], idsRemover: string[], novas: object[], recalculada: boolean }}
  */
 export function recalcularAgendaMaquinaNoAcc(acc, {

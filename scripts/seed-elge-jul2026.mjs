@@ -3,10 +3,7 @@
  * Uso: node scripts/seed-elge-jul2026.mjs [--dry]
  */
 import {
-  gerarManutencoesPeriodicasFuturas,
-  calcLimiteExecucaoMs,
-  buildDiasOcupadosFromManutencoes,
-  isSlotCadeiaPeriodicaAberta,
+  recalcularPeriodicasNoEstado,
 } from '../src/domain/agendaDomain.js'
 import { INTERVALOS } from '../src/domain/equipamentoDomain.js'
 import { proximoNumeroRelatorioSequencial } from '../src/domain/relatorioDomain.js'
@@ -94,28 +91,17 @@ function checklistSnapshot(subcategoriaId, checklistItems) {
 }
 
 function recalcFutureSlots(maquinaId, periodicidade, dataExecucao, tecnico, manutencoes, hojeStr) {
-  const intervaloDias = INTERVALOS[periodicidade]?.dias ?? 90
-  const aRemover = manutencoes.filter(m => isSlotCadeiaPeriodicaAberta(m, maquinaId))
-  const idsRemover = aRemover.map(m => m.id)
-  const idsRemoverSet = new Set(idsRemover)
-  const semFuturas = manutencoes.filter(m => !idsRemoverSet.has(m.id))
-  const diasOcupados = buildDiasOcupadosFromManutencoes(semFuturas)
-  const limiteMs = calcLimiteExecucaoMs(dataExecucao, hojeStr)
-  const { novas } = gerarManutencoesPeriodicasFuturas({
-    dataBaseIso: dataExecucao,
-    periodicidade,
-    intervaloDias,
+  const { idsRemover, novas } = recalcularPeriodicasNoEstado(manutencoes, {
     maquinaId,
+    periodicidade,
+    dataExecucao,
     tecnico,
-    limiteMs,
-    diasOcupados,
     hojeStr,
-    observacoes: 'Reagendamento automático pós-execução periódica.',
+    intervalos: INTERVALOS,
     idSeed: Date.now() + Math.floor(Math.random() * 1e5),
-    idSuffixRandom: true,
-    incluirCriadoEm: true,
+    observacoes: 'Reagendamento automático pós-execução periódica.',
   })
-  return { idsRemover, novas, semFuturas }
+  return { idsRemover, novas }
 }
 
 async function main() {
