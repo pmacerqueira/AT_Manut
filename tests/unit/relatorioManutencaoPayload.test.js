@@ -58,14 +58,18 @@ describe('buildProximasManutencoesManutencao', () => {
     assert.ok(prox[0].data)
   })
 
-  it('falls back to manutencao.periodicidade (montagem antes de copiar para máquina)', () => {
+  it('uses open agenda slots when manutencao is concluida', () => {
     const prox = buildProximasManutencoesManutencao({
-      relatorio: { dataCriacao: '2026-02-01T12:00:00Z' },
-      manutencao: { tipo: 'montagem', periodicidade: 'semestral', tecnico: 'Tec' },
-      maquina: {},
+      relatorio: { dataCriacao: '2026-07-31T12:00:00.000Z', tecnico: 'Tec' },
+      manutencao: { id: 'm1', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', tecnico: 'Tec' },
+      maquina: { id: 'm1', periodicidadeManut: 'trimestral' },
+      manutencoes: [
+        { id: 'f1', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2026-11-04', periodicidade: 'trimestral', tecnico: 'Tec' },
+        { id: 'f2', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2027-01-27', periodicidade: 'trimestral', tecnico: 'Tec' },
+        { id: 'x', maquinaId: 'm2', status: 'agendada', tipo: 'periodica', data: '2026-10-29' },
+      ],
     })
-    assert.ok(prox.length >= 1)
-    assert.ok(prox[0].data)
+    assert.deepEqual(prox.map(p => p.data), ['2026-11-04', '2027-01-27'])
   })
 })
 

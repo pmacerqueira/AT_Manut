@@ -3,6 +3,7 @@
  * Fonte única para data de execução, próximas datas e metadados de declaração.
  */
 import { computarProximasDatas } from './diasUteis.js'
+import { listProximasAgendaPeriodicas } from './proximaManutAgenda.js'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio.js'
 
 /** Periodicidade efectiva: ficha da máquina ou linha de manutenção (montagem antes de copiar para máquina). */
@@ -21,14 +22,30 @@ export function resolveDataExecucaoManutencao({ relatorio, manutencao, dataExecu
   )
 }
 
-/** 12 próximas datas futuras a partir da execução (não usar registos da BD). */
-export function buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao }) {
+/**
+ * Próximas manutenções para PDF/email.
+ * Manutenção concluída + lista da agenda: espelha slots abertos recalculados (BD).
+ * Caso contrário: calcula a partir da data de execução (pré-visualização / montagem).
+ */
+export function buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao, manutencoes }) {
   const dataExec = dataExecucao ?? resolveDataExecucaoManutencao({ relatorio, manutencao })
   const periMaq = resolvePeriodicidadeManutencao({ maquina, manutencao })
+  const tecnico = manutencao?.tecnico || relatorio?.tecnico || ''
   if (!periMaq || !dataExec) return []
-  return computarProximasDatas(dataExec, periMaq, {
-    tecnico: manutencao?.tecnico || relatorio?.tecnico || '',
-  })
+
+  const maquinaId = manutencao?.maquinaId ?? maquina?.id
+  if (manutencao?.status === 'concluida' && Array.isArray(manutencoes) && maquinaId) {
+    const fromAgenda = listProximasAgendaPeriodicas(maquinaId, manutencoes)
+    if (fromAgenda.length > 0) {
+      return fromAgenda.map(m => ({
+        data: m.data,
+        periodicidade: m.periodicidade || periMaq,
+        tecnico: m.tecnico || tecnico,
+      }))
+    }
+  }
+
+  return computarProximasDatas(dataExec, periMaq, { tecnico })
 }
 
 /**
@@ -42,6 +59,7 @@ export function buildRelatorioManutencaoMeta({
   getCategoria,
   getTecnicoByNome,
   checklistItems = [],
+  manutencoes,
 }) {
   const sub = maquina ? getSubcategoria(maquina.subcategoriaId) : null
   const dataExecucao = resolveDataExecucaoManutencao({ relatorio, manutencao })
@@ -49,7 +67,7 @@ export function buildRelatorioManutencaoMeta({
     checklistItems,
     subcategoriaNome: sub?.nome ?? '',
     tecnicoObj: getTecnicoByNome?.(manutencao?.tecnico || relatorio?.tecnico) ?? null,
-    proximasManutencoes: buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao }),
+    proximasManutencoes: buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao, manutencoes }),
     categoriaNome: categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria),
     declaracaoClienteDepois: declaracaoClienteDepoisFromMaquina(maquina, getSubcategoria, getCategoria),
     dataExecucao,
@@ -68,6 +86,7 @@ export function buildRelatorioManutencaoPdfArgs({
   getCategoria,
   getTecnicoByNome,
   checklistItems = [],
+  manutencoes,
 }) {
   const meta = buildRelatorioManutencaoMeta({
     relatorio,
@@ -77,6 +96,7 @@ export function buildRelatorioManutencaoPdfArgs({
     getCategoria,
     getTecnicoByNome,
     checklistItems,
+    manutencoes,
   })
   return {
     relatorio,
@@ -106,6 +126,7 @@ export function buildRelatorioManutencaoEmailArgs({
   getTecnicoByNome,
   checklistItems = [],
   logoUrl = '',
+  manutencoes,
 }) {
   const meta = buildRelatorioManutencaoMeta({
     relatorio,
@@ -115,6 +136,7 @@ export function buildRelatorioManutencaoEmailArgs({
     getCategoria,
     getTecnicoByNome,
     checklistItems,
+    manutencoes,
   })
   return {
     emailDestinatario,
@@ -129,5 +151,7 @@ export function buildRelatorioManutencaoEmailArgs({
     marcas,
     categoriaNome: meta.categoriaNome,
     declaracaoClienteDepois: meta.declaracaoClienteDepois,
+    proximasManutencoes: meta.proximasManutencoes,
+    manutencoes,
   }
 }

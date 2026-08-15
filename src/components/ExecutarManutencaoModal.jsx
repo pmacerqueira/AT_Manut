@@ -909,6 +909,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         getCategoria,
         getTecnicoByNome,
         checklistItems: items,
+        manutencoes,
       }))
       const url = URL.createObjectURL(blob)
       setPreviewPdfUrl(url)
@@ -1262,6 +1263,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           getTecnicoByNome,
           checklistItems: items,
           logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+          manutencoes,
         }))
         if (resultado.ok) {
           showToast(`Email enviado para ${emailDestinatario}.`, 'success')

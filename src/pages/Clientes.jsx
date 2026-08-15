@@ -257,6 +257,7 @@ export default function Clientes() {
         getCategoria,
         getTecnicoByNome,
         checklistItems,
+        manutencoes,
       }))
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

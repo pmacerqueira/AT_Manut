@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.17.9] — 2026-08-15 — PDF/email: próximas datas espelham agenda recalculada
+
+### Correcções
+- **`buildProximasManutencoesManutencao`:** para manutenções **concluídas**, PDF e email usam os slots periódicos em aberto na agenda (BD) em vez de recalcular datas genéricas — alinha relatório AUTO ELGE Jul/2026 com Nov/2026, Jan/2027, etc.
+- **`listProximasAgendaPeriodicas`** em `proximaManutAgenda.js`; callers passam `manutencoes` (Manutenções, Clientes, ExecutarManutencaoModal, EnviarEmailModal).
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.8] — 2026-08-15 — Agenda trimestral: slot em atraso + AUTO ELGE Jul/2026
 
 ### Correcções

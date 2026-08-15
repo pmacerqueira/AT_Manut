@@ -11,7 +11,7 @@ import { logger } from '../utils/logger'
 const EMAIL_ADMIN = 'comercial@navel.pt'
 
 export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatorio, maquina, cliente }) {
-  const { getChecklistBySubcategoria, getSubcategoria, getCategoria, updateRelatorio, getTecnicoByNome, marcas } = useData()
+  const { getChecklistBySubcategoria, getSubcategoria, getCategoria, updateRelatorio, getTecnicoByNome, marcas, manutencoes } = useData()
   const { showToast } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
 
@@ -66,6 +66,7 @@ export default function EnviarEmailModal({ isOpen, onClose, manutencao, relatori
           getTecnicoByNome,
           checklistItems,
           logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+          manutencoes,
         }))
         if (resultado?.ok) sucesso++
         else {

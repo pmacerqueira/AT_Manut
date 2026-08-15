@@ -51,3 +51,13 @@ export function candidatosMesmaDataMinimaAberta(maquinaId, listaManutencoes) {
   const minD = ordenadas[0].data
   return ordenadas.filter(m => m.data === minD)
 }
+
+/**
+ * Próximas manutenções periódicas em aberto na agenda (exclui montagem).
+ * Usado em PDF/email para espelhar slots já recalculados na BD.
+ */
+export function listProximasAgendaPeriodicas(maquinaId, listaManutencoes, { limit = 12 } = {}) {
+  return listManutencoesAbertasOrdenadas(maquinaId, listaManutencoes)
+    .filter(m => m.tipo !== 'montagem')
+    .slice(0, limit)
+}

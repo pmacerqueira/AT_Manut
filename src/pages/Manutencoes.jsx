@@ -711,6 +711,7 @@ export default function Manutencoes() {
           getTecnicoByNome,
           checklistItems,
           logoUrl: `${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`,
+          manutencoes,
         }))
         if (resultado?.ok) sucessoDests.push(dest)
         else {
@@ -761,6 +762,7 @@ export default function Manutencoes() {
         getCategoria,
         getTecnicoByNome,
         checklistItems,
+        manutencoes,
       }))
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

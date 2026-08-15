@@ -129,6 +129,10 @@ export async function enviarRelatorioEmail({
   declaracaoClienteDepois = '',
   /** Presente apenas no fluxo de reparação — data na ficha da reparação, etc. */
   reparacao        = null,
+  /** Lista completa (PDF/email espelha agenda recalculada quando manutenção concluída). */
+  manutencoes      = null,
+  /** Pré-calculadas em buildRelatorioManutencaoEmailArgs (opcional). */
+  proximasManutencoes: proximasManutencoesIn = null,
 }) {
   if (!emailDestinatario?.trim()) {
     return { ok: false, message: 'Endereço de email em falta.' }
@@ -202,7 +206,7 @@ export async function enviarRelatorioEmail({
 
       const proximasManutencoes = isRepair
         ? []
-        : buildProximasManutencoesManutencao({ relatorio, manutencao, maquina })
+        : (proximasManutencoesIn ?? buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, manutencoes }))
       const resumoExec = buildResumoExecutivoEmailPayload({
         relatorio,
         manutencao,
