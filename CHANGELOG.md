@@ -9,6 +9,20 @@ Política de continuidade:
 
 ---
 
+## [1.17.11] — 2026-08-15 — MONTALVERNE: Jul/2026 em falta (2 elevadores)
+
+### Dados (produção)
+- **`scripts/seed-montalverne-jul2026.mjs`:** regista manutenções **29/07/2026** executadas + relatórios **2026.MP.00109** (S/N 10574064) e **00110** (S/N 10653025); técnico e assinatura alinhados com a visita Jul/2026 da restante frota (Aldevino Costa / Fabio teles).
+- Recálculo agenda: próxima trimestral **27/10/2026** nos dois equipamentos (paridade com os outros elevadores MONTALVERNE).
+
+### Contexto
+- Mesmo padrão do AUTO ELGE (slot Jul/2026 ignorado antes da correcção v1.17.8); restantes 5 equipamentos trimestrais do cliente já tinham Jul/2026.
+
+### Deploy
+- PWA `public_html/manut/` (script + nota CHANGELOG; sem alterações PHP).
+
+---
+
 ## [1.17.10] — 2026-08-15 — Review agenda/PDF + numeração relatórios PHP
 
 ### Correcções
