@@ -9,6 +9,25 @@ Política de continuidade:
 
 ---
 
+## [1.17.13] — 2026-08-15 — ANTERO REGO: assinantes por secção + dados corrigidos
+
+### Funcionalidade
+- **`clienteAssinantesSecao.js`:** detecta secção Mecânica/Colisão no rótulo do elevador; escolha entre Fábio Cordeiro e Paulo Sousa; repõe assinatura histórica por secção.
+- **`ExecutarManutencaoModal` / `ClienteStep`:** chips de secção + validação que impede assinante errado.
+- **`scripts/fix-antero-rego-assinantes.mjs`:** normalização de relatórios existentes.
+
+### Dados (produção)
+- **Abr/2026:** 8 relatórios já correctos (auditoria).
+- **Corrigidos 8 relatórios** (Jan/2026 nomes abreviados + Jul/2026 Colisão com assinante errado): MP.00026–00052, 00111, 00112.
+
+### Qualidade
+- **`tests/unit/clienteAssinantesSecao.test.js`** — 5 testes; **136** unitários no total.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.12] — 2026-08-15 — Auditoria de lapsos na agenda periódica
 
 ### Funcionalidade

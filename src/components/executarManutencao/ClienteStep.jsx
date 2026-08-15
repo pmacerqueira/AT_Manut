@@ -1,5 +1,6 @@
 import { Bookmark } from 'lucide-react'
 import { resolveDeclaracaoClienteForMaquina } from '../../constants/relatorio'
+import { normTexto } from '../../domain/clienteAssinantesSecao.js'
 
 /**
  * Passo nome do cliente + declaração de aceitação.
@@ -17,7 +18,13 @@ export default function ClienteStep({
   getSubcategoria,
   getCategoria,
   onGuardarNomeContacto,
+  opcoesAssinanteSecao = [],
+  secaoDetectada = null,
+  onSelecionarAssinanteSecao,
 }) {
+  const multiSecao = opcoesAssinanteSecao.length > 0
+  const nomeNorm = normTexto(form.nomeAssinante)
+
   return (
     <div className="wizard-step-content" style={{ display: visible ? 'block' : 'none' }}>
       {isCorrectionMode && <h3 className="admin-edit-section-title">Nome do cliente</h3>}
@@ -38,6 +45,38 @@ export default function ClienteStep({
         </div>
       )}
 
+      {multiSecao && !isCorrectionMode && (
+        <div className="form-section assinante-secao-block">
+          <span className="assinante-secao-label">
+            Secção do equipamento
+            {secaoDetectada && (
+              <span className="assinante-secao-detectada">
+                — detectada: {secaoDetectada === 'colisao' ? 'Colisão' : 'Mecânica'}
+              </span>
+            )}
+          </span>
+          <div className="assinante-secao-opcoes" role="group" aria-label="Responsável pela secção">
+            {opcoesAssinanteSecao.map(opcao => {
+              const activo = nomeNorm === normTexto(opcao.nomeAssinante)
+              return (
+                <button
+                  key={opcao.secao}
+                  type="button"
+                  className={`assinante-secao-chip${activo ? ' assinante-secao-chip--activo' : ''}`}
+                  onClick={() => onSelecionarAssinanteSecao?.(opcao)}
+                  title={opcao.assinaturaDigital ? 'Carregar assinatura histórica' : 'Sem assinatura histórica — assinar manualmente'}
+                >
+                  {opcao.label || opcao.nomeAssinante}
+                </button>
+              )
+            })}
+          </div>
+          <p className="form-hint assinante-secao-hint">
+            Escolha o responsável da secção. A assinatura histórica é reposta automaticamente quando existir.
+          </p>
+        </div>
+      )}
+
       <label className={`${isCorrectionMode ? '' : 'label-required'} form-section`}>
         <span>
           {isCorrectionMode ? 'Nome do cliente que assinou' : 'Nome do cliente que assina'}
@@ -50,8 +89,9 @@ export default function ClienteStep({
             onChange={e => { setForm(f => ({ ...f, nomeAssinante: e.target.value })); setErroAssinatura('') }}
             placeholder="Nome completo do responsável"
             maxLength={80}
+            readOnly={multiSecao && !isCorrectionMode}
           />
-          {form.nomeAssinante.trim() && (
+          {!multiSecao && form.nomeAssinante.trim() && (
             <button
               type="button"
               className="btn-guardar-contacto"

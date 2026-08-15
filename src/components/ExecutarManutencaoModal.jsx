@@ -58,6 +58,11 @@ import TecnicoStep from './executarManutencao/TecnicoStep'
 import ClienteStep from './executarManutencao/ClienteStep'
 import AssinaturaStep from './executarManutencao/AssinaturaStep'
 import FinalizarStep from './executarManutencao/FinalizarStep'
+import {
+  resolverAssinanteEquipamento,
+  validarAssinanteSecaoEquipamento,
+} from '../domain/clienteAssinantesSecao.js'
+import { desenharAssinaturaNoCanvas } from '../utils/desenharAssinaturaCanvas.js'
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
@@ -151,6 +156,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
+  const assinanteSecao = useMemo(() => {
+    if (!maq) return { multiSecao: false, opcoes: [], secaoDetectada: null }
+    return resolverAssinanteEquipamento({
+      maq,
+      clienteNif: cli?.nif ?? maq?.clienteNif,
+      relatorios: todosRelatorios,
+      existingRel: rel,
+      nomeContactoCliente: cli?.nomeContacto ?? '',
+    })
+  }, [maq, cli, todosRelatorios, rel])
   const isCorrectionMode = adminEdit || quickEdit
   /** Admin: `adminEdit`. ATecnica: relatório ainda não enviado ao cliente — podem corrigir agendamento e data de execução. */
   const showStatusDatasSection = isCorrectionMode || (!!rel && !isRelatorioEnviadoAoCliente(rel) && !isAdmin)
@@ -383,7 +398,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
               usado: true,
             }))
           : [])
-    const nomePreenchido = existingRel?.nomeAssinante || cli?.nomeContacto || ''
+    const assinanteResolvido = resolverAssinanteEquipamento({
+      maq,
+      clienteNif: cli?.nif ?? maq?.clienteNif,
+      relatorios: todosRelatorios,
+      existingRel,
+      nomeContactoCliente: cli?.nomeContacto ?? '',
+    })
+    const nomePreenchido = assinanteResolvido.nomeAssinante || cli?.nomeContacto || ''
     const horasIniciaisUnificadas = horasNaManutAberta ?? horasNaFicha
     const nextFotos = existingRel?.fotos ?? []
     const nextForm = {
@@ -410,7 +432,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setSignatureClearedByUser(false)
     const clienteEmail = cli?.email ?? ''
     setEmailDestinatario(clienteEmail)
-    const assinaturaBaseline = !!(existingRel?.assinaturaDigital || cli?.assinaturaContacto)
+    const assinaturaBaseline = !!(
+      existingRel?.assinaturaDigital ||
+      assinanteResolvido.assinaturaDigital ||
+      (!assinanteResolvido.multiSecao && cli?.assinaturaContacto)
+    )
     execCancelBaselineRef.current = snapshotExecCancelState({
       form: nextForm,
       fotos: nextFotos,
@@ -429,7 +455,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       // Prioridade: assinatura já guardada no relatório (edição antes de enviar ao cliente);
       // senão, assinatura reutilizável do contacto do cliente.
-      const assinaturaImgSrc = existingRel?.assinaturaDigital || cli?.assinaturaContacto || null
+      const assinaturaImgSrc = existingRel?.assinaturaDigital
+        || assinanteResolvido.assinaturaDigital
+        || (!assinanteResolvido.multiSecao ? cli?.assinaturaContacto : null)
+        || null
       if (assinaturaImgSrc) {
         const img = new Image()
         img.onload = () => {
@@ -573,6 +602,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setAssinaturaFeita(false)
     setSignatureClearedByUser(true)
   }, [])
+
+  const selecionarAssinanteSecao = useCallback((opcao) => {
+    setForm(f => ({ ...f, nomeAssinante: opcao.nomeAssinante }))
+    setErroAssinatura('')
+    if (opcao.assinaturaDigital) {
+      requestAnimationFrame(() => {
+        desenharAssinaturaNoCanvas(canvasRef.current, opcao.assinaturaDigital, {
+          onLoad: () => {
+            setAssinaturaFeita(true)
+            setSignatureClearedByUser(false)
+          },
+          onError: () => limparAssinatura(),
+        })
+      })
+    } else {
+      limparAssinatura()
+    }
+  }, [limparAssinatura])
 
   const guardarNomeContacto = useCallback(() => {
     const nome = form.nomeAssinante.trim()
@@ -718,6 +765,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           setErroAssinatura('Indique o nome do cliente que assina o relatório.')
           return false
         }
+        const erroSecaoCli = validarAssinanteSecaoEquipamento({
+          maq,
+          clienteNif: cli?.nif ?? maq?.clienteNif,
+          nomeAssinante: form.nomeAssinante,
+        })
+        if (erroSecaoCli) {
+          setErroAssinatura(erroSecaoCli)
+          return false
+        }
         setErroAssinatura('')
         return true
       }
@@ -764,6 +820,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (s === W.cli) {
       if (!form.nomeAssinante.trim()) {
         setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        return false
+      }
+      const erroSecaoCli = validarAssinanteSecaoEquipamento({
+        maq,
+        clienteNif: cli?.nif ?? maq?.clienteNif,
+        nomeAssinante: form.nomeAssinante,
+      })
+      if (erroSecaoCli) {
+        setErroAssinatura(erroSecaoCli)
         return false
       }
       setErroAssinatura('')
@@ -994,6 +1059,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (!semAssinatura) {
       if (!form.nomeAssinante.trim()) {
         setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        return
+      }
+      const erroSecao = validarAssinanteSecaoEquipamento({
+        maq,
+        clienteNif: cli?.nif ?? maq?.clienteNif,
+        nomeAssinante: form.nomeAssinante,
+      })
+      if (erroSecao) {
+        setErroAssinatura(erroSecao)
         return
       }
       const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
@@ -2069,6 +2143,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             getSubcategoria={getSubcategoria}
             getCategoria={getCategoria}
             onGuardarNomeContacto={guardarNomeContacto}
+            opcoesAssinanteSecao={assinanteSecao.opcoes}
+            secaoDetectada={assinanteSecao.secaoDetectada}
+            onSelecionarAssinanteSecao={selecionarAssinanteSecao}
           />
 
           <AssinaturaStep

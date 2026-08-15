@@ -1004,6 +1004,42 @@ body:has(.modal-overlay) {
 .btn-guardar-contacto:hover { background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.22); }
 .btn-guardar-contacto:active { opacity: 0.8; }
 
+.assinante-secao-block { margin-bottom: 0.5rem; }
+.assinante-secao-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.45rem;
+}
+.assinante-secao-detectada {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.assinante-secao-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.assinante-secao-chip {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.assinante-secao-chip:hover {
+  border-color: var(--color-accent);
+}
+.assinante-secao-chip--activo {
+  border-color: var(--color-accent);
+  background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.18);
+  font-weight: 600;
+}
+.assinante-secao-hint { margin-top: 0.35rem; }
+
 .form-section.consumiveis-section, .form-section.horas-acumuladas-section { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
 .form-section.consumiveis-section h3, .form-section.horas-acumuladas-section h3 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--color-text); font-weight: 600; }
 .horas-info { margin: 0; font-size: 0.9em; }
