@@ -46,6 +46,20 @@ export function calcLimiteExecucaoMs(dataExecIso, hojeStr) {
 }
 
 /**
+ * Slots passados: criar só se forem o primeiro da cadeia e o atraso ≤ 1 período
+ * (ex.: execução Abr → Jul em falta em Ago). Âncoras antigas saltam anos passados.
+ */
+export function deveIncluirSlotPeriodicoAntesDeHoje(iso, hojeStr, intervaloDias, novasCount) {
+  if (!hojeStr || iso >= hojeStr) return true
+  if (novasCount > 0) return false
+  const hojeMs = new Date(`${hojeStr}T12:00:00`).getTime()
+  const slotMs = new Date(`${iso}T12:00:00`).getTime()
+  const atrasoMs = hojeMs - slotMs
+  const umPeriodoMs = intervaloDias * 24 * 3600 * 1000
+  return atrasoMs <= umPeriodoMs
+}
+
+/**
  * Gera slots de manutenções periódicas futuras a partir de dataBase + intervalo.
  * @returns {{ novas: object[], conflitos?: object[] }}
  */
@@ -79,7 +93,7 @@ export function gerarManutencoesPeriodicasFuturas({
 
     const { data: dAjustada, conflito } = encontrarDiaLivre(d, feriadosSet, ocupados)
     const iso = dateToIsoLocal(dAjustada)
-    if (hojeStr && iso < hojeStr) continue
+    if (!deveIncluirSlotPeriodicoAntesDeHoje(iso, hojeStr, intervaloDias, novas.length)) continue
 
     const idx = novas.length
     const id = idSuffixRandom

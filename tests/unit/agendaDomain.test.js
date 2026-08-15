@@ -9,6 +9,7 @@ import {
   resolverDataExecucaoParaMaquina,
   recalcularPeriodicasNoEstado,
   recalcularAgendaMaquinaNoAcc,
+  deveIncluirSlotPeriodicoAntesDeHoje,
 } from '../../src/domain/agendaDomain.js'
 import { INTERVALOS } from '../../src/domain/equipamentoDomain.js'
 
@@ -52,7 +53,7 @@ describe('gerarManutencoesPeriodicasFuturas', () => {
     assert.match(novas[0].id, /^mp1000_/)
   })
 
-  it('skips dates before hoje when hojeStr set', () => {
+  it('skips ancient past dates when hojeStr set but keeps slots within one period overdue', () => {
     const { novas } = gerarManutencoesPeriodicasFuturas({
       dataBaseIso: '2020-01-01',
       periodicidade: 'anual',
@@ -64,7 +65,27 @@ describe('gerarManutencoesPeriodicasFuturas', () => {
       observacoes: 'test',
       idSeed: 2000,
     })
-    assert.ok(novas.every(n => n.data >= '2026-06-12'))
+    assert.ok(novas.length >= 1)
+    assert.ok(novas.every(n => n.data >= '2025-06-12'))
+    assert.ok(novas.some(n => n.data >= '2026-06-12'))
+  })
+
+  it('creates trimestral July slot when last exec was April and hoje is August (AUTO ELGE case)', () => {
+    const { novas } = gerarManutencoesPeriodicasFuturas({
+      dataBaseIso: '2026-04-17',
+      periodicidade: 'trimestral',
+      intervaloDias: 90,
+      maquinaId: 'm-elge',
+      limiteMs: calcLimiteExecucaoMs('2026-04-17', '2026-08-15'),
+      diasOcupados: new Set(),
+      hojeStr: '2026-08-15',
+      observacoes: 'test',
+      idSeed: 2100,
+    })
+    assert.ok(novas.length >= 2)
+    assert.ok(novas[0].data >= '2026-07-01' && novas[0].data < '2026-08-01', `first slot should be July, got ${novas[0].data}`)
+    assert.ok(novas[0].data < '2026-08-15', 'July slot should appear as overdue')
+    assert.ok(novas[1].data >= '2026-10-01')
   })
 
   it('tracks conflitos when enabled', () => {
@@ -133,6 +154,18 @@ describe('recalcularPeriodicasNoEstado', () => {
     assert.ok(novaCount >= 1)
     assert.ok(next.some(m => m.maquinaId === 'm1' && m.id !== 'old1'))
     assert.ok(next.some(m => m.id === 'keep'))
+  })
+})
+
+describe('deveIncluirSlotPeriodicoAntesDeHoje', () => {
+  it('allows first slot within one trimestral period overdue', () => {
+    assert.equal(deveIncluirSlotPeriodicoAntesDeHoje('2026-07-16', '2026-08-15', 90, 0), true)
+  })
+  it('rejects ancient first slot beyond one period', () => {
+    assert.equal(deveIncluirSlotPeriodicoAntesDeHoje('2021-01-01', '2026-06-12', 365, 0), false)
+  })
+  it('rejects additional past slots once one exists', () => {
+    assert.equal(deveIncluirSlotPeriodicoAntesDeHoje('2026-07-16', '2026-08-15', 90, 1), false)
   })
 })
 

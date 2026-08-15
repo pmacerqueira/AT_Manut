@@ -9,6 +9,20 @@ Política de continuidade:
 
 ---
 
+## [1.17.8] — 2026-08-15 — Agenda trimestral: slot em atraso + AUTO ELGE Jul/2026
+
+### Correcções
+- **`agendaDomain.js` — `deveIncluirSlotPeriodicoAntesDeHoje`:** ao sincronizar/recalcular a agenda, o primeiro trimestre em falta (ex.: execução Abr/2026 → Jul/2026 em Ago) deixa de ser ignorado; só slots muito antigos (>1 período) continuam a ser saltados.
+- **Produção AUTO ELGE:** criadas manutenções concluídas **31/07/2026** + relatórios **2026.MP.00107** e **2026.MP.00108** (assinatura reutilizada — Paulo Rodrigues); agenda futura recalculada (próxima ~Nov/2026).
+
+### Qualidade
+- `tests/unit/agendaDomain.test.js` — caso AUTO ELGE + helper `deveIncluirSlotPeriodicoAntesDeHoje`.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.7] — 2026-06-23 — PDF pré-visualização alinhado ao email
 
 ### Correcções
