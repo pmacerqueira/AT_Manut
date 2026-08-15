@@ -17,6 +17,7 @@ import SignaturePad from '../components/SignaturePad'
 import { logger } from '../utils/logger'
 import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
 import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive, Users, Plus, Pencil, Trash2, X, Phone, PenLine } from 'lucide-react'
+import AgendaAuditPanel from '../components/AgendaAuditPanel'
 import { STORAGE } from '../config/storageKeys'
 import './Definicoes.css'
 
@@ -323,6 +324,8 @@ export default function Definicoes() {
           </div>
         </div>
       </section>
+
+      <AgendaAuditPanel />
 
       {/* Modo campo */}
       <section className="def-section">

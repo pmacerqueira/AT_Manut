@@ -9,6 +9,25 @@ Política de continuidade:
 
 ---
 
+## [1.17.12] — 2026-08-15 — Auditoria de lapsos na agenda periódica
+
+### Funcionalidade
+- **`agendaAuditDomain.js`:** varrimento além do «Sincronizar agenda» — buracos entre concluídas, saltos Abr→Out, slots que sync criaria em atraso, `proximaManut` desalinhada.
+- **Definições (Admin):** painel «Auditoria da agenda periódica» com tabela, copiar relatório e link ao equipamento.
+- **CLI:** `scripts/audit-agenda-gaps.mjs` (`--json`; exit 1 se houver anomalias).
+
+### Qualidade
+- **`tests/unit/agendaAuditDomain.test.js`** — 6 testes.
+- **131** testes unitários (`npm run test:unit`).
+
+### Documentação
+- **`docs/AGENDA-PERIODICA-E-PROXIMAS.md`** — secção auditoria.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.11] — 2026-08-15 — MONTALVERNE: Jul/2026 em falta (2 elevadores)
 
 ### Dados (produção)

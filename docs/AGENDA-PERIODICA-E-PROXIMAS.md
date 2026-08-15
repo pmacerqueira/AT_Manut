@@ -45,6 +45,11 @@
 ### Coerência ficha ↔ agenda
 Após recálculo: `maquinas.proximaManut` = `minDataManutencaoAberta(maquinaId, manutencoes)` (`proximaManutAgenda.js`).
 
+### Auditoria de lapsos
+- **Domínio:** `src/domain/agendaAuditDomain.js` — buracos entre concluídas, saltos na agenda aberta, slots que sync criaria, `proximaManut` desalinhada.
+- **Admin:** Definições → «Auditoria da agenda periódica».
+- **CLI:** `node scripts/audit-agenda-gaps.mjs` (exit 1 se houver anomalias; `--json` para export).
+
 ---
 
 ## 3. PDF e email (`relatorioManutencaoPayload.js`)

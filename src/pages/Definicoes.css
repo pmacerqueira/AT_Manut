@@ -496,3 +496,76 @@
 @media (max-width: 1024px) and (orientation: landscape) {
   .def-page { padding: 0.75rem 1rem 2rem; }
 }
+
+/* ── Auditoria agenda ─────────────────────────────────────────────────────── */
+.agenda-audit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.agenda-audit-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.agenda-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.agenda-audit-table th,
+.agenda-audit-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.agenda-audit-table th {
+  background: var(--color-bg-elevated);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.agenda-audit-equip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.agenda-audit-equip span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.agenda-audit-detalhe {
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+.agenda-audit-sev {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.agenda-audit-sev--alta {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.agenda-audit-sev--media {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+}
+
+.agenda-audit-sev--baixa {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
