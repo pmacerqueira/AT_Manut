@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.17.15] — 2026-08-15 — Auditoria cadeia 2026 + paridade sync
+
+### Funcionalidade
+- **`scripts/audit-2026-cadeia-manutencoes.mjs`:** varrimento produção — 1.ª execução 2026 por equipamento, próximas abertas, paridade com sync simulado, resumo por cliente (`--json`).
+
+### Auditoria (produção 2026-08-15)
+- **83** equipamentos periódicos, **27** clientes; **63** com execução em 2026.
+- **0** lapsos (`audit-agenda-gaps`); **83/83** paridade sync.
+- Clientes elevadores (ANTERO REGO, AUTO ELGE, MONTALVERNE): cadeias Jan→Abr→Jul→Out correctas.
+
+### Documentação
+- `docs/AGENDA-PERIODICA-E-PROXIMAS.md` — referência ao novo CLI.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.14] — 2026-08-15 — ANTERO REGO: assinaturas canónicas por secção
 
 ### Correcção

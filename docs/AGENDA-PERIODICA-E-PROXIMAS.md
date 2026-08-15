@@ -49,6 +49,7 @@ Após recálculo: `maquinas.proximaManut` = `minDataManutencaoAberta(maquinaId, 
 - **Domínio:** `src/domain/agendaAuditDomain.js` — buracos entre concluídas, saltos na agenda aberta, slots que sync criaria, `proximaManut` desalinhada.
 - **Admin:** Definições → «Auditoria da agenda periódica».
 - **CLI:** `node scripts/audit-agenda-gaps.mjs` (exit 1 se houver anomalias; `--json` para export).
+- **CLI cadeia 2026+:** `node scripts/audit-2026-cadeia-manutencoes.mjs` — 1.ªs execuções do ano, próximas abertas e paridade com sync simulado (exit 1 se anomalias; `--json`).
 
 ---
 
