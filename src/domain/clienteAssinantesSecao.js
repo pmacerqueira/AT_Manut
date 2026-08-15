@@ -12,12 +12,15 @@ export const ASSINANTES_SECAO_ANTERO_REGO = [
     keywords: ['mecanica', 'mecânica'],
     nomeAssinante: 'Fabio Cordeiro - MECANICA',
     label: 'Fábio Cordeiro — Mecânica',
+    /** Relatório com assinatura histórica correcta (Abr/2026 ANTERO REGO). */
+    relatorioRefAssinatura: '2026.MP.00059',
   },
   {
     secao: 'colisao',
     keywords: ['colisao', 'colisão'],
     nomeAssinante: 'Paulo Sousa - COLISAO',
     label: 'Paulo Sousa — Colisão',
+    relatorioRefAssinatura: '2026.MP.00048',
   },
 ]
 
@@ -68,21 +71,15 @@ function tsRelatorio(r) {
   return String(r?.dataAssinatura || r?.dataCriacao || '')
 }
 
-/** Última assinatura digital histórica para um nome de assinante canónico. */
-export function ultimaAssinaturaHistorica(relatorios, nomeAssinanteAlvo) {
+/** Última assinatura com nome **exactamente** igual ao canónico (evita cruzar pessoas). */
+export function ultimaAssinaturaHistoricaExata(relatorios, nomeAssinanteAlvo) {
   if (!nomeAssinanteAlvo || !Array.isArray(relatorios)) return null
   const alvoNorm = normTexto(nomeAssinanteAlvo)
-  const prefixo = alvoNorm.split(' - ')[0] || alvoNorm
-  const sufixoSecao = alvoNorm.split(' - ')[1] || ''
-
   let bestSig = null
   let bestTs = ''
   for (const r of relatorios) {
     if (!r?.assinaturaDigital || !r?.nomeAssinante) continue
-    const rn = normTexto(r.nomeAssinante)
-    const matchExato = rn === alvoNorm
-    const matchParcial = rn.includes(prefixo) && (!sufixoSecao || rn.includes(sufixoSecao))
-    if (!matchExato && !matchParcial) continue
+    if (normTexto(r.nomeAssinante) !== alvoNorm) continue
     const ts = tsRelatorio(r)
     if (ts >= bestTs) {
       bestTs = ts
@@ -90,6 +87,21 @@ export function ultimaAssinaturaHistorica(relatorios, nomeAssinanteAlvo) {
     }
   }
   return bestSig
+}
+
+/** Assinatura canónica: relatório de referência → histórico exacto. */
+export function assinaturaCanonicaAssinante(relatorios, entry) {
+  if (!entry) return null
+  if (entry.relatorioRefAssinatura) {
+    const ref = relatorios.find(r => r.numeroRelatorio === entry.relatorioRefAssinatura)
+    if (ref?.assinaturaDigital) return ref.assinaturaDigital
+  }
+  return ultimaAssinaturaHistoricaExata(relatorios, entry.nomeAssinante)
+}
+
+/** @deprecated Preferir ultimaAssinaturaHistoricaExata — mantido para compat. */
+export function ultimaAssinaturaHistorica(relatorios, nomeAssinanteAlvo) {
+  return ultimaAssinaturaHistoricaExata(relatorios, nomeAssinanteAlvo)
 }
 
 /**
@@ -100,7 +112,7 @@ export function buildOpcoesAssinanteSecao(config, relatorios) {
     secao: entry.secao,
     nomeAssinante: entry.nomeAssinante,
     label: entry.label || entry.nomeAssinante,
-    assinaturaDigital: ultimaAssinaturaHistorica(relatorios, entry.nomeAssinante),
+    assinaturaDigital: assinaturaCanonicaAssinante(relatorios, entry),
   }))
 }
 
@@ -133,8 +145,10 @@ export function resolverAssinanteEquipamento({
     : null
 
   if (existingRel?.nomeAssinante) {
+    const entryMatch = config.find(e => normTexto(e.nomeAssinante) === normTexto(existingRel.nomeAssinante))
     const hist = existingRel.assinaturaDigital
-      || ultimaAssinaturaHistorica(relatorios, existingRel.nomeAssinante)
+      || assinaturaCanonicaAssinante(relatorios, entryMatch)
+      || ultimaAssinaturaHistoricaExata(relatorios, existingRel.nomeAssinante)
     return {
       multiSecao: true,
       opcoes,
@@ -146,8 +160,7 @@ export function resolverAssinanteEquipamento({
 
   const nomeAuto = entrySecao?.nomeAssinante || nomeContactoCliente || opcoes[0]?.nomeAssinante || ''
   const assinaturaAuto = entrySecao
-    ? (ultimaAssinaturaHistorica(relatorios, entrySecao.nomeAssinante)
-      || opcoes.find(o => o.secao === entrySecao.secao)?.assinaturaDigital)
+    ? assinaturaCanonicaAssinante(relatorios, entrySecao)
     : null
 
   return {

@@ -6,6 +6,7 @@ import {
   ASSINANTES_SECAO_ANTERO_REGO,
   resolverAssinanteEquipamento,
   ultimaAssinaturaHistorica,
+  assinaturaCanonicaAssinante,
   getClienteAssinantesSecaoConfig,
   validarAssinanteSecaoEquipamento,
 } from '../../src/domain/clienteAssinantesSecao.js'
@@ -27,22 +28,31 @@ describe('clienteAssinantesSecao', () => {
     )
   })
 
-  it('ultimaAssinaturaHistorica escolhe a mais recente', () => {
+  it('ultimaAssinaturaHistoricaExata não cruza Fabio com Paulo', () => {
     const rels = [
-      { nomeAssinante: 'Fabio Cordeiro - MECANICA', assinaturaDigital: 'data:old', dataAssinatura: '2026-01-01' },
-      { nomeAssinante: 'Fabio Cordeiro - MECANICA', assinaturaDigital: 'data:new', dataAssinatura: '2026-07-01' },
+      { nomeAssinante: 'Fabio Cordeiro - MECANICA', assinaturaDigital: 'data:fabio', dataAssinatura: '2026-07-01' },
+      { nomeAssinante: 'Paulo Sousa - COLISAO', assinaturaDigital: 'data:paulo', dataAssinatura: '2026-06-01' },
     ]
     assert.equal(
-      ultimaAssinaturaHistorica(rels, 'Fabio Cordeiro - MECANICA'),
-      'data:new',
+      ultimaAssinaturaHistorica(rels, 'Paulo Sousa - COLISAO'),
+      'data:paulo',
     )
+  })
+
+  it('assinaturaCanonicaAssinante usa relatório de referência', () => {
+    const rels = [
+      { numeroRelatorio: '2026.MP.00048', nomeAssinante: 'Paulo Sousa - COLISAO', assinaturaDigital: 'data:paulo-ref' },
+      { numeroRelatorio: '2026.MP.00111', nomeAssinante: 'Paulo Sousa - COLISAO', assinaturaDigital: 'data:paulo-wrong', dataAssinatura: '2026-08-01' },
+    ]
+    const entry = ASSINANTES_SECAO_ANTERO_REGO.find(e => e.secao === 'colisao')
+    assert.equal(assinaturaCanonicaAssinante(rels, entry), 'data:paulo-ref')
   })
 
   it('resolverAssinanteEquipamento auto-selecciona secção e assinatura', () => {
     const maq = { id: 'm1', modelo: 'Ravaglioli KPX343WK FORD COLISAO', numeroSerie: '10574091' }
     const relatorios = [
-      { nomeAssinante: 'Paulo Sousa - COLISAO', assinaturaDigital: 'data:paulo', dataAssinatura: '2026-06-01' },
-      { nomeAssinante: 'Fabio Cordeiro - MECANICA', assinaturaDigital: 'data:fabio', dataAssinatura: '2026-06-01' },
+      { numeroRelatorio: '2026.MP.00048', nomeAssinante: 'Paulo Sousa - COLISAO', assinaturaDigital: 'data:paulo', dataAssinatura: '2026-06-01' },
+      { numeroRelatorio: '2026.MP.00059', nomeAssinante: 'Fabio Cordeiro - MECANICA', assinaturaDigital: 'data:fabio', dataAssinatura: '2026-06-01' },
     ]
     const r = resolverAssinanteEquipamento({
       maq,

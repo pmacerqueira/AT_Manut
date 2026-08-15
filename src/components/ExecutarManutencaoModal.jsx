@@ -61,6 +61,7 @@ import FinalizarStep from './executarManutencao/FinalizarStep'
 import {
   resolverAssinanteEquipamento,
   validarAssinanteSecaoEquipamento,
+  findOpcaoAssinante,
 } from '../domain/clienteAssinantesSecao.js'
 import { desenharAssinaturaNoCanvas } from '../utils/desenharAssinaturaCanvas.js'
 
@@ -242,6 +243,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       pecas: null,
     }
   }, [useKaeserPipeline])
+
+  /** Repõe assinatura canónica ao entrar no passo Assinatura (multi-secção ANTERO REGO). */
+  useEffect(() => {
+    if (step !== W.ass || isCorrectionMode || !assinanteSecao.multiSecao || signatureClearedByUser) return
+    const opcao = findOpcaoAssinante(assinanteSecao.opcoes, form.nomeAssinante)
+    if (!opcao?.assinaturaDigital) return
+    requestAnimationFrame(() => {
+      desenharAssinaturaNoCanvas(canvasRef.current, opcao.assinaturaDigital, {
+        onLoad: () => {
+          setAssinaturaFeita(true)
+          setSignatureClearedByUser(false)
+        },
+      })
+    })
+  }, [step, W.ass, form.nomeAssinante, assinanteSecao, isCorrectionMode, signatureClearedByUser])
 
   useLayoutEffect(() => {
     if (!isOpen) {

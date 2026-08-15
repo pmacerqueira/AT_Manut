@@ -1,10 +1,11 @@
 /**
- * Normaliza assinantes ANTERO REGO: nomes canónicos + assinatura da secção correcta.
+ * Normaliza assinantes ANTERO REGO: nomes canónicos + assinatura canónica por secção.
  * Uso: node scripts/fix-antero-rego-assinantes.mjs [--dry]
  */
 import {
   ANTERO_REGO_NIF,
   ASSINANTES_SECAO_ANTERO_REGO,
+  assinaturaCanonicaAssinante,
   detectarSecaoEquipamento,
   normTexto,
 } from '../src/domain/clienteAssinantesSecao.js'
@@ -55,37 +56,6 @@ function nomeEsperado(secao) {
   return ASSINANTES_SECAO_ANTERO_REGO.find(x => x.secao === secao)?.nomeAssinante ?? null
 }
 
-function assinaturaReferencia(relatorios, nomeCanonico) {
-  const alvo = normTexto(nomeCanonico)
-  let best = null
-  let bestTs = ''
-  for (const r of relatorios) {
-    if (!r.assinaturaDigital || !r.nomeAssinante) continue
-    if (normTexto(r.nomeAssinante) !== alvo) continue
-    const ts = r.dataAssinatura || r.dataCriacao || ''
-    if (ts >= bestTs) {
-      bestTs = ts
-      best = r.assinaturaDigital
-    }
-  }
-  return best
-}
-
-function nomeCorrespondeSecao(nomeAssinante, secao) {
-  const esperado = nomeEsperado(secao)
-  if (!esperado) return true
-  const n = normTexto(nomeAssinante)
-  const e = normTexto(esperado)
-  if (n === e) return true
-  const prefixo = e.split(' - ')[0]
-  const sufixo = e.split(' - ')[1] || ''
-  if (secao === 'mecanica' && n.includes('fabio') && n.includes('cordeiro') && !n.includes('colisao')) return false
-  if (secao === 'colisao' && n.includes('fabio') && n.includes('mecanica')) return false
-  if (secao === 'colisao' && n === normTexto('Paulo Sousa')) return false
-  if (secao === 'mecanica' && n === normTexto('Fabio Cordeiro')) return false
-  return n.includes(prefixo) && (!sufixo || n.includes(sufixo))
-}
-
 async function main() {
   console.log(DRY ? '=== DRY RUN ===' : '=== PRODUÇÃO ===')
   const token = await login()
@@ -95,15 +65,18 @@ async function main() {
     apiList(token, 'relatorios'),
   ])
 
+  const sigFabio = assinaturaCanonicaAssinante(relatorios, ASSINANTES_SECAO_ANTERO_REGO[0])
+  const sigPaulo = assinaturaCanonicaAssinante(relatorios, ASSINANTES_SECAO_ANTERO_REGO[1])
+  console.log(`Ref Fabio (${ASSINANTES_SECAO_ANTERO_REGO[0].relatorioRefAssinatura}): ${sigFabio?.length ?? 0} bytes`)
+  console.log(`Ref Paulo (${ASSINANTES_SECAO_ANTERO_REGO[1].relatorioRefAssinatura}): ${sigPaulo?.length ?? 0} bytes`)
+  if (!sigFabio || !sigPaulo) throw new Error('Assinaturas de referência em falta')
+  if (sigFabio === sigPaulo) throw new Error('Assinaturas Fabio/Paulo são iguais — abortar')
+
   const maqById = Object.fromEntries(
     maquinas
       .filter(m => String(m.clienteNif || m.clienteId) === ANTERO_REGO_NIF)
       .map(m => [m.id, m]),
   )
-
-  const sigFabio = assinaturaReferencia(relatorios, 'Fabio Cordeiro - MECANICA')
-  const sigPaulo = assinaturaReferencia(relatorios, 'Paulo Sousa - COLISAO')
-  if (!sigFabio || !sigPaulo) throw new Error('Assinaturas de referência em falta (Abr/2026?)')
 
   const correcoes = []
   for (const mu of manutencoes.filter(m => m.status === 'concluida')) {
@@ -114,12 +87,13 @@ async function main() {
     const rel = relatorios.find(r => r.manutencaoId === mu.id)
     if (!rel) continue
 
+    const entry = ASSINANTES_SECAO_ANTERO_REGO.find(e => e.secao === secao)
     const esperado = nomeEsperado(secao)
     const sigRef = secao === 'colisao' ? sigPaulo : sigFabio
     const nomeOk = normTexto(rel.nomeAssinante) === normTexto(esperado)
-    const secaoOk = nomeCorrespondeSecao(rel.nomeAssinante, secao)
+    const sigOk = rel.assinaturaDigital === sigRef
 
-    if (nomeOk && secaoOk) continue
+    if (nomeOk && sigOk) continue
 
     correcoes.push({
       rel,
@@ -132,14 +106,16 @@ async function main() {
       sn: maq.numeroSerie,
       data: mu.data,
       de: rel.nomeAssinante,
-      para: esperado,
+      sigDe: rel.assinaturaDigital?.length,
+      sigPara: sigRef.length,
     })
   }
 
   console.log(`Correcções: ${correcoes.length}`)
   for (const c of correcoes) {
     console.log(`  ${c.rel.numeroRelatorio} S/N ${c.sn} @ ${c.data}`)
-    console.log(`    "${c.de}" → "${c.para}"`)
+    console.log(`    nome: "${c.de}" → "${c.patch.nomeAssinante}"`)
+    console.log(`    sig: ${c.sigDe} → ${c.sigPara} bytes`)
     if (!DRY) await apiUpdate(token, c.patch)
   }
   if (DRY) console.log('(dry-run — nada gravado)')

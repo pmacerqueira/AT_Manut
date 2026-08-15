@@ -9,6 +9,24 @@ Política de continuidade:
 
 ---
 
+## [1.17.14] — 2026-08-15 — ANTERO REGO: assinaturas canónicas por secção
+
+### Correcção
+- **`clienteAssinantesSecao.js`:** assinatura canónica por relatório de referência (`2026.MP.00059` Fábio, `2026.MP.00048` Paulo); match histórico **exacto** de `nomeAssinante` (remove cruzamento parcial).
+- **`ExecutarManutencaoModal`:** repõe assinatura correcta ao entrar no passo Assinatura quando multi-secção.
+- **`scripts/fix-antero-rego-assinantes.mjs`:** reescrito — aborta se Fabio/Paulo forem iguais; corrige PNG em relatórios Colisão.
+
+### Dados (produção)
+- **6 relatórios** Colisão corrigidos (assinatura 21786 → 11278 bytes, assinatura Paulo Sousa).
+
+### Qualidade
+- **`tests/unit/clienteAssinantesSecao.test.js`** — match exacto + referência canónica; **137** unitários.
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.13] — 2026-08-15 — ANTERO REGO: assinantes por secção + dados corrigidos
 
 ### Funcionalidade
