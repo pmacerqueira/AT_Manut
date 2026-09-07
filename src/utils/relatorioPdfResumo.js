@@ -123,19 +123,18 @@ export function itensNaoConformes(relatorio, checklistItems = []) {
     .filter(Boolean)
 }
 
-/** Bullets para o resumo (máx. 3). */
-export function buildResumoExecutivoBullets({ notas, naoConformes, max = 3 }) {
+/** Bullets para o resumo (máx. 6 — o PDF faz quebra de linha com splitTextToSize). */
+export function buildResumoExecutivoBullets({ notas, naoConformes, max = 6 }) {
   const bullets = []
   for (const nc of naoConformes) {
     if (bullets.length >= max) break
-    const txt = nc.texto.length > 90 ? `${nc.texto.slice(0, 87)}…` : nc.texto
-    bullets.push(`Não conforme (${nc.index}): ${txt}`)
+    bullets.push(`Não conforme (${nc.index}): ${nc.texto}`)
   }
   const notaLinhas = linhasNotasRelatorio(notas)
   for (const line of notaLinhas) {
     if (bullets.length >= max) break
     if (bullets.some(b => b.includes(line))) continue
-    bullets.push(line.length > 100 ? `${line.slice(0, 97)}…` : line)
+    bullets.push(line)
   }
   if (bullets.length === 0 && naoConformes.length === 0) {
     bullets.push('Verificação concluída sem não conformidades registadas.')
@@ -158,8 +157,8 @@ export function buildResumoExecutivoMeta({
   const veredito = isReparacao ? null : calcularVereditoChecklist(relatorio?.checklistRespostas, checklistItems)
   const naoConformes = isReparacao ? [] : itensNaoConformes(relatorio, checklistItems)
   const bullets = isReparacao
-    ? buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes: [], max: 3 })
-    : buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes, max: 3 })
+    ? buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes: [], max: 6 })
+    : buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes, max: 6 })
   const proxSorted = (proximasManutencoes ?? []).filter(pm => pm?.data).sort((a, b) => a.data.localeCompare(b.data))
   const proxima = proxSorted[0] ?? null
   const dataExecIso = resolveDataExecucaoIso({ relatorio, manutencao, isReparacao, reparacao })

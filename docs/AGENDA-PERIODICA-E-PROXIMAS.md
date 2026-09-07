@@ -13,7 +13,7 @@
 | **Recálculo** | `agendaDomain.js` → `recalcularPeriodicasNoEstado`, `sincronizarAgendaCompleta` | Regenera cadeia periódica após execução ou sync global |
 | **Documento (PDF/email)** | `relatorioManutencaoPayload.js` → `buildProximasManutencoesManutencao` | Lista «Próximas manutenções» no relatório |
 
-**Invariante (desde v1.17.9):** para manutenção **concluída**, PDF/email **espelham** a agenda aberta (`listProximasAgendaPeriodicas`), não uma fórmula isolada.
+**Invariante (desde v1.17.9, corrigido v1.17.12):** para manutenção **concluída**, PDF/email usam o **1.º slot cronológico** com `data > dataExecução` (`listProximasAposExecucao`), incluindo manutenções já concluídas no histórico importado — não apenas slots abertos actuais.
 
 **Excepção:** wizard / pré-visualização **antes** de concluir → `computarProximasDatas()` (estimativa a partir da data de execução do formulário).
 
@@ -66,7 +66,7 @@ Deve coincidir com a data real da intervenção (ex. **31/07/2026**, não ano er
 buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, manutencoes })
 ```
 
-1. Se `manutencao.status === 'concluida'` **e** existem slots abertos na agenda → usar **`listProximasAgendaPeriodicas`** (até 12).
+1. Se `manutencao.status === 'concluida'` **e** existem registos com `data > dataExec` → usar **`listProximasAposExecucao`** (até 12; inclui concluídas futuras no histórico).
 2. Senão → **`computarProximasDatas(dataExec, periodicidade)`** (pré-visualização / montagem / fallback).
 
 **Callers obrigados a passar `manutencoes`:** `Manutencoes.jsx`, `Clientes.jsx`, `ExecutarManutencaoModal.jsx`, `EnviarEmailModal.jsx`, `emailService.js` (via email args).

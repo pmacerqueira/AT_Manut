@@ -9,6 +9,27 @@ Política de continuidade:
 
 ---
 
+## [1.17.16] — 2026-09-07 — Próximas manutenções em relatórios históricos (UNICOL)
+
+### Correcção
+- **`listProximasAposExecucao`** (`proximaManutAgenda.js`): PDF/email de manutenção **concluída** usam o 1.º slot com `data > execução` (inclui concluídas futuras no histórico importado), em vez de saltar para slots abertos actuais (ex.: relatório 2025 mostrava 2027 em vez de 2026-08-07).
+- **`buildProximasManutencoesManutencao`:** passa a usar cadeia cronológica; corrige resumo executivo e tabela «Próximas manutenções» em todos os relatórios históricos.
+
+### UNICOL (512005451)
+- **`scripts/audit-unicol-proximas.mjs`:** auditoria 60 relatórios — 0 anomalias após correcção.
+- Scripts export frota/relatórios, fixes consumíveis/peças/notas RAV4800; PDFs regenerados localmente (`scripts/output/`).
+
+### Qualidade
+- Unitários: **143** testes (`agendaProximasParity`, `relatorioManutencaoPayload` — caso histórico RAV4800).
+
+### Documentação
+- `docs/AGENDA-PERIODICA-E-PROXIMAS.md` — invariante actualizado (v1.17.16).
+
+### Deploy
+- PWA `public_html/manut/`.
+
+---
+
 ## [1.17.15] — 2026-08-15 — Auditoria cadeia 2026 + paridade sync
 
 ### Funcionalidade

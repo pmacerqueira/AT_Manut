@@ -3,7 +3,7 @@
  * Fonte única para data de execução, próximas datas e metadados de declaração.
  */
 import { computarProximasDatas } from './diasUteis.js'
-import { listProximasAgendaPeriodicas } from './proximaManutAgenda.js'
+import { listProximasAposExecucao } from './proximaManutAgenda.js'
 import { categoriaNomeFromMaquina, declaracaoClienteDepoisFromMaquina } from '../constants/relatorio.js'
 
 /** Periodicidade efectiva: ficha da máquina ou linha de manutenção (montagem antes de copiar para máquina). */
@@ -24,7 +24,7 @@ export function resolveDataExecucaoManutencao({ relatorio, manutencao, dataExecu
 
 /**
  * Próximas manutenções para PDF/email.
- * Manutenção concluída + lista da agenda: espelha slots abertos recalculados (BD).
+ * Manutenção concluída + lista completa: 1.º slot com data > execução (inclui concluídas futuras no histórico).
  * Caso contrário: calcula a partir da data de execução (pré-visualização / montagem).
  */
 export function buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, dataExecucao, manutencoes }) {
@@ -34,15 +34,15 @@ export function buildProximasManutencoesManutencao({ relatorio, manutencao, maqu
   if (!periMaq || !dataExec) return []
 
   const maquinaId = manutencao?.maquinaId ?? maquina?.id
-  const fromAgenda = (manutencao?.status === 'concluida' && Array.isArray(manutencoes) && maquinaId)
-    ? listProximasAgendaPeriodicas(maquinaId, manutencoes)
-    : []
-  if (fromAgenda.length > 0) {
-    return fromAgenda.map(m => ({
-      data: m.data,
-      periodicidade: m.periodicidade || periMaq,
-      tecnico: m.tecnico || tecnico,
-    }))
+  if (manutencao?.status === 'concluida' && Array.isArray(manutencoes) && maquinaId) {
+    const fromTimeline = listProximasAposExecucao(maquinaId, manutencoes, dataExec, { limit: 12 })
+    if (fromTimeline.length > 0) {
+      return fromTimeline.map(m => ({
+        data: m.data,
+        periodicidade: m.periodicidade || periMaq,
+        tecnico: m.tecnico || tecnico,
+      }))
+    }
   }
 
   return computarProximasDatas(dataExec, periMaq, { tecnico, count: 12 })

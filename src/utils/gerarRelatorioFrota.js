@@ -14,6 +14,7 @@
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
+import { INTERVALOS } from '../domain/equipamentoDomain'
 import {
   normEntityId,
   dateKeyForFilter,
@@ -77,6 +78,9 @@ export async function gerarRelatorioFrotaPdf(
   const periodoLabel = options.periodoLabel || String(ano)
   const pinicio = options.periodoInicio ?? null
   const pfim = options.periodoFim ?? null
+  const agendaAno = options.agendaAno ?? null
+  const incluirHistorico = options.incluirHistoricoManutencoes !== false
+  const assinaturas = options.assinaturas ?? null
 
   const dataDentroPeriodo = (dk) => {
     if (!dk) return false
@@ -86,10 +90,12 @@ export async function gerarRelatorioFrotaPdf(
   }
 
   const { loadImageAsDataUrl, addImageFitInBoxMm } = await import('./gerarPdfRelatorio')
-  let frotaLogoDataUrl = null
-  try {
-    frotaLogoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
-  } catch (_) { /* sem logo */ }
+  let frotaLogoDataUrl = options.logoDataUrl ?? null
+  if (!frotaLogoDataUrl) {
+    try {
+      frotaLogoDataUrl = await loadImageAsDataUrl(`${import.meta.env.BASE_URL}NAVEL_LOGO.jpg`)
+    } catch (_) { /* sem logo */ }
+  }
 
   // ── Pré-filtragem com Maps para O(1) lookup ─────────────────────────────
   const maqIds = new Set(maquinas.map(m => normEntityId(m.id)))
@@ -185,6 +191,36 @@ export async function gerarRelatorioFrotaPdf(
     })
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 25)
+
+  const maqMap = new Map(maquinas.map(m => [normEntityId(m.id), m]))
+  const periodicidadeLabel = (mt, maq) => {
+    const p = mt?.periodicidade || maq?.periodicidadeManut
+    return (p && INTERVALOS[p]?.label) || p || '\u2014'
+  }
+
+  const historicoManutencoes = incluirHistorico
+    ? manutsDoCliente
+      .filter(mt => {
+        if (!isManutencaoConcluida(mt)) return false
+        if (periodoCustom) return dataDentroPeriodo(dateKeyForFilter(mt.data))
+        return mt.data?.startsWith(String(ano))
+      })
+      .sort((a, b) => {
+        const da = dateKeyForFilter(a.data)
+        const db = dateKeyForFilter(b.data)
+        if (da !== db) return db.localeCompare(da)
+        return normEntityId(a.maquinaId).localeCompare(normEntityId(b.maquinaId))
+      })
+    : []
+
+  const agendaSlots = agendaAno
+    ? manutsDoCliente
+      .filter(mt => {
+        if (mt.status !== 'agendada' && mt.status !== 'pendente') return false
+        return dateKeyForFilter(mt.data).startsWith(String(agendaAno))
+      })
+      .sort((a, b) => dateKeyForFilter(a.data).localeCompare(dateKeyForFilter(b.data)))
+    : []
 
   // ── Helpers de desenho ───────────────────────────────────────────────────
   let y = 0
@@ -306,7 +342,18 @@ export async function gerarRelatorioFrotaPdf(
     'Frota de equipamentos por categoria',
   ]
   if (totalAtraso > 0) indexItems.push(`Manuten\u00e7\u00f5es em atraso (${totalAtraso})`)
-  if (repsRecentes.length > 0) indexItems.push(`Repara\u00e7\u00f5es conclu\u00eddas (\u00faltimos 12 meses)`)
+  if (repsRecentes.length > 0) {
+    indexItems.push(periodoCustom
+      ? `Repara\u00e7\u00f5es conclu\u00eddas (${periodoLabel})`
+      : 'Repara\u00e7\u00f5es conclu\u00eddas (\u00faltimos 12 meses)')
+  }
+  if (historicoManutencoes.length > 0) {
+    indexItems.push(`Hist\u00f3rico de manuten\u00e7\u00f5es executadas (${historicoManutencoes.length})`)
+  }
+  if (agendaSlots.length > 0) {
+    indexItems.push(`Agenda de manuten\u00e7\u00f5es \u2014 ${agendaAno} (${agendaSlots.length})`)
+  }
+  if (assinaturas) indexItems.push('Assinaturas')
 
   pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...TEXTO)
   indexItems.forEach((item, i) => {
@@ -598,7 +645,6 @@ export async function gerarRelatorioFrotaPdf(
     })
     y += 5
 
-    const maqMap = new Map(maquinas.map(m => [normEntityId(m.id), m]))
     repsRecentes.forEach((r, i) => {
       if (y > 272) { pdf.addPage(); y = 18 }
       if (i % 2 === 0) { pdf.setFillColor(254, 251, 235); pdf.rect(M, y - 3.5, CW, 7, 'F') }
@@ -617,6 +663,192 @@ export async function gerarRelatorioFrotaPdf(
       pdf.text(truncate(r.descricao || r.descricaoAvaria || '', 80), cx + 1, y)
       y += snLines.length > 1 ? 9.5 : 6.5
     })
+  }
+
+  let secNum = totalAtraso > 0 ? (repsRecentes.length > 0 ? 5 : 4) : (repsRecentes.length > 0 ? 4 : 3)
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HISTÓRICO DE MANUTENÇÕES EXECUTADAS
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (historicoManutencoes.length > 0) {
+    secNum += 1
+    if (y > 230) { pdf.addPage(); drawHeader() }
+    else { y += 4 }
+
+    drawSectionTitle(`${secNum}. Hist\u00f3rico de manuten\u00e7\u00f5es executadas (${periodoLabel}) \u2014 ${historicoManutencoes.length}`)
+    y += 2
+
+    const histCols = [
+      { label: 'Data', w: 18, align: 'center' },
+      { label: 'Equipamento', w: 44 },
+      { label: 'N\u00ba S\u00e9rie', w: 24 },
+      { label: 'Relat\u00f3rio', w: 28, align: 'center' },
+      { label: 'Per\u00edodo', w: 18, align: 'center' },
+      { label: 'T\u00e9cnico', w: 50 },
+    ]
+
+    const drawHistHeader = () => {
+      checkPage(18)
+      let x = M
+      pdf.setFillColor(...AZUL)
+      pdf.rect(M, y - 3.5, CW, 7, 'F')
+      pdf.setTextColor(...BRANCO); pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold')
+      histCols.forEach(col => {
+        pdf.text(col.label.toUpperCase(), col.align === 'center' ? x + col.w / 2 : x + 1, y, col.align === 'center' ? { align: 'center' } : undefined)
+        x += col.w
+      })
+      y += 5
+    }
+
+    drawHistHeader()
+
+    historicoManutencoes.forEach((mt, i) => {
+      if (y > 272) { pdf.addPage(); y = 18; drawHistHeader() }
+      if (i % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(M, y - 3.5, CW, 7, 'F') }
+      const maq = maqMap.get(normEntityId(mt.maquinaId))
+      const rel = relMap.get(normEntityId(mt.id))
+      let cx = M
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...TEXTO)
+      pdf.text(fmtD(mt.data), cx + 9, y, { align: 'center' }); cx += 18
+      pdf.text(truncate(maq ? `${maq.marca} ${maq.modelo}` : '\u2014', 34), cx + 1, y); cx += 44
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
+      pdf.text(truncate(maq?.numeroSerie, 22), cx + 1, y); cx += 24
+      pdf.setTextColor(...AZUL); pdf.setFont('helvetica', 'bold')
+      pdf.text(numeroRelatorioLegivel(rel) || '\u2014', cx + 14, y, { align: 'center' }); cx += 28
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...TEXTO)
+      pdf.text(periodicidadeLabel(mt, maq), cx + 9, y, { align: 'center' }); cx += 18
+      pdf.text(truncate(mt.tecnico || rel?.tecnico || '\u2014', 46), cx + 1, y)
+      y += 6.5
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AGENDA FUTURA (ex.: 2027)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (agendaSlots.length > 0) {
+    secNum += 1
+    const PAGE_BOTTOM = 268
+    const AG_ROW_H = 6.5
+
+    // Secção completa numa página nova — evita tabela cortada após o histórico
+    pdf.addPage()
+    drawHeader()
+
+    drawSectionTitle(`${secNum}. Agenda de manuten\u00e7\u00f5es \u2014 ${agendaAno} (${agendaSlots.length})`, VERDE)
+    y += 2
+
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
+    pdf.text('Datas previstas com base no plano peri\u00f3dico actual e nos slots abertos na agenda.', M, y)
+    y += 6
+
+    const agCols = [
+      { label: 'Data prevista', w: 24, align: 'center' },
+      { label: 'Equipamento', w: 48 },
+      { label: 'N\u00ba S\u00e9rie', w: 26 },
+      { label: 'Per\u00edodo', w: 20, align: 'center' },
+      { label: 'Estado', w: 64 },
+    ]
+
+    const drawAgHeader = () => {
+      let x = M
+      pdf.setFillColor(...VERDE)
+      pdf.rect(M, y - 3.5, CW, 7, 'F')
+      pdf.setTextColor(...BRANCO); pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold')
+      agCols.forEach(col => {
+        pdf.text(col.label.toUpperCase(), col.align === 'center' ? x + col.w / 2 : x + 1, y, col.align === 'center' ? { align: 'center' } : undefined)
+        x += col.w
+      })
+      y += 5
+    }
+
+    drawAgHeader()
+
+    agendaSlots.forEach((mt, i) => {
+      if (y + AG_ROW_H > PAGE_BOTTOM) {
+        pdf.addPage()
+        drawHeader()
+        drawAgHeader()
+      }
+      if (i % 2 === 0) { pdf.setFillColor(...VERDE_BG); pdf.rect(M, y - 3.5, CW, AG_ROW_H, 'F') }
+      const maq = maqMap.get(normEntityId(mt.maquinaId))
+      let cx = M
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...VERDE)
+      pdf.text(fmtD(mt.data), cx + 12, y, { align: 'center' }); cx += 24
+      pdf.setTextColor(...TEXTO)
+      pdf.text(truncate(maq ? `${maq.marca} ${maq.modelo}` : '\u2014', 38), cx + 1, y); cx += 48
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...MUTED)
+      pdf.text(truncate(maq?.numeroSerie, 24), cx + 1, y); cx += 26
+      pdf.setTextColor(...TEXTO)
+      pdf.text(periodicidadeLabel(mt, maq), cx + 10, y, { align: 'center' }); cx += 20
+      pdf.text(mt.status === 'agendada' ? 'Agendada' : 'Pendente', cx + 1, y)
+      y += AG_ROW_H
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ASSINATURAS (técnico + cliente)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (assinaturas) {
+    pdf.addPage()
+    drawHeader()
+    y += 4
+
+    pdf.setTextColor(...AZUL)
+    pdf.setFontSize(10); pdf.setFont('helvetica', 'bold')
+    pdf.text('Aceita\u00e7\u00e3o e assinaturas', M, y); y += 7
+
+    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(...TEXTO)
+    const declLines = pdf.splitTextToSize(
+      'O presente relat\u00f3rio resume o estado da frota, o hist\u00f3rico de manuten\u00e7\u00f5es executadas no per\u00edodo indicado e o plano de agendamento futuro. '
+      + 'Ao assinar, o cliente confirma ter recebido e revisto esta informa\u00e7\u00e3o.',
+      CW
+    )
+    declLines.forEach(ln => { pdf.text(ln, M, y); y += 4.5 })
+    y += 8
+
+    const halfW = (CW - 4) / 2
+    const hasTecSig = !!assinaturas.tecnicoAssinatura
+    const reservarCliente = !!assinaturas.reservarCaixaCliente
+    const hasCliSig = !!assinaturas.clienteAssinatura
+    const sigBoxH = (hasTecSig || hasCliSig || reservarCliente) ? 38 : 20
+
+    pdf.setFillColor(243, 244, 246); pdf.setDrawColor(209, 213, 219)
+    pdf.rect(M, y - 4, halfW, sigBoxH, 'FD')
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('T\u00c9CNICO RESPONS\u00c1VEL', M + 2, y)
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    pdf.text(assinaturas.tecnicoNome || '\u2014', M + 2, y + 5)
+    if (assinaturas.tecnicoTelefone) {
+      pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
+      pdf.text(`Tel: ${assinaturas.tecnicoTelefone}`, M + 2, y + 10)
+    }
+    if (hasTecSig) {
+      try {
+        pdf.addImage(assinaturas.tecnicoAssinatura, 'PNG', M + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
+      } catch (_) { /* sem imagem */ }
+    }
+
+    const xRight = M + halfW + 4
+    pdf.setFillColor(240, 253, 244); pdf.setDrawColor(187, 247, 208)
+    pdf.rect(xRight, y - 4, halfW, sigBoxH, 'FD')
+    pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(22, 163, 74)
+    pdf.text('ASSINATURA DO CLIENTE', xRight + 2, y)
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
+    pdf.text(assinaturas.clienteNome || '\u2014', xRight + 2, y + 5)
+    if (hasCliSig) {
+      pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
+      pdf.text(`Assinado em ${hojeFormatado}`, xRight + 2, y + 10)
+      try {
+        pdf.addImage(assinaturas.clienteAssinatura, 'PNG', xRight + 2, y + 13, halfW - 8, 18, undefined, 'FAST')
+      } catch (_) { /* sem imagem */ }
+    } else if (reservarCliente) {
+      pdf.setFontSize(7); pdf.setTextColor(107, 114, 128)
+      pdf.text('(Reservado para assinatura)', xRight + 2, y + 10)
+      pdf.setDrawColor(187, 247, 208); pdf.setLineWidth(0.3)
+      pdf.line(xRight + 4, y + 28, xRight + halfW - 6, y + 28)
+    }
+
+    y += sigBoxH + 8
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -111,7 +111,7 @@ export function createClientesHandlers(deps) {
       await apiReparacoes.bulkRestore([])
       await apiMaquinas.bulkRestore([])
       await apiClientes.bulkRestore([])
-      saveCache({
+      await saveCache({
         clientes: [],
         categorias: getCategorias(),
         subcategorias: getSubcategorias(),

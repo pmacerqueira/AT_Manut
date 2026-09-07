@@ -284,7 +284,7 @@ const addXxx = useCallback((data) => {
 
 ```powershell
 # Desenvolvimento
-npm run dev                 # http://localhost:5173
+npm run dev                 # http://localhost:5400 (não 5173 — essa porta era partilhada)
 
 # Testes unitários (domain + slices)
 npm run test:unit            # 125 testes em tests/unit/

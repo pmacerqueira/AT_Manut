@@ -19,6 +19,7 @@ import { getDiasAviso, setDiasAviso } from '../config/alertasConfig'
 import { ArrowLeft, Download, Upload, Database, AlertTriangle, CheckCircle, Info, Shield, Bell, Sun, HardDrive, Users, Plus, Pencil, Trash2, X, Phone, PenLine } from 'lucide-react'
 import AgendaAuditPanel from '../components/AgendaAuditPanel'
 import { STORAGE } from '../config/storageKeys'
+import { clearOfflineCache, getOfflineStorageStats } from '../services/localCache'
 import './Definicoes.css'
 
 export default function Definicoes() {
@@ -78,8 +79,7 @@ export default function Definicoes() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
 
-  const calcUsageLS = () => {
-    const QUOTA_BYTES = 5 * 1024 * 1024
+  const calcUsageLS = useCallback(async () => {
     const atmKeys = Object.values(STORAGE)
     let atmBytes = 0
     let otherBytes = 0
@@ -99,17 +99,57 @@ export default function Definicoes() {
     }
     breakdown.sort((a, b) => b.size - a.size)
 
-    const totalBytes = atmBytes + otherBytes
-    const pct = Math.min(100, Math.round((totalBytes / QUOTA_BYTES) * 100))
-    return { totalBytes, atmBytes, otherBytes, pct, fmt: fmtBytes(totalBytes), fmtAtm: fmtBytes(atmBytes), breakdown }
-  }
-
-  const [lsUsage, setLsUsage] = useState(() => calcUsageLS())
-  const refreshUsage = useCallback(() => setLsUsage(calcUsageLS()), [])
-
-  const handleLimparCache = useCallback(() => {
+    let storageStats = { cacheBytes: 0, quotaBytes: null, usageBytes: null, pct: 0, backend: 'indexeddb' }
     try {
-      localStorage.removeItem(STORAGE.CACHE)
+      storageStats = await getOfflineStorageStats()
+    } catch {
+      /* ignore */
+    }
+
+    const cacheEntry = {
+      key: 'cache_offline',
+      label: `cache offline (${storageStats.backend})`,
+      size: storageStats.cacheBytes || atmBytes,
+    }
+    const breakdownWithCache = [
+      cacheEntry,
+      ...breakdown.filter(b => b.key !== STORAGE.CACHE),
+    ].sort((a, b) => b.size - a.size)
+
+    const quotaRef = storageStats.quotaBytes ?? 50 * 1024 * 1024
+    const usedRef = storageStats.usageBytes ?? (storageStats.cacheBytes + otherBytes + (atmBytes - (localStorage.getItem(STORAGE.CACHE)?.length ?? 0) * 2))
+    const pct = storageStats.quotaBytes
+      ? Math.min(100, Math.round((usedRef / quotaRef) * 100))
+      : Math.min(100, Math.round((storageStats.cacheBytes / (10 * 1024 * 1024)) * 100))
+
+    return {
+      totalBytes: usedRef,
+      atmBytes: storageStats.cacheBytes + atmBytes,
+      otherBytes,
+      pct,
+      fmt: fmtBytes(usedRef),
+      fmtAtm: fmtBytes(storageStats.cacheBytes),
+      fmtQuota: storageStats.quotaBytes ? fmtBytes(storageStats.quotaBytes) : null,
+      backend: storageStats.backend,
+      breakdown: breakdownWithCache,
+    }
+  }, [])
+
+  const [lsUsage, setLsUsage] = useState({
+    totalBytes: 0, atmBytes: 0, otherBytes: 0, pct: 0,
+    fmt: '—', fmtAtm: '—', fmtQuota: null, backend: 'indexeddb', breakdown: [],
+  })
+  const refreshUsage = useCallback(() => {
+    calcUsageLS().then(setLsUsage).catch(() => {})
+  }, [calcUsageLS])
+
+  useEffect(() => {
+    refreshUsage()
+  }, [refreshUsage])
+
+  const handleLimparCache = useCallback(async () => {
+    try {
+      await clearOfflineCache()
       localStorage.removeItem(STORAGE.LOG)
       localStorage.removeItem(STORAGE.LOG_PENDING_FLUSH)
       localStorage.removeItem(STORAGE.SYNC_QUEUE)
@@ -274,12 +314,16 @@ export default function Definicoes() {
           ))}
         </div>
 
-        {/* Indicador de uso do localStorage */}
+        {/* Indicador de armazenamento offline */}
         <div className="def-ls-usage">
           <div className="def-ls-usage-header">
             <HardDrive size={14} />
-            <span>Cache local (localStorage)</span>
-            <span className="def-ls-usage-val">{lsUsage.fmt} <span className="def-ls-usage-pct">({lsUsage.pct}%)</span></span>
+            <span>Armazenamento offline (IndexedDB)</span>
+            <span className="def-ls-usage-val">
+              {lsUsage.fmt}
+              {lsUsage.fmtQuota ? ` / ${lsUsage.fmtQuota}` : ''}
+              <span className="def-ls-usage-pct"> ({lsUsage.pct}%)</span>
+            </span>
           </div>
           <div className="def-ls-bar">
             <div
@@ -309,9 +353,13 @@ export default function Definicoes() {
           {lsUsage.pct >= 70 && (
             <p className="def-ls-aviso">
               <AlertTriangle size={13} />
-              Armazenamento a atingir o limite. Os dados no servidor não são afectados.
+              Armazenamento a aproximar-se do limite do browser. Os dados no servidor não são afectados.
             </p>
           )}
+
+          <p className="def-ls-actions-hint def-ls-backend-hint">
+            Cache principal: {lsUsage.backend}. Migração automática a partir do localStorage (~5 MB).
+          </p>
 
           <div className="def-ls-actions">
             <button type="button" className="def-btn def-btn--secondary def-btn--sm" onClick={handleLimparCache}>

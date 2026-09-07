@@ -51,7 +51,7 @@ export default function OfflineBanner() {
   // Actualizar data do cache e visibilidade
   useEffect(() => {
     if (!isOnline) {
-      setCacheDate(cacheTimestamp())
+      cacheTimestamp().then(setCacheDate)
       setVisible(true)
     } else if (syncPending > 0) {
       setVisible(true)

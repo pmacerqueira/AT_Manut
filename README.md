@@ -61,7 +61,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 # Instalar dependências
 npm install
 
-# Servidor de desenvolvimento (http://localhost:5173)
+# Servidor de desenvolvimento (http://localhost:5400)
 npm run dev
 
 # Build de produção (inclui optimize-images automaticamente)

@@ -58,7 +58,7 @@ describe('buildProximasManutencoesManutencao', () => {
     assert.ok(prox[0].data)
   })
 
-  it('uses open agenda slots when manutencao is concluida', () => {
+  it('uses timeline slots after exec when manutencao is concluida', () => {
     const prox = buildProximasManutencoesManutencao({
       relatorio: { dataCriacao: '2026-07-31T12:00:00.000Z', tecnico: 'Tec' },
       manutencao: { id: 'm1', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', tecnico: 'Tec' },
@@ -70,6 +70,24 @@ describe('buildProximasManutencoesManutencao', () => {
       ],
     })
     assert.deepEqual(prox.map(p => p.data), ['2026-11-04', '2027-01-27'])
+  })
+
+  it('prefers next chronological slot over current open agenda (historical PDF)', () => {
+    const prox = buildProximasManutencoesManutencao({
+      relatorio: { dataCriacao: '2025-05-14T12:00:00.000Z', tecnico: 'Paulo Medeiros' },
+      manutencao: { id: 'c25', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', tecnico: 'Paulo Medeiros', data: '2025-05-14' },
+      maquina: { id: 'm1', periodicidadeManut: 'semestral' },
+      manutencoes: [
+        { id: 'c23', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2023-07-06' },
+        { id: 'c24', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2024-11-10' },
+        { id: 'c25', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2025-05-14' },
+        { id: 'c26', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2026-08-07' },
+        { id: 'f1', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2027-02-03' },
+        { id: 'f2', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2027-08-02' },
+      ],
+    })
+    assert.equal(prox[0].data, '2026-08-07')
+    assert.deepEqual(prox.map(p => p.data), ['2026-08-07', '2027-02-03', '2027-08-02'])
   })
 })
 

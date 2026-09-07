@@ -134,7 +134,7 @@ export function DataProvider({ children }) {
       setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
       lastBulkFetchOkAtRef.current = Date.now()
       // Guardar snapshot no cache para uso offline
-      saveCache(d)
+      await saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
         clientes: (d.clientes ?? []).length,
         maquinas: (d.maquinas ?? []).length,
@@ -144,7 +144,7 @@ export function DataProvider({ children }) {
       const isNetErr = !err.status
       if (isNetErr) {
         // Sem ligação — tentar cache local
-        const cache = loadCache()
+        const cache = await loadCache()
         if (cache?.data) {
           const d = cache.data
           setClientes(d.clientes           ?? [])

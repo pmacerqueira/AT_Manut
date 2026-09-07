@@ -54,10 +54,31 @@ export function candidatosMesmaDataMinimaAberta(maquinaId, listaManutencoes) {
 
 /**
  * Próximas manutenções periódicas em aberto na agenda (exclui montagem).
- * Usado em PDF/email para espelhar slots já recalculados na BD.
+ * Usado na UI (ficha, próximaManut) para espelhar slots ainda por executar.
  */
 export function listProximasAgendaPeriodicas(maquinaId, listaManutencoes, { limit = 12 } = {}) {
   return listManutencoesAbertasOrdenadas(maquinaId, listaManutencoes)
     .filter(m => m.tipo !== 'montagem')
+    .slice(0, limit)
+}
+
+/**
+ * Manutenções periódicas da máquina com data estritamente posterior à execução
+ * do relatório (inclui concluídas — histórico importado). Ordenadas por data asc.
+ * Fonte canónica para «próxima manutenção» em PDF/email de relatórios concluídos.
+ */
+export function listProximasAposExecucao(maquinaId, listaManutencoes, dataExecIso, { limit = 12 } = {}) {
+  if (!maquinaId || !Array.isArray(listaManutencoes) || !dataExecIso) return []
+  const mid = nid(maquinaId)
+  const exec = String(dataExecIso).slice(0, 10)
+  return listaManutencoes
+    .filter(m => nid(m.maquinaId) === mid)
+    .filter(m => m.tipo !== 'montagem')
+    .filter(m => m.data != null && m.data !== '' && String(m.data).slice(0, 10) > exec)
+    .sort((a, b) => {
+      const c = String(a.data).localeCompare(String(b.data))
+      if (c !== 0) return c
+      return String(a.id || '').localeCompare(String(b.id || ''))
+    })
     .slice(0, limit)
 }

@@ -1,0 +1,73 @@
+{
+  "_instrucoes": "Preencher datas (YYYY-MM-DD), notas e checklist por equipamento. Correr: node scripts/seed-unicol-manutencoes.mjs --dry",
+  "clienteNif": "512005451",
+  "tecnico": "Aldevino Costa",
+  "nomeAssinante": "Eng. Emanuel Garcia",
+  "assinaturaDigital": null,
+  "observacoesGerais": "Manutenção semestral — registada em batch.",
+  "equipamentos": [
+    {
+      "numeroSerie": "10472288",
+      "marca": "Ravaglioli",
+      "modelo": "RAV232NF-EMPILHADORES",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "10364300-2018",
+      "marca": "Ravaglioli",
+      "modelo": "RAV261",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "10364301-2018",
+      "marca": "Ravaglioli",
+      "modelo": "RAV261",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "437",
+      "marca": "Ravaglioli",
+      "modelo": "RAV4800",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "20/17JP",
+      "marca": "Sunshine",
+      "modelo": "SXJS3519",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "00002-2018",
+      "marca": "Sunshine",
+      "modelo": "SXJS3018D",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    },
+    {
+      "numeroSerie": "18K09-00001-2018",
+      "marca": "Sunshine",
+      "modelo": "QJY-J-55",
+      "dataExecucao": "",
+      "notas": "",
+      "checklistRespostas": {}
+    }
+  ],
+  "emailFrota": {
+    "destinatario": "Emanuel.Garcia@unicol.pt",
+    "assunto": "Relatório Executivo de Frota — 2026 — UNICOL — Navel",
+    "periodoLabel": "2026",
+    "periodoInicio": "2026-01-01",
+    "periodoFim": "2026-12-31"
+  }
+}

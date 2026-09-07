@@ -72,3 +72,37 @@ describe('parseKaeserPlanoPdf', () => {
     assert.equal(ter.codigoArtigo, '400771.0')
   })
 })
+
+/** Trecho ASD50T UNICOL — códigos sem ponto (222958E1) e com hífen (4-00007.0). */
+const TEXTO_ASD50T_UNICOL = `C
+2182 222958E1 \tJogo manutenção válv. descarga 1 \tPÇ
+4701 9.9860.00010 Rolamento rígido de esferas 63 2 \tPÇ
+D
+4451 4-00007.0 \tKIT revisão rolamentos 6210/62 1 \tPÇ
+4920 9.9282E0 \tKIT Fan unit Ø251 \t1 \tPÇ
+`
+
+describe('parseKaeserPlanoPdf — ASD50T UNICOL', () => {
+  it('código 222958E1 (notação E sem ponto)', () => {
+    const r = parseKaeserPlanoPdf(TEXTO_ASD50T_UNICOL)
+    const linha = r.C.find(p => p.posicao === '2182')
+    assert.ok(linha)
+    assert.equal(linha.codigoArtigo, '222958E1')
+    assert.ok(linha.descricao.includes('válv. descarga'))
+  })
+
+  it('código 4-00007.0 (hífen)', () => {
+    const r = parseKaeserPlanoPdf(TEXTO_ASD50T_UNICOL)
+    const linha = r.D.find(p => p.posicao === '4451')
+    assert.ok(linha)
+    assert.equal(linha.codigoArtigo, '4-00007.0')
+    assert.ok(linha.descricao.includes('rolamentos'))
+  })
+
+  it('quantidade 2 com dimensão na descrição (rolamento 63)', () => {
+    const r = parseKaeserPlanoPdf(TEXTO_ASD50T_UNICOL)
+    const linha = r.C.find(p => p.posicao === '4701')
+    assert.equal(linha.quantidade, 2)
+    assert.ok(linha.descricao.includes('63'))
+  })
+})

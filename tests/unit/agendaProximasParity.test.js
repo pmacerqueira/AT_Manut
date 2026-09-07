@@ -38,7 +38,7 @@ describe('agenda ↔ PDF próximas (paridade)', () => {
     assert.equal(minOpen, novas[0].data)
   })
 
-  it('buildProximas espelha listProximasAgendaPeriodicas para concluída', () => {
+  it('buildProximas usa slots após exec (coincide com abertos quando não há histórico intermédio)', () => {
     const maquinaId = 'm1'
     const manutencoes = [
       { id: 'c1', maquinaId, status: 'concluida', tipo: 'periodica', data: '2026-07-31', periodicidade: 'trimestral' },
@@ -54,6 +54,24 @@ describe('agenda ↔ PDF próximas (paridade)', () => {
       manutencoes,
     }).map(p => p.data)
     assert.deepEqual(pdfDates.slice(0, 2), agendaDates.slice(0, 2))
+  })
+
+  it('buildProximas não salta slot concluído intermédio (relatório histórico)', () => {
+    const maquinaId = 'm1'
+    const manutencoes = [
+      { id: 'c1', maquinaId, status: 'concluida', tipo: 'periodica', data: '2025-05-14' },
+      { id: 'c2', maquinaId, status: 'concluida', tipo: 'periodica', data: '2026-08-07' },
+      { id: 'f1', maquinaId, status: 'agendada', tipo: 'periodica', data: '2027-02-03' },
+    ]
+    const openDates = listProximasAgendaPeriodicas(maquinaId, manutencoes).map(m => m.data)
+    const pdfDates = buildProximasManutencoesManutencao({
+      relatorio: { dataCriacao: '2025-05-14T12:00:00.000Z' },
+      manutencao: { id: 'c1', maquinaId, status: 'concluida', tipo: 'periodica', tecnico: 'Tec' },
+      maquina: { id: maquinaId, periodicidadeManut: 'semestral' },
+      manutencoes,
+    }).map(p => p.data)
+    assert.equal(openDates[0], '2027-02-03')
+    assert.equal(pdfDates[0], '2026-08-07')
   })
 
   it('sincronizar tarde não salta trimestre em atraso imediato (Abr → Jul)', () => {

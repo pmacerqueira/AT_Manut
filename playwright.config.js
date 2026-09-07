@@ -10,12 +10,12 @@ export default defineConfig({
   workers: 2,
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:5400',
     reuseExistingServer: !process.env.CI,
   },
   retries: 1,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5400',
     headless: true,
     viewport: { width: 1280, height: 800 },
     screenshot: 'only-on-failure',

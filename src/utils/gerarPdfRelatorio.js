@@ -213,6 +213,40 @@ export function imprimirOuGuardarPdf(html) {
   })
 }
 
+/** Bullets do resumo executivo — indentação pendente, largura total do bloco. */
+function layoutResumoBulletsPdf(
+  pdf,
+  bullets,
+  contentWidth,
+  { lineH = 4.5, bulletGap = 2, bulletIndent = 5, fontSize = 8.5 } = {},
+) {
+  pdf.setFontSize(fontSize)
+  pdf.setFont('helvetica', 'normal')
+  const textW = Math.max(40, contentWidth - bulletIndent)
+  const blocks = (bullets ?? []).map(b => {
+    const lines = pdf.splitTextToSize(String(b).trim(), textW)
+    return { lines, height: lines.length * lineH + bulletGap }
+  })
+  const totalHeight = blocks.reduce((s, b) => s + b.height, 0) - (blocks.length ? bulletGap : 0)
+  return { blocks, totalHeight, lineH, bulletIndent, bulletGap, textW, fontSize }
+}
+
+function drawResumoBulletsPdf(pdf, layout, x, yStart, color = [17, 24, 39]) {
+  pdf.setFontSize(layout.fontSize)
+  pdf.setFont('helvetica', 'normal')
+  let y = yStart
+  pdf.setTextColor(...color)
+  for (const block of layout.blocks) {
+    block.lines.forEach((ln, i) => {
+      if (i === 0) pdf.text('\u2013', x, y)
+      pdf.text(ln, x + layout.bulletIndent, y, { maxWidth: layout.textW })
+      y += layout.lineH
+    })
+    y += layout.bulletGap
+  }
+  return y
+}
+
 /**
  * Gera um Blob PDF compacto usando a API nativa do jsPDF (sem html2canvas).
  * Texto seleccionável; com fotografias o tamanho do ficheiro cresce (JPEG em base64).
@@ -359,19 +393,16 @@ export async function gerarPdfCompacto({
       pdf.setDrawColor(30, 58, 95)
       pdf.setLineWidth(0.5)
       const pad = 5
-      const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`- ${b}`, cW - pad * 2))
-      const boxH = 12 + bulletLines.length * 4.2 + pad
+      const bulletFs = 8
+      const contentW = cW - pad * 2
+      const layout = layoutResumoBulletsPdf(pdf, resumoMeta.bullets, contentW, { lineH: 4.5, fontSize: bulletFs })
+      const boxH = 12 + layout.totalHeight + pad
       if (y + boxH > 275) { pdf.addPage(); y = 20 }
       const y0 = y - 3
       pdf.rect(M, y0, cW, boxH, 'FD')
       pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
       pdf.text('RESUMO DA INTERVEN\u00c7\u00c3O', M + pad, y0 + 5)
-      let yTxt = y0 + 11
-      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-      bulletLines.forEach((ln) => {
-        pdf.text(ln, M + pad, yTxt)
-        yTxt += 4.2
-      })
+      drawResumoBulletsPdf(pdf, layout, M + pad, y0 + 11, [55, 65, 81])
       y = y0 + boxH + 4
       return
     }
@@ -381,12 +412,14 @@ export async function gerarPdfCompacto({
     if (y > 245) { pdf.addPage(); y = 20 }
 
     const pad = 5
-    const bulletLines = resumoMeta.bullets.flatMap(b => pdf.splitTextToSize(`- ${b}`, cW - pad * 2 - 4))
+    const bulletFs = 8.5
+    const contentW = cW - pad * 2 - 4
+    const layout = layoutResumoBulletsPdf(pdf, resumoMeta.bullets, contentW, { lineH: 4.6, fontSize: bulletFs })
     let extraH = 0
-    if (resumoMeta.proximaData) extraH += 5
+    if (resumoMeta.proximaData) extraH += 7
     const contagemLine = `${resumoMeta.nSim} conforme \u2022 ${resumoMeta.nNao} n\u00e3o conforme` +
       (resumoMeta.nNa ? ` \u2022 ${resumoMeta.nNa} N/A` : '')
-    const boxH = 22 + bulletLines.length * 4.2 + extraH + pad
+    const boxH = 22 + layout.totalHeight + extraH + pad
     if (y + boxH > 275) { pdf.addPage(); y = 20 }
 
     const y0 = y - 3
@@ -400,12 +433,7 @@ export async function gerarPdfCompacto({
     pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
     pdf.text(contagemLine, M + pad + 2, y0 + 11)
 
-    let yTxt = y0 + 16
-    pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39)
-    bulletLines.forEach((ln) => {
-      pdf.text(ln, M + pad + 2, yTxt)
-      yTxt += 4.2
-    })
+    const yTxt = drawResumoBulletsPdf(pdf, layout, M + pad + 2, y0 + 16)
 
     if (resumoMeta.proximaData) {
       pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
@@ -414,7 +442,6 @@ export async function gerarPdfCompacto({
       const proxTxt = `${formatDataRelatorioPdf(resumoMeta.proximaData)}` +
         (resumoMeta.proximaTecnico ? `  |  ${resumoMeta.proximaTecnico}` : '')
       pdf.text(proxTxt, M + pad + 46, yTxt + 1)
-      yTxt += 5
     }
 
     y = y0 + boxH + 4

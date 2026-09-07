@@ -372,7 +372,7 @@ export function createManutencoesHandlers(deps) {
 
       lastBulkFetchOkAtRef.current = Date.now()
 
-      saveCache({
+      await saveCache({
         ...d,
         manutencoes: acc,
         maquinas: maquinasMerged,

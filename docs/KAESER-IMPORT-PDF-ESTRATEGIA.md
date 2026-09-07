@@ -60,6 +60,13 @@ Separadores: espaços e/ou tabs. O código de artigo tem formato típico `X.XXXX
 - Códigos com notação científica: 9.4945E1
 - Algumas linhas com quantidade colada à descrição: "6206 1 	PÇ" — parser deve ser tolerante
 
+### Variações ASD50T (UNICOL_ASD50T_1008.pdf, v1.17.16+)
+- Plano **sem kits de manutenção agrupados** — mais linhas de consumíveis individuais (filtros, esteiras, tubagens)
+- Códigos **sem ponto** com notação E: `222958E1` (válvula descarga)
+- Códigos **com hífen**: `4-00007.0` (KIT rolamentos)
+- Quantidade >1 no fim da linha mesmo com dimensão na descrição: «Rolamento … 63 **2** PÇ»
+- Duplicados de posição `9602` (duas unidades serv. condensação) — importar ambos
+
 ### Secções
 - Marcadores: **A**, **B**, **C**, **D** (linha isolada antes das peças)
 - Ordem: sempre A → B → C → D

@@ -8,6 +8,8 @@ export default defineConfig({
   plugins: [react()],
   base: process.env.VITE_BASE_URL || '/manut/',
   server: {
+    port: 5400,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'https://www.navel.pt',

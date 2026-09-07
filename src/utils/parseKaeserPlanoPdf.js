@@ -11,6 +11,25 @@
  * @param {string} text — Texto extraído do PDF
  * @returns {{ A: Array, B: Array, C: Array, D: Array }} Peças por tipo
  */
+
+/** Códigos Kaeser: pontos, hífen (4-00007.0), notação E com/sem ponto (222958E1, 9.9282E0). */
+const RE_CODIGO_KAESER =
+  /^([\d]+(?:-[\d]+)?(?:\.[\d]+)*(?:E\d+)?|\d+E\d+)\s+([\s\S]+)$/
+
+function isPlausibleKaeserCode(code) {
+  if (!code || code.length < 2) return false
+  if (/^\d{4}$/.test(code)) return false
+  return /[.\-]/.test(code) || /E\d+$/i.test(code)
+}
+
+function splitCodigoDescricao(meio) {
+  const m = meio.match(RE_CODIGO_KAESER)
+  if (m && isPlausibleKaeserCode(m[1])) {
+    return { codigoArtigo: m[1], descricao: m[2].trim() }
+  }
+  return { codigoArtigo: '', descricao: meio }
+}
+
 export function parseKaeserPlanoPdf(text) {
   const TIPOS = ['A', 'B', 'C', 'D']
   const resultado = { A: [], B: [], C: [], D: [] }
@@ -43,24 +62,12 @@ export function parseKaeserPlanoPdf(text) {
 
     if (unidadeMatch) {
       quantidade = parseFloat(unidadeMatch[1].replace(',', '.')) || 1
-      unidade = unidadeMatch[2].replace('Ç', 'Ç') // normalizar PÇ
+      unidade = unidadeMatch[2]
       if (unidade === 'PC') unidade = 'PÇ'
       meio = resto.slice(0, resto.length - unidadeMatch[0].length).trim()
     }
 
-    // Meio: código artigo (opcional) + descrição
-    // Código KAESER: contém ponto (ex: 490103.10010, 9.0920.10030, 9.4945E1)
-    const codeMatch = meio.match(/^([\d.]+(?:E\d+)?)\s+(.+)$/s)
-    let codigoArtigo = ''
-    let descricao = meio
-
-    if (codeMatch && codeMatch[1].includes('.')) {
-      const possivelCodigo = codeMatch[1]
-      if (/^[\d.]+(?:E\d+)?$/.test(possivelCodigo)) {
-        codigoArtigo = possivelCodigo
-        descricao = codeMatch[2].trim()
-      }
-    }
+    const { codigoArtigo, descricao } = splitCodigoDescricao(meio)
 
     // Ignorar linhas sem descrição útil (ex: "Use up part - see bill of mate" pode ficar)
     if (!descricao || descricao.length < 2) continue

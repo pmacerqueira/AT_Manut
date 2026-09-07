@@ -7,6 +7,7 @@ import { GlobalLoadingProvider } from './context/GlobalLoadingContext'
 import { ToastProvider } from './components/Toast'
 import { logEntry } from './utils/logger'
 import { STORAGE } from './config/storageKeys'
+import { loadCache } from './services/localCache'
 import './index.css'
 import './styles/data-table-system.css'
 import App from './App.jsx'
@@ -53,6 +54,8 @@ import { APP_VERSION } from './config/version'
     } else {
       logEntry('info', 'App', 'startup', `App iniciada (v${APP_VERSION})`)
     }
+    // Migra cache legado localStorage → IndexedDB (se existir)
+    loadCache().catch(() => {})
   } catch (err) {
     logEntry('warn', 'App', 'versionUpdate', 'Falha ao limpar caches ou actualizar versão', { msg: err?.message })
   }
