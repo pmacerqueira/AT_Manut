@@ -1203,7 +1203,7 @@ body.modo-campo .num-servico {
 .kaeser-pecas-table .kaeser-peca-un-select {
   display: block;
   width: 100%;
-  min-width: 5.5rem;
+  min-width: 0;
   box-sizing: border-box;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1218,6 +1218,23 @@ body.modo-campo .num-servico {
 .kaeser-pecas-table .kaeser-peca-un-select:focus-visible {
   outline: 2px solid var(--color-primary, #1ab8f0);
   outline-offset: 1px;
+}
+@media (max-width: 640px) {
+  .kaeser-pecas-table-wrap {
+    overflow-x: visible;
+  }
+  .kaeser-pecas-table {
+    table-layout: fixed;
+  }
+  .kaeser-pecas-table .col-peca-un {
+    width: 3.4rem;
+    min-width: 3.4rem;
+    max-width: 3.4rem;
+  }
+  .kaeser-pecas-table .kaeser-peca-un-select {
+    padding-right: 0.15rem;
+    padding-left: 0.15rem;
+  }
 }
 
 .kaeser-help-btn {
@@ -1317,6 +1334,9 @@ body.modo-campo .num-servico {
   font-size: 0.88rem;
   margin-top: 0.75rem;
   animation: wizardConfirmIn 0.25s ease;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 .wizard-confirm > span {
   flex: 1;

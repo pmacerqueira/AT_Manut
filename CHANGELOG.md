@@ -9,6 +9,20 @@ Política de continuidade:
 
 ---
 
+## [1.17.17] — 2026-10-06 — Avisos do wizard visíveis no telemóvel
+
+### Correcção
+- **Execução de manutenção:** bloqueios do formulário (série, horas, checklist, observações, fotos, técnico, assinante, assinatura) passam a toast amarelo ao centro do ecrã (4 s), além do texto no campo. No telemóvel o erro ficava dentro da área com scroll e os técnicos não o viam.
+- **KAESER:** o tipo A/B/C/D aplica-se ao tocar «Seguinte» quando as horas já sugerem o tipo (antes só no blur, que o telemóvel muitas vezes não dispara). O selector do tipo ficou logo por baixo das horas. Sem linhas de consumíveis, a confirmação «não houve materiais» fica no topo. A tabela de peças deixa de forçar scroll horizontal que prendia o scroll vertical.
+- **Outros compressores e geradores:** o contador de horas passou para cima da confirmação do número de série, com indicação de que o valor é só o número.
+- **Observações:** o aviso distingue texto curto de texto sem espaço entre palavras.
+- **Reparações:** o toast de conclusão diz o que falta (checklist ou assinatura) e permanece 4 s.
+
+### Deploy
+- PWA `public_html/manut/`. Sem alteração de PHP/API.
+
+---
+
 ## [1.17.16] — 2026-09-07 — Próximas manutenções em relatórios históricos (UNICOL)
 
 ### Correcção

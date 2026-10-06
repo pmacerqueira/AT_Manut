@@ -7,7 +7,6 @@ import { INTERVALOS_KAESER } from '../../domain/equipamentoDomain'
 import {
   KAESER_INTERVALO_HORAS_REF,
   KAESER_ANUAL_MIN_DIAS,
-  tipoKaeserSugeridoPorHorasServico,
   descricaoCicloKaeser,
   proximaPosicaoKaeser,
 } from '../../constants/kaeserCiclo.js'
@@ -37,7 +36,7 @@ export default function KaeserHorasStep({
   return (
     <div className="wizard-step-content" data-testid="kaeser-passo-horas">
       <p className="wizard-step-hint">
-        Leia o <strong>contador de horas de serviço</strong>. A app combina <strong>Δh desde a última referência</strong> na ficha com a <strong>janela anual ({KAESER_ANUAL_MIN_DIAS} d)</strong> — sugere o tipo A/B/C/D; pode sempre alterar.
+        Obrigatório neste passo: <strong>horas do contador</strong> e <strong>tipo A/B/C/D</strong>. A app sugere o tipo; pode alterá-lo.
         <button
           type="button"
           className="btn-icon-hint kaeser-help-btn"
@@ -84,6 +83,32 @@ export default function KaeserHorasStep({
             }))
           }}
         />
+      </div>
+      <div className="form-section">
+        <label>
+          Tipo de manutenção KAESER (A/B/C/D) <span className="req-star">*</span>
+          <select
+            value={form.tipoManutKaeser}
+            onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
+          >
+            <option value="">— Seleccionar —</option>
+            {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
+              <option key={tipo} value={tipo}>{info.label}</option>
+            ))}
+          </select>
+        </label>
+        <p className="form-hint" style={{ marginTop: '0.35rem' }}>
+          Se as horas já estão preenchidas, «Seguinte» usa a sugestão quando o tipo ainda está vazio.
+          {maq?.posicaoKaeser != null && (
+            <>
+              {' '}
+              <span className="kaeser-ciclo-hint">
+                Ciclo na ficha: {descricaoCicloKaeser(maq.posicaoKaeser)}
+                {' '}· Próximo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
+              </span>
+            </>
+          )}
+        </p>
       </div>
       <div className="form-section" style={{ marginTop: '0.25rem' }}>
         <label className="kaeser-anual-checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.95rem' }}>
@@ -189,40 +214,6 @@ export default function KaeserHorasStep({
           )}
         </div>
       )}
-      <div className="form-section">
-        <label>
-          Tipo de manutenção KAESER (A/B/C/D) <span className="req-star">*</span>
-          <select
-            value={form.tipoManutKaeser}
-            onChange={e => aplicarTipoKaeserComPecas(e.target.value)}
-          >
-            <option value="">— Seleccionar —</option>
-            {Object.entries(INTERVALOS_KAESER).map(([tipo, info]) => (
-              <option key={tipo} value={tipo}>{info.label}</option>
-            ))}
-          </select>
-        </label>
-        <p className="form-hint" style={{ marginTop: '0.35rem' }}>
-          Fallback absoluto (sem Δh fiável):{' '}
-          <strong>
-            {(() => {
-              const hs = parseInt(String(form.horasServico).trim(), 10)
-              return Number.isFinite(hs) && hs >= 0
-                ? `Tipo ${tipoKaeserSugeridoPorHorasServico(hs)}`
-                : '— (preencha as horas de serviço)'
-            })()}
-          </strong>
-          {maq?.posicaoKaeser != null && (
-            <>
-              {' '}
-              <span className="kaeser-ciclo-hint">
-                · Ciclo na ficha: {descricaoCicloKaeser(maq.posicaoKaeser)}
-                {' '}· Próximo: {descricaoCicloKaeser(proximaPosicaoKaeser(maq.posicaoKaeser))}
-              </span>
-            </>
-          )}
-        </p>
-      </div>
       {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
     </div>
   )

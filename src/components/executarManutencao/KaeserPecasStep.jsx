@@ -12,11 +12,26 @@ export default function KaeserPecasStep({
   setKaeserSemConsumiveis,
   erroChecklist,
 }) {
+  const semLinhas = form.pecasUsadas.length === 0
+  const confirmacaoSemMateriais = (
+    <label className="exec-equip-confirm-label form-section" style={{ marginTop: semLinhas ? 0 : '0.75rem' }}>
+      <input
+        type="checkbox"
+        checked={kaeserSemConsumiveis}
+        onChange={e => setKaeserSemConsumiveis(e.target.checked)}
+      />
+      <span>Confirmo que nesta intervenção não houve substituição nem consumo de materiais do plano (lista vazia ou só inspecção).</span>
+    </label>
+  )
+
   return (
     <div className="wizard-step-content">
       <p className="wizard-step-hint">
-        Lista do plano para o <strong>Tipo {form.tipoManutKaeser || '—'}</strong>. Pré-preenchida com <strong>1 un.</strong> por linha — ajuste as quantidades (0 = não aplicável) ou acrescente artigos extra.
+        {semLinhas
+          ? <>O tipo <strong>{form.tipoManutKaeser || '—'}</strong> não tem consumíveis no plano. Confirme que não houve materiais, ou adicione uma linha.</>
+          : <>Lista do plano para o <strong>Tipo {form.tipoManutKaeser || '—'}</strong>. Pré-preenchida com <strong>1 un.</strong> por linha — ajuste as quantidades (0 = não aplicável) ou acrescente artigos extra.</>}
       </p>
+      {semLinhas && confirmacaoSemMateriais}
       <div className="kaeser-pecas-table-wrap">
         {form.pecasUsadas.length === 0 ? (
           <p className="text-muted">Nenhum consumível no plano para este tipo. Adicione linhas manualmente ou configure o plano em Equipamentos.</p>
@@ -56,14 +71,7 @@ export default function KaeserPecasStep({
           <Plus size={14} /> Adicionar linha
         </button>
       </div>
-      <label className="exec-equip-confirm-label form-section" style={{ marginTop: '0.75rem' }}>
-        <input
-          type="checkbox"
-          checked={kaeserSemConsumiveis}
-          onChange={e => setKaeserSemConsumiveis(e.target.checked)}
-        />
-        <span>Confirmo que nesta intervenção não houve substituição nem consumo de materiais do plano (lista vazia ou só inspecção).</span>
-      </label>
+      {!semLinhas && confirmacaoSemMateriais}
       {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
     </div>
   )

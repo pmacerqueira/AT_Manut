@@ -60,6 +60,17 @@ export function notasCumpremMinimoObservacoes(notas, quickNotesList) {
   return t.length >= OBSERVACOES_TEXTO_LIVRE_MIN && /\s/.test(t)
 }
 
+/** Mensagem vazia se as observações passam. Distingue texto curto de texto sem espaço. */
+export function mensagemObservacoesInsuficientes(notas, quickNotesList) {
+  const t = (notas || '').trim()
+  if (!t) return 'As observações são obrigatórias. Utilize uma nota rápida ou descreva o trabalho.'
+  if (notasCumpremMinimoObservacoes(t, quickNotesList)) return ''
+  if (t.length >= OBSERVACOES_TEXTO_LIVRE_MIN && !/\s/.test(t)) {
+    return 'Escreva as observações com um espaço entre palavras, ou toque numa nota rápida.'
+  }
+  return `Use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`
+}
+
 /**
  * Divide notas do relatório em linhas (uma nota rápida ou parágrafo por linha).
  * Com `\n` explícito faz split; legado sem separador tenta partir notas rápidas conhecidas.

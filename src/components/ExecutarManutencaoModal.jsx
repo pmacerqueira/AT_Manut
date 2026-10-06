@@ -44,8 +44,7 @@ import {
   sanitizarPecasRelatorio,
   getQuickNotes,
   normalizarChecklistRespostasMap,
-  notasCumpremMinimoObservacoes,
-  OBSERVACOES_TEXTO_LIVRE_MIN,
+  mensagemObservacoesInsuficientes,
   snapshotExecCancelState,
 } from './executarManutencao/execWizardHelpers'
 import KaeserHorasStep from './executarManutencao/KaeserHorasStep'
@@ -111,6 +110,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [manutencaoAtual, setManutencaoAtual] = useState(null)
   const [erroChecklist, setErroChecklist] = useState('')
   const [erroAssinatura, setErroAssinatura] = useState('')
+  /** Bloqueio do wizard: texto junto ao campo e toast amarelo ao centro (visível no telemóvel). */
+  const avisarBloqueio = useCallback((msg, campo = 'checklist') => {
+    if (campo === 'assinatura') setErroAssinatura(msg)
+    else setErroChecklist(msg)
+    showToast(msg, 'warning', 4000)
+  }, [showToast])
   const [assinaturaFeita, setAssinaturaFeita] = useState(false)
   /** True após «Limpar assinatura» no canvas — não reutilizar assinatura antiga do relatório ao gravar. */
   const [signatureClearedByUser, setSignatureClearedByUser] = useState(false)
@@ -152,6 +157,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   /** Última sugestão do motor (para auditoria no relatório). */
   const kaeserAuditoriaRef = useRef({ tipoSugerido: null, motivo: null })
   const kaeserWarnAnualHighDeltaRef = useRef(false)
+  /** Tipo sugerido no passo horas — lido ao avançar, sem esperar pelo blur do teclado do telemóvel. */
+  const kaeserAutoTipoRef = useRef('')
+  const kaeserAutoMotivoRef = useRef('')
+  const aplicarTipoKaeserRef = useRef(null)
+  const pendingTipoTrocaRef = useRef('')
 
   const maq = maquina
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
@@ -701,7 +711,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
       )
       if (!todasMarcadas) {
-        setErroChecklist('Todas as linhas da checklist devem ser verificadas.')
+        avisarBloqueio('Todas as linhas da checklist devem ser verificadas.')
         return false
       }
       setErroChecklist('')
@@ -710,13 +720,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     if (s === W.verif) {
       if (!confirmaEquipamentoSerie) {
-        setErroChecklist('Confirme o número de série do equipamento antes de avançar.')
+        avisarBloqueio('Confirme o número de série do equipamento antes de avançar.')
         return false
       }
       if (temContadorHoras && !useKaeserPipeline) {
         const hs = String(form.horasServico).trim()
         if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
-          setErroChecklist('Indique as horas no contador (acumuladas) — leitura actual.')
+          avisarBloqueio('Indique as horas no contador (acumuladas) — leitura actual.')
           return false
         }
       }
@@ -728,12 +738,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (s === W.horas) {
         const hs = String(form.horasServico).trim()
         if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
-          setErroChecklist('Indique as horas no contador (acumuladas) do compressor.')
+          avisarBloqueio('Indique as horas no contador (acumuladas) do compressor.')
           return false
         }
         if (!form.tipoManutKaeser) {
-          setErroChecklist('Seleccione o tipo de manutenção KAESER (A/B/C/D).')
-          return false
+          const auto = kaeserAutoTipoRef.current
+          if (auto) {
+            kaeserAuditoriaRef.current = {
+              tipoSugerido: auto,
+              motivo: kaeserAutoMotivoRef.current || 'fallback',
+            }
+            aplicarTipoKaeserRef.current?.(auto, { skipDirtyConfirm: true })
+          } else {
+            avisarBloqueio('Seleccione o tipo de manutenção KAESER (A/B/C/D).')
+            return false
+          }
         }
         setErroChecklist('')
         return true
@@ -742,7 +761,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         const pecasSan = sanitizarPecasRelatorio(form.pecasUsadas)
         const algumUsado = pecasSan.some(p => p.usado && Number(p.quantidadeUsada) > 0)
         if (!algumUsado && !kaeserSemConsumiveis) {
-          setErroChecklist('Indique consumíveis com quantidade superior a zero ou confirme que não houve materiais nesta intervenção.')
+          avisarBloqueio('Indique consumíveis com quantidade superior a zero ou confirme que não houve materiais nesta intervenção.')
           return false
         }
         setErroChecklist('')
@@ -750,12 +769,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
       if (s === W.checklist) return validarChecklistCompleta()
       if (s === W.notas) {
-        if (!form.notas.trim()) {
-          setErroChecklist('As observações são obrigatórias. Utilize uma nota rápida ou descreva o trabalho.')
-          return false
-        }
-        if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-          setErroChecklist(`Use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`)
+        const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
+        if (msgNotas) {
+          avisarBloqueio(msgNotas)
           return false
         }
         setErroChecklist('')
@@ -764,13 +780,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (s === W.fotos) {
         if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
           setConfirmacaoPendente('fotos')
+          showToast('Pretende continuar sem fotografias? Confirme «Sim, avançar».', 'warning', 4000)
           return false
         }
         return true
       }
       if (s === W.tec) {
         if (!form.tecnico) {
-          setErroAssinatura('Selecione o técnico que realizou a manutenção.')
+          avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
           return false
         }
         setErroAssinatura('')
@@ -778,7 +795,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
       if (s === W.cli) {
         if (!form.nomeAssinante.trim()) {
-          setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+          avisarBloqueio('Indique o nome do cliente que assina o relatório.', 'assinatura')
           return false
         }
         const erroSecaoCli = validarAssinanteSecaoEquipamento({
@@ -787,7 +804,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           nomeAssinante: form.nomeAssinante,
         })
         if (erroSecaoCli) {
-          setErroAssinatura(erroSecaoCli)
+          avisarBloqueio(erroSecaoCli, 'assinatura')
           return false
         }
         setErroAssinatura('')
@@ -796,7 +813,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (s === W.ass) {
         const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
         if (!isAdmin && !temAssinaturaOuRel) {
-          setErroAssinatura('A assinatura digital do cliente é obrigatória.')
+          avisarBloqueio('A assinatura digital do cliente é obrigatória.', 'assinatura')
           return false
         }
         setErroAssinatura('')
@@ -807,12 +824,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     if (s === W.checklist) return validarChecklistCompleta()
     if (s === W.notas) {
-      if (!form.notas.trim()) {
-        setErroChecklist('As observações são obrigatórias. Utilize uma nota rápida ou descreva o trabalho.')
-        return false
-      }
-      if (!notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-        setErroChecklist(`Use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`)
+      const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
+      if (msgNotas) {
+        avisarBloqueio(msgNotas)
         return false
       }
       setErroChecklist('')
@@ -821,13 +835,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (s === W.fotos) {
       if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
         setConfirmacaoPendente('fotos')
+        showToast('Pretende continuar sem fotografias? Confirme «Sim, avançar».', 'warning', 4000)
         return false
       }
       return true
     }
     if (s === W.tec) {
       if (!form.tecnico) {
-        setErroAssinatura('Selecione o técnico que realizou a manutenção.')
+        avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
         return false
       }
       setErroAssinatura('')
@@ -835,7 +850,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
     if (s === W.cli) {
       if (!form.nomeAssinante.trim()) {
-        setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        avisarBloqueio('Indique o nome do cliente que assina o relatório.', 'assinatura')
         return false
       }
       const erroSecaoCli = validarAssinanteSecaoEquipamento({
@@ -844,7 +859,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         nomeAssinante: form.nomeAssinante,
       })
       if (erroSecaoCli) {
-        setErroAssinatura(erroSecaoCli)
+        avisarBloqueio(erroSecaoCli, 'assinatura')
         return false
       }
       setErroAssinatura('')
@@ -853,14 +868,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (s === W.ass) {
       const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
       if (!isAdmin && !temAssinaturaOuRel) {
-        setErroAssinatura('A assinatura digital do cliente é obrigatória.')
+        avisarBloqueio('A assinatura digital do cliente é obrigatória.', 'assinatura')
         return false
       }
       setErroAssinatura('')
       return true
     }
     return true
-  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes])
+  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes, avisarBloqueio, showToast])
 
   const goNext = useCallback(() => {
     if (step >= W.total) return
@@ -877,6 +892,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroChecklist('')
     setErroAssinatura('')
   }, [])
+
+  useEffect(() => {
+    if (!erroChecklist && !erroAssinatura && confirmacaoPendente !== 'fotos') return
+    const id = requestAnimationFrame(() => {
+      const raiz = document.querySelector('.modal-relatorio-form')
+      if (!raiz) return
+      const selector = (confirmacaoPendente === 'fotos' && !erroChecklist && !erroAssinatura)
+        ? '.wizard-confirm'
+        : '.form-erro'
+      const alvo = [...raiz.querySelectorAll(selector)].find(el => el.offsetParent !== null && (el.textContent || '').trim())
+      alvo?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [erroChecklist, erroAssinatura, confirmacaoPendente])
 
   const pecasDoPlanoKaeser = useCallback((tipo) => {
     if (!tipo || !maq) return []
@@ -897,7 +926,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
     if (!skipDirtyConfirm && kaeserPecasDirty && form.tipoManutKaeser && form.tipoManutKaeser !== tipo) {
-      if (!window.confirm('Já alterou consumíveis manualmente. Substituir pelo plano do tipo seleccionado?')) return
+      if (pendingTipoTrocaRef.current !== tipo) {
+        pendingTipoTrocaRef.current = tipo
+        showToast('Já alterou consumíveis. Seleccione outra vez o mesmo tipo para substituir pelo plano.', 'warning', 4000)
+        return
+      }
+      pendingTipoTrocaRef.current = ''
+    } else {
+      pendingTipoTrocaRef.current = ''
     }
     setKaeserPecasDirty(false)
     setForm(f => ({
@@ -905,7 +941,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       tipoManutKaeser: tipo,
       pecasUsadas: pecasDoPlanoKaeser(tipo),
     }))
-  }, [pecasDoPlanoKaeser, kaeserPecasDirty, form.tipoManutKaeser])
+  }, [pecasDoPlanoKaeser, kaeserPecasDirty, form.tipoManutKaeser, showToast])
 
   const kaeserSugestaoLive = useMemo(() => {
     if (!maq || !isKaeserAbcdMaq) return null
@@ -919,6 +955,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       contadorFichaConfiavel: temManutencaoConcluidaNaMaq,
     })
   }, [maq, isKaeserAbcdMaq, form.horasServico, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq])
+
+  aplicarTipoKaeserRef.current = aplicarTipoKaeserComPecas
+  kaeserAutoTipoRef.current = (!kaeserIntervencaoAnual && kaeserSugestaoLive?.tipoPreSelecao)
+    ? kaeserSugestaoLive.tipoPreSelecao
+    : ''
+  kaeserAutoMotivoRef.current = kaeserSugestaoLive?.motivoPrincipal || ''
 
   useEffect(() => {
     if (!useKaeserPipeline || step !== W.horas) return
@@ -1055,8 +1097,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           return
         }
       }
-      if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-        showToast(`Observações: use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`, 'warning')
+      const msgNotasGravar = mensagemObservacoesInsuficientes(form.notas, quickNotes)
+      if (msgNotasGravar) {
+        showToast(msgNotasGravar, 'warning', 4000)
         return
       }
     }
@@ -1065,16 +1108,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
     )
     if (!todasMarcadas) {
-      setErroChecklist('Todas as linhas da checklist devem ser verificadas pelo utilizador.')
+      avisarBloqueio('Todas as linhas da checklist devem ser verificadas pelo utilizador.')
       return
     }
     if (!form.tecnico) {
-      setErroAssinatura('Selecione o técnico que realizou a manutenção.')
+      avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
       return
     }
     if (!semAssinatura) {
       if (!form.nomeAssinante.trim()) {
-        setErroAssinatura('Indique o nome do cliente que assina o relatório.')
+        avisarBloqueio('Indique o nome do cliente que assina o relatório.', 'assinatura')
         return
       }
       const erroSecao = validarAssinanteSecaoEquipamento({
@@ -1083,12 +1126,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         nomeAssinante: form.nomeAssinante,
       })
       if (erroSecao) {
-        setErroAssinatura(erroSecao)
+        avisarBloqueio(erroSecao, 'assinatura')
         return
       }
       const temAssinaturaOuRel = assinaturaFeita || (!!rel?.assinaturaDigital && !signatureClearedByUser)
       if (!temAssinaturaOuRel) {
-        setErroAssinatura('A assinatura digital do cliente é obrigatória.')
+        avisarBloqueio('A assinatura digital do cliente é obrigatória.', 'assinatura')
         return
       }
     }
@@ -1427,8 +1470,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       showToast('Preencha toda a checklist (Sim/Não).', 'warning')
       return
     }
-    if (!form.notas.trim() || !notasCumpremMinimoObservacoes(form.notas, quickNotes)) {
-      showToast(`Observações: use uma nota rápida ou escreva pelo menos ${OBSERVACOES_TEXTO_LIVRE_MIN} caracteres descritivos.`, 'warning')
+    const msgNotasAdmin = mensagemObservacoesInsuficientes(form.notas, quickNotes)
+    if (msgNotasAdmin) {
+      showToast(msgNotasAdmin, 'warning', 4000)
       return
     }
     if (temContadorHoras) {
@@ -1864,6 +1908,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   Data da intervenção: <strong>{formatarDataPT(getHojeAzores())}</strong>
                 </p>
               </div>
+              {temContadorHoras && !useKaeserPipeline && (
+                <div className="form-section">
+                  <HorasContadorInput
+                    value={form.horasServico}
+                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
+                    horasAnterior={horasReferenciaManutencaoAnterior}
+                    hint="Obrigatório nos compressores e geradores. Escreva só o número do contador, sem pontos."
+                  />
+                </div>
+              )}
               <label className="exec-equip-confirm-label form-section">
                 <input
                   type="checkbox"
@@ -1872,15 +1926,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 />
                 <span>Confirmo que o equipamento acima é o que estou a manter / inspeccionar nesta visita.</span>
               </label>
-              {temContadorHoras && !useKaeserPipeline && (
-                <div className="form-section">
-                  <HorasContadorInput
-                    value={form.horasServico}
-                    onChange={e => setForm(f => ({ ...f, horasServico: e.target.value }))}
-                    horasAnterior={horasReferenciaManutencaoAnterior}
-                  />
-                </div>
-              )}
               {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
             </div>
           )}

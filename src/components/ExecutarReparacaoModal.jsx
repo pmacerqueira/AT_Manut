@@ -386,19 +386,21 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     if (checklistItems.length > 0) {
       const pendentes = checklistItems.filter(it => !form.checklistRespostas[it.id])
       if (pendentes.length > 0) {
-        setErroChecklist(`${pendentes.length} item(ns) do checklist por preencher`)
-        erros.push('Checklist incompleto')
+        const msg = `${pendentes.length} item(ns) do checklist por preencher`
+        setErroChecklist(msg)
+        erros.push(msg)
       } else {
         setErroChecklist('')
       }
     }
     if (!assinaturaFeita) {
-      setErroAssinatura('A assinatura do cliente é obrigatória')
-      erros.push('Assinatura em falta')
+      const msg = 'A assinatura do cliente é obrigatória'
+      setErroAssinatura(msg)
+      erros.push(msg)
     }
 
     if (erros.length > 0) {
-      showToast(erros[0], 'warning')
+      showToast(erros[0], 'warning', 4000)
       return
     }
 
