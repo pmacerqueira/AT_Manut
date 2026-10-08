@@ -457,7 +457,7 @@ await page.waitForTimeout(500)
 **Paridade servidor:** `servidor-cpanel/send-email.php` (FPDF) deve espelhar a mesma ordem e regras de paginação.
 
 ### Regras de paginação:
-- Checklist: `SetAutoPageBreak(false)` na página da checklist; fonte/altura de linha compactas
+- Checklist: `SetAutoPageBreak(false)` na página da checklist; fonte/altura de linha compactas. Rótulos à direita por extenso (`rotuloRespostaPdf`: ANALISADO, EXECUTADO, …); teste com carga «2 CICLOS»; coluna de 38 mm no jsPDF e no FPDF
 - Notas: cada linha separada; legado com notas rápidas embutidas é normalizado em `linhasNotasRelatorio`
 - Página final: próximas + declaração + assinaturas tentam ficar juntas; altura de linha da tabela de próximas reduz-se (7→4 mm) para caber a lista completa
 - As assinaturas são SEMPRE o último bloco de conteúdo

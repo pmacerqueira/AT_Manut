@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-06-12
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-10-08
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -346,7 +346,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
    - Campo técnico (select)
    - Nome do assinante
    - Canvas de assinatura digital
-   - Campo de fotos (opcional)
+   - Fotos: chapa de identificação ao confirmar a série, e pelo menos mais uma do equipamento e do local (aviso amarelo até OK)
    - Horas de serviço (opcional)
 3. Submit → valida checklist + assinatura → guarda relatório + atualiza manutenção
 4. **Assinatura em 2 passos (opcional):** Se a assinatura não for recolhida no momento, o status fica `pendenteAssinatura`. O modal `RecolherAssinaturaModal` permite recolher a assinatura posteriormente.
@@ -373,9 +373,9 @@ Ordem canónica — **não alterar** sem rever `.cursor/rules/at-manut-workflow.
 | 4 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) | Elevador novo: sem caixa CONFORME |
 | 5 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante, contexto da visita) | Não | Elevador: série, pedido e pedido fora do âmbito |
 | 6 | **Pontos de atenção** (não conformidades) | Se existirem | |
-| 7 | Checklist de verificação | Se existir | **Uma página A4** (fonte/linha compactas) |
+| 7 | Checklist de verificação | Se existir | **Uma página A4**. Rótulos por extenso (ANALISADO, EXECUTADO, …); teste com carga «2 CICLOS»; coluna direita 38 mm |
 | 8 | Notas adicionais | Se existirem | **Uma nota por linha** (`linhasNotasRelatorio`) |
-| 9 | Fotos (documentação fotográfica, grelha A4) | Se existirem | Máx. 6 |
+| 9 | Fotos (documentação fotográfica, grelha A4) | Obrigatórias na execução individual | Máx. 6. A chapa de identificação é a primeira |
 | 10 | Consumíveis e peças | Se existirem | |
 | 11 | **Página final:** Próximas manutenções agendadas | Se periódica | Lista completa, sem cortes por página |
 | 12 | Declaração de aceitação / receção | **Sempre** | Antes da nota legal e das assinaturas |

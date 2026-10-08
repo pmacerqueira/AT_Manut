@@ -1,7 +1,8 @@
 # AT_Manut — Roadmap de Evolução
 
 > Documento de planeamento estratégico e arquivo de entregas. **Estado presente da app:** `CHANGELOG.md` e `src/config/version.js`.  
-> Última revisão de formato: 2026-04-30 — v1.16.81
+> O ciclo de relatórios de elevador, fotos obrigatórias e rótulos da checklist está em [`docs/PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md`](PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md) e [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md).  
+> Última revisão de formato: 2026-04-30 — o arquivo abaixo não é o estado actual.
 
 ---
 

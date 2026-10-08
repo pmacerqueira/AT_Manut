@@ -424,4 +424,4 @@ Os testes dependem de classes CSS. Se alterar uma classe, verificar:
 
 ---
 
-*Última actualização: 2026-06-12 — v1.17.5 (114 testes unitários; PDF/email layout final)*
+*Última actualização: 2026-10-08. Contagem viva de testes: `README.md`. Rótulos da checklist: `tests/unit/relatorioElevadorPreventivo.test.js`.*

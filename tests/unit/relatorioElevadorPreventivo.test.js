@@ -306,7 +306,9 @@ describe('relatorio elevador preventivo', () => {
     assert.ok(validarChecklistElevador(items, { t: semRec }).some(e => /recomendação/i.test(e)))
     const naoObs = respostaTeste({ executado: true, carga: 'sem_carga', observacao: 'nao_observado' })
     assert.ok(validarChecklistElevador(items, { t: naoObs }).some(e => /não foi observado/.test(e)))
-    assert.equal(rotuloRespostaPdf(respostaTeste({ executado: false, motivo: 'Sem energia no quadro.' })), 'S/ TESTE')
+    assert.equal(rotuloRespostaPdf(respostaTeste({ executado: false, motivo: 'Sem energia no quadro.' })), 'SEM TESTE')
+    assert.equal(rotuloRespostaPdf(respostaDocumento('analisado')), 'ANALISADO')
+    assert.equal(rotuloRespostaPdf(respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' })), 'EXECUTADO')
   })
 
   it('série confirmada na chapa exige a fotografia e essa foto abre o relatório', () => {

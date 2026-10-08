@@ -1,6 +1,6 @@
 # Fotografias nos relatórios — limites, PDF, email e deploy
 
-Documento de **memória operacional** para agentes e desenvolvimento futuro (v1.16.11+; layout PDF/email v1.17.5).
+Documento de **memória operacional** para agentes e desenvolvimento futuro (v1.16.11+; layout PDF/email v1.17.5; fotos obrigatórias e rótulos por extenso em 2026-10-08).
 
 ---
 
@@ -15,6 +15,22 @@ Usada em: `ExecutarManutencaoModal.jsx`, `ExecutarReparacaoModal.jsx`, `gerarPdf
 **Dados legados** com mais de 6 entradas no array `fotos`: HTML e PDF mostram **apenas as primeiras 6**; o PDF compacto pode indicar no subtítulo que existem mais fotografias no total (quando aplicável).
 
 ---
+
+## Fotos obrigatórias na execução
+
+Em qualquer equipamento, na manutenção e na conclusão da reparação:
+
+- Ao confirmar a série, o técnico tira a foto da chapa. A cópia vai para Transferências e a mesma imagem entra no PDF à frente das outras, com a marca «Chapa».
+- A secção de fotos exige pelo menos mais uma imagem do equipamento e do local. O aviso amarelo fica até OK: «Introduzir fotos do equipamento e do local de instalação». A chapa não conta para esta foto.
+- Se a chapa do elevador não foi possível de ver (`desconhecido`), essa foto da chapa não é exigida. A foto do equipamento e do local continua a ser exigida.
+- Guardar progresso de uma reparação não bloqueia. Concluir bloqueia.
+- A execução em lote não fotografa cada máquina. A foto entra na execução individual.
+
+Funções: `mensagemFotoChapa`, `mensagemFotosEquipamento`, `fotosComChapa` em `src/domain/relatorioElevadorPreventivo.js`. Campo: `FotoChapaCampo.jsx`.
+
+## Rótulos da checklist no PDF
+
+O lado direito da checklist usa a palavra completa (`rotuloRespostaPdf`): ANALISADO, EXECUTADO, NÃO ANALISADO, ANOMALIA, SEM TESTE, SEM CARGA, NÃO EXECUTADO, NÃO OBSERVADO, ILEGÍVEL. O teste com carga fica «2 CICLOS». A coluna reserva 38 mm em `gerarPdfRelatorio.js` e em `send-email.php`. O browser envia o texto em `checklist_json.badge`.
 
 ## Compressão no dispositivo (tablet / telemóvel)
 

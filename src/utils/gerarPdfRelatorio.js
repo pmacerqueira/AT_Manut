@@ -619,7 +619,7 @@ export async function gerarPdfCompacto({
     const headerBlockH = 13
 
     const textLeftCl = M + 8
-    const badgeReserveMm = 24
+    const badgeReserveMm = 38
     const textoItemMaxW = Math.max(40, W - M - badgeReserveMm - textLeftCl)
 
     const fontCandidates = [

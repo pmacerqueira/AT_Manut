@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-06-12 (v1.17.5 — PDF/email layout) · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-10-08 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -58,6 +58,7 @@ Próximo passo:
 | `src/domain/equipamentoDomain.js` | Constantes, KAESER, `getIntervaloDias*` (categoria → subcategoria → máquina) |
 | `src/domain/agendaDomain.js` | Geração de periódicas futuras (`gerarManutencoesPeriodicasFuturas`, `recalcularPeriodicasNoEstado`, `recalcularAgendaMaquinaNoAcc`, …) |
 | `src/domain/relatorioDomain.js` | `mergeRelatoriosMantendoEnvio`, `proximoNumeroRelatorioSequencial` |
+| `src/domain/relatorioElevadorPreventivo.js` | Modelo da manutenção preventiva de elevadores: respostas, validação, fotos da chapa e do local, `rotuloRespostaPdf` |
 | `src/domain/manutencaoDomain.js` | `resolverIdsRemoverAoEliminarConcluida` (cascata ao eliminar concluída) |
 | `src/domain/backupDomain.js` | Export/import JSON (`buildBackupPayload`, `validateBackupDados`, `appVersao` + `BACKUP_FORMAT_VERSION`) |
 | `src/domain/persistDomain.js` | `runPersist` — online/offline + fila syncQueue |

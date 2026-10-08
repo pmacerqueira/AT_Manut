@@ -9,6 +9,19 @@ Política de continuidade:
 
 ---
 
+## [1.17.30] — 2026-10-08 — Rótulos completos na checklist
+
+### Alteração
+- Na checklist do PDF e do email, o lado direito deixa de abreviar. Passa a «ANALISADO», «EXECUTADO», «NÃO ANALISADO», «ANOMALIA», «SEM TESTE» e «NÃO EXECUTADO». O teste com carga continua marcado como «2 CICLOS».
+
+### Documentação
+- Alinhados a este ciclo: `DOCUMENTACAO.md`, `DESENVOLVIMENTO.md`, `docs/INDEX.md`, `docs/PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md`, `docs/FOTOS-PDF-EMAIL-LIMITES.md`, `docs/MANUT-APP-INSIGHTS.md`, `docs/ROADMAP.md`, `docs/TESTES-E2E.md`, `servidor-cpanel/INSTRUCOES_CPANEL.md` e a regra de checklist em `.cursor/rules/at-manut-workflow.mdc`.
+
+### Deploy
+- Publicada em 2026-10-08: PWA em `public_html/manut/` e `send-email.php` em `public_html/api/`.
+
+---
+
 ## [1.17.29] — 2026-10-08 — Validações do ponto 10
 
 ### Alteração

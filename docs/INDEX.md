@@ -36,7 +36,7 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 | Ficheiro | Conteúdo |
 |----------|----------|
 | **[`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](AGENDA-PERIODICA-E-PROXIMAS.md)** | **Canónico:** agenda trimestral, sync, paridade PDF/email, numeração relatórios |
-| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST, compressão; PDF (checklist, fecho); corpo HTML UTF-8 (v1.17.5) |
+| [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md) | Limites de anexos, POST, compressão; fotos obrigatórias; rótulos da checklist; PDF e corpo HTML |
 | [`docs/CRON-ALERTAS.md`](CRON-ALERTAS.md) | Lembretes automáticos |
 | [`docs/KAESER-IMPORT-PDF-ESTRATEGIA.md`](KAESER-IMPORT-PDF-ESTRATEGIA.md) | PDF Kaeser |
 | [`docs/TESTE-OFFLINE-MANUAL.md`](TESTE-OFFLINE-MANUAL.md) | Modo offline |

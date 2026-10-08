@@ -120,7 +120,9 @@ Aceitação manual no telemóvel, num tablet e num PC, com a mesma manutenção 
 
 ## 7. P1 — checklist que distingue execução de observação
 
-Estado em 1.17.28: implementado na manutenção periódica de elevadores (execução/observação, estado do documento, teste com veículo e 2 ciclos ou sem carga, não aplicável por configuração, receção com função e canal, identificação da visita no relatório). Um documento em falta não conta como anomalia de equipamento.
+Estado em 1.17.30: implementado na manutenção periódica de elevadores (execução/observação, estado do documento, teste com veículo e 2 ciclos ou sem carga, não aplicável por configuração, receção com função e canal, identificação da visita no relatório). Um documento em falta não conta como anomalia de equipamento.
+
+Os rótulos à direita da checklist são por extenso: ANALISADO, EXECUTADO, NÃO ANALISADO, ANOMALIA, SEM TESTE, SEM CARGA, NÃO EXECUTADO, NÃO OBSERVADO e ILEGÍVEL. O teste com carga mantém «2 CICLOS». A coluna tem 38 mm. A checklist continua a caber numa A4, com a letra a reduzir-se se precisar.
 
 
 
@@ -135,11 +137,11 @@ Depois de P0 estável no terreno:
 
 Isto continua em JSON no relatório e na ficha da máquina. Não se criam tabelas de reparação, certificação ou avaliação de conformidade.
 
-O PDF da checklist pode passar a mais de uma página **só** se o rótulo curto deixar de caber. O detalhe da anomalia permanece nos pontos de atenção.
+O detalhe da anomalia permanece nos pontos de atenção. A checklist tenta ficar numa página; a coluna dos rótulos está reservada para a palavra completa.
 
 ## 8. P2 — depois da prática de P0 e P1
 
-Estado em 1.17.28: o PDF não cita normas por validar; a nota legal de colocação no mercado está no fecho; o pedido de reparação, alteração ou certificação fica registado como fora do âmbito e não abre esses serviços; o calendário avisa quando há recomendação de não utilização. Não foi inventado prazo de arquivo. A declaração antiga dos relatórios já emitidos não foi reescrita.
+Estado em 1.17.30: o PDF não cita normas por validar; a nota legal de colocação no mercado está no fecho; o pedido de reparação, alteração ou certificação fica registado como fora do âmbito e não abre esses serviços; o calendário avisa quando há recomendação de não utilização. Não foi inventado prazo de arquivo. A declaração antiga dos relatórios já emitidos não foi reescrita. A foto da chapa e mais uma foto do equipamento e do local são obrigatórias em qualquer equipamento, na manutenção e na conclusão da reparação. O catálogo de normas continua por validar.
 
 
 

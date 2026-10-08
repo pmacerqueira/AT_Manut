@@ -277,27 +277,27 @@ export function rotuloRespostaPdf(valor) {
   if (!valor || typeof valor !== 'object' || !valor.papel) return ''
     if (valor.papel === 'documento') {
     const doc = {
-      analisado: 'ANALIS.',
-      nao_analisado: 'N/ ANALIS.',
+      analisado: 'ANALISADO',
+      nao_analisado: 'NÃO ANALISADO',
       nao_disponibilizado: 'AUSENTE',
-      ilegivel: 'ILEGIVEL',
+      ilegivel: 'ILEGÍVEL',
       na: 'N/A',
     }
     return doc[valor.documento] || ''
   }
   if (valor.papel === 'teste') {
-    if (!valor.executado) return 'S/ TESTE'
-    if (valor.observacao === 'anomalia') return 'ANOM.'
+    if (!valor.executado) return 'SEM TESTE'
+    if (valor.observacao === 'anomalia') return 'ANOMALIA'
     if (valor.carga === 'com_carga') return '2 CICLOS'
-    if (valor.carga === 'sem_carga') return 'S/ CARGA'
+    if (valor.carga === 'sem_carga') return 'SEM CARGA'
     return 'TESTE'
   }
-  if (valor.r === 'nao' || valor.observacao === 'anomalia') return 'ANOM.'
+  if (valor.r === 'nao' || valor.observacao === 'anomalia') return 'ANOMALIA'
   if (valor.execucao === 'parcial') return 'PARCIAL'
-  if (valor.execucao === 'nao_executado') return 'N/ EXEC.'
-  if (valor.observacao === 'nao_observado') return 'N/ OBS.'
+  if (valor.execucao === 'nao_executado') return 'NÃO EXECUTADO'
+  if (valor.observacao === 'nao_observado') return 'NÃO OBSERVADO'
   if (valor.r === 'na') return 'N/A'
-  if (valor.r === 'sim') return 'EXEC.'
+  if (valor.r === 'sim') return 'EXECUTADO'
   return ''
 }
 

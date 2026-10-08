@@ -1,7 +1,7 @@
 # AT_Manut — Continuidade entre Agentes e Memória Operacional
 
 > Documento canónico para manter continuidade quando muda o agente/modelo no Cursor.
-> Última revisão: 2026-06-12.
+> Última revisão: 2026-10-08.
 
 ---
 
@@ -86,6 +86,23 @@ O workspace `c:\Cursor_Projetos\NAVEL` contém vários projectos independentes (
 **Doc canónica:** [`docs/AGENDA-PERIODICA-E-PROXIMAS.md`](AGENDA-PERIODICA-E-PROXIMAS.md) — consultar antes de alterar agenda, sync ou secção «próximas» do PDF.
 
 **Verificação rápida:** `maquinas.proximaManut` = 1.ª linha aberta na lista = 1.ª data no PDF (manutenção concluída).
+
+---
+
+## 8) Handoff — relatórios e fotos (2026-10-08)
+
+**Publicado:** ver `src/config/version.js`. PWA em `public_html/manut/` e `send-email.php` em `public_html/api/`.
+
+**O que ficou estável:**
+- Manutenção preventiva de elevadores: execução e observação separadas, documentos, teste com veículo e 2 ciclos, fora de âmbito, nota legal, quadro de fora de serviço, planeamento por baixo das próximas datas.
+- Rótulos da checklist por extenso (`rotuloRespostaPdf`). «2 CICLOS» mantém-se no teste com carga. Coluna de 38 mm no jsPDF e no FPDF.
+- Foto da chapa e mais uma foto do equipamento e do local, em qualquer equipamento, na manutenção e ao concluir a reparação. Aviso amarelo até OK.
+- O email não falha se `quick_notes_json` não vier no pedido (`atm_quick_notes_default_list`).
+- Snapshots já assinados não se reescrevem. O catálogo de normas continua `validado: false`.
+
+**Doc canónica:** [`docs/PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md`](PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md) e [`docs/FOTOS-PDF-EMAIL-LIMITES.md`](FOTOS-PDF-EMAIL-LIMITES.md).
+
+**Ainda de fora, de propósito:** execução em lote sem foto de cada máquina; catálogo de normas por validar; a pergunta viva «Validar o bom funcionamento antes do elevador ser recolocado em serviço» não foi reescrita.
 
 ---
 

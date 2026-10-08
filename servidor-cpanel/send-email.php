@@ -1366,7 +1366,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $y_chk_start = $pdf->GetY();
                 $chk_header_h = 14;
                 $chk_num_w = 7;
-                $chk_badge_w = 24;
+                $chk_badge_w = 38;
                 $chk_text_w = $cW - $chk_num_w - $chk_badge_w - 2;
 
                 $chk_font = 8.5;
