@@ -664,18 +664,20 @@ function atm_peca_foi_usada($p) {
 }
 
 /** Notas rápidas por defeito — alinhado a execWizardHelpers.js (QUICK_NOTES_DEFAULT). */
-const ATM_QUICK_NOTES_DEFAULT = [
-    'Equipamento em bom estado geral',
-    'Desgaste normal, dentro do esperado',
-    'Necessita acompanhamento na próxima visita',
-    'Cliente informado de anomalia',
-    'Peça substituída preventivamente',
-    'Ruído anormal detetado — monitorizar',
-    'Lubrificação efetuada em todos os pontos',
-    'Alinhamento verificado e corrigido',
-    'Filtros substituídos conforme plano',
-    'Sem observações adicionais',
-];
+function atm_quick_notes_default_list() {
+    return [
+        'Equipamento em bom estado geral',
+        'Desgaste normal, dentro do esperado',
+        'Necessita acompanhamento na próxima visita',
+        'Cliente informado de anomalia',
+        'Peça substituída preventivamente',
+        'Ruído anormal detetado — monitorizar',
+        'Lubrificação efetuada em todos os pontos',
+        'Alinhamento verificado e corrigido',
+        'Filtros substituídos conforme plano',
+        'Sem observações adicionais',
+    ];
+}
 
 function atm_get_quick_notes_list($json) {
     if ($json) {
@@ -692,7 +694,7 @@ function atm_get_quick_notes_list($json) {
             }
         }
     }
-    return ATM_QUICK_NOTES_DEFAULT;
+    return atm_quick_notes_default_list();
 }
 
 /**
@@ -718,7 +720,7 @@ function atm_linhas_notas_relatorio($notas, $quick_notes_list = null) {
 
     $list = is_array($quick_notes_list) && count($quick_notes_list) > 0
         ? $quick_notes_list
-        : ATM_QUICK_NOTES_DEFAULT;
+        : atm_quick_notes_default_list();
     $filtered = [];
     foreach ($list as $q) {
         if (is_string($q) && trim($q) !== '') {

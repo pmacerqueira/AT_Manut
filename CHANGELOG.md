@@ -26,6 +26,7 @@ Política de continuidade:
 
 ### Deploy
 - Publicada em 2026-10-08: PWA em `public_html/manut/` e `send-email.php` em `public_html/api/`.
+- O email do relatório deixava de ser enviado se a lista de notas rápidas não viesse no pedido. Corrigido e voltou a ser publicado no mesmo dia. Um ensaio real de elevador enviou o PDF para comercial@navel.pt e os registos de teste foram apagados.
 - Em 2026-10-08 as perguntas de elevador foram actualizadas no MySQL de produção. Os dois ficheiros SQL não encontravam o texto que já estava na base; a correcção foi feita sobre as frases reais, só nas subcategorias sub1, sub2, sub4, sub12 e sub13. Relatórios já gravados não foram reescritos. Lavagem e compressores não foram alterados.
 
 ---
