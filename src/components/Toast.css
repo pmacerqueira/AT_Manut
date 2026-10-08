@@ -50,8 +50,11 @@
   color: var(--color-white);
 }
 .toast--warning {
-  background: #d97706;
-  color: var(--color-white);
+  background: #facc15;
+  color: #1c1917;
+  border: 2px solid #a16207;
+  cursor: default;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 .toast--info {
   background: #0284c7;
@@ -66,6 +69,27 @@
 
 .toast-msg {
   flex: 1;
+}
+
+.toast-ok {
+  flex-shrink: 0;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.35rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: #1c1917;
+  color: #facc15;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.toast-ok:focus-visible {
+  outline: 2px solid #1c1917;
+  outline-offset: 2px;
 }
 
 /* Animação de entrada */

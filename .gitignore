@@ -12,6 +12,7 @@ dist
 dist-ssr
 dist_upload/
 dist_upload.zip
+NUL.css
 scripts/output/
 
 # Environment (credenciais, API keys)

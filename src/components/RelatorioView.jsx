@@ -3,8 +3,10 @@ import { safeHttpUrl } from '../utils/sanitize'
 import { ExternalLink } from 'lucide-react'
 import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { useData } from '../context/DataContext'
-import { resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
+import { categoriaNomeFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, NOTA_AMBITO_TITULO, pontosNotaAmbito, TEXTO_PEDIDO_FORA_AMBITO, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
@@ -14,6 +16,10 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
   const { getSubcategoria, getCategoria } = useData()
   if (!relatorio) return null
   const items = resolveChecklist(relatorio, checklistItems)
+  const emissao = emissaoDoRelatorio(relatorio)
+  const decisao = decisaoOperacionalElevador(items, relatorio?.checklistRespostas, {
+    recomendaRetirada: !!emissao?.recomendaRetirada,
+  })
   const equipComContadorHoras = maquina &&
     SUBCATEGORIAS_COM_CONTADOR_HORAS.includes(maquina.subcategoriaId)
   const horasContador = horasContadorParaRelatorio(maquina, manutencao, null, relatorio)
@@ -27,6 +33,15 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
 
   return (
     <div className="relatorio-view">
+      <section className="relatorio-section">
+        <h3>{NOTA_AMBITO_TITULO}</h3>
+        {pontosNotaAmbito({
+          categoriaNome: categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria),
+          tipoManutencao: manutencao?.tipo,
+        }).map(ponto => (
+          <p key={ponto}>{ponto}</p>
+        ))}
+      </section>
       <section className="relatorio-section">
         <h3>Dados da manutenção</h3>
         <p><strong>Equipamento:</strong> {maquina ? `${maquina.marca} ${maquina.modelo} — Nº Série: ${maquina.numeroSerie}` : '—'}</p>
@@ -61,6 +76,13 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
         )}
       </section>
 
+      {emissao?.pedidoExtra === 'sim' && emissao.pedidoExtraDescricao && (
+        <section className="relatorio-section">
+          <h3>Pedido fora do âmbito</h3>
+          <p>{emissao.pedidoExtraDescricao}. {TEXTO_PEDIDO_FORA_AMBITO}</p>
+        </section>
+      )}
+
       {items.length > 0 && (
         <section className="relatorio-section checklist-section">
           <h3>Checklist de verificação</h3>
@@ -69,11 +91,12 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
               {items.map((item, i) => (
                 <tr key={item.id}>
                   <td className="checklist-num">{i + 1}.</td>
-                  <td className="checklist-texto">{item.texto}</td>
+                  <td className="checklist-texto">{limparCitacaoNormaChecklist(item.texto)}</td>
                   <td className="checklist-resp">
-                    {relatorio.checklistRespostas?.[item.id] === 'sim' && <span className="badge-sim">Sim</span>}
-                    {relatorio.checklistRespostas?.[item.id] === 'nao' && <span className="badge-nao">Não</span>}
-                    {!relatorio.checklistRespostas?.[item.id] && '—'}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'sim' && <span className="badge-sim">{emissao ? 'Sem anomalia' : 'Sim'}</span>}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nao' && <span className="badge-nao">{emissao ? 'Anomalia' : 'Não'}</span>}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'na' && <span>Não aplicável</span>}
+                    {!codigoResposta(relatorio.checklistRespostas?.[item.id]) && '—'}
                   </td>
                 </tr>
               ))}
@@ -100,18 +123,53 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
           <>
             <p><strong>Data de assinatura:</strong> {dataAssinaturaFormatada}</p>
             <p><strong>Nome de quem assinou:</strong> {relatorio.nomeAssinante ?? '—'}</p>
+            {emissao?.funcaoAssinante && <p><strong>Função:</strong> {emissao.funcaoAssinante}</p>}
           </>
+        )}
+        {emissao?.assinaturaRecusada && (
+          <p><strong>Assinatura recusada.</strong> Canal: {emissao.canalAlternativo || '—'}</p>
+        )}
+        {emissao?.recomendaRetirada && (
+          <p>{AVISO_FORA_DE_SERVICO}</p>
         )}
       </section>
 
       <section className="relatorio-section declaracao">
-        <p className="declaracao-texto">{resolveDeclaracaoClienteForMaquina(
+        {emissao?.declaracaoTitulo && <h3>{emissao.declaracaoTitulo}</h3>}
+        <p className="declaracao-texto">{textoRececaoVisivel(emissao?.declaracaoTexto) || resolveDeclaracaoClienteForMaquina(
           manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica',
           maquina,
           getSubcategoria,
           getCategoria,
         )}</p>
       </section>
+
+      {aplicaNotaLegalColocacao({
+        categoriaNome: categoriaNomeFromMaquina(maquina, getSubcategoria, getCategoria),
+        isReparacao: false,
+      }) && (
+        <section className="relatorio-section">
+          <h3>{NOTA_LEGAL_COLOCACAO_TITULO}</h3>
+          <p>{NOTA_LEGAL_COLOCACAO_INTRO}</p>
+          <table>
+            <tbody>
+              {NOTA_LEGAL_COLOCACAO_LINHAS.map(linha => (
+                <tr key={linha.referencia}>
+                  <td><strong>{linha.referencia}</strong></td>
+                  <td>{linha.vigencia}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {decisao && (
+        <section className="relatorio-section decisao-operacional">
+          <h3>{decisao.titulo}</h3>
+          <p>{decisao.motivo}</p>
+        </section>
+      )}
 
       {relatorio.assinadoPeloCliente && (
         <section className="relatorio-section assinatura-block assinatura-final">

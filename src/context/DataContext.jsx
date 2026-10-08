@@ -5,7 +5,7 @@
  * Estrutura: clientes, categorias, subcategorias, checklistItems, maquinas, manutencoes, relatorios.
  */
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { minDataManutencaoAberta } from '../utils/proximaManutAgenda'
+import { minDataManutencaoAberta, STATUS_MANUTENCAO_ABERTA } from '../utils/proximaManutAgenda'
 import { mergeRelatoriosMantendoEnvio } from '../domain/relatorioDomain'
 import {
   buildBackupPayload,
@@ -26,7 +26,7 @@ import { createReparacoesHandlers } from './slices/reparacoesSlice'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
-import { enqueue, processQueue, queueSize } from '../services/syncQueue'
+import { enqueue, processQueue, queueSize, removeItem, setItemSending } from '../services/syncQueue'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
 
 const DataContext = createContext(null)
@@ -84,6 +84,7 @@ export function DataProvider({ children }) {
   manutencoesRef.current = manutencoes
   /** Evita cliques repetidos em «Sincronizar agenda completa». */
   const agendaCompletaBusyRef = useRef(false)
+  const syncBusyRef = useRef(false)
   const [relatorios,          setRelatorios]          = useState([])
   const relatoriosRef = useRef([])
   relatoriosRef.current = relatorios
@@ -133,6 +134,7 @@ export function DataProvider({ children }) {
       setTecnicos(d.tecnicos                 ?? [])
       setPecasPlano(Array.isArray(d.pecasPlano) ? d.pecasPlano : [])
       lastBulkFetchOkAtRef.current = Date.now()
+      setIsOnline(true)
       // Guardar snapshot no cache para uso offline
       await saveCache(d)
       logger.info('DataContext', 'fetchTodos', 'Dados carregados com sucesso', {
@@ -178,13 +180,16 @@ export function DataProvider({ children }) {
 
   // ── Processar fila de sync e actualizar dados quando volta online ─────────
   const processSync = useCallback(async () => {
+    if (syncBusyRef.current) return { processed: 0, failed: 0 }
     const { isTokenValid, apiCall } = await import('../services/apiService')
-    if (!navigator.onLine || !isTokenValid()) return { processed: 0, failed: 0 }
+    if (!isTokenValid()) return { processed: 0, failed: 0 }
+    syncBusyRef.current = true
     setIsSyncing(true)
     try {
       const result = await processQueue((resource, action, opts) => apiCall(resource, action, opts))
       setSyncPending(queueSize())
       if (result.processed > 0) {
+        setIsOnline(true)
         await fetchTodos()
         logger.action('DataContext', 'processSync',
           `${result.processed} operação(ões) sincronizadas com o servidor`, result)
@@ -198,16 +203,18 @@ export function DataProvider({ children }) {
       logger.error('DataContext', 'processSync', err.message || 'Erro ao sincronizar', { stack: err.stack?.slice(0, 300) })
       return { processed: 0, failed: 0 }
     } finally {
+      syncBusyRef.current = false
       setIsSyncing(false)
     }
   }, [fetchTodos])
 
   useEffect(() => {
     fetchTodos({ source: 'mount' })
+    if (queueSize() > 0) processSync()
     const handleFocus = () => fetchTodos({ source: 'focus' })
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [fetchTodos])
+  }, [fetchTodos, processSync])
 
   // ── Listeners: online/offline + evento de login ───────────────────────────
   useEffect(() => {
@@ -225,7 +232,11 @@ export function DataProvider({ children }) {
     window.addEventListener('online',    handleOnline)
     window.addEventListener('offline',   handleOffline)
     window.addEventListener('atm:login', handleLogin)
+    const retryQueued = setInterval(() => {
+      if (queueSize() > 0 && navigator.onLine) processSync()
+    }, 30000)
     return () => {
+      clearInterval(retryQueued)
       window.removeEventListener('online',    handleOnline)
       window.removeEventListener('offline',   handleOffline)
       window.removeEventListener('atm:login', handleLogin)
@@ -295,7 +306,10 @@ export function DataProvider({ children }) {
       rollback,
       throwOnFailure: opts?.throwOnFailure === true,
       enqueue,
-      onQueued: () => setSyncPending(prev => prev + 1),
+      dequeue: removeItem,
+      markSending: setItemSending,
+      onQueued: () => setSyncPending(queueSize()),
+      onQueueSettled: () => setSyncPending(queueSize()),
       onNetworkLost: () => setIsOnline(false),
       log: logger,
     })
@@ -395,17 +409,16 @@ export function DataProvider({ children }) {
     if (loading || syncManutRef.current) return
     if (maquinas.length === 0) return
     syncManutRef.current = true
-    const pendentes = new Set(
+    const abertas = new Set(
       manutencoes
-        .filter(m => m.status === 'pendente' || m.status === 'agendada')
-        .map(m => m.maquinaId)
+        .filter(m => STATUS_MANUTENCAO_ABERTA.has(m.status))
+        .map(m => String(m.maquinaId))
     )
-    let criadas = 0
+    const novas = []
     maquinas.forEach(maq => {
-      if (!maq.proximaManut || pendentes.has(maq.id)) return
-      const id = 'msync' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
-      const novo = {
-        id,
+      if (!maq.proximaManut || abertas.has(String(maq.id))) return
+      novas.push({
+        id: 'msync' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         maquinaId: maq.id,
         data: maq.proximaManut,
         tipo: 'periodica',
@@ -413,17 +426,16 @@ export function DataProvider({ children }) {
         observacoes: '',
         tecnico: '',
         criadoEm: new Date().toISOString(),
-      }
-      setManutencoes(prev => [...prev, novo])
-      import('../services/apiService').then(({ apiManutencoes }) =>
-        persist(() => apiManutencoes.create(novo),
-                { resource: 'manutencoes', action: 'create', data: novo })
-      ).catch(() => {})
-      criadas++
+      })
     })
-    if (criadas > 0) {
+    if (novas.length > 0) {
+      setManutencoes(prev => [...prev, ...novas])
+      import('../services/apiService').then(({ apiManutencoes }) =>
+        persist(() => apiManutencoes.bulkCreate(novas),
+          { resource: 'manutencoes', action: 'bulk_create', data: novas })
+      ).catch(() => {})
       logger.action('DataContext', 'syncManutencoesFalta',
-        `Criadas ${criadas} manutenção(ões) em falta a partir de proximaManut`, { criadas })
+        `Criadas ${novas.length} manutenção(ões) em falta a partir de proximaManut`, { criadas: novas.length })
     }
   }, [loading, maquinas, manutencoes, persist])
 

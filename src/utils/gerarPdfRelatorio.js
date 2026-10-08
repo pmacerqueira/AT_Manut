@@ -10,6 +10,8 @@ import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, linhaPontoAtencao, linhasContextoEmissao, NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, rotuloRespostaPdf, textoRececaoVisivel, TITULO_RELATORIO_ELEVADOR } from '../domain/relatorioElevadorPreventivo'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import { linhasNotasRelatorio, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
@@ -274,6 +276,7 @@ export async function gerarPdfCompacto({
 }) {
   const isReparacao = relatorioKind === 'reparacao'
   const checklistItems = resolveChecklist(relatorio, checklistItemsLive)
+  const emissaoElevador = isReparacao ? null : emissaoDoRelatorio(relatorio)
   const resumoMeta = buildResumoExecutivoMeta({
     relatorio,
     manutencao,
@@ -283,6 +286,7 @@ export async function gerarPdfCompacto({
     proximasManutencoes,
     isReparacao,
     reparacao,
+    categoriaNome,
   })
   const { jsPDF } = await import('jspdf')
 
@@ -294,6 +298,9 @@ export async function gerarPdfCompacto({
   const tipoServico  = isReparacao
     ? 'Repara\u00e7\u00e3o'
     : (manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manuten\u00e7\u00e3o Peri\u00f3dica')
+  const tituloDocumento = emissaoElevador
+    ? TITULO_RELATORIO_ELEVADOR
+    : ('Relat\u00f3rio de ' + tipoServico)
   const numRel       = relatorio?.numeroRelatorio ?? 'S/N'
   const equipDesc    = maquina
     ? `${subcategoriaNome ? subcategoriaNome + ' \u2014 ' : ''}${maquina.marca} ${maquina.modelo} (N\u00ba ${maquina.numeroSerie})`
@@ -370,7 +377,7 @@ export async function gerarPdfCompacto({
   // ── Tipo de serviço + número ──────────────────────────────────────────────
   pdf.setTextColor(30, 58, 95)
   pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
-  pdf.text('Relat\u00f3rio de ' + tipoServico, M, y); y += 7
+  pdf.text(tituloDocumento, M, y); y += 7
 
   pdf.setTextColor(13, 110, 253)
   pdf.setFontSize(18); pdf.setFont('helvetica', 'bold')
@@ -384,6 +391,30 @@ export async function gerarPdfCompacto({
   const horasPdf = horasContadorParaRelatorio(maquina, isReparacao ? null : manutencao, null, relatorio)
   const horasPdfLabel = horasPdf != null ? `${horasPdf} h` : '\u2014'
   const moradaCliente = resumoMeta.moradaCliente
+
+  function renderNotaAmbito() {
+    const pontos = resumoMeta.notaAmbitoPontos?.length ? resumoMeta.notaAmbitoPontos : NOTA_AMBITO_PONTOS
+    if (!pontos?.length) return
+    const titulo = NOTA_AMBITO_TITULO
+    const textW = cW - 8
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9)
+    const tLines = pdf.splitTextToSize(titulo, textW)
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8)
+    const pLines = pontos.flatMap(p => pdf.splitTextToSize(String(p), textW))
+    const boxH = 6 + tLines.length * 4.2 + pLines.length * 3.7 + 4
+    if (y + boxH > 275) { pdf.addPage(); y = 20 }
+    const y0 = y
+    pdf.setFillColor(248, 250, 252)
+    pdf.setDrawColor(30, 58, 95)
+    pdf.setLineWidth(0.4)
+    pdf.rect(M, y0, cW, boxH, 'FD')
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(30, 58, 95)
+    let ty = y0 + 5
+    tLines.forEach(ln => { pdf.text(ln, M + 4, ty); ty += 4.2 })
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(55, 65, 81)
+    pLines.forEach(ln => { pdf.text(ln, M + 4, ty); ty += 3.7 })
+    y = y0 + boxH + 4
+  }
 
   function renderResumoExecutivo() {
     if (isReparacao) {
@@ -431,7 +462,7 @@ export async function gerarPdfCompacto({
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(...style.text)
     pdf.text(`RESUMO EXECUTIVO - ${style.label}`, M + pad + 2, y0 + 5)
     pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
-    pdf.text(contagemLine, M + pad + 2, y0 + 11)
+    pdf.text(resumoMeta.contagemLinha || contagemLine, M + pad + 2, y0 + 11)
 
     const yTxt = drawResumoBulletsPdf(pdf, layout, M + pad + 2, y0 + 16)
 
@@ -448,19 +479,26 @@ export async function gerarPdfCompacto({
   }
 
   function renderPontosAtencao() {
-    if (isReparacao || resumoMeta.naoConformes.length === 0) return
+    const pontos = [
+      ...(resumoMeta.naoConformes || []),
+      ...(resumoMeta.pendentes || []).map(p => ({ ...p, texto: `Pendente: ${p.texto}` })),
+    ]
+    if (isReparacao || pontos.length === 0) return
     if (y > 248) { pdf.addPage(); y = 20 }
 
     pdf.setFillColor(255, 251, 235)
     pdf.setDrawColor(217, 119, 6)
     pdf.setLineWidth(0.6)
     pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(180, 83, 9)
-    pdf.text('PONTOS DE ATEN\u00c7\u00c3O (N\u00c3O CONFORMIDADES)', M, y)
+    const tituloAtencao = String(resumoMeta.veredito || '').startsWith('ambito')
+      ? 'PONTOS DE ATEN\u00c7\u00c3O (ANOMALIAS OBSERVADAS)'
+      : 'PONTOS DE ATEN\u00c7\u00c3O (N\u00c3O CONFORMIDADES)'
+    pdf.text(tituloAtencao, M, y)
     y += 6
 
     pdf.setFontSize(8.5); pdf.setFont('helvetica', 'normal')
-    resumoMeta.naoConformes.forEach((nc) => {
-      const line = `${nc.index}. ${nc.texto}`
+    pontos.forEach((nc) => {
+      const line = linhaPontoAtencao(nc)
       const wrapped = pdf.splitTextToSize(line, cW - 6)
       const blockH = wrapped.length * 4.2 + 2
       if (y + blockH > 275) { pdf.addPage(); y = 20 }
@@ -483,6 +521,7 @@ export async function gerarPdfCompacto({
     pdf.line(M, y, W - M, y); y += 5
   }
 
+  renderNotaAmbito()
   renderResumoExecutivo()
 
   // ── Dados do serviço (após resumo — alinhado a send-email.php FPDF) ───────
@@ -511,6 +550,7 @@ export async function gerarPdfCompacto({
         ['DATA DE EXECU\u00c7\u00c3O', dataAssin],
         ['T\u00c9CNICO',      relatorio?.tecnico ?? manutencao?.tecnico ?? '\u2014'],
         ['ASSINADO POR',      relatorio?.nomeAssinante ?? '\u2014'],
+        ...linhasContextoEmissao(emissaoElevador),
       ]
   if (isReparacao && relatorio?.numeroAviso?.trim()) {
     dataRows.push(['N.\u00ba AVISO / PEDIDO', relatorio.numeroAviso.trim()])
@@ -579,7 +619,7 @@ export async function gerarPdfCompacto({
     const headerBlockH = 13
 
     const textLeftCl = M + 8
-    const badgeReserveMm = 18
+    const badgeReserveMm = 24
     const textoItemMaxW = Math.max(40, W - M - badgeReserveMm - textLeftCl)
 
     const fontCandidates = [
@@ -595,7 +635,7 @@ export async function gerarPdfCompacto({
       pdf.setFontSize(cand.fs)
       let needH = headerBlockH
       for (const item of checklistItems) {
-        const linhasTxt = pdf.splitTextToSize(String(item.texto ?? ''), textoItemMaxW)
+        const linhasTxt = pdf.splitTextToSize(limparCitacaoNormaChecklist(item.texto), textoItemMaxW)
         const lastBaseline = cand.lineMm + (linhasTxt.length - 1) * cand.lineMm
         const textoBlockBottom = lastBaseline + 2.9
         const rowH = textoBlockBottom + cand.rowGap
@@ -617,11 +657,13 @@ export async function gerarPdfCompacto({
     const nSim = valsCh.filter(v => v === 'sim' || v === 'OK').length
     const nNao = valsCh.filter(v => v === 'nao' || v === 'NOK').length
     pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
-    pdf.text(`${nSim} conforme \u2022 ${nNao} n\u00e3o conforme \u2022 ${checklistItems.length} itens`, M, y); y += 5
+    const linhaContagemChecklist = resumoMeta.contagemLinha
+      || `${nSim} conforme \u2022 ${nNao} n\u00e3o conforme \u2022 ${checklistItems.length} itens`
+    pdf.text(linhaContagemChecklist, M, y); y += 5
 
     pdf.setFontSize(chosen.fs)
     checklistItems.forEach((item, i) => {
-      const texto = String(item.texto ?? '')
+      const texto = limparCitacaoNormaChecklist(item.texto)
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
       const linhasTxt = pdf.splitTextToSize(texto, textoItemMaxW)
       const checklistLineMm = chosen.lineMm
@@ -638,19 +680,25 @@ export async function gerarPdfCompacto({
         pdf.rect(M, rowTop, cW, zebraH, 'F')
       }
 
-      const resp = relatorio?.checklistRespostas?.[item.id]
-      const badge = resp === 'sim' || resp === 'OK'
+      const valorResp = relatorio?.checklistRespostas?.[item.id]
+      const respCodigo = codigoResposta(valorResp)
+      const rotulo = rotuloRespostaPdf(valorResp)
+      const badge = rotulo || (respCodigo === 'sim'
         ? 'SIM'
-        : resp === 'nao' || resp === 'NOK'
+        : respCodigo === 'nao'
           ? 'N\u00c3O'
-          : resp === 'N/A'
+          : respCodigo === 'na'
             ? 'N/A'
-            : '\u2014'
-      const rgb = (resp === 'sim' || resp === 'OK')
+            : respCodigo === 'parcial'
+              ? 'PARCIAL'
+              : '\u2014')
+      const rgb = respCodigo === 'sim'
         ? [22, 163, 74]
-        : (resp === 'nao' || resp === 'NOK')
+        : respCodigo === 'nao'
           ? [220, 38, 38]
-          : [107, 114, 128]
+          : respCodigo === 'parcial'
+            ? [180, 83, 9]
+            : [107, 114, 128]
 
       pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128)
       pdf.text(String(i + 1) + '.', M + 1, y)
@@ -823,19 +871,22 @@ export async function gerarPdfCompacto({
     const resolvePeriodicidade = (pm) => periLabels[pm.periodicidade] || periLabels[periMaqVal] || pm.tipo || '\u2014'
 
     const declTipoPreview = manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica'
-    const declTextPreview = resolveDeclaracaoCliente(declTipoPreview, categoriaNome, declaracaoClienteDepois)
+    const declTextPreview = textoRececaoVisivel(emissaoElevador?.declaracaoTexto)
+      || resolveDeclaracaoCliente(declTipoPreview, categoriaNome, declaracaoClienteDepois)
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
     const declLinesPreview = pdf.splitTextToSize(declTextPreview, cW - 12)
     const declBoxHPreview = 10 + declLinesPreview.length * 3.6 + 6
     const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
-    const reservedAfter = declBoxHPreview + sigBoxHPreview + 14
+    const notaLegalReserva = aplicaNotaLegalColocacao({ categoriaNome, isReparacao }) ? 64 : 0
+    const reservedAfter = declBoxHPreview + sigBoxHPreview + notaLegalReserva + 14
 
     if (proximas.length > 0 || periMaqVal) {
       const fmtD = (d) => { const s = String(d ?? '').slice(0, 10).split('-'); return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : '\u2014' }
       pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.5)
 
       if (proximas.length > 0) {
-        const availTable = Math.max(50, yClosingMax - y - reservedAfter)
+        const avisoRetiradaMm = emissaoElevador?.recomendaRetirada ? 12 : 0
+        const availTable = Math.max(50, yClosingMax - y - reservedAfter - avisoRetiradaMm)
         const rowCandidates = [
           { fs: 8, rowMm: 7, headFs: 7.5 },
           { fs: 7.5, rowMm: 6.5, headFs: 7 },
@@ -856,6 +907,15 @@ export async function gerarPdfCompacto({
 
         pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
         pdf.text('PR\u00d3XIMAS MANUTEN\u00c7\u00d5ES AGENDADAS', M, y); y += 6
+        if (emissaoElevador?.recomendaRetirada) {
+          pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(185, 28, 28)
+          const aviso = pdf.splitTextToSize(
+            AVISO_FORA_DE_SERVICO,
+            cW,
+          )
+          pdf.text(aviso, M, y)
+          y += aviso.length * 4 + 2
+        }
 
         pdf.setFillColor(30, 58, 95); pdf.rect(M, y - 3.5, cW, 7, 'F')
         pdf.setFontSize(chosen.headFs); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(255, 255, 255)
@@ -894,7 +954,10 @@ export async function gerarPdfCompacto({
     const declTipo = isReparacao
       ? 'reparacao'
       : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
-    const declText = resolveDeclaracaoCliente(declTipo, categoriaNome, declaracaoClienteDepois)
+    const declText = textoRececaoVisivel(emissaoElevador?.declaracaoTexto)
+      || resolveDeclaracaoCliente(declTipo, categoriaNome, declaracaoClienteDepois)
+    const declTitulo = emissaoElevador?.declaracaoTitulo
+      || 'DECLARA\u00c7\u00c3O DE ACEITA\u00c7\u00c3O E COMPROMISSO DO CLIENTE'
     const declPad = 6
     const declTextW = cW - declPad * 2
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal')
@@ -902,11 +965,35 @@ export async function gerarPdfCompacto({
     const declLineH = 3.6
     const declBoxH = 10 + declLines.length * declLineH + declPad
     const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
-    if (y + declBoxH + sigBoxHPreview + 8 > yClosingMax) { pdf.addPage(); y = 20 }
+    const mostraNotaLegal = aplicaNotaLegalColocacao({ categoriaNome, isReparacao })
+    let notaLegalH = 0
+    if (mostraNotaLegal) {
+      pdf.setFontSize(6.5)
+      const introMed = pdf.splitTextToSize(NOTA_LEGAL_COLOCACAO_INTRO, cW - 8)
+      notaLegalH = 8 + introMed.length * 3.2 + 2
+      for (const linha of NOTA_LEGAL_COLOCACAO_LINHAS) {
+        const refMed = pdf.splitTextToSize(linha.referencia, 58)
+        const vigMed = pdf.splitTextToSize(linha.vigencia, Math.max(24, cW - 70))
+        notaLegalH += Math.max(refMed.length, vigMed.length, 1) * 3.2 + 1.2
+      }
+      notaLegalH += 4
+    }
+    const decisao = (!isReparacao && emissaoElevador)
+      ? decisaoOperacionalElevador(checklistItems, relatorio?.checklistRespostas, {
+          recomendaRetirada: !!emissaoElevador.recomendaRetirada,
+        })
+      : null
+    let decisaoH = 0
+    if (decisao) {
+      pdf.setFontSize(8)
+      const motMed = pdf.splitTextToSize(decisao.motivo, cW - 8)
+      decisaoH = 12 + motMed.length * 3.6 + 6
+    }
+    if (y + declBoxH + notaLegalH + decisaoH + sigBoxHPreview + 8 > yClosingMax) { pdf.addPage(); y = 20 }
     pdf.setFillColor(243, 244, 246); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.8)
     pdf.rect(M, y - 4, cW, declBoxH, 'FD')
     pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
-    pdf.text('DECLARA\u00c7\u00c3O DE ACEITA\u00c7\u00c3O E COMPROMISSO DO CLIENTE', M + declPad, y + 1)
+    pdf.text(declTitulo, M + declPad, y + 1)
     y += 8
     pdf.setFontSize(7); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
     declLines.forEach((line) => {
@@ -914,6 +1001,47 @@ export async function gerarPdfCompacto({
       y += declLineH
     })
     y += declPad + 4
+
+  if (mostraNotaLegal) {
+    if (y + notaLegalH + 8 > yClosingMax) { pdf.addPage(); y = 20 }
+    const yNota = y - 3
+    pdf.setFillColor(248, 250, 252); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.4)
+    pdf.rect(M, yNota, cW, notaLegalH, 'FD')
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text(NOTA_LEGAL_COLOCACAO_TITULO, M + 3, y + 1)
+    y += 5
+    pdf.setFontSize(6.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    const introLines = pdf.splitTextToSize(NOTA_LEGAL_COLOCACAO_INTRO, cW - 8)
+    introLines.forEach(ln => { pdf.text(ln, M + 3, y); y += 3.2 })
+    y += 1.5
+    NOTA_LEGAL_COLOCACAO_LINHAS.forEach(linha => {
+      pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+      const refLines = pdf.splitTextToSize(linha.referencia, 58)
+      pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+      const vigLines = pdf.splitTextToSize(linha.vigencia, Math.max(24, cW - 70))
+      const n = Math.max(refLines.length, vigLines.length, 1)
+      refLines.forEach((ln, i) => { pdf.setFont('helvetica', 'bold'); pdf.text(ln, M + 3, y + i * 3.2) })
+      vigLines.forEach((ln, i) => { pdf.setFont('helvetica', 'normal'); pdf.text(ln, M + 62, y + i * 3.2) })
+      y += n * 3.2 + 1.2
+    })
+    y += 4
+  }
+
+  if (decisao) {
+    if (y + decisaoH + 6 > yClosingMax) { pdf.addPage(); y = 20 }
+    const yDec = y - 3
+    pdf.setFillColor(254, 242, 242); pdf.setDrawColor(185, 28, 28); pdf.setLineWidth(0.6)
+    pdf.rect(M, yDec, cW, decisaoH, 'FD')
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(153, 27, 27)
+    pdf.text(decisao.titulo, M + 4, y + 1)
+    y += 6
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
+    pdf.splitTextToSize(decisao.motivo, cW - 8).forEach(ln => {
+      pdf.text(ln, M + 4, y)
+      y += 3.6
+    })
+    y += 6
+  }
   }
 
   // ── Bloco de assinaturas (técnico + cliente) ──

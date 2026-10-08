@@ -21,6 +21,9 @@ export default function ClienteStep({
   opcoesAssinanteSecao = [],
   secaoDetectada = null,
   onSelecionarAssinanteSecao,
+  declaracaoTitulo = '',
+  declaracaoTexto = '',
+  notaAmbito = null,
 }) {
   const multiSecao = opcoesAssinanteSecao.length > 0
   const nomeNorm = normTexto(form.nomeAssinante)
@@ -32,17 +35,35 @@ export default function ClienteStep({
       {erroAssinatura && <p className="form-erro">{erroAssinatura}</p>}
 
       {!isCorrectionMode && (
-        <div className="declaracao-assinatura-box">
-          <p className="declaracao-assinatura-titulo">Declaração de aceitação</p>
-          <p className="declaracao-assinatura-texto">
-            {resolveDeclaracaoClienteForMaquina(
-              manutencaoAtual?.tipo === 'montagem' ? 'montagem' : 'periodica',
-              maq,
-              getSubcategoria,
-              getCategoria,
-            )}
-          </p>
-        </div>
+        <>
+          {notaAmbito?.aberto && notaAmbito.pontos?.length > 0 && (
+            <div className="declaracao-assinatura-box">
+              <p className="declaracao-assinatura-titulo">{notaAmbito.titulo || 'Âmbito e limites do serviço'}</p>
+              {notaAmbito.pontos.map(ponto => (
+                <p key={ponto} className="declaracao-assinatura-texto">{ponto}</p>
+              ))}
+            </div>
+          )}
+          <div className="declaracao-assinatura-box">
+            <p className="declaracao-assinatura-titulo">{declaracaoTitulo || 'Declaração de aceitação'}</p>
+            <p className="declaracao-assinatura-texto">
+              {declaracaoTexto || resolveDeclaracaoClienteForMaquina(
+                manutencaoAtual?.tipo === 'montagem' ? 'montagem' : 'periodica',
+                maq,
+                getSubcategoria,
+                getCategoria,
+              )}
+            </p>
+          </div>
+          {!notaAmbito?.aberto && notaAmbito?.pontos?.length > 0 && (
+            <details className="declaracao-assinatura-box">
+              <summary>{notaAmbito.titulo || 'Âmbito e limites do serviço'}</summary>
+              {notaAmbito.pontos.map(ponto => (
+                <p key={ponto} className="declaracao-assinatura-texto">{ponto}</p>
+              ))}
+            </details>
+          )}
+        </>
       )}
 
       {multiSecao && !isCorrectionMode && (
@@ -104,6 +125,41 @@ export default function ClienteStep({
           )}
         </div>
       </label>
+
+      {declaracaoTitulo && (
+        <>
+          <label className="form-section">
+            Função de quem recebe
+            <input
+              type="text"
+              value={form.funcaoAssinante || ''}
+              maxLength={80}
+              placeholder="Ex.: responsável de oficina"
+              onChange={e => setForm(f => ({ ...f, funcaoAssinante: e.target.value }))}
+            />
+          </label>
+          <label className="checklist-retirada">
+            <input
+              type="checkbox"
+              checked={!!form.assinaturaRecusada}
+              onChange={e => setForm(f => ({ ...f, assinaturaRecusada: e.target.checked }))}
+            />
+            O cliente não assina neste momento
+          </label>
+          {form.assinaturaRecusada && (
+            <label className="form-section">
+              Canal alternativo da receção
+              <input
+                type="text"
+                value={form.canalAlternativo || ''}
+                maxLength={120}
+                placeholder="Email, telefone ou entrega presencial"
+                onChange={e => setForm(f => ({ ...f, canalAlternativo: e.target.value }))}
+              />
+            </label>
+          )}
+        </>
+      )}
     </div>
   )
 }

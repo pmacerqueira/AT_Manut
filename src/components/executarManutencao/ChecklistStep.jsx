@@ -1,5 +1,16 @@
+import { useEffect, useRef } from 'react'
 import { History, X } from 'lucide-react'
 import MaquinaDocumentacaoLinks from '../MaquinaDocumentacaoLinks'
+import ChecklistElevadorPonto from './ChecklistElevadorPonto'
+import { limparCitacaoNormaChecklist } from '../../domain/notaLegalColocacaoMercado'
+import {
+  codigoResposta,
+  ESTADOS_MANUTENCAO_ELEVADOR,
+  fundamentoInaplicavel,
+  papelDoPonto,
+  respostaInaplicavel,
+  respostaOperacao,
+} from '../../domain/relatorioElevadorPreventivo'
 import { INTERVALOS_KAESER } from '../../domain/equipamentoDomain'
 import { tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../../constants/kaeserCiclo'
 
@@ -21,12 +32,21 @@ export default function ChecklistStep({
   isKaeserAbcdMaq,
   manutencaoAtual,
   aplicarTipoKaeserComPecas,
+  modoElevador = false,
 }) {
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem')
   /** Em «Corrigir relatório» KAESER A/B/C/D o modal já tem tabela editável — evitar duplicar lista só-leitura. */
   const showPecasConsumiveis = !(isCorrectionMode && isKaeserPeriodicExec)
     && (isCorrectionMode || !useKaeserPipeline)
     && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser))
+  const identificacaoRef = useRef(null)
+  const forcarIdentificacao = modoElevador && /pedido|s[eé]rie|limita/i.test(erroChecklist || '')
+
+  useEffect(() => {
+    if (!forcarIdentificacao || !identificacaoRef.current) return
+    identificacaoRef.current.open = true
+    identificacaoRef.current.scrollIntoView({ block: 'nearest' })
+  }, [forcarIdentificacao, erroChecklist])
 
   const updatePeca = (idx, patch) => setForm(f => ({
     ...f,
@@ -36,7 +56,13 @@ export default function ChecklistStep({
   return (
     <div className="wizard-step-content" style={{ display: visible ? 'block' : 'none' }}>
       {isCorrectionMode && <h3 className="admin-edit-section-title">Checklist de verificação</h3>}
-      {!isCorrectionMode && <p className="wizard-step-hint">Confirme ponto a ponto se a tarefa foi executada (Sim/Não).</p>}
+      {!isCorrectionMode && (
+        <p className="wizard-step-hint">
+          {modoElevador
+            ? 'Em cada ponto: sem anomalia observada, anomalia (com descrição e recomendação) ou não aplicável.'
+            : 'Confirme ponto a ponto se a tarefa foi executada (Sim/Não).'}
+        </p>
+      )}
 
       {preFilledFromLast && (
         <div className="prefill-banner">
@@ -57,15 +83,48 @@ export default function ChecklistStep({
       {items.length > 0 && (
         <div className="checklist-section-wizard">
           <h3>Checklist de verificação</h3>
-          <span className="checklist-obrigatorio-badge">✱ Preenchimento obrigatório — todos os itens Sim / Não</span>
+          <span className="checklist-obrigatorio-badge">
+            {modoElevador
+              ? '✱ Preenchimento obrigatório — sem anomalia, anomalia ou não aplicável'
+              : '✱ Preenchimento obrigatório — todos os itens Sim / Não'}
+          </span>
+          {modoElevador && (
+            <label className="checklist-elevador-estado">
+              Estado da manutenção
+              <select
+                value={form.estadoManutencaoElevador || 'concluida_ambito'}
+                onChange={e => setForm(f => ({ ...f, estadoManutencaoElevador: e.target.value }))}
+              >
+                {Object.entries(ESTADOS_MANUTENCAO_ELEVADOR).map(([id, label]) => (
+                  <option key={id} value={id}>{label}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="checklist-quick-actions">
             <button type="button" className="btn-link-checklist"
               onClick={() => {
                 const all = {}
-                items.forEach(it => { all[it.id] = 'sim' })
+                items.forEach(it => {
+                  if (!modoElevador) {
+                    all[it.id] = 'sim'
+                    return
+                  }
+                  const fund = fundamentoInaplicavel(it, maq?.subcategoriaId)
+                  const papel = papelDoPonto(it)
+                  if (fund) {
+                    all[it.id] = respostaInaplicavel(it, fund)
+                    return
+                  }
+                  if (papel === 'documento' || papel === 'teste') {
+                    all[it.id] = ''
+                    return
+                  }
+                  all[it.id] = respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' })
+                })
                 setForm(f => ({ ...f, checklistRespostas: all }))
               }}>
-              Marcar todos
+              {modoElevador ? 'Sem anomalia nos pontos aplicáveis' : 'Marcar todos'}
             </button>
             <span className="checklist-quick-sep">/</span>
             <button type="button" className="btn-link-checklist"
@@ -77,25 +136,152 @@ export default function ChecklistStep({
               Desmarcar todos
             </button>
           </div>
+          {modoElevador && (
+            <details className="checklist-identificacao" open ref={identificacaoRef}>
+              <summary>Identificação desta visita e pedido</summary>
+              <label className="label-required">
+                Série confirmada no local
+                <select value={form.serieConfirmada || ''} onChange={e => setForm(f => ({ ...f, serieConfirmada: e.target.value }))}>
+                  <option value="">—</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                  <option value="desconhecido">Não foi possível ver a chapa</option>
+                </select>
+              </label>
+              <label>
+                Ano de fabrico (ou «desconhecido»)
+                <input value={form.anoFabrico || ''} maxLength={20} onChange={e => setForm(f => ({ ...f, anoFabrico: e.target.value }))} />
+              </label>
+              <label>
+                Capacidade comunicada pelo cliente
+                <input value={form.capacidadeComunicada || ''} maxLength={40} onChange={e => setForm(f => ({ ...f, capacidadeComunicada: e.target.value }))} />
+              </label>
+              <label>
+                Fornecido pela NAVEL
+                <select value={form.fornecidoPelaNavel || ''} onChange={e => setForm(f => ({ ...f, fornecidoPelaNavel: e.target.value }))}>
+                  <option value="">—</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                  <option value="desconhecido">Desconhecido</option>
+                </select>
+              </label>
+              <label>
+                Instalado pela NAVEL
+                <select value={form.instaladoPelaNavel || ''} onChange={e => setForm(f => ({ ...f, instaladoPelaNavel: e.target.value }))}>
+                  <option value="">—</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                  <option value="desconhecido">Desconhecido</option>
+                </select>
+              </label>
+              <label className="checklist-retirada">
+                <input type="checkbox" checked={!!form.pedidoSoPreventiva} onChange={e => setForm(f => ({ ...f, pedidoSoPreventiva: e.target.checked }))} />
+                O pedido desta visita é manutenção preventiva
+              </label>
+              <label>
+                O cliente pediu também reparação, alteração ou certificação?
+                <select value={form.pedidoExtra || ''} onChange={e => setForm(f => ({ ...f, pedidoExtra: e.target.value, pedidoExtraDescricao: e.target.value === 'sim' ? f.pedidoExtraDescricao : '' }))}>
+                  <option value="">—</option>
+                  <option value="nao">Não</option>
+                  <option value="sim">Sim — fica fora desta visita</option>
+                </select>
+              </label>
+              {form.pedidoExtra === 'sim' && (
+                <label>
+                  O que foi pedido (não é executado)
+                  <textarea
+                    value={form.pedidoExtraDescricao || ''}
+                    maxLength={240}
+                    placeholder="Ex.: reparação do fim de curso, ou alteração da capacidade"
+                    onChange={e => setForm(f => ({ ...f, pedidoExtraDescricao: e.target.value }))}
+                  />
+                </label>
+              )}
+              <label>
+                Limitações do pedido
+                <textarea value={form.limitacoesAdmissao || ''} onChange={e => setForm(f => ({ ...f, limitacoesAdmissao: e.target.value }))} />
+              </label>
+            </details>
+          )}
           <div className="checklist-respostas">
-            {items.map((item, i) => (
-              <div key={item.id} className="checklist-item-row">
-                <span className="checklist-item-num">{i + 1}.</span>
-                <span className="checklist-item-texto">{item.texto}</span>
-                <div className="checklist-item-btns">
-                  <button type="button"
-                    className={`btn-simnao ${form.checklistRespostas[item.id] === 'sim' ? 'active-sim' : ''}`}
-                    onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'sim' } }))}>
-                    Sim
-                  </button>
-                  <button type="button"
-                    className={`btn-simnao ${form.checklistRespostas[item.id] === 'nao' ? 'active-nao' : ''}`}
-                    onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'nao' } }))}>
-                    Não
-                  </button>
-                </div>
-              </div>
-            ))}
+            {items.map((item, i) => {
+              const valor = form.checklistRespostas[item.id]
+              const codigo = codigoResposta(valor)
+              if (!modoElevador) {
+                return (
+                  <div key={item.id} className="checklist-item-row">
+                    <span className="checklist-item-num">{i + 1}.</span>
+                    <span className="checklist-item-texto">{limparCitacaoNormaChecklist(item.texto)}</span>
+                    <div className="checklist-item-btns">
+                      <button type="button"
+                        className={`btn-simnao ${codigo === 'sim' ? 'active-sim' : ''}`}
+                        onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'sim' } }))}>
+                        Sim
+                      </button>
+                      <button type="button"
+                        className={`btn-simnao ${codigo === 'nao' ? 'active-nao' : ''}`}
+                        onClick={() => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: 'nao' } }))}>
+                        Não
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+              const legadoSemPapel = valor && !valor.papel && (typeof valor === 'string' || valor.r)
+              if (legadoSemPapel) {
+                const setCodigo = (novo) => setForm(f => {
+                  const prev = f.checklistRespostas[item.id]
+                  let next = 'sim'
+                  if (novo === 'nao') {
+                    next = {
+                      r: 'nao',
+                      descricao: prev && typeof prev === 'object' ? (prev.descricao || '') : '',
+                      recomendacao: prev && typeof prev === 'object' ? (prev.recomendacao || '') : '',
+                    }
+                  } else if (novo === 'na') {
+                    next = {
+                      r: 'na',
+                      fundamento: prev && typeof prev === 'object' ? (prev.fundamento || '') : '',
+                    }
+                  }
+                  return { ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: next } }
+                })
+                return (
+                  <div key={item.id} className="checklist-item-row checklist-item-row--elevador">
+                    <span className="checklist-item-num">{i + 1}.</span>
+                    <span className="checklist-item-texto">{limparCitacaoNormaChecklist(item.texto)}</span>
+                    <div className="checklist-item-btns checklist-item-btns--elevador" role="group" aria-label={`Ponto ${i + 1}`}>
+                      <button type="button" className={`btn-simnao ${codigo === 'sim' ? 'active-sim' : ''}`} onClick={() => setCodigo('sim')}>Sem anomalia</button>
+                      <button type="button" className={`btn-simnao ${codigo === 'nao' ? 'active-nao' : ''}`} onClick={() => setCodigo('nao')}>Anomalia</button>
+                      <button type="button" className={`btn-simnao ${codigo === 'na' ? 'active-na' : ''}`} onClick={() => setCodigo('na')}>Não aplicável</button>
+                    </div>
+                    {codigo === 'nao' && (
+                      <div className="checklist-detalhe">
+                        <label>O que observou<textarea value={valor?.descricao || ''} onChange={e => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: { ...(typeof valor === 'object' ? valor : { r: 'nao' }), r: 'nao', descricao: e.target.value } } }))} /></label>
+                        <label>Recomendação transmitida ao cliente<textarea value={valor?.recomendacao || ''} onChange={e => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: { ...(typeof valor === 'object' ? valor : { r: 'nao' }), r: 'nao', recomendacao: e.target.value } } }))} /></label>
+                      </div>
+                    )}
+                    {codigo === 'na' && (
+                      <div className="checklist-detalhe">
+                        <label>Fundamento<textarea value={valor?.fundamento || ''} onChange={e => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: { r: 'na', fundamento: e.target.value } } }))} /></label>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              return (
+                <ChecklistElevadorPonto
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  valor={typeof valor === 'object' ? valor : null}
+                  onChange={next => setForm(f => ({
+                    ...f,
+                    checklistRespostas: { ...f.checklistRespostas, [item.id]: next },
+                  }))}
+                />
+              )
+            })}
           </div>
         </div>
       )}

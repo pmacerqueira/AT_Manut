@@ -1,5 +1,5 @@
 -- Migração: Checklists completas para sub4 (Elevador de tesoura)
--- Base: Manual Twin Busch TW S3-18U, Manual Maqser REF 9810, EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+-- Base: Manual Twin Busch TW S3-18U, Manual Maqser REF 9810 e prática de manutenção preventiva
 -- Executar no MySQL/cPanel após add_tipo_checklist.sql (se grupo ainda não existir)
 
 -- 1. Garantir coluna grupo (se não existir)
@@ -19,8 +19,8 @@ INSERT INTO `checklist_items` (`id`, `subcategoria_id`, `tipo`, `grupo`, `ordem`
 ('ch4m10', 'sub4', 'montagem', 'hidraulica', 10, 'Óleo hidráulico no reservatório (conforme manual do fabricante)'),
 ('ch4m11', 'sub4', 'montagem', 'hidraulica', 11, 'Unidade de bomba e cilindros hidráulicos instalados'),
 ('ch4m12', 'sub4', 'montagem', 'seguranca', 12, 'Trincos de segurança (bloqueio mecânico) instalados e funcionais'),
-('ch4m13', 'sub4', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm) — EN 1493:2020'),
-('ch4m14', 'sub4', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE)'),
+('ch4m13', 'sub4', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm)'),
+('ch4m14', 'sub4', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE'),
 ('ch4m15', 'sub4', 'montagem', 'electrica', 15, 'Verificação da tensão de alimentação e sequência de fases'),
 ('ch4m16', 'sub4', 'montagem', 'seguranca', 16, 'Sinalização de aviso e pictogramas de segurança visíveis'),
 ('ch4m17', 'sub4', 'montagem', 'teste', 17, 'Teste de subida e descida em vazio; sincronização das plataformas'),

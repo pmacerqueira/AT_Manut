@@ -443,6 +443,25 @@ if ($periodicidade_label !== '' && empty($resumo_exec['periodicidadeLabel'])) {
 if ($data_agendamento !== '' && empty($resumo_exec['dataAgendamento'])) {
     $resumo_exec['dataAgendamento'] = $data_agendamento;
 }
+$nota_ambito_titulo = trim((string)($resumo_exec['notaAmbitoTitulo'] ?? ''));
+$nota_ambito_pontos = is_array($resumo_exec['notaAmbitoPontos'] ?? null) ? $resumo_exec['notaAmbitoPontos'] : [];
+if (count($nota_ambito_pontos) === 0) {
+    $nota_ambito_titulo = 'Âmbito e limites do serviço';
+    $nota_ambito_pontos = [
+        '1) O presente documento constitui exclusivamente um relatório de manutenção preventiva / diagnóstico técnico, limitado às operações e pontos de inspeção expressamente identificados.',
+        '2) Não constitui declaração CE/UE de conformidade, certificação, avaliação integral de conformidade legal, validação da instalação original, reconstituição do processo técnico do fabricante, ensaio estrutural, ensaio de carga, nem autorização autónoma de colocação ou manutenção em serviço do equipamento.',
+        '3) A conclusão é válida apenas para a data, local, condições de acesso, configuração e componentes observados. Não abrange defeitos ocultos, intervenções anteriores de terceiros, alterações não comunicadas, fundações, ancoragens, instalação elétrica, dimensionamento da alimentação, documentação não disponibilizada ou utilização posterior indevida.',
+    ];
+}
+$contagem_linha     = trim((string)($resumo_exec['contagemLinha'] ?? ''));
+$recomenda_retirada = !empty($resumo_exec['recomendaRetirada']);
+$linhas_contexto    = is_array($resumo_exec['linhasContexto'] ?? null) ? $resumo_exec['linhasContexto'] : [];
+$decisao_titulo     = trim((string)($resumo_exec['decisaoTitulo'] ?? ''));
+$decisao_motivo     = trim((string)($resumo_exec['decisaoMotivo'] ?? ''));
+$nota_legal_titulo  = trim((string)($resumo_exec['notaLegalTitulo'] ?? ''));
+$nota_legal_intro   = trim((string)($resumo_exec['notaLegalIntro'] ?? ''));
+$nota_legal_linhas  = is_array($resumo_exec['notaLegalLinhas'] ?? null) ? $resumo_exec['notaLegalLinhas'] : [];
+$declaracao_titulo_resumo = trim((string)($resumo_exec['declaracaoTitulo'] ?? ''));
 $veredito_key      = $resumo_exec['veredito'] ?? 'conforme';
 $veredito_style    = atm_veredito_style_php($veredito_key);
 $veredito_label    = $resumo_exec['vereditoLabel'] ?? $veredito_style['label'];
@@ -524,11 +543,11 @@ function texto_declaracao_cliente($tipo, $legislacao = 'outros') {
     ];
     $mid = $labels[$tipo] ?? 'manutenção';
     $antes = 'Declaro que li e concordo com o que foi relatado pelo técnico na';
-    $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $depois_elev = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos de todas as manutenções realizadas, de acordo com o manual do fabricante, bem como a preservar toda a documentação exigível para o equipamento (Manual de Utilizador e Declaração de Conformidade CE), conservando os relatórios de manutenções preventivas realizadas pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos.';
     $depois_comp = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
     $depois_outros = 'do equipamento e que obtive todas as informações de manuseamento seguro do mesmo, comprometendo-me a manter registos das manutenções e intervenções realizadas, de acordo com as recomendações e manual do fabricante, bem como a preservar a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis), conservando os relatórios de manutenções e assistência técnica realizados pelo fornecedor NAVEL-AÇORES pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
     // Textos canónicos para reparação (intervenção corretiva) — alinhados a src/constants/relatorio.js
-    $rep_elev = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este relatório e a documentação técnica exigível (nomeadamente Manual de Utilizador e Declaração de Conformidade CE) pelo período mínimo de dois anos ou pelo prazo aplicável, no estrito cumprimento da legislação em vigor, nomeadamente: Norma Europeia EN 1493:2022, Diretiva Máquinas 2006/42/CE (e Regulamento (UE) 2023/1230, quando aplicável) e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho.';
+    $rep_elev = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este relatório e a documentação técnica exigível (nomeadamente Manual de Utilizador e Declaração de Conformidade CE) pelo período mínimo de dois anos ou pelo prazo aplicável.';
     $rep_comp = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL-AÇORES e a documentação técnica pertinente (manuais, instruções e Declaração de Conformidade CE quando aplicável) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, no estrito cumprimento da legislação em vigor, nomeadamente: Diretiva Máquinas 2006/42/CE e Decreto-Lei n.º 50/2005, relativo às prescrições mínimas de segurança e saúde para a utilização de equipamentos de trabalho, e no que respeita a equipamento sob pressão e instalações de ar comprimido, a Diretiva 2014/68/UE relativa aos equipamentos sob pressão e o respectivo enquadramento nacional (nomeadamente o Decreto-Lei n.º 32/2015, de 4 de março, e legislação complementar aplicável aos equipamentos sob pressão).';
     $rep_out = 'do equipamento relativamente à intervenção de reparação e assistência técnica realizada, que declarei compreender, e que obtive as informações necessárias ao manuseamento seguro do equipamento após a intervenção, comprometendo-me a conservar este e demais relatórios de intervenção realizados pelo fornecedor NAVEL-AÇORES e a documentação técnica pertinente ao equipamento (manuais, instruções e certificados quando aplicáveis) pelo período mínimo de dois anos ou pelo prazo adequado à actividade e ao tipo de equipamento, em conformidade com a legislação e normas aplicáveis ao mesmo e com as regras de segurança e saúde no trabalho.';
     if ($tipo === 'reparacao') {
@@ -562,6 +581,10 @@ function atm_veredito_style_php($veredito) {
         'conforme'     => ['label' => 'CONFORME', 'fill' => [236, 253, 245], 'border' => [16, 185, 129], 'text' => [6, 95, 70]],
         'reservas'     => ['label' => 'CONFORME COM RESERVAS', 'fill' => [254, 243, 199], 'border' => [245, 158, 11], 'text' => [146, 64, 14]],
         'nao_conforme' => ['label' => 'NAO CONFORME', 'fill' => [254, 226, 226], 'border' => [239, 68, 68], 'text' => [153, 27, 27]],
+        'ambito_concluido' => ['label' => 'MANUTENCAO CONCLUIDA NO AMBITO IDENTIFICADO', 'fill' => [239, 246, 255], 'border' => [30, 58, 95], 'text' => [30, 58, 95]],
+        'ambito_concluido_anomalias' => ['label' => 'MANUTENCAO CONCLUIDA NO AMBITO IDENTIFICADO', 'fill' => [255, 251, 235], 'border' => [217, 119, 6], 'text' => [180, 83, 9]],
+        'ambito_parcial' => ['label' => 'MANUTENCAO PARCIALMENTE EXECUTADA', 'fill' => [255, 251, 235], 'border' => [217, 119, 6], 'text' => [180, 83, 9]],
+        'ambito_suspenso' => ['label' => 'MANUTENCAO SUSPENSA / NAO EXECUTADA', 'fill' => [254, 242, 242], 'border' => [220, 38, 38], 'text' => [185, 28, 28]],
     ];
     return $map[$veredito] ?? $map['conforme'];
 }
@@ -1108,6 +1131,38 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->Line($M, $pdf->GetY(), $W - $M, $pdf->GetY());
     $pdf->Ln(5);
 
+    if (count($nota_ambito_pontos) > 0) {
+        $pdf->SetFont('Arial', 'B', 9);
+        $tituloAmb = $nota_ambito_titulo !== '' ? $nota_ambito_titulo : 'Ambito e limites do servico';
+        $pdf->SetFont('Arial', '', 8);
+        $linhasAmb = 0;
+        $pdf->SetFont('Arial', 'B', 9);
+        $linhasAmb += $pdf->NbLines($cW - 8, f($tituloAmb));
+        $pdf->SetFont('Arial', '', 8);
+        foreach ($nota_ambito_pontos as $pontoAmb) {
+            $linhasAmb += $pdf->NbLines($cW - 8, f((string)$pontoAmb));
+        }
+        $boxAmb = 6 + $linhasAmb * 3.7 + 4;
+        if ($pdf->GetY() + $boxAmb > 275) {
+            $pdf->AddPage();
+        }
+        $yAmb = $pdf->GetY();
+        $pdf->SetFillColor(248, 250, 252);
+        $pdf->SetDrawColor(30, 58, 95);
+        $pdf->Rect($M, $yAmb, $cW, $boxAmb, 'FD');
+        $pdf->SetXY($M + 4, $yAmb + 3);
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetTextColor(30, 58, 95);
+        $pdf->MultiCell($cW - 8, 4.2, f($tituloAmb), 0, 'L');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetTextColor(55, 65, 81);
+        foreach ($nota_ambito_pontos as $pontoAmb) {
+            $pdf->SetX($M + 4);
+            $pdf->MultiCell($cW - 8, 3.7, f((string)$pontoAmb), 0, 'L');
+        }
+        $pdf->SetY($yAmb + $boxAmb + 4);
+    }
+
     // Resumo executivo (alinhado a gerarPdfCompacto)
     if ($manutencao_tipo !== 'reparacao') {
         $pad = 3;
@@ -1130,7 +1185,9 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->Cell(0, 5, f('RESUMO EXECUTIVO - ' . $veredito_label), 0, 1);
         $pdf->SetFont('Arial', '', 8.5);
         $pdf->SetTextColor(55, 65, 81);
-        $contagem = f($nSim . ' conforme  /  ' . $nNao . ' nao conforme' . ($nNa_resumo ? '  /  ' . $nNa_resumo . ' N/A' : ''));
+        $contagem = $contagem_linha !== ''
+            ? f($contagem_linha)
+            : f($nSim . ' conforme  /  ' . $nNao . ' nao conforme' . ($nNa_resumo ? '  /  ' . $nNa_resumo . ' N/A' : ''));
         $pdf->SetX($M + $pad + 2);
         $pdf->Cell(0, 4, $contagem, 0, 1);
         $yBul = $pdf->GetY();
@@ -1179,6 +1236,12 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $rows[] = [$data_row_label,  f($data_real)];
     $rows[] = ['TECNICO',        f($tecnico)];
     $rows[] = ['ASSINADO POR',   f($assinado_por)];
+    foreach ($linhas_contexto as $lc) {
+        if (!is_array($lc) || count($lc) < 2) {
+            continue;
+        }
+        $rows[] = [f((string)$lc[0]), f((string)$lc[1])];
+    }
     if ($manutencao_tipo === 'reparacao') {
         if ($rep_num_aviso !== '') {
             $rows[] = ['N. AVISO / PEDIDO', f(mb_substr(strip_tags(str_replace(["\r", "\n", "\0"], ' ', $rep_num_aviso)), 0, 200, 'UTF-8'))];
@@ -1273,11 +1336,18 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetTextColor(146, 64, 14);
         $pdf->SetX($M);
-        $pdf->Cell(0, 7, f('PONTOS DE ATENCAO - NAO CONFORMIDADES'), 0, 1);
+        $tituloAtencaoPdf = (strpos((string)$veredito_key, 'ambito') === 0)
+            ? 'PONTOS DE ATENCAO - ANOMALIAS OBSERVADAS'
+            : 'PONTOS DE ATENCAO - NAO CONFORMIDADES';
+        $pdf->Cell(0, 7, f($tituloAtencaoPdf), 0, 1);
         $pdf->SetFont('Arial', '', 8.5);
         $pdf->SetTextColor(55, 65, 81);
         foreach ($nao_conformes as $nc) {
             $line = ($nc['index'] ?? '') . '. ' . ($nc['texto'] ?? '');
+            $detNc = trim((string)($nc['descricao'] ?? ''));
+            $recNc = trim((string)($nc['recomendacao'] ?? ''));
+            if ($detNc !== '') $line .= ' — ' . $detNc;
+            if ($recNc !== '') $line .= ' Recomendação: ' . $recNc;
             $pdf->SetX($M + 2);
             $pdf->MultiCell($cW - 4, 4.5, f($line), 0, 'L');
         }
@@ -1293,7 +1363,7 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $y_chk_start = $pdf->GetY();
                 $chk_header_h = 14;
                 $chk_num_w = 7;
-                $chk_badge_w = 14;
+                $chk_badge_w = 24;
                 $chk_text_w = $cW - $chk_num_w - $chk_badge_w - 2;
 
                 $chk_font = 8.5;
@@ -1330,12 +1400,18 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $pdf->SetFont('Arial', '', 8);
                 $pdf->SetTextColor(107, 114, 128);
                 $pdf->SetX($M);
-                $pdf->Cell(0, 5, $nSim . ' conforme  /  ' . $nNao . ' nao conforme  (' . count($checklist) . ' itens)', 0, 1);
+                $linha_chk = $contagem_linha !== ''
+                    ? f($contagem_linha)
+                    : ($nSim . ' conforme  /  ' . $nNao . ' nao conforme  (' . count($checklist) . ' itens)');
+                $pdf->Cell(0, 5, $linha_chk, 0, 1);
                 $pdf->Ln(1);
 
                 foreach ($checklist as $i => $item) {
                     $resp = $item['resp'] ?? '';
-                    if ($resp === 'sim' || $resp === 'OK') {
+                    $badge_in = trim((string)($item['badge'] ?? ''));
+                    if ($badge_in !== '') {
+                        $badge = f($badge_in);
+                    } elseif ($resp === 'sim' || $resp === 'OK') {
                         $badge = 'SIM';
                     } elseif ($resp === 'nao' || $resp === 'NOK') {
                         $badge = 'NAO';
@@ -1582,6 +1658,13 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $pdf->SetTextColor(30, 58, 95);
             $pdf->SetX($M);
             $pdf->Cell(0, 6, 'PROXIMAS MANUTENCOES AGENDADAS', 0, 1);
+            if ($recomenda_retirada) {
+                $pdf->SetFont('Arial', 'B', 8);
+                $pdf->SetTextColor(185, 28, 28);
+                $pdf->SetX($M);
+                $pdf->MultiCell($cW, 4, f('Recomendação ao cliente: colocar o equipamento fora de serviço de imediato, após a tomada de conhecimento, a assinatura e o envio deste relatório, até correção da deficiência. As datas seguintes são planeamento e não autorizam o uso.'), 0, 'L');
+                $pdf->Ln(1);
+            }
             $pdf->SetFont('Arial', 'B', max(7, $prox_font - 0.5));
             $pdf->SetTextColor(30, 58, 95);
             $pdf->SetX($M);
@@ -1631,7 +1714,12 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     }
 
     // Declaração de aceitação — imediatamente antes das assinaturas
-    if ($pdf->GetY() + $decl_box_h + $sig_box_h_preview + 6 > $y_closing_max) {
+    $nota_legal_h = 0;
+    if (count($nota_legal_linhas) > 0) {
+        $nota_legal_h = 62;
+    }
+    $decisao_h = ($decisao_titulo !== '' && $decisao_motivo !== '') ? 28 : 0;
+    if ($pdf->GetY() + $decl_box_h + $nota_legal_h + $decisao_h + $sig_box_h_preview + 6 > $y_closing_max) {
         $pdf->AddPage();
     }
     $y_decl = $pdf->GetY();
@@ -1642,12 +1730,63 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetTextColor(30, 58, 95);
     $pdf->SetXY($M + 6, $y_decl + 4);
-    $pdf->Cell(0, 6, 'DECLARACAO DE ACEITACAO E COMPROMISSO DO CLIENTE', 0, 1);
+    $tituloDeclPdf = $declaracao_titulo_resumo !== ''
+        ? f($declaracao_titulo_resumo)
+        : 'DECLARACAO DE ACEITACAO E COMPROMISSO DO CLIENTE';
+    $pdf->Cell(0, 6, $tituloDeclPdf, 0, 1);
     $pdf->SetFont('Arial', '', 7);
     $pdf->SetTextColor(55, 65, 81);
     $pdf->SetXY($M + 6, $y_decl + 11);
     $pdf->MultiCell($cW - 12, $decl_line_h, $decl_txt_f, 0, 'L');
     $pdf->SetY($y_decl + $decl_box_h + 4);
+
+    if (count($nota_legal_linhas) > 0) {
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetTextColor(30, 58, 95);
+        $pdf->SetX($M);
+        $pdf->Cell(0, 5, f($nota_legal_titulo !== '' ? $nota_legal_titulo : 'Nota legal — colocação no mercado'), 0, 1);
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->SetTextColor(55, 65, 81);
+        $pdf->SetX($M);
+        $pdf->MultiCell($cW, 3.4, f($nota_legal_intro), 0, 'L');
+        $pdf->Ln(1);
+        foreach ($nota_legal_linhas as $nl) {
+            if (!is_array($nl)) {
+                continue;
+            }
+            $ref = f((string)($nl['referencia'] ?? ''));
+            $vig = f((string)($nl['vigencia'] ?? ''));
+            $y_nl = $pdf->GetY();
+            $pdf->SetFont('Arial', 'B', 6.5);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetXY($M, $y_nl);
+            $pdf->MultiCell(58, 3.2, $ref, 0, 'L');
+            $y_after_ref = $pdf->GetY();
+            $pdf->SetFont('Arial', '', 6.5);
+            $pdf->SetTextColor(55, 65, 81);
+            $pdf->SetXY($M + 60, $y_nl);
+            $pdf->MultiCell($cW - 60, 3.2, $vig, 0, 'L');
+            $pdf->SetY(max($y_after_ref, $pdf->GetY()) + 1);
+        }
+        $pdf->Ln(2);
+    }
+
+    if ($decisao_titulo !== '' && $decisao_motivo !== '') {
+        $y_dec = $pdf->GetY();
+        $pdf->SetFillColor(254, 242, 242);
+        $pdf->SetDrawColor(185, 28, 28);
+        $pdf->SetLineWidth(0.4);
+        $pdf->Rect($M, $y_dec, $cW, $decisao_h, 'FD');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetTextColor(153, 27, 27);
+        $pdf->SetXY($M + 3, $y_dec + 3);
+        $pdf->MultiCell($cW - 6, 4, f($decisao_titulo), 0, 'L');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetTextColor(55, 65, 81);
+        $pdf->SetX($M + 3);
+        $pdf->MultiCell($cW - 6, 3.6, f($decisao_motivo), 0, 'L');
+        $pdf->SetY($y_dec + $decisao_h + 4);
+    }
 
     // Bloco de assinaturas — técnico (esquerda) + cliente (direita)
     $halfW = ($cW - 4) / 2;
@@ -1756,7 +1895,9 @@ $preheader_bits = ['Relatório ' . $num_rel];
 if ($manutencao_tipo !== 'reparacao') {
     $preheader_bits[] = $veredito_label;
     if ($nNao > 0) {
-        $preheader_bits[] = $nNao . ' não conforme';
+        $preheader_bits[] = (strpos((string)$veredito_key, 'ambito') === 0)
+            ? ($nNao . ' anomalias')
+            : ($nNao . ' não conforme');
     }
 }
 if ($proxima_email_fmt !== '') {
@@ -1798,6 +1939,15 @@ $html  = '<!DOCTYPE html><html lang="pt"><head><meta http-equiv="Content-Type" c
   </td></tr>
   <tr><td style="padding:16px 24px;">';
 
+if (count($nota_ambito_pontos) > 0) {
+    $html .= '<div style="background:#f8fafc;border:1px solid #1e3a5f;border-radius:8px;padding:12px 14px;margin-bottom:14px;">'
+           . '<div style="font-size:13px;font-weight:800;color:#1e3a5f;margin-bottom:6px;">' . atm_html_esc($nota_ambito_titulo !== '' ? $nota_ambito_titulo : 'Âmbito e limites do serviço') . '</div>';
+    foreach ($nota_ambito_pontos as $pontoAmb) {
+        $html .= '<p style="margin:0 0 6px;font-size:12px;color:#374151;line-height:1.45;">' . atm_html_esc((string)$pontoAmb) . '</p>';
+    }
+    $html .= '</div>';
+}
+
 // Resumo executivo no corpo (scan rapido antes do PDF)
 if ($manutencao_tipo !== 'reparacao') {
     $vf = $veredito_style['fill'];
@@ -1806,7 +1956,7 @@ if ($manutencao_tipo !== 'reparacao') {
     $html .= '<div style="background:rgb(' . $vf[0] . ',' . $vf[1] . ',' . $vf[2] . ');border:1px solid rgb(' . $vb[0] . ',' . $vb[1] . ',' . $vb[2] . ');border-radius:8px;padding:12px 14px;margin-bottom:14px;">'
            . '<div style="font-size:13px;font-weight:800;color:rgb(' . $vt[0] . ',' . $vt[1] . ',' . $vt[2] . ');margin-bottom:6px;">Resumo executivo — ' . atm_html_esc($veredito_label) . '</div>'
            . '<div style="font-size:12px;color:#374151;margin-bottom:6px;">'
-           . atm_html_esc($nSim . ' conforme · ' . $nNao . ' não conforme' . ($nNa_resumo ? ' · ' . $nNa_resumo . ' N/A' : ''))
+           . atm_html_esc($contagem_linha !== '' ? $contagem_linha : ($nSim . ' conforme · ' . $nNao . ' não conforme' . ($nNa_resumo ? ' · ' . $nNa_resumo . ' N/A' : '')))
            . '</div>';
     if (count($resumo_bullets) > 0) {
         $html .= '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
@@ -1868,11 +2018,18 @@ $html .= '</table></td></tr>';
 if ($manutencao_tipo !== 'reparacao' && count($nao_conformes) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px;">'
-           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">Pontos de atenção — não conformidades</div>'
+           . '<div style="color:#92400e;font-weight:700;font-size:12px;margin-bottom:8px;">'
+           . (strpos((string)$veredito_key, 'ambito') === 0 ? 'Pontos de atenção — anomalias observadas' : 'Pontos de atenção — não conformidades')
+           . '</div>'
            . '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#374151;line-height:1.5;">';
     foreach ($nao_conformes as $nc) {
+        $linhaNc = (string)($nc['texto'] ?? '');
+        $detHtml = trim((string)($nc['descricao'] ?? ''));
+        $recHtml = trim((string)($nc['recomendacao'] ?? ''));
+        if ($detHtml !== '') $linhaNc .= ' — ' . $detHtml;
+        if ($recHtml !== '') $linhaNc .= ' Recomendação: ' . $recHtml;
         $html .= '<li style="margin-bottom:4px;"><strong>' . atm_html_esc((string)($nc['index'] ?? '')) . '.</strong> '
-               . atm_html_esc($nc['texto'] ?? '') . '</li>';
+               . atm_html_esc($linhaNc) . '</li>';
     }
     $html .= '</ul></div></td></tr>';
 }
@@ -1954,6 +2111,12 @@ $html .= '<tr><td style="padding:0 24px 12px;">'
        . '</div></td></tr>';
 
 // Próximas intervenções previstas (mini-tabela — alinhada ao PDF)
+if ($manutencao_tipo !== 'reparacao' && $recomenda_retirada) {
+    $html .= '<tr><td style="padding:0 24px 8px;">'
+           . '<div style="color:#b91c1c;font-size:12px;font-weight:700;">'
+           . atm_html_esc('Recomendação ao cliente: colocar o equipamento fora de serviço de imediato, após a tomada de conhecimento, a assinatura e o envio deste relatório, até correção da deficiência. As datas seguintes são planeamento e não autorizam o uso.')
+           . '</div></td></tr>';
+}
 if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
     $html .= '<tr><td style="padding:0 24px 12px;">'
            . '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:12px;">'
@@ -2006,6 +2169,36 @@ $html .= '</div>'
        . ATM_MARCA_CURTA . ': <strong>' . ATM_TELEFONES_GERAIS . '</strong>'
        . ' · <a href="mailto:' . REPLY_TO . '" style="color:#0d6efd;text-decoration:none;">' . REPLY_TO . '</a>'
        . '</div></div></td></tr>';
+
+if (count($nota_legal_linhas) > 0) {
+    $html .= '<tr><td style="padding:0 24px 16px;">'
+           . '<div style="border:1px solid #1e3a5f;border-radius:8px;padding:12px 14px;">'
+           . '<div style="font-size:12px;font-weight:700;color:#1e3a5f;margin-bottom:6px;">'
+           . atm_html_esc($nota_legal_titulo !== '' ? $nota_legal_titulo : 'Nota legal — colocação no mercado')
+           . '</div>'
+           . '<p style="margin:0 0 8px;font-size:11px;color:#374151;line-height:1.45;">'
+           . atm_html_esc($nota_legal_intro) . '</p>';
+    foreach ($nota_legal_linhas as $nl) {
+        if (!is_array($nl)) {
+            continue;
+        }
+        $html .= '<p style="margin:0 0 6px;font-size:11px;color:#374151;line-height:1.4;">'
+               . '<strong>' . atm_html_esc((string)($nl['referencia'] ?? '')) . '</strong><br>'
+               . atm_html_esc((string)($nl['vigencia'] ?? ''))
+               . '</p>';
+    }
+    $html .= '</div></td></tr>';
+}
+
+if ($decisao_titulo !== '' && $decisao_motivo !== '') {
+    $html .= '<tr><td style="padding:0 24px 16px;">'
+           . '<div style="border:1px solid #b91c1c;background:#fef2f2;border-radius:8px;padding:12px 14px;">'
+           . '<div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:6px;">'
+           . atm_html_esc($decisao_titulo) . '</div>'
+           . '<p style="margin:0;font-size:12px;color:#374151;line-height:1.45;">'
+           . atm_html_esc($decisao_motivo) . '</p>'
+           . '</div></td></tr>';
+}
 
 $html .= '<tr><td style="background:#1e3a5f;padding:14px 24px;color:rgba(255,255,255,.65);font-size:10px;text-align:center;line-height:1.9;">'
        . atm_html_esc(ATM_RAZAO_SOCIAL) . '<br>'

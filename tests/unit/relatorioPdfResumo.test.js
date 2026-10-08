@@ -25,7 +25,7 @@ describe('relatorioPdfResumo', () => {
   it('itensNaoConformes lista só respostas não', () => {
     const items = [{ id: 'c1', texto: 'Item A' }, { id: 'c2', texto: 'Item B' }]
     const rel = { checklistRespostas: { c1: 'sim', c2: 'nao' } }
-    assert.deepEqual(itensNaoConformes(rel, items), [{ index: 2, id: 'c2', texto: 'Item B' }])
+    assert.deepEqual(itensNaoConformes(rel, items), [{ index: 2, id: 'c2', texto: 'Item B', descricao: '', recomendacao: '', papel: '' }])
   })
 
   it('buildResumoExecutivoBullets prioriza não conformidades', () => {

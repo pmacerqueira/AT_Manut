@@ -56,12 +56,13 @@ export function createClientesHandlers(deps) {
     if (cli) {
       const merged = { ...cli, ...data }
       const recId = clienteRecordId(cli)
-      schedulePersistViaApi(persist, {
+      return schedulePersistViaApi(persist, {
         resource: 'clientes',
         runWithApi: api => api.update(recId, merged),
         queueDescriptor: { resource: 'clientes', action: 'update', id: recId, data: merged },
       })
     }
+    return undefined
   }
 
   const removeCliente = (nif) => {

@@ -18,6 +18,8 @@ import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } fr
 import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
+import { codigoResposta, emissaoDoRelatorio, rotuloRespostaPdf, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { buildResumoExecutivoEmailPayload } from '../utils/relatorioPdfResumo'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { notasRelatorioParaTexto, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
@@ -143,9 +145,10 @@ export async function enviarRelatorioEmail({
     return { ok: false, message: 'Dados da manutenção em falta.' }
   }
 
+  const emissaoElevador = isRepair ? null : emissaoDoRelatorio(relatorio)
   const tipoServico = isRepair
     ? 'Reparação'
-    : (manutencao?.tipo === 'montagem' ? 'Montagem' : 'Manutenção Periódica')
+    : (manutencao?.tipo === 'montagem' ? 'Montagem' : emissaoElevador ? 'Manutenção Preventiva' : 'Manutenção Periódica')
   const numeroRel   = relatorio?.numeroRelatorio ?? 'S/N'
   const equipDesc   = maquina
     ? `${maquina.marca} ${maquina.modelo} (${maquina.numeroSerie})`
@@ -176,10 +179,16 @@ export async function enviarRelatorioEmail({
       // Usar snapshot do relatório quando disponível (imutabilidade)
       const itemsResolvidos = resolveChecklist(relatorioParsed, checklistItems)
       const checklistJson = JSON.stringify(
-        itemsResolvidos.map(item => ({
-          texto: item.texto,
-          resp:  relatorio?.checklistRespostas?.[item.id] ?? '',
-        }))
+        itemsResolvidos.map(item => {
+          const valor = relatorioParsed.checklistRespostas?.[item.id]
+          const c = codigoResposta(valor)
+          const badge = rotuloRespostaPdf(valor)
+          return {
+            texto: limparCitacaoNormaChecklist(item.texto),
+            resp: c === 'na' ? 'N/A' : c,
+            ...(badge ? { badge } : {}),
+          }
+        })
       )
 
       // Fotos: 1-2 primeiras com melhor qualidade para o PDF; restantes como thumbnails.
@@ -207,16 +216,26 @@ export async function enviarRelatorioEmail({
       const proximasManutencoes = isRepair
         ? []
         : (proximasManutencoesIn ?? buildProximasManutencoesManutencao({ relatorio, manutencao, maquina, manutencoes }))
-      const resumoExec = buildResumoExecutivoEmailPayload({
-        relatorio,
-        manutencao,
-        maquina,
-        cliente,
-        checklistItems: itemsResolvidos,
-        proximasManutencoes,
-        isReparacao: isRepair,
-        reparacao: isRepair ? relatorio : null,
-      })
+      const resumoExec = {
+        ...buildResumoExecutivoEmailPayload({
+          relatorio,
+          manutencao,
+          maquina,
+          cliente,
+          checklistItems: itemsResolvidos,
+          proximasManutencoes,
+          isReparacao: isRepair,
+          reparacao: isRepair ? relatorio : null,
+          categoriaNome,
+        }),
+        ...(aplicaNotaLegalColocacao({ categoriaNome, isReparacao: isRepair })
+          ? {
+              notaLegalTitulo: NOTA_LEGAL_COLOCACAO_TITULO,
+              notaLegalIntro: NOTA_LEGAL_COLOCACAO_INTRO,
+              notaLegalLinhas: NOTA_LEGAL_COLOCACAO_LINHAS,
+            }
+          : {}),
+      }
       const proximaManutFmt = resumoExec.proximaDataFmt
         || (proximaManutRaw ? formatDataAzores(proximaManutRaw, true) : '')
       const periMaq = isRepair ? '' : resolvePeriodicidadeManutencao({ maquina, manutencao })
@@ -224,7 +243,8 @@ export async function enviarRelatorioEmail({
         ? 'reparacao'
         : (manutencao?.tipo === 'montagem' ? 'montagem' : 'periodica')
       const declaracaoLegislacao = declaracaoLegislacaoVariantFromCategoriaNome(categoriaNome)
-      const declaracaoTexto = resolveDeclaracaoCliente(manutencaoTipo, categoriaNome, declaracaoClienteDepois)
+      const declaracaoTexto = textoRececaoVisivel(emissaoElevador?.declaracaoTexto)
+        || resolveDeclaracaoCliente(manutencaoTipo, categoriaNome, declaracaoClienteDepois)
       const pecasUsadas = relatorioParsed.pecasUsadas
 
       const horasContadorEmail = isRepair

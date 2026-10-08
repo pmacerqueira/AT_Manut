@@ -155,15 +155,16 @@ function parseFailureLocation(stackText) {
 
 function inferFailureMode(level, action, message, details) {
   const msg = String(message || '').toLowerCase()
-  const status = Number(details?.status || 0)
-  if (status === 0) return 'network'
+  const hasStatus = details != null && details.status != null && details.status !== ''
+  const status = hasStatus ? Number(details.status) : null
+  if (hasStatus && status === 0) return 'network'
   if (status === 401) return 'auth_expired'
   if (status === 403) return 'forbidden'
   if (status === 404) return msg.includes('recurso desconhecido') ? 'api_unknown_resource' : 'not_found'
   if (status === 408) return 'timeout'
   if (status === 409) return 'conflict'
   if (status === 422) return 'validation'
-  if (status >= 500) return 'server_error'
+  if (status != null && status >= 500) return 'server_error'
   if (msg.includes('failed to fetch') || msg.includes('falha de rede') || msg.includes('networkerror')) return 'network'
   if (msg.includes('recurso desconhecido')) return 'api_unknown_resource'
   if (String(action || '').toLowerCase().includes('login')) return 'auth'

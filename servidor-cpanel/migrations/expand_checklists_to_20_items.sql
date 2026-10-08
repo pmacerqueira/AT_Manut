@@ -1,5 +1,5 @@
 -- Migração: Expandir checklists sub2, sub4, sub12 para 20 itens (montagem + periódica)
--- Base: Manual RAV261, EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+-- Base: Manual RAV261 e prática de manutenção preventiva
 -- Executar após add_sub2_checklists, add_sub4_checklists, add_sub12_checklists
 
 -- sub2: Novos itens periódica (ch34c-ch34g)

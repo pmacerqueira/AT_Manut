@@ -8,11 +8,12 @@
  *  • Online (limpo)         → oculto
  */
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useData } from '../context/DataContext'
 import { cacheTimestamp } from '../services/localCache'
 import { getHojeAzores } from '../utils/datasAzores'
 import { addDays } from 'date-fns'
-import { WifiOff, RefreshCw, CloudOff, CheckCircle2 } from 'lucide-react'
+import { CloudOff, CheckCircle2 } from 'lucide-react'
 import './OfflineBanner.css'
 
 const PREFETCH_DIAS = 5
@@ -63,13 +64,39 @@ export default function OfflineBanner() {
 
   // Iniciar sync manual
   const handleSync = async () => {
-    if (syncing || !isOnline) return
+    if (syncing) return
     setSyncing(true)
     await processSync()
     setSyncing(false)
   }
 
   // M5: Indicador de prontidão da semana (mostrado brevemente ao carregar)
+  const barraSync = syncPending > 0
+    ? createPortal(
+      <div className="sync-dados-bar" role="status" aria-live="polite">
+        <div className="sync-dados-bar__text">
+          <strong>Dados guardados neste telemóvel</strong>
+          <span>
+            {syncing
+              ? 'A enviar ao servidor…'
+              : `${syncPending} operação${syncPending !== 1 ? 'ões' : ''} por enviar`}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="sync-dados-bar__btn"
+          onClick={handleSync}
+          disabled={syncing}
+        >
+          {syncing ? 'A sincronizar…' : 'Sincronizar dados'}
+        </button>
+      </div>,
+      document.body,
+    )
+    : null
+
+  if (syncPending > 0) return barraSync
+
   if (readyVisible && isOnline && weekReadiness && syncPending === 0) {
     return (
       <div className="offline-banner offline-banner--ready" role="status" aria-live="polite">
@@ -92,44 +119,6 @@ export default function OfflineBanner() {
       hour: '2-digit', minute: '2-digit',
       timeZone: 'Atlantic/Azores',
     })
-  }
-
-  // Estado: online + syncing
-  if (isOnline && syncing) {
-    return (
-      <div className="offline-banner offline-banner--syncing" role="status" aria-live="polite">
-        <RefreshCw size={15} className="offline-banner__spin" />
-        <span>A sincronizar operações pendentes…</span>
-      </div>
-    )
-  }
-
-  // Estado: online + pendentes (não está a sincronizar)
-  if (isOnline && syncPending > 0) {
-    return (
-      <div className="offline-banner offline-banner--pending" role="status" aria-live="polite">
-        <RefreshCw size={15} />
-        <span>{syncPending} operação{syncPending !== 1 ? 'ões' : ''} aguardam envio</span>
-        <button
-          type="button"
-          className="offline-banner__btn"
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          Sincronizar
-        </button>
-      </div>
-    )
-  }
-
-  // Estado: offline com pendentes
-  if (!isOnline && syncPending > 0) {
-    return (
-      <div className="offline-banner offline-banner--offline-pending" role="alert" aria-live="assertive">
-        <WifiOff size={15} />
-        <span>Sem ligação · {syncPending} operação{syncPending !== 1 ? 'ões' : ''} aguardam sincronização</span>
-      </div>
-    )
   }
 
   // Estado: offline sem pendentes

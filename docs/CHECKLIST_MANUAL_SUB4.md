@@ -3,7 +3,7 @@
 Checklists implementadas para **Montagem** e **Manutenção Periódica**, baseadas em:
 - Manual Twin Busch TW S3-18U (elevador de tesoura)
 - Manual Maqser REF 9810 (elevador de tesoura chão hidráulico)
-- EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+- Prática de manutenção preventiva. O regime de colocação no mercado fica na nota legal do relatório.
 - Checklists típicas do sector e boas práticas para elevadores de tesoura (scissor lifts)
 
 ---
@@ -24,8 +24,8 @@ Checklists implementadas para **Montagem** e **Manutenção Periódica**, basead
 | Hidráulica | 10 | Óleo hidráulico no reservatório (conforme manual do fabricante) |
 | Hidráulica | 11 | Unidade de bomba e cilindros hidráulicos instalados |
 | Segurança | 12 | Trincos de segurança (bloqueio mecânico) instalados e funcionais |
-| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) — EN 1493:2020 |
-| Segurança | 14 | Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE) |
+| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) |
+| Segurança | 14 | Marcação CE, manual em português e declaração CE |
 | Eléctrica | 15 | Verificação da tensão de alimentação e sequência de fases |
 | Segurança | 16 | Sinalização de aviso e pictogramas de segurança visíveis |
 | Teste | 17 | Teste de subida e descida em vazio; sincronização das plataformas |

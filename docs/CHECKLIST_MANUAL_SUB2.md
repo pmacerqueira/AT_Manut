@@ -1,6 +1,6 @@
 # Checklist — Elevador electro-hidráulico de 2 colunas (sub2)
 
-Checklists implementadas para **Montagem** e **Manutenção Periódica**, baseadas em EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE e checklists típicas do sector.
+Checklists implementadas para **Montagem** e **Manutenção Periódica**, a partir dos manuais do equipamento e da prática de manutenção preventiva. O regime de colocação no mercado fica na nota legal do relatório, e não em cada pergunta.
 
 ---
 
@@ -20,8 +20,8 @@ Checklists implementadas para **Montagem** e **Manutenção Periódica**, basead
 | Hidráulica | 10 | Óleo hidráulico HLP 32 (cerca de 80% do tanque) |
 | Hidráulica | 11 | Unidade motora e bomba instaladas |
 | Segurança | 12 | Travas de segurança instaladas e funcionais |
-| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) — EN 1493:2020 |
-| Segurança | 14 | Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE) |
+| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) |
+| Segurança | 14 | Marcação CE, manual em português e declaração CE |
 | Teste | 15 | Verificação da tensão de alimentação e sequência de fases |
 | Segurança | 16 | Sinalização de aviso e pictogramas de segurança visíveis |
 | Teste | 17 | Teste de subida e descida em vazio (vários ciclos) |

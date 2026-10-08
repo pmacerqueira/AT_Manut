@@ -20,6 +20,7 @@
  */
 
 import { STORAGE } from '../config/storageKeys'
+import { isRetryablePersistError } from '../domain/persistDomain'
 
 const QUEUE_KEY      = STORAGE.SYNC_QUEUE
 const MAX_SIZE_BYTES = 4 * 1024 * 1024 // 4 MB
@@ -66,8 +67,15 @@ export function enqueue({ resource, action, id = null, data = null }) {
   if (preview.length > MAX_SIZE_BYTES) {
     return { ok: false, reason: 'quota' }
   }
-  save(next)
+  if (!save(next)) return { ok: false, reason: 'quota' }
   return { ok: true, queueId: item.queueId }
+}
+
+/** Marca um item como envio em curso para a fila automática não o repetir. */
+export function setItemSending(queueId, sending) {
+  if (!queueId) return
+  const q = load()
+  save(q.map(i => (i.queueId === queueId ? { ...i, sending: !!sending } : i)))
 }
 
 /** Remove um item da fila pelo seu queueId. */
@@ -89,16 +97,21 @@ export async function processQueue(callFn) {
   let failed    = 0
 
   for (const item of q) {
+    const fresh = load().find(i => i.queueId === item.queueId)
+    if (!fresh) continue
+    if (fresh.sending) break
+    setItemSending(item.queueId, true)
     try {
       await callFn(item.resource, item.action, { id: item.id, data: item.data })
       removeItem(item.queueId)
       processed++
     } catch (err) {
-      if (!err.status) {
-        // Erro de rede: ainda offline — parar processamento
+      setItemSending(item.queueId, false)
+      if (isRetryablePersistError(err)) {
+        // Rede, timeout ou limite do alojamento (508): manter na fila e parar.
         break
       }
-      // Erro de servidor (4xx/5xx): o item não vai melhorar, remover e continuar
+      // Erro definitivo (4xx de validação, etc.): o item não vai melhorar.
       removeItem(item.queueId)
       failed++
     }

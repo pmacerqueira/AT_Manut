@@ -11,6 +11,8 @@ import { logger } from '../utils/logger'
 import { getHojeAzores, nowISO, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { addDays } from 'date-fns'
 import { PenLine, Trash2, CheckCircle2, Bookmark, X } from 'lucide-react'
+import { categoriaNomeFromMaquina } from '../constants/relatorio'
+import { aplicaModeloElevadorPreventivo, snapshotChecklistParaRelatorio } from '../domain/relatorioElevadorPreventivo'
 
 export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, maquinaMap }) {
   const { isAdmin } = usePermissions()
@@ -19,6 +21,8 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
     updateManutencao,
     addRelatorio,
     getChecklistBySubcategoria,
+    getSubcategoria,
+    getCategoria,
     getIntervaloDiasByMaquina,
     updateMaquina,
     recalcularPeriodicasAposExecucao,
@@ -205,9 +209,16 @@ export default function BulkExecutarModal({ isOpen, onClose, manutencoesList, ma
           checklistItems.forEach(it => { checklistRespostas[it.id] = 'sim' })
         }
 
+        const modeloElevador = aplicaModeloElevadorPreventivo({
+          categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
+          tipoManutencao: m.tipo,
+        })
         const relPayload = {
           checklistRespostas,
-          checklistSnapshot: checklistItems.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
+          checklistSnapshot: snapshotChecklistParaRelatorio(checklistItems, {
+            modeloElevador,
+            estado: 'concluida_ambito',
+          }),
           notas: form.notas.slice(0, 300),
           fotos: [],
           tecnico: form.tecnico,

@@ -94,6 +94,72 @@
   to   { opacity: 0; }
 }
 
+/* Barra fixa — visível por cima do formulário de conclusão */
+.sync-dados-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #9a3412;
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.sync-dados-bar__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sync-dados-bar__text strong {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.sync-dados-bar__text span {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.sync-dados-bar__btn {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #9a3412;
+  background: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.sync-dados-bar__btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (max-width: 1024px) {
+  .sync-dados-bar {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .sync-dados-bar__btn {
+    width: 100%;
+  }
+}
+
 /* Responsivo: texto mais curto em mobile */
 @media (max-width: 480px) {
   .offline-banner {

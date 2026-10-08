@@ -229,7 +229,7 @@ VALUES
    'Pedro Medeiros', 'José Ribeiro', 1,
    'AV-2026-002',
    'Dispositivo de bloqueio de segurança não enclava em posição elevada.',
-   'Substituída mola e trinco do dispositivo de bloqueio coluna esquerda. Lubrificação dos trilhos de segurança. Ajuste da sincronização entre colunas. Teste de segurança realizado conforme EN 1493:2020.',
+   'Substituída mola e trinco do dispositivo de bloqueio coluna esquerda. Lubrificação dos trilhos de segurança. Ajuste da sincronização entre colunas. Teste de funcionamento do bloqueio realizado.',
    3.0,
    '{}',
    '[{"codigo":"CAST-TRNCO-01","descricao":"Trinco de segurança CASTOR CT-2000","quantidade":2},{"codigo":"CAST-MOLA-S","descricao":"Mola de retorno trinco","quantidade":2},{"codigo":"LUB-W40-300","descricao":"Lubrificante WD-40 300ml","quantidade":1}]',

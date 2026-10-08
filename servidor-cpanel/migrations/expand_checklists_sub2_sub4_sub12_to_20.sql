@@ -1,5 +1,5 @@
 -- Migração: Expandir checklists sub2, sub4, sub12 de 15 para 20 itens
--- Base: Manual RAV261 (Ravaglioli), EN 1493:2020, boas práticas do sector
+-- Base: Manual RAV261 (Ravaglioli) e prática de manutenção preventiva
 -- Mantém IDs existentes para compatibilidade com relatórios
 
 -- ========== SUB2: Elevador electro-hidráulico 2 colunas ==========

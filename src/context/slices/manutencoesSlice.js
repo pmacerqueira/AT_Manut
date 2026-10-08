@@ -91,12 +91,13 @@ export function createManutencoesHandlers(deps) {
     logger.action('DataContext', 'updateManutencao',
       `Manutenção ${id} actualizada (${data.status ?? 'sem status'})`,
       { id, ...data })
-    import('../../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.update(id, data),
-        { resource: 'manutencoes', action: 'update', id, data }),
-    ).catch(err => {
-      logger.error('DataContext', 'updateManutencao', 'Falha ao persistir actualização', { msg: err?.message, id })
-    })
+    return persist(
+      async () => {
+        const { apiManutencoes } = await import('../../services/apiService')
+        await apiManutencoes.update(id, data)
+      },
+      { resource: 'manutencoes', action: 'update', id, data },
+    )
   }
 
   const removeManutencao = (id) => {
@@ -150,13 +151,14 @@ export function createManutencoesHandlers(deps) {
     logger.action('DataContext', 'addRelatorio',
       `Relatório criado: ${numeroRelatorio}`,
       { id: novo.id, manutencaoId: r.manutencaoId, assinado: novo.assinadoPeloCliente })
-    import('../../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.create(novo),
-        { resource: 'relatorios', action: 'create', data: novo }),
-    ).catch(err => {
-      logger.error('DataContext', 'addRelatorio', 'Falha ao persistir relatório', { msg: err?.message, id: novo.id })
-    })
-    return { id: novo.id, numeroRelatorio }
+    const envio = persist(
+      async () => {
+        const { apiRelatorios } = await import('../../services/apiService')
+        await apiRelatorios.create(novo)
+      },
+      { resource: 'relatorios', action: 'create', data: novo },
+    )
+    return { id: novo.id, numeroRelatorio, envio }
   }
 
   const updateRelatorio = (id, data) => {
@@ -165,12 +167,13 @@ export function createManutencoesHandlers(deps) {
     logger.action('DataContext', 'updateRelatorio',
       `Relatório ${id} actualizado (${tipo})`,
       { id, assinado: data.assinadoPeloCliente ?? false })
-    import('../../services/apiService').then(({ apiRelatorios }) =>
-      persist(() => apiRelatorios.update(id, data),
-        { resource: 'relatorios', action: 'update', id, data }),
-    ).catch(err => {
-      logger.error('DataContext', 'updateRelatorio', 'Falha ao persistir actualização', { msg: err?.message, id })
-    })
+    return persist(
+      async () => {
+        const { apiRelatorios } = await import('../../services/apiService')
+        await apiRelatorios.update(id, data)
+      },
+      { resource: 'relatorios', action: 'update', id, data },
+    )
   }
 
   const prepararManutencoesPeriodicas = (manutencaoMontagem) => {
@@ -201,13 +204,14 @@ export function createManutencoesHandlers(deps) {
     logger.action('DataContext', 'confirmarManutencoesPeriodicas',
       `${novas.length} manutenções periódicas confirmadas (pós-montagem)`,
       { count: novas.length, maquinaId: novas[0]?.maquinaId })
-    import('../../services/apiService').then(({ apiManutencoes }) =>
-      persist(() => apiManutencoes.bulkCreate(novas),
-        { resource: 'manutencoes', action: 'bulk_create', data: novas }),
-    ).catch(err => {
-      logger.error('DataContext', 'confirmarManutencoesPeriodicas', 'Falha ao persistir periódicas', { msg: err?.message, count: novas.length })
-    })
-    return novas.length
+    const envio = persist(
+      async () => {
+        const { apiManutencoes } = await import('../../services/apiService')
+        await apiManutencoes.bulkCreate(novas)
+      },
+      { resource: 'manutencoes', action: 'bulk_create', data: novas },
+    )
+    return { count: novas.length, envio }
   }
 
   const getRelatorioByManutencao = (manutencaoId) =>
@@ -223,10 +227,9 @@ export function createManutencoesHandlers(deps) {
     if (!periodicidade || !INTERVALOS[periodicidade]) return 0
 
     const hojeStr = getHojeAzores()
-    let novaCount = 0
-
+    let computed = null
     setManutencoes(prev => {
-      const { next, idsRemover, novas, novaCount: n } = recalcularPeriodicasNoEstado(prev, {
+      computed = recalcularPeriodicasNoEstado(prev, {
         maquinaId,
         periodicidade,
         dataExecucao,
@@ -235,31 +238,33 @@ export function createManutencoesHandlers(deps) {
         intervalos: INTERVALOS,
         idSeed: Date.now(),
       })
-      novaCount = n
-
-      import('../../services/apiService').then(async ({ apiManutencoes }) => {
-        try {
-          for (const rid of idsRemover) {
-            await persist(() => apiManutencoes.remove(rid),
-              { resource: 'manutencoes', action: 'delete', id: rid })
-          }
-          if (novas.length > 0) {
-            await persist(() => apiManutencoes.bulkCreate(novas),
-              { resource: 'manutencoes', action: 'bulk_create', data: novas })
-          }
-        } catch (err) {
-          logger.error('DataContext', 'recalcularPeriodicasAposExecucao', 'Falha ao persistir recálculo', { msg: err?.message, count: novas.length })
-        }
-      })
-
-      if (novas.length > 0 || idsRemover.length > 0) {
-        logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
-          `${novas.length} periódicas criadas, ${idsRemover.length} removidas para máquina ${maquinaId}`,
-          { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.length })
-      }
-
-      return next
+      return computed.next
     })
+    const { idsRemover = [], novas = [], novaCount = 0 } = computed || {}
+    const envios = []
+    for (const rid of idsRemover) {
+      envios.push(persist(
+        async () => {
+          const { apiManutencoes } = await import('../../services/apiService')
+          await apiManutencoes.remove(rid)
+        },
+        { resource: 'manutencoes', action: 'delete', id: rid },
+      ))
+    }
+    if (novas.length > 0) {
+      envios.push(persist(
+        async () => {
+          const { apiManutencoes } = await import('../../services/apiService')
+          await apiManutencoes.bulkCreate(novas)
+        },
+        { resource: 'manutencoes', action: 'bulk_create', data: novas },
+      ))
+    }
+    if (novas.length > 0 || idsRemover.length > 0) {
+      logger.action('DataContext', 'recalcularPeriodicasAposExecucao',
+        `${novas.length} periódicas criadas, ${idsRemover.length} removidas para máquina ${maquinaId}`,
+        { maquinaId, periodicidade, dataExecucao, criadas: novas.length, removidas: idsRemover.length })
+    }
 
     queueMicrotask(() => {
       const lista = getManutencoesRef()
@@ -271,7 +276,7 @@ export function createManutencoesHandlers(deps) {
       updateMaquina(maquinaId, patchMaq)
     })
 
-    return novaCount
+    return { novaCount, envios }
   }
 
   const sincronizarAgendaCompleta = async () => {

@@ -2,7 +2,7 @@
 
 Directrizes de interface e experiência do utilizador. **Todas as novas funcionalidades devem seguir estas regras.**
 
-Última revisão: 2026-03-17 — v1.14.0
+Última revisão: 2026-10-08 — ver `src/config/version.js`
 
 ---
 
@@ -19,7 +19,7 @@ const { showToast } = useToast()
 
 showToast('Operação concluída.', 'success')          // 4 s
 showToast('Erro ao enviar.', 'error')                // 4 s
-showToast('Atenção: limite atingido.', 'warning')    // 2.5 s
+showToast('Preencha o ponto.', 'warning')            // fica até OK
 showToast('Dica: use o filtro.', 'info')             // 2.5 s
 showToast('Mensagem importante.', 'success', 5000)  // duração custom
 ```
@@ -30,7 +30,7 @@ showToast('Mensagem importante.', 'success', 5000)  // duração custom
 |----------|------|---------|
 | Operação concluída (gravar, enviar, eliminar) | `success` | 4 s |
 | Erro de rede / servidor | `error` | 4 s |
-| Aviso de regra de negócio | `warning` | 2.5 s |
+| Aviso de regra de negócio | `warning` | Até o técnico carregar em OK |
 | Informação geral | `info` | 2.5 s |
 | Validação de campo num formulário | Inline (próximo do campo) | — |
 | Erro de login | Inline (padrão UX) | — |

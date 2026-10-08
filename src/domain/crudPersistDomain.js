@@ -47,17 +47,21 @@ export async function persistViaApi(
     loadApiModule = () => import('../services/apiService'),
   },
 ) {
-  const mod = await loadApiModule()
-  const api = resolveApiForResource(mod, resource)
   const opts = throwOnFailure ? { throwOnFailure: true } : {}
-  await persist(() => runWithApi(api), queueDescriptor, rollback, opts)
+  // persist() grava na fila do telemóvel antes do primeiro await.
+  return persist(async () => {
+    const mod = await loadApiModule()
+    const api = resolveApiForResource(mod, resource)
+    return runWithApi(api)
+  }, queueDescriptor, rollback, opts)
 }
 
 /**
  * Fire-and-forget com handler de erro opcional (padrão CRUD simples no DataContext).
  */
 export function schedulePersistViaApi(persist, params, { onError } = {}) {
-  persistViaApi(persist, params).catch(err => {
+  return persistViaApi(persist, params).catch(err => {
     if (onError) onError(err)
+    return { queued: true, uploaded: false }
   })
 }

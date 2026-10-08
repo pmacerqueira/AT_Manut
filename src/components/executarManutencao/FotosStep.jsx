@@ -42,7 +42,7 @@ export default function FotosStep({
           {fotoCarregando && <span className="fotos-loading">A processar…</span>}
         </div>
         <p className="fotos-limite-hint">
-          Máximo de <strong>{MAX_FOTOS}</strong> fotografias por relatório (PDF e envio por email). As imagens são comprimidas no dispositivo.
+          Máximo de <strong>{MAX_FOTOS}</strong> fotografias por relatório (PDF e envio por email). Cada foto tirada aqui fica também na pasta Transferências do telemóvel, para a poder voltar a escolher em Galeria.
           {fotos.length >= MAX_FOTOS && (
             <span className="fotos-limite-atingido"> Limite atingido — remova uma foto para adicionar outra.</span>
           )}

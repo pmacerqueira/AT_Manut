@@ -363,23 +363,26 @@ Após execução de qualquer manutenção (montagem ou periódica):
 
 ### Estrutura do PDF de relatório (`gerarPdfCompacto`)
 
-Ordem canónica — **não alterar** sem rever `.cursor/rules/at-manut-workflow.mdc` e testar PDF browser + FPDF email. Desde **v1.17.5**, o bloco de fecho vive numa **página final dedicada**: **próximas manutenções (lista completa) → declaração → assinaturas**.
+Ordem canónica — **não alterar** sem rever `.cursor/rules/at-manut-workflow.mdc` e testar PDF browser + FPDF email. Desde **v1.17.5**, o bloco de fecho vive numa **página final dedicada**: **próximas manutenções (lista completa) → declaração → nota legal (elevador) → decisão de fora de serviço (se existir) → assinaturas**.
 
 | # | Secção | Condicional? | Notas (v1.17.5) |
 |---|--------|-------------|-----------------|
 | 1 | Cabeçalho (logo, contactos) | Não | |
-| 2 | Tipo de serviço + nº relatório | Não | |
-| 3 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) | Desde v1.17.3 |
-| 4 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante) | Não | Rótulos com `MultiCell` no FPDF (evita sobreposição) |
-| 5 | **Pontos de atenção** (não conformidades) | Se existirem | |
-| 6 | Checklist de verificação | Se existir | **Uma página A4** (fonte/linha compactas) |
-| 7 | Notas adicionais | Se existirem | **Uma nota por linha** (`linhasNotasRelatorio`) |
-| 8 | Fotos (documentação fotográfica, grelha A4) | Se existirem | Máx. 6 |
-| 9 | Consumíveis e peças | Se existirem | |
-| 10 | **Página final:** Próximas manutenções agendadas | Se periódica | Lista completa, sem cortes por página |
-| 11 | Declaração de aceitação do cliente | **Sempre** | Imediatamente **antes** das assinaturas |
-| 12 | Assinaturas (técnico + cliente) | **Sempre** | Último conteúdo antes do rodapé |
-| 13 | Rodapé (todas as páginas) | Não | `APP_FOOTER_TEXT` |
+| 2 | Tipo de serviço + nº relatório | Não | Elevador periódico: «Relatório de Manutenção Preventiva» |
+| 3 | Âmbito e limites do serviço | Não | Logo a seguir ao título |
+| 4 | **Resumo executivo** (veredito, bullets, próxima data) | Manutenção (não reparação) | Elevador novo: sem caixa CONFORME |
+| 5 | Dados do serviço (cliente, NIF, local, equipamento, tipo, periodicidade, agendamento, horas, execução, técnico, assinante, contexto da visita) | Não | Elevador: série, pedido e pedido fora do âmbito |
+| 6 | **Pontos de atenção** (não conformidades) | Se existirem | |
+| 7 | Checklist de verificação | Se existir | **Uma página A4** (fonte/linha compactas) |
+| 8 | Notas adicionais | Se existirem | **Uma nota por linha** (`linhasNotasRelatorio`) |
+| 9 | Fotos (documentação fotográfica, grelha A4) | Se existirem | Máx. 6 |
+| 10 | Consumíveis e peças | Se existirem | |
+| 11 | **Página final:** Próximas manutenções agendadas | Se periódica | Lista completa, sem cortes por página |
+| 12 | Declaração de aceitação / receção | **Sempre** | Antes da nota legal e das assinaturas |
+| 13 | Nota legal de colocação no mercado | Manutenção de elevador | Não avalia o equipamento da visita |
+| 14 | Decisão operacional: fora de serviço imediato | Se houver recomendação | Imediatamente antes das assinaturas |
+| 15 | Assinaturas (técnico + cliente) | **Sempre** | Último conteúdo antes do rodapé |
+| 16 | Rodapé (todas as páginas) | Não | `APP_FOOTER_TEXT` |
 
 **Reparação:** corpo principal com ordem **peças → fotos → notas → checklist**; declaração + assinaturas no fecho (sem tabela de próximas).
 

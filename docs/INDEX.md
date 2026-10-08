@@ -42,6 +42,11 @@ Ponto de entrada único. **Não duplicar** o mesmo procedimento em vários `.md`
 | [`docs/TESTE-OFFLINE-MANUAL.md`](TESTE-OFFLINE-MANUAL.md) | Modo offline |
 | Checklists manuais `CHECKLIST_MANUAL_SUB*.md` | Textos legais por subcategoria |
 
+## Planeamento
+| Ficheiro | Conteúdo |
+|----------|----------|
+| **[`docs/PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md`](PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md)** | **Canónico:** mapa de alterações dos relatórios de manutenção preventiva de elevadores (P0 antes de P1/P2). Intenção em [`NAVEL_reflexao_melhoria_relatorios_Cursor.md`](NAVEL_reflexao_melhoria_relatorios_Cursor.md) |
+
 ## Planeamento (histórico, não estado actual)
 - [`docs/ROADMAP.md`](ROADMAP.md)
 - [`docs/ROADMAP-EVOLUCAO-2026.md`](ROADMAP-EVOLUCAO-2026.md)

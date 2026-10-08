@@ -3,7 +3,7 @@
 Checklists implementadas para **Montagem** e **Manutenção Periódica**, baseadas em:
 - Manual Twin Busch TW 550/750 4C independentes (Operating and Service Manual)
 - Manual RAV261 (4 colunas independentes)
-- EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+- Prática de manutenção preventiva. O regime de colocação no mercado fica na nota legal do relatório.
 - Checklists típicas do sector para elevadores de 4 colunas independentes
 
 *O manual original está em inglês; as instruções foram adaptadas para português.*
@@ -26,8 +26,8 @@ Checklists implementadas para **Montagem** e **Manutenção Periódica**, basead
 | Hidráulica | 10 | Óleo hidráulico HLP no reservatório (conforme manual do fabricante) |
 | Hidráulica | 11 | Unidade de bomba e cilindros telescópicos instalados em cada coluna |
 | Segurança | 12 | Travas de segurança e cabo de segurança instalados e funcionais |
-| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) — EN 1493:2020 |
-| Segurança | 14 | Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE) |
+| Segurança | 13 | Bloqueio dos braços (máx. 150 mm) |
+| Segurança | 14 | Marcação CE, manual em português e declaração CE |
 | Eléctrica | 15 | Verificação da tensão de alimentação e sequência de fases (RAV261) |
 | Segurança | 16 | Sinalização de aviso e pictogramas de segurança visíveis |
 | Teste | 17 | Teste de sincronização das 4 colunas em subida e descida |

@@ -23,6 +23,32 @@ const PASSES = [
   [640, 0.36],
 ]
 
+/**
+ * Grava uma cópia no armazenamento do telemóvel (pasta Transferências).
+ * A câmara aberta pelo browser não escreve na galeria; sem esta cópia a foto
+ * desaparece se o envio ao servidor falhar.
+ * Tem de ser chamada no mesmo gesto do utilizador, antes de qualquer await.
+ * @param {File|Blob} file
+ * @param {number} [indice]
+ * @returns {string} nome do ficheiro
+ */
+export function guardarFotoNoDispositivo(file, indice = 1) {
+  const agora = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  const stamp = `${agora.getFullYear()}${p(agora.getMonth() + 1)}${p(agora.getDate())}_${p(agora.getHours())}${p(agora.getMinutes())}${p(agora.getSeconds())}`
+  const nome = `NAVEL_${stamp}_${indice}.jpg`
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nome
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 15000)
+  return nome
+}
+
 /** Copia o ficheiro para memória (evita revogação de ficheiros temporários da câmara em mobile). */
 export function fileToMemory(file) {
   return new Promise((resolve, reject) => {

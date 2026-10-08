@@ -1,5 +1,5 @@
 -- Migração: Checklists completas para sub2 (Elevador electro-hidráulico 2 colunas)
--- Base: Manual Twin Busch TW 242 PE, EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+-- Base: Manual Twin Busch TW 242 PE e prática de manutenção preventiva
 -- Executar no MySQL/cPanel após add_tipo_checklist.sql
 
 -- 1. Adicionar coluna grupo (para agrupamento visual)
@@ -19,8 +19,8 @@ INSERT INTO `checklist_items` (`id`, `subcategoria_id`, `tipo`, `grupo`, `ordem`
 ('ch2m10', 'sub2', 'montagem', 'hidraulica', 10, 'Óleo hidráulico HLP 32 (cerca de 80% do tanque)'),
 ('ch2m11', 'sub2', 'montagem', 'hidraulica', 11, 'Unidade motora e bomba instaladas'),
 ('ch2m12', 'sub2', 'montagem', 'seguranca', 12, 'Travas de segurança instaladas e funcionais'),
-('ch2m13', 'sub2', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm) — EN 1493:2020'),
-('ch2m14', 'sub2', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE)'),
+('ch2m13', 'sub2', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm)'),
+('ch2m14', 'sub2', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE'),
 ('ch2m15', 'sub2', 'montagem', 'electrica', 15, 'Verificação da tensão de alimentação e sequência de fases'),
 ('ch2m16', 'sub2', 'montagem', 'seguranca', 16, 'Sinalização de aviso e pictogramas de segurança visíveis'),
 ('ch2m17', 'sub2', 'montagem', 'teste', 17, 'Teste de subida e descida em vazio (vários ciclos)'),

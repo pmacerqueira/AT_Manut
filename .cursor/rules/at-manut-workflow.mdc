@@ -147,7 +147,7 @@ Quando o utilizador cola um relatório de suporte (texto iniciado com `=== RELAT
 
 ### Toast
 - **Posicionamento:** Sempre ao centro do ecrã (qualquer tipo de ecrã)
-- **Duração:** success/error = 4 s; warning/info = 2.5 s
+- **Duração:** success/error = 4 s; info = 2.5 s; warning fica ao centro, em amarelo, até o técnico carregar em OK
 - **Nunca** usar `alert()` — sempre `showToast()`
 
 | Situação | Fazer |

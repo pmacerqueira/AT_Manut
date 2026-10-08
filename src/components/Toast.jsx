@@ -3,11 +3,12 @@
  *
  * Uso:
  *   const { showToast } = useToast()
- *   showToast('Guardado com sucesso!', 'success')      // verde
- *   showToast('Erro ao enviar email.', 'error')        // vermelho
- *   showToast('Email enviado.', 'success', 1500)       // duração custom (ms)
+ *   showToast('Guardado com sucesso!', 'success')      // verde, fecha sozinho
+ *   showToast('Erro ao enviar email.', 'error')        // vermelho, fecha sozinho
+ *   showToast('Preencha o ponto.', 'warning')          // amarelo, fica até OK
  *
  * Tipos: 'success' | 'error' | 'warning' | 'info'
+ * O aviso (warning) não desaparece sozinho: o técnico fecha com OK.
  */
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import './Toast.css'
@@ -42,22 +43,34 @@ const ICONS = {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
   const timerRef = useRef({})
+  const avisosAbertos = useRef(new Set())
 
   const showToast = useCallback((message, type = 'info', duration) => {
+    const sticky = type === 'warning'
+    if (sticky) {
+      if (avisosAbertos.current.has(message)) return
+      avisosAbertos.current.add(message)
+    }
     const d = duration ?? (type === 'success' || type === 'error' ? 4000 : 2500)
-    const id = Date.now()
-    setToasts(prev => [...prev, { id, message, type }])
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, message, type, sticky }])
 
-    timerRef.current[id] = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-      delete timerRef.current[id]
-    }, d)
+    if (!sticky) {
+      timerRef.current[id] = setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id))
+        delete timerRef.current[id]
+      }, d)
+    }
   }, [])
 
   const dismiss = useCallback((id) => {
     clearTimeout(timerRef.current[id])
     delete timerRef.current[id]
-    setToasts(prev => prev.filter(t => t.id !== id))
+    setToasts(prev => prev.filter(t => {
+      if (t.id !== id) return true
+      if (t.sticky) avisosAbertos.current.delete(t.message)
+      return false
+    }))
   }, [])
 
   return (
@@ -68,11 +81,16 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             className={`toast toast--${t.type}`}
-            role="status"
-            onClick={() => dismiss(t.id)}
+            role={t.sticky ? 'alert' : 'status'}
+            onClick={t.sticky ? undefined : () => dismiss(t.id)}
           >
             <span className="toast-icon">{ICONS[t.type]}</span>
             <span className="toast-msg">{t.message}</span>
+            {t.sticky && (
+              <button type="button" className="toast-ok" onClick={() => dismiss(t.id)}>
+                OK
+              </button>
+            )}
           </div>
         ))}
       </div>

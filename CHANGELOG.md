@@ -9,6 +9,137 @@ Política de continuidade:
 
 ---
 
+## [1.17.28] — 2026-10-08 — Avisos amarelos com OK
+
+### Alteração
+- Os avisos ao técnico ficam ao centro, em amarelo, até serem fechados com OK. Não desaparecem sozinhos. O mesmo aviso não se empilha.
+- Na checklist de elevadores, a identificação da visita abre quando o fecho fica bloqueado por pedido ou série.
+- Um documento em falta deixa de bloquear «Estrutura visível» sem anomalia. Só uma anomalia de equipamento ou de teste dispara essa regra.
+
+### Deploy
+- PWA em `public_html/manut/` e `send-email.php` em `public_html/api/`. As migrações `2026-10-08-checklist-elevador-sem-citacao-norma.sql` e `2026-10-08-checklist-elevador-textos-preventiva.sql` ainda têm de correr no MySQL para as perguntas novas ficarem na base. O ecrã e o PDF já limpam as citações antigas ao mostrar.
+
+---
+
+## [1.17.27] — 2026-10-08 — Pedido fora do âmbito da visita
+
+### Alteração
+- Na manutenção preventiva de elevadores, o técnico indica se o cliente pediu também reparação, alteração ou certificação. Se pediu, o relatório regista o pedido e deixa claro que não foi executado e que não gera esses serviços.
+
+### Deploy
+- Ainda não publicado.
+
+---
+
+## [1.17.26] — 2026-10-08 — Teste com carga: veículo e 2 ciclos
+
+### Alteração
+- No teste funcional de subida e descida, «com carga» confirma apenas que se elevou um veículo na função habitual, com 2 ciclos completos. Deixa de haver campo de limitação. Não é ensaio formal de carga. «Sem carga» mantém-se quando o veículo não foi elevado.
+
+### Deploy
+- Ainda não publicado. A frase nova da pergunta entra na migração `2026-10-08-checklist-elevador-textos-preventiva.sql`.
+
+---
+
+## [1.17.25] — 2026-10-08 — Quadro de decisão antes das assinaturas
+
+### Alteração
+- Quando o relatório de elevador recomenda fora de serviço, surge um quadro imediatamente antes das assinaturas do técnico e do cliente: «Decisão operacional: Fora de serviço imediato» e o motivo, com os pontos críticos assinalados. O mesmo quadro vai no PDF do email. Não aparece se não houver essa recomendação. Não diz «apto» nem trata a NAVEL como autoridade que proíbe a utilização.
+
+### Deploy
+- Ainda não publicado. Entra com o PWA e o `send-email.php`.
+
+---
+
+## [1.17.24] — 2026-10-08 — Fora de serviço automático nos pontos críticos
+
+### Alteração
+- Se a manutenção periódica de elevador regista anomalia em bloqueio, cabos de aço, cabo de segurança, travão, sincronização, fim de curso, braços ou suportes de carga, estrutura, ancoragem ou retenção, o relatório recomenda ao cliente colocar o equipamento fora de serviço. A recomendação nasce no ponto, não se desliga, e repete-se no calendário: vale após a tomada de conhecimento, a assinatura e o envio do relatório. Não é interdição legal nem estado «apto».
+- Uma anomalia noutro ponto, por exemplo nível de óleo, continua a poder ser só uma recomendação do técnico.
+
+### Deploy
+- Ainda não publicado. Entra com o PWA e o `send-email.php` da 1.17.23.
+
+---
+
+## [1.17.23] — 2026-10-08 — Checklist e textos da manutenção preventiva de elevadores
+
+### Alteração
+- As perguntas periódicas de elevador deixam de trazer a conclusão no enunciado. Documentos passam a ser o nome do documento; o estado fica nos botões. Redutor, motor e travão são pontos separados. A limpeza deixa de estar colada ao teste funcional. Sai «estado geral», «bom estado», «funcionamento correto» e o limite de 150 mm que vinha da edição inexistente da EN 1493.
+- Na manutenção periódica de elevador, a nota de âmbito é o texto da reflexão (só manutenção preventiva). A declaração que se assina é só a receção. Os outros equipamentos mantêm a nota de três pontos, incluindo diagnóstico técnico.
+- No formulário de elevador deixam de aparecer as notas rápidas «bom estado geral», «desgaste normal» e «sem observações adicionais».
+- Relatórios já gravados não são reescritos. A montagem de elevadores e as checklists de outros equipamentos ficam como estavam.
+
+### Deploy
+- Ainda não publicado. Quando for: PWA, `send-email.php` e, por esta ordem, as migrações `2026-10-08-checklist-elevador-sem-citacao-norma.sql` e `2026-10-08-checklist-elevador-textos-preventiva.sql`.
+
+---
+
+## [1.17.22] — 2026-10-08 — Nota legal de colocação no mercado
+
+### Alteração
+- As perguntas de checklist de elevador deixam de citar EN 1493:2020 (edição inexistente), EN 16625 (número errado) e a diretiva ou o decreto como se a visita os verificasse. O ecrã, o PDF e o email aplicam esta limpeza também a relatórios já gravados. O texto assinado na base de dados não é reescrito.
+- A declaração antiga de elevador perde só a lista «nomeadamente EN 1493:2022…». A frase dos dois anos mantém-se. Emissões novas continuam com a declaração congelada, sem normas.
+- No fecho dos relatórios de manutenção de elevadores de automóveis, depois da declaração e antes das assinaturas, entra um quadro «Nota legal — colocação no mercado». Lista a Diretiva 2006/42/CE (até 19 de janeiro de 2027), o Decreto-Lei n.º 103/2008, a EN 1493:2010 (Jornal Oficial de 8 de abril de 2011; substituída pelo CEN em novembro de 2022), a EN 1493:2022 (sem citação no Jornal Oficial em 8 de outubro de 2026) e o Regulamento (UE) 2023/1230 (aplicação geral em 20 de janeiro de 2027). A nota informa o regime de colocação no mercado e não avalia o equipamento da visita.
+- Compressores e restantes equipamentos mantêm as suas citações. Reparações de elevador não levam o quadro.
+
+### Deploy
+- Ainda não publicado. Quando for: PWA `public_html/manut/`, `public_html/api/send-email.php`, e a migração `servidor-cpanel/migrations/2026-10-08-checklist-elevador-sem-citacao-norma.sql` nas linhas vivas de `checklist_items`. Sem essa SQL o ecrã e o PDF já mostram as perguntas limpas.
+
+---
+
+## [1.17.21] — 2026-10-08 — Elevadores: execução, observação e receção
+
+### Alteração
+- Na manutenção preventiva de elevadores, cada ponto distingue o que foi feito do que foi observado. Documentos (CE, manual, declaração, registo) têm estado próprio. O teste em funcionamento indica se correu sem carga ou com carga, e essa carga não é um ensaio formal.
+- Pontos que não existem na configuração (cabos ou redutor num hidráulico; circuito hidráulico num electromecânico) nascem como não aplicável, e o técnico pode alterar.
+- A visita grava, no próprio relatório, série confirmada, ano, capacidade comunicada, se a NAVEL forneceu e se a NAVEL instalou, a função de quem recebe e, se não houver assinatura, o canal alternativo.
+- Se for recomendada a não utilização, o calendário das próximas manutenções deixa isso escrito: as datas são planeamento e não autorizam o uso.
+- Normas ainda por validar (EN 1493, EN 16625, Regulamento 2023/1230) ficam num catálogo que o PDF não imprime. Relatórios antigos mantêm o texto que já tinham.
+
+### Deploy
+- Ainda não publicado. Quando for: PWA `public_html/manut/` e `public_html/api/send-email.php`. Sem migração de base de dados.
+
+---
+
+## [1.17.20] — 2026-10-08 — Relatório de manutenção preventiva de elevadores
+
+### Alteração
+- Qualquer relatório (manutenção, montagem ou reparação, de qualquer equipamento) abre com a nota «Âmbito e limites do serviço». A nota define o âmbito do documento e não fica reservada aos elevadores.
+- Manutenção periódica de elevadores: o PDF e o email passam a intitular-se «Relatório de Manutenção Preventiva».
+- Deixa de existir a caixa CONFORME / CONFORME COM RESERVAS / NÃO CONFORME nestas emissões novas. O estado é «concluída no âmbito», «parcial» ou «suspensa». Uma anomalia exige descrição e recomendação. Notas de «bom estado geral» ficam bloqueadas quando há anomalia.
+- A declaração de receção e o texto da nota ficam gravados no relatório. Documentos já emitidos, sem esta marca, abrem com o título, o veredito e a declaração anteriores.
+- Corrigir um relatório de elevador já assinado cria um aditamento (`…-A1`). O original e a assinatura não são reescritos.
+
+### Deploy
+- PWA `public_html/manut/` e `public_html/api/send-email.php` (paridade do PDF de email). Sem migração de base de dados: a marca da emissão vai dentro de `checklist_snapshot`.
+
+---
+
+## [1.17.19] — 2026-10-07 — Cópia das fotos no telemóvel
+
+### Correcção
+- **Fotografias tiradas na manutenção ou reparação:** cada foto da câmara é também descarregada para a pasta Transferências do telemóvel (`NAVEL_aaaammdd_hhmmss_n.jpg`), no mesmo toque, antes de comprimir para o relatório. A câmara aberta pelo browser não grava na galeria; sem esta cópia a imagem perde-se se o envio falhar.
+- O passo de fotos indica que a cópia fica em Transferências e pode ser escolhida outra vez em Galeria.
+
+### Deploy
+- PWA `public_html/manut/`. Sem alteração de PHP/API.
+
+---
+
+## [1.17.18] — 2026-10-07 — Gravar no telemóvel e sincronizar no terreno
+
+### Correcção
+- **Gravar manutenção:** o relatório, a conclusão e os dados ligados ficam escritos na fila do telemóvel antes de qualquer envio ao servidor. Se a rede falhar, o tempo esgotar ou o alojamento responder 508, o trabalho não é apagado.
+- **Sincronizar dados:** com operações por enviar, aparece uma barra fixa (por cima do formulário) com o botão «Sincronizar dados». O ecrã final diz «Guardado neste telemóvel» quando o servidor ainda não recebeu.
+- **Agenda automática:** uma manutenção em progresso já conta como slot aberto (deixa de nascer um duplicado vazio). As criações em falta vão num único envio, em vez de dezenas de pedidos em paralelo.
+- **Ligação:** um falhanço de rede já não deixa a aplicação presa em «Sem ligação» sem forma de reenviar. A fila volta a tentar ao abrir a aplicação e de 30 em 30 segundos.
+
+### Deploy
+- PWA `public_html/manut/`. Sem alteração de PHP/API.
+
+---
+
 ## [1.17.17] — 2026-10-06 — Avisos do wizard visíveis no telemóvel
 
 ### Correcção

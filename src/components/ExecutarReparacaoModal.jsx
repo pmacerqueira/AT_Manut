@@ -16,7 +16,8 @@ import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
-import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
+import { NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO } from '../domain/relatorioElevadorPreventivo'
+import { fileToMemory, comprimirFotoParaRelatorio, guardarFotoNoDispositivo } from '../utils/comprimirImagemRelatorio'
 import './ExecutarReparacaoModal.css'
 
 export default function ExecutarReparacaoModal({ reparacao, onClose }) {
@@ -250,6 +251,17 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     const ficheiros = files.slice(0, disponiveis)
     if (files.length > ficheiros.length) {
       showToast(`Só couberam mais ${ficheiros.length} foto(s) (máx. ${MAX_FOTOS}).`, 'warning')
+    }
+    const daCamera = fotoCameraRef.current && e.target === fotoCameraRef.current
+    if (daCamera) {
+      ficheiros.forEach((file, i) => guardarFotoNoDispositivo(file, fotos.length + i + 1))
+      showToast(
+        ficheiros.length === 1
+          ? 'Cópia guardada no telemóvel, na pasta Transferências.'
+          : `${ficheiros.length} cópias guardadas no telemóvel, na pasta Transferências.`,
+        'info',
+        4000,
+      )
     }
     setFotoCarregando(true)
     const novas = []
@@ -916,6 +928,12 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                     {resolveDeclaracaoCliente('reparacao', categoriaNome, declaracaoClienteDepois)}
                   </p>
                 </div>
+                <details className="declaracao-assinatura-box">
+                  <summary>{NOTA_AMBITO_TITULO}</summary>
+                  {NOTA_AMBITO_PONTOS.map(ponto => (
+                    <p key={ponto} className="declaracao-assinatura-texto">{ponto}</p>
+                  ))}
+                </details>
                 <div className="form-group">
                   <label>Nome do assinante <span className="required">*</span></label>
                   <div className="campo-com-guardar">

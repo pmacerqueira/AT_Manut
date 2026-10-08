@@ -134,30 +134,27 @@ export function createMaquinasHandlers(deps) {
     }
   }
 
-  const updateMaquina = async (id, data) => {
+  const updateMaquina = (id, data) => {
     let snapshot
     setMaquinas(prev => {
       snapshot = prev
       return mergeMaquinaInList(prev, id, data)
     })
-    try {
-      const { apiMaquinas } = await import('../../services/apiService')
-      let serverRow = null
-      await persist(
-        async () => {
-          serverRow = await apiMaquinas.update(id, data)
-        },
-        { resource: 'maquinas', action: 'update', id, data },
-        () => { if (snapshot) setMaquinas(snapshot) },
-        { throwOnFailure: true },
-      )
-      if (serverRow && typeof serverRow === 'object') {
-        setMaquinas(prev => mergeMaquinaInList(prev, id, serverRow))
-      }
-    } catch (err) {
+    return persist(
+      async () => {
+        const { apiMaquinas } = await import('../../services/apiService')
+        const serverRow = await apiMaquinas.update(id, data)
+        if (serverRow && typeof serverRow === 'object') {
+          setMaquinas(prev => mergeMaquinaInList(prev, id, serverRow))
+        }
+      },
+      { resource: 'maquinas', action: 'update', id, data },
+      () => { if (snapshot) setMaquinas(snapshot) },
+      { throwOnFailure: true },
+    ).catch(err => {
       logger.error('DataContext', 'updateMaquina', err?.message || 'Falha ao atualizar equipamento', { stack: err?.stack?.slice(0, 300) })
-      throw err
-    }
+      return { queued: false, uploaded: false }
+    })
   }
 
   const removeMaquina = (id) => {

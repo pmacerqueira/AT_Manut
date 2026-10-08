@@ -1,5 +1,5 @@
 -- Migração: Checklists completas para sub12 (Elevador electro-hidráulico de pesados 4 colunas móveis independentes)
--- Base: Manual Twin Busch TW 550/750 4C independentes, EN 1493:2020, DL 50/2005, DL 103/2008, Dir. 2006/42/CE
+-- Base: Manual Twin Busch TW 550/750 4C independentes e prática de manutenção preventiva
 -- Manual em inglês; instruções adaptadas para português
 
 -- 2. CHECKLIST MONTAGEM — sub12 (4 colunas móveis independentes)
@@ -16,8 +16,8 @@ INSERT INTO `checklist_items` (`id`, `subcategoria_id`, `tipo`, `grupo`, `ordem`
 ('ch12m10', 'sub12', 'montagem', 'hidraulica', 10, 'Óleo hidráulico HLP no reservatório (conforme manual do fabricante)'),
 ('ch12m11', 'sub12', 'montagem', 'hidraulica', 11, 'Unidade de bomba e cilindros telescópicos instalados em cada coluna'),
 ('ch12m12', 'sub12', 'montagem', 'seguranca', 12, 'Travas de segurança e cabo de segurança instalados e funcionais'),
-('ch12m13', 'sub12', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm) — EN 1493:2020'),
-('ch12m14', 'sub12', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE (Dir. 2006/42/CE)'),
+('ch12m13', 'sub12', 'montagem', 'seguranca', 13, 'Bloqueio dos braços (máx. 150 mm)'),
+('ch12m14', 'sub12', 'montagem', 'seguranca', 14, 'Marcação CE, manual em português e declaração CE'),
 ('ch12m15', 'sub12', 'montagem', 'electrica', 15, 'Verificação da tensão de alimentação e sequência de fases (RAV261)'),
 ('ch12m16', 'sub12', 'montagem', 'seguranca', 16, 'Sinalização de aviso e pictogramas de segurança visíveis'),
 ('ch12m17', 'sub12', 'montagem', 'teste', 17, 'Teste de sincronização das 4 colunas em subida e descida'),

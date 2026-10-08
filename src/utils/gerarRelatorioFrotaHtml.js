@@ -5,6 +5,7 @@
  * Para visualização/download PDF, usar gerarRelatorioFrotaPdf.
  */
 import { escapeHtml } from './sanitize'
+import { codigoResposta, itensDoSnapshot } from '../domain/relatorioElevadorPreventivo'
 import { formatDataAzores, parseDateLocal } from './datasAzores'
 import { cssBase, htmlHeader, htmlTituloBar, htmlFooter, PALETA } from './relatorioBaseStyles'
 import { ASSETS } from '../constants/assets'
@@ -123,8 +124,8 @@ export function gerarRelatorioFrotaHtml(cliente, maquinas, manutencoes, relatori
     if (manutsConclM.length >= 2) {
       const relsConcl = manutsConclM.slice(0, TENDENCIA_HISTORICO_MAX).map(mt => relMap.get(normEntityId(mt.id))).filter(Boolean)
       const anomaliasTotal = relsConcl.reduce((n, r) => {
-        const snap = r.checklistSnapshot ?? []
-        return n + snap.filter(item => r.checklistRespostas?.[item.id] === 'nao').length
+        const snap = itensDoSnapshot(r.checklistSnapshot)
+        return n + snap.filter(item => codigoResposta(r.checklistRespostas?.[item.id]) === 'nao').length
       }, 0)
       if (emAtraso) {
         tendencia = { nivel: 'critico', texto: '⚠ Atraso', cor: PALETA.vermelho }

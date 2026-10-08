@@ -30,7 +30,7 @@ import { enviarRelatorioEmail } from '../services/emailService'
 import { MAX_FOTOS } from '../config/limits'
 import { buildRelatorioManutencaoPdfArgs, buildRelatorioManutencaoEmailArgs } from '../utils/relatorioManutencaoPayload'
 import { candidatosMesmaDataMinimaAberta } from '../utils/proximaManutAgenda'
-import { fileToMemory, comprimirFotoParaRelatorio } from '../utils/comprimirImagemRelatorio'
+import { fileToMemory, comprimirFotoParaRelatorio, guardarFotoNoDispositivo } from '../utils/comprimirImagemRelatorio'
 import {
   horasContadorNaFicha,
   horasContadorNaManutencao,
@@ -63,6 +63,28 @@ import {
   findOpcaoAssinante,
 } from '../domain/clienteAssinantesSecao.js'
 import { desenharAssinaturaNoCanvas } from '../utils/desenharAssinaturaCanvas.js'
+import { categoriaNomeFromMaquina } from '../constants/relatorio'
+import {
+  aplicarForaDeServico,
+  aplicaModeloElevadorPreventivo,
+  checklistEstaCompleta,
+  contextoEmissaoFromForm,
+  emissaoDoRelatorio,
+  fundamentoInaplicavel,
+  mensagemNotasContraditoriasElevador,
+  mensagemPedidoForaAmbito,
+  NOTA_AMBITO_PONTOS,
+  NOTA_AMBITO_TITULO,
+  notasRapidasParaElevador,
+  pontosNotaAmbito,
+  numeroAditamento,
+  respostaInaplicavel,
+  snapshotChecklistParaRelatorio,
+  temAnomaliaChecklist,
+  textoDeclaracaoElevadorNovo,
+  TITULO_RECECAO_ELEVADOR,
+  validarChecklistElevador,
+} from '../domain/relatorioElevadorPreventivo.js'
 
 export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, maquina, adminEdit = false, quickEdit = false }) {
   const { isAdmin } = usePermissions()
@@ -104,6 +126,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     tipoManutKaeser: '',
     pecasUsadas: [],
     dataRealizacao: '', // Admin only — data histórica (YYYY-MM-DD); vazio = usa data de hoje
+    estadoManutencaoElevador: 'concluida_ambito',
+    funcaoAssinante: '',
+    assinaturaRecusada: false,
+    canalAlternativo: '',
+    serieConfirmada: '',
+    anoFabrico: '',
+    capacidadeComunicada: '',
+    fornecidoPelaNavel: '',
+    instaladoPelaNavel: '',
+    pedidoSoPreventiva: false,
+    pedidoExtra: '',
+    pedidoExtraDescricao: '',
+    limitacoesAdmissao: '',
   })
   const [fotos, setFotos] = useState([])
   const [fotoCarregando, setFotoCarregando] = useState(false)
@@ -166,6 +201,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const maq = maquina
   const cli = useMemo(() => clientes.find(c => c.nif === maq?.clienteNif) ?? null, [clientes, maq?.clienteNif])
   const items = maq ? getChecklistBySubcategoria(maq.subcategoriaId, manutencaoAtual?.tipo || 'periodica') : []
+  const modoElevador = aplicaModeloElevadorPreventivo({
+    categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
+    tipoManutencao: manutencaoAtual?.tipo,
+  })
   const rel   = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
   const assinanteSecao = useMemo(() => {
     if (!maq) return { multiSecao: false, opcoes: [], secaoDetectada: null }
@@ -374,8 +413,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setPreFilledFromLast(isPreFilled)
 
     const prefillMap = normalizarChecklistRespostasMap(fontePreFill?.checklistRespostas)
+    const elevadorBootstrap = aplicaModeloElevadorPreventivo({
+      categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
+      tipoManutencao: tipoAtual,
+    })
     checklistItems.forEach((it) => {
-      checklistRespostas[it.id] = prefillMap[it.id] ?? prefillMap[String(it.id)] ?? ''
+      let prev = prefillMap[it.id] ?? prefillMap[String(it.id)] ?? ''
+      if (!existingRel && elevadorBootstrap && (typeof prev !== 'object' || !prev?.papel)) prev = ''
+      if (prev === '' && elevadorBootstrap) {
+        const fund = fundamentoInaplicavel(it, maq?.subcategoriaId)
+        if (fund) prev = respostaInaplicavel(it, fund)
+      }
+      checklistRespostas[it.id] = prev
     })
     const tipoAutoCiclo = isKaeserAbcdMaquina(maq) && maq.posicaoKaeser != null
       ? tipoKaeserNaPosicao(maq.posicaoKaeser)
@@ -449,6 +498,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         ? ((existingRel.dataAssinatura || existingRel.dataCriacao || '').slice(0, 10) || m?.data || '')
         : (m?.data || ''),
       limparAssinatura: false,
+      estadoManutencaoElevador: emissaoDoRelatorio(existingRel)?.estado || 'concluida_ambito',
+      funcaoAssinante: emissaoDoRelatorio(existingRel)?.funcaoAssinante || '',
+      assinaturaRecusada: !!emissaoDoRelatorio(existingRel)?.assinaturaRecusada,
+      canalAlternativo: emissaoDoRelatorio(existingRel)?.canalAlternativo || '',
+      serieConfirmada: emissaoDoRelatorio(existingRel)?.serieConfirmada || '',
+      anoFabrico: emissaoDoRelatorio(existingRel)?.anoFabrico || (maq?.anoFabrico ? String(maq.anoFabrico) : ''),
+      capacidadeComunicada: emissaoDoRelatorio(existingRel)?.capacidadeComunicada || '',
+      fornecidoPelaNavel: emissaoDoRelatorio(existingRel)?.fornecidoPelaNavel || '',
+      instaladoPelaNavel: emissaoDoRelatorio(existingRel)?.instaladoPelaNavel || '',
+      pedidoSoPreventiva: !!emissaoDoRelatorio(existingRel)?.pedidoSoPreventiva,
+      pedidoExtra: emissaoDoRelatorio(existingRel)?.pedidoExtra || '',
+      pedidoExtraDescricao: emissaoDoRelatorio(existingRel)?.pedidoExtraDescricao || '',
+      limitacoesAdmissao: emissaoDoRelatorio(existingRel)?.limitacoesAdmissao || '',
     }
     setForm(nextForm)
     setFotos(nextFotos)
@@ -681,6 +743,17 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (files.length > ficheiros.length) {
       showToast(`Só couberam mais ${ficheiros.length} foto(s) (máx. ${MAX_FOTOS} por relatório).`, 'warning')
     }
+    const daCamera = fotoCameraRef.current && e.target === fotoCameraRef.current
+    if (daCamera) {
+      ficheiros.forEach((file, i) => guardarFotoNoDispositivo(file, fotos.length + i + 1))
+      showToast(
+        ficheiros.length === 1
+          ? 'Cópia guardada no telemóvel, na pasta Transferências.'
+          : `${ficheiros.length} cópias guardadas no telemóvel, na pasta Transferências.`,
+        'info',
+        4000,
+      )
+    }
     setFotoCarregando(true)
     const novas = []
     try {
@@ -707,12 +780,50 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   // ── Wizard: validação por etapa + navegação ──────────────────────────────
   const validateStep = useCallback((s) => {
     const validarChecklistCompleta = () => {
-      const todasMarcadas = items.length === 0 || items.every(it =>
-        form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
-      )
-      if (!todasMarcadas) {
-        avisarBloqueio('Todas as linhas da checklist devem ser verificadas.')
+      if (!checklistEstaCompleta(items, form.checklistRespostas, { elevador: modoElevador })) {
+        avisarBloqueio(modoElevador
+          ? 'Preencha a execução e a observação de todos os pontos.'
+          : 'Todas as linhas da checklist devem ser verificadas.')
         return false
+      }
+      if (modoElevador) {
+        const erroElev = validarChecklistElevador(items, form.checklistRespostas)[0]
+        if (erroElev) {
+          avisarBloqueio(erroElev)
+          return false
+        }
+        if (!form.pedidoSoPreventiva) {
+          avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
+          return false
+        }
+        const msgPedido = mensagemPedidoForaAmbito(form)
+        if (msgPedido) {
+          avisarBloqueio(msgPedido)
+          return false
+        }
+        if (!form.serieConfirmada) {
+          avisarBloqueio('Indique se a série foi confirmada no local.')
+          return false
+        }
+      }
+      setErroChecklist('')
+      return true
+    }
+    const validarNotasPasso = () => {
+      const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
+      if (msgNotas) {
+        avisarBloqueio(msgNotas)
+        return false
+      }
+      if (modoElevador) {
+        const msgContra = mensagemNotasContraditoriasElevador(
+          form.notas,
+          temAnomaliaChecklist(items, form.checklistRespostas),
+        )
+        if (msgContra) {
+          avisarBloqueio(msgContra)
+          return false
+        }
       }
       setErroChecklist('')
       return true
@@ -768,15 +879,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         return true
       }
       if (s === W.checklist) return validarChecklistCompleta()
-      if (s === W.notas) {
-        const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
-        if (msgNotas) {
-          avisarBloqueio(msgNotas)
-          return false
-        }
-        setErroChecklist('')
-        return true
-      }
+      if (s === W.notas) return validarNotasPasso()
       if (s === W.fotos) {
         if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
           setConfirmacaoPendente('fotos')
@@ -823,15 +926,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     if (s === W.checklist) return validarChecklistCompleta()
-    if (s === W.notas) {
-      const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
-      if (msgNotas) {
-        avisarBloqueio(msgNotas)
-        return false
-      }
-      setErroChecklist('')
-      return true
-    }
+    if (s === W.notas) return validarNotasPasso()
     if (s === W.fotos) {
       if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
         setConfirmacaoPendente('fotos')
@@ -875,7 +970,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return true
     }
     return true
-  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes, avisarBloqueio, showToast])
+  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes, avisarBloqueio, showToast, modoElevador])
 
   const goNext = useCallback(() => {
     if (step >= W.total) return
@@ -993,9 +1088,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         ? `${dataExecPreview}T12:00:00.000Z`
         : (rel?.dataCriacao ?? nowISO())
       const hPreview = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
+      const respostasPreview = modoElevador ? aplicarForaDeServico(items, form.checklistRespostas) : form.checklistRespostas
       const tempRel = {
         ...rel,
-        checklistRespostas: form.checklistRespostas,
+        checklistRespostas: respostasPreview,
         notas: form.notas,
         fotos,
         tecnico: form.tecnico,
@@ -1007,6 +1103,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         ...(hPreview != null && { horasLeituraContador: hPreview }),
         ...(form.tipoManutKaeser && { tipoManutKaeser: form.tipoManutKaeser }),
         ...(form.pecasUsadas.length > 0 && { pecasUsadas: sanitizarPecasRelatorio(form.pecasUsadas) }),
+        ...(modoElevador ? {
+          checklistSnapshot: snapshotChecklistParaRelatorio(items, {
+            modeloElevador: true,
+            estado: form.estadoManutencaoElevador,
+            contexto: contextoEmissaoFromForm({ ...form, checklistRespostas: respostasPreview }, items),
+          }),
+        } : {}),
         ...(isKaeserAbcdMaq && form.tipoManutKaeser
           ? (() => {
               const aud = kaeserAuditoriaRef.current
@@ -1044,7 +1147,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
   }, [previewPdfUrl, maq, clientes, rel, form, fotos, assinaturaFeita, signatureClearedByUser, manutencaoAtual, items, getSubcategoria, getCategoria, getTecnicoByNome, marcas, showToast, isKaeserAbcdMaq])
 
-  const gravar = (semAssinatura = false, enviarEmailAoGravar = true) => {
+  const gravar = async (semAssinatura = false, enviarEmailAoGravar = true) => {
     setErroChecklist('')
     setErroAssinatura('')
     if (!manutencaoAtual || !maq) return
@@ -1102,17 +1205,59 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         showToast(msgNotasGravar, 'warning', 4000)
         return
       }
+      if (modoElevador) {
+        const msgContra = mensagemNotasContraditoriasElevador(
+          form.notas,
+          temAnomaliaChecklist(items, form.checklistRespostas),
+        )
+        if (msgContra) {
+          showToast(msgContra, 'warning', 5000)
+          return
+        }
+      }
     }
 
-    const todasMarcadas = items.length === 0 || items.every(it =>
-      form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
-    )
+    const todasMarcadas = checklistEstaCompleta(items, form.checklistRespostas, { elevador: modoElevador })
     if (!todasMarcadas) {
-      avisarBloqueio('Todas as linhas da checklist devem ser verificadas pelo utilizador.')
+      avisarBloqueio(modoElevador
+        ? 'Preencha a execução e a observação de todos os pontos.'
+        : 'Todas as linhas da checklist devem ser verificadas pelo utilizador.')
       return
+    }
+    if (modoElevador) {
+      const erroElev = validarChecklistElevador(items, form.checklistRespostas)[0]
+      if (erroElev) {
+        avisarBloqueio(erroElev)
+        return
+      }
+      if (!form.pedidoSoPreventiva) {
+        avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
+        return
+      }
+      const msgPedido = mensagemPedidoForaAmbito(form)
+      if (msgPedido) {
+        avisarBloqueio(msgPedido)
+        return
+      }
+      if (!form.serieConfirmada) {
+        avisarBloqueio('Indique se a série foi confirmada no local.')
+        return
+      }
     }
     if (!form.tecnico) {
       avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
+      return
+    }
+    if (modoElevador && semAssinatura && !String(form.canalAlternativo || '').trim()) {
+      avisarBloqueio('Indique o canal alternativo porque o cliente não assinou.', 'assinatura')
+      return
+    }
+    if (modoElevador && !semAssinatura && form.assinaturaRecusada) {
+      avisarBloqueio('Desmarque «o cliente não assina» ou grave sem assinatura.', 'assinatura')
+      return
+    }
+    if (modoElevador && !semAssinatura && !String(form.funcaoAssinante || '').trim()) {
+      avisarBloqueio('Indique a função de quem recebe o relatório.', 'assinatura')
       return
     }
     if (!semAssinatura) {
@@ -1175,9 +1320,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         : (pecasSanGravar.length > 0 ? pecasSanGravar : undefined)
     const hContadorRel = temContadorHoras ? parseHorasContadorForm(form.horasServico) : null
 
+    const respostasGravar = modoElevador ? aplicarForaDeServico(items, form.checklistRespostas) : form.checklistRespostas
     const relPayload = {
-      checklistRespostas: form.checklistRespostas,
-      checklistSnapshot: items.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
+      checklistRespostas: respostasGravar,
+      checklistSnapshot: snapshotChecklistParaRelatorio(items, {
+        modeloElevador: modoElevador,
+        estado: form.estadoManutencaoElevador,
+        contexto: modoElevador
+          ? contextoEmissaoFromForm({ ...form, checklistRespostas: respostasGravar }, items, { assinaturaRecusada: semAssinatura || !!form.assinaturaRecusada })
+          : null,
+      }),
       notas: form.notas.slice(0, 300),
       fotos,
       tecnico: form.tecnico,
@@ -1216,6 +1368,29 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     // para ser passado ao logger e ao serviço de email (evita "undefined"/"S/N").
     let numeroRelatorioFinal
     let relIdFinal
+    const envios = []
+    const fecharAposEnvio = async (variantSeServidor) => {
+      const results = await Promise.all(envios.filter(Boolean).map(p =>
+        Promise.resolve(p)
+          .then(r => (r && typeof r === 'object' && 'uploaded' in r) ? r : { uploaded: true })
+          .catch(() => ({ uploaded: false, queued: true })),
+      ))
+      const ficouNoTelefone = results.some(r => r.uploaded === false && r.queued)
+      const falhou = results.some(r => r.uploaded === false && !r.queued)
+      if (ficouNoTelefone) {
+        setConclusaoVariant('guardado_no_telemovel')
+        showToast('Guardado neste telemóvel. Toque em Sincronizar dados para enviar ao servidor.', 'warning', 7000)
+        setConcluido(true)
+        return true
+      }
+      if (falhou) {
+        showToast('Alguns dados não foram guardados. Tente outra vez.', 'error', 6000)
+        setConcluido(true)
+        return true
+      }
+      if (variantSeServidor) setConclusaoVariant(variantSeServidor)
+      return false
+    }
     if (rel) {
       const anoExecucao = new Date(now).getFullYear()
       const anoRelatorio = parseInt(rel.numeroRelatorio?.split('.')[0], 10)
@@ -1232,11 +1407,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         const next = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1
         relPayload.numeroRelatorio = `${anoExecucao}.${prefix}.${String(next).padStart(5, '0')}`
       }
-      updateRelatorio(rel.id, relPayload)
+      envios.push(updateRelatorio(rel.id, relPayload))
       relIdFinal = rel.id
       numeroRelatorioFinal = relPayload.numeroRelatorio || rel.numeroRelatorio
     } else {
       const resultado = addRelatorio({ manutencaoId: manutencaoAtual.id, ...relPayload })
+      envios.push(resultado.envio)
       relIdFinal = resultado.id
       numeroRelatorioFinal = resultado.numeroRelatorio
     }
@@ -1253,7 +1429,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         manutPatch.horasTotais = hCont
       }
     }
-    updateManutencao(manutencaoAtual.id, manutPatch)
+    envios.push(updateManutencao(manutencaoAtual.id, manutPatch))
 
     if (!semAssinatura && maq?.clienteNif) {
       const clienteUpdate = {}
@@ -1261,7 +1437,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       if (nomeTrimmed) clienteUpdate.nomeContacto = nomeTrimmed
       if (assinaturaDataUrl) clienteUpdate.assinaturaContacto = assinaturaDataUrl
       if (Object.keys(clienteUpdate).length > 0) {
-        updateCliente(maq.clienteNif, clienteUpdate)
+        envios.push(updateCliente(maq.clienteNif, clienteUpdate))
       }
     }
 
@@ -1324,7 +1500,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     // Se for montagem com periodicidade: calcular datas e verificar conflitos antes de confirmar
     if (manutencaoAtual.tipo === 'montagem' && manutencaoAtual.periodicidade) {
       updateMaqData.periodicidadeManut = manutencaoAtual.periodicidade
-      updateMaquina(maq.id, updateMaqData)
+      envios.push(updateMaquina(maq.id, updateMaqData))
 
       const resultado = prepararManutencoesPeriodicas({
         ...manutencaoAtual,
@@ -1337,10 +1513,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         setConflitosAgendamento(resultado)
       } else {
         // Sem conflitos: confirmar imediatamente
-        const n = confirmarManutencoesPeriodicas(resultado.novas)
-        setManutAgendadas(n)
-        setConclusaoVariant('executada')
-        showToast('Dados gravados com sucesso.', 'success', 5000)
+        const conf = confirmarManutencoesPeriodicas(resultado.novas)
+        envios.push(conf?.envio)
+        setManutAgendadas(conf?.count ?? 0)
+        const ficou = await fecharAposEnvio('executada')
+        if (!ficou) showToast('Dados gravados com sucesso.', 'success', 5000)
         setConcluido(true)
       }
       return
@@ -1351,10 +1528,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       updateMaqData.periodicidadeManut = manutencaoAtual.periodicidade
     }
 
-    updateMaquina(maq.id, updateMaqData)
+    envios.push(updateMaquina(maq.id, updateMaqData))
 
     if (manutencaoAtual.tipo === 'periodica' && periodicidadeRecalc) {
-      const n = recalcularPeriodicasAposExecucao(maq.id, periodicidadeRecalc, hoje, form.tecnico)
+      const rec = recalcularPeriodicasAposExecucao(maq.id, periodicidadeRecalc, hoje, form.tecnico)
+      const n = rec?.novaCount ?? 0
+      if (Array.isArray(rec?.envios)) envios.push(...rec.envios)
       if (n > 0) {
         logger.action('ExecutarManutencaoModal', 'reagendarPeriodicas',
           `${n} periódicas reagendadas para ${maq.marca ?? ''} ${maq.modelo ?? ''} a partir de ${hoje}`,
@@ -1364,16 +1543,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     if (semAssinatura) {
-      setConclusaoVariant('executada')
-      showToast('Dados gravados com sucesso.', 'success', 5000)
+      const ficou = await fecharAposEnvio('executada')
+      if (!ficou) showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
       return
     }
 
     // Gravar sem enviar email — concluir processo técnico sem envio
     if (!enviarEmailAoGravar) {
-      setConclusaoVariant('gravado_sem_email')
-      showToast('Dados gravados com sucesso.', 'success', 5000)
+      const ficou = await fecharAposEnvio('gravado_sem_email')
+      if (!ficou) showToast('Dados gravados com sucesso.', 'success', 5000)
       setConcluido(true)
       return
     }
@@ -1426,6 +1605,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return
     }
 
+    const ficouNoTelefone = await fecharAposEnvio(null)
+    if (ficouNoTelefone) return
+
     setConclusaoVariant('email_enviando')
     showToast('Dados gravados. A enviar email ao cliente…', 'info', 3500)
     const relAtualizado = { ...relPayload, manutencaoId: manutencaoAtual.id, numeroRelatorio: numeroRelatorioFinal }
@@ -1463,12 +1645,40 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       showToast('Selecione o técnico responsável.', 'warning')
       return
     }
-    const todasMarcadasAdmin = items.length === 0 || items.every(it =>
-      form.checklistRespostas[it.id] === 'sim' || form.checklistRespostas[it.id] === 'nao'
-    )
+    const todasMarcadasAdmin = checklistEstaCompleta(items, form.checklistRespostas, { elevador: modoElevador })
     if (!todasMarcadasAdmin) {
-      showToast('Preencha toda a checklist (Sim/Não).', 'warning')
+      showToast(modoElevador
+        ? 'Preencha a execução e a observação de todos os pontos.'
+        : 'Preencha toda a checklist (Sim/Não).', 'warning')
       return
+    }
+    if (modoElevador) {
+      const erroElev = validarChecklistElevador(items, form.checklistRespostas)[0]
+      if (erroElev) {
+        showToast(erroElev, 'warning', 5000)
+        return
+      }
+      if (!form.pedidoSoPreventiva) {
+        showToast('Confirme que o pedido desta visita é manutenção preventiva.', 'warning')
+        return
+      }
+      const msgPedidoAdmin = mensagemPedidoForaAmbito(form)
+      if (msgPedidoAdmin) {
+        showToast(msgPedidoAdmin, 'warning', 5000)
+        return
+      }
+      if (!form.serieConfirmada) {
+        showToast('Indique se a série foi confirmada no local.', 'warning')
+        return
+      }
+      const msgContra = mensagemNotasContraditoriasElevador(
+        form.notas,
+        temAnomaliaChecklist(items, form.checklistRespostas),
+      )
+      if (msgContra) {
+        showToast(msgContra, 'warning', 5000)
+        return
+      }
     }
     const msgNotasAdmin = mensagemObservacoesInsuficientes(form.notas, quickNotes)
     if (msgNotasAdmin) {
@@ -1483,9 +1693,47 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
     }
 
+    if (modoElevador && rel.assinadoPeloCliente) {
+      const numAd = numeroAditamento(rel.numeroRelatorio, todosRelatorios)
+      const respostasAditamento = aplicarForaDeServico(items, form.checklistRespostas)
+      addRelatorio({
+        manutencaoId: manutencaoAtual.id,
+        numeroRelatorio: numAd,
+        checklistRespostas: respostasAditamento,
+        checklistSnapshot: snapshotChecklistParaRelatorio(items, {
+          modeloElevador: true,
+          estado: form.estadoManutencaoElevador,
+          retificaDe: rel.id,
+          retificaNumero: rel.numeroRelatorio,
+          contexto: contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAditamento }, items, { assinaturaRecusada: true }),
+        }),
+        notas: form.notas.slice(0, 300),
+        fotos,
+        tecnico: form.tecnico,
+        nomeAssinante: '',
+        assinadoPeloCliente: false,
+        assinaturaDigital: null,
+        dataAssinatura: null,
+        dataCriacao: nowISO(),
+      })
+      logger.action('ExecutarManutencaoModal', 'aditamentoElevador', `Aditamento ${numAd} do relatório ${rel.numeroRelatorio}`, {
+        manutencaoId: manutencaoAtual.id,
+        numeroRelatorio: numAd,
+        retificaNumero: rel.numeroRelatorio,
+      })
+      showToast(`Aditamento ${numAd} criado. O relatório ${rel.numeroRelatorio} e a assinatura mantêm-se.`, 'success', 7000)
+      onClose()
+      return
+    }
+
+    const respostasAdmin = modoElevador ? aplicarForaDeServico(items, form.checklistRespostas) : form.checklistRespostas
     const relPayload = {
-      checklistRespostas: form.checklistRespostas,
-      checklistSnapshot: items.map(it => ({ id: it.id, texto: it.texto, ordem: it.ordem, grupo: it.grupo ?? null })),
+      checklistRespostas: respostasAdmin,
+      checklistSnapshot: snapshotChecklistParaRelatorio(items, {
+        modeloElevador: modoElevador,
+        estado: form.estadoManutencaoElevador,
+        contexto: modoElevador ? contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAdmin }, items) : null,
+      }),
       notas: form.notas.slice(0, 300),
       fotos,
       tecnico: form.tecnico,
@@ -1586,9 +1834,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (manutencaoAtual.tipo === 'periodica' && dataRecalc) {
       const periodicidade = maq.periodicidadeManut || manutencaoAtual.periodicidade
       if (periodicidade) {
-        const n = recalcularPeriodicasAposExecucao(maq.id, periodicidade, dataRecalc, form.tecnico, {
+        const rec = recalcularPeriodicasAposExecucao(maq.id, periodicidade, dataRecalc, form.tecnico, {
           ultimaManutencaoData: dataRecalc,
         })
+        const n = rec?.novaCount ?? 0
         if (n > 0) {
           showToast(`${n} manutenções futuras reagendadas a partir de ${dataRecalc}.`, 'info', 2500)
         }
@@ -1714,12 +1963,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const relFinal = manutencaoAtual ? getRelatorioByManutencao(manutencaoAtual.id) : null
     const foiSemAssinatura = relFinal && !relFinal.assinadoPeloCliente
     const tituloConclusao =
-      conclusaoVariant === 'gravado_sem_email' ? 'Dados gravados com sucesso'
+      conclusaoVariant === 'guardado_no_telemovel' ? 'Guardado neste telemóvel'
+      : conclusaoVariant === 'gravado_sem_email' ? 'Dados gravados com sucesso'
       : conclusaoVariant === 'email_enviado' ? 'Manutenção executada e email enviado'
       : conclusaoVariant === 'email_falhou' ? 'Manutenção executada; email não enviado'
       : 'Manutenção executada!'
     const textoConclusao =
-      conclusaoVariant === 'gravado_sem_email'
+      conclusaoVariant === 'guardado_no_telemovel'
+        ? 'O relatório ficou guardado neste telemóvel. O envio ao servidor ainda não concluiu. Toque em Sincronizar dados — o botão fica visível até o envio terminar.'
+      : conclusaoVariant === 'gravado_sem_email'
         ? 'O relatório foi guardado; o email ao cliente não foi enviado. Pode enviar o comprovativo mais tarde a partir da lista de manutenções.'
       : conclusaoVariant === 'email_enviado'
         ? 'Relatório gravado, assinado e enviado ao cliente. A intervenção fica marcada como enviada ao cliente.'
@@ -1759,7 +2011,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         const slot = horarios[conf.existentes] // posição do novo serviço (no fim da fila)
         return { ...n, observacoes: `Agendamento automático pós-montagem. Horário sugerido: ${slot}` }
       })
-      const count = confirmarManutencoesPeriodicas(novasAjustadas)
+      const count = confirmarManutencoesPeriodicas(novasAjustadas)?.count ?? 0
       setConflitosAgendamento(null)
       setManutAgendadas(count)
       setConclusaoVariant('executada')
@@ -1789,7 +2041,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         diasOcupados.add(iso)
         return { ...n, data: iso }
       })
-      const count = confirmarManutencoesPeriodicas(novasAjustadas)
+      const count = confirmarManutencoesPeriodicas(novasAjustadas)?.count ?? 0
       setConflitosAgendamento(null)
       setManutAgendadas(count)
       setConclusaoVariant('executada')
@@ -1798,7 +2050,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     const resolverIgnorando = () => {
-      const count = confirmarManutencoesPeriodicas(novas)
+      const count = confirmarManutencoesPeriodicas(novas)?.count ?? 0
       setConflitosAgendamento(null)
       setManutAgendadas(count)
       setConclusaoVariant('executada')
@@ -2152,6 +2404,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             isKaeserAbcdMaq={isKaeserAbcdMaq}
             manutencaoAtual={manutencaoAtual}
             aplicarTipoKaeserComPecas={aplicarTipoKaeserComPecas}
+            modoElevador={modoElevador}
           />
 
           <NotasStep
@@ -2161,7 +2414,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             stepNotas={W.notas}
             form={form}
             setForm={setForm}
-            quickNotes={quickNotes}
+            quickNotes={modoElevador ? notasRapidasParaElevador(quickNotes) : quickNotes}
             confirmacaoPendente={confirmacaoPendente}
             setConfirmacaoPendente={setConfirmacaoPendente}
             erroChecklist={erroChecklist}
@@ -2203,6 +2456,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             cli={cli}
             getSubcategoria={getSubcategoria}
             getCategoria={getCategoria}
+            declaracaoTitulo={modoElevador ? TITULO_RECECAO_ELEVADOR : ''}
+            declaracaoTexto={modoElevador ? textoDeclaracaoElevadorNovo() : ''}
+            notaAmbito={{
+              titulo: NOTA_AMBITO_TITULO,
+              pontos: modoElevador
+                ? pontosNotaAmbito({
+                    categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
+                    tipoManutencao: manutencaoAtual?.tipo,
+                  })
+                : NOTA_AMBITO_PONTOS,
+              aberto: modoElevador,
+            }}
             onGuardarNomeContacto={guardarNomeContacto}
             opcoesAssinanteSecao={assinanteSecao.opcoes}
             secaoDetectada={assinanteSecao.secaoDetectada}
