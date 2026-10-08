@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   aplicaNotaLegalColocacao,
   limparCitacaoNormaChecklist,
+  NOTA_LEGAL_COLOCACAO_FONTES,
   NOTA_LEGAL_COLOCACAO_LINHAS,
 } from '../../src/domain/notaLegalColocacaoMercado.js'
 
@@ -46,5 +47,11 @@ describe('nota legal de colocação no mercado', () => {
     assert.doesNotMatch(texto, /EN 1493:2020/)
     assert.doesNotMatch(texto, /EN 16625/)
     assert.doesNotMatch(texto, /ISO 16625/)
+    assert.doesNotMatch(texto, /50\/2005/)
+    const fontes = NOTA_LEGAL_COLOCACAO_FONTES.map(f => f.url).join('\n')
+    assert.match(fontes, /decreto-lei\/50-2005-584397/)
+    assert.match(fontes, /decreto-lei\/103-2008-456188/)
+    assert.match(fontes, /eli\/reg\/2023\/1230/)
+    assert.match(fontes, /ipq\.pt\/servicos-ipq\/consultar-o-catalogo-de-normas/)
   })
 })

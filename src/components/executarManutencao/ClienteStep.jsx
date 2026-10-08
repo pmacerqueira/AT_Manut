@@ -24,6 +24,7 @@ export default function ClienteStep({
   declaracaoTitulo = '',
   declaracaoTexto = '',
   notaAmbito = null,
+  exigeComunicacaoUrgente = false,
 }) {
   const multiSecao = opcoesAssinanteSecao.length > 0
   const nomeNorm = normTexto(form.nomeAssinante)
@@ -146,6 +147,29 @@ export default function ClienteStep({
             />
             O cliente não assina neste momento
           </label>
+          {exigeComunicacaoUrgente && (
+            <label className="form-section">
+              Comunicação da recomendação urgente
+              <select
+                value={form.comunicacaoUrgente || ''}
+                onChange={e => setForm(f => ({ ...f, comunicacaoUrgente: e.target.value }))}
+              >
+                <option value="">—</option>
+                <option value="email">Pelo envio deste relatório por email</option>
+                <option value="outro">Outro canal, já nesta visita</option>
+              </select>
+              {form.comunicacaoUrgente === 'outro' && (
+                <input
+                  type="text"
+                  value={form.comunicacaoUrgenteNota || ''}
+                  maxLength={160}
+                  placeholder="Presencial, telefone ou outro meio"
+                  onChange={e => setForm(f => ({ ...f, comunicacaoUrgenteNota: e.target.value }))}
+                />
+              )}
+              <span className="form-hint">Não depende da assinatura. O email só conta se o relatório for enviado agora.</span>
+            </label>
+          )}
           {form.assinaturaRecusada && (
             <label className="form-section">
               Canal alternativo da receção

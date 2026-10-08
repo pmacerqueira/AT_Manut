@@ -16,9 +16,17 @@ import MaquinaDocumentacaoLinks from './MaquinaDocumentacaoLinks'
 import { Hammer, X, Camera, FolderOpen, PenLine, Trash2, Plus, CheckCircle2, Mail, AlertTriangle, FileText, Eye, Bookmark } from 'lucide-react'
 import { MAX_FOTOS } from '../config/limits'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
-import { NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO } from '../domain/relatorioElevadorPreventivo'
+import { NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, fotosComChapa, mensagemFotoChapa, mensagemFotosEquipamento } from '../domain/relatorioElevadorPreventivo'
+import FotoChapaCampo from './executarManutencao/FotoChapaCampo'
 import { fileToMemory, comprimirFotoParaRelatorio, guardarFotoNoDispositivo } from '../utils/comprimirImagemRelatorio'
 import './ExecutarReparacaoModal.css'
+
+function snapshotReparacao(items, temChapa) {
+  return JSON.stringify({
+    itens: items.map(it => ({ id: it.id, texto: it.texto ?? it.nome, ordem: it.ordem, grupo: it.grupo ?? null })),
+    fotoChapa: !!temChapa,
+  })
+}
 
 export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const { isAdmin } = usePermissions()
@@ -97,6 +105,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   })
   const [pecas, setPecas]         = useState([{ codigo: '', descricao: '', quantidade: 1 }])
   const [fotos, setFotos]         = useState([])
+  const [fotoChapa, setFotoChapa] = useState('')
   const [fotoCarregando, setFotoCarregando] = useState(false)
   const [erroChecklist, setErroChecklist]   = useState('')
   const [erroAssinatura, setErroAssinatura] = useState('')
@@ -113,6 +122,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   const lastPosRef  = useRef({ x: 0, y: 0 })
   const fotoInputRef = useRef(null)
   const fotoCameraRef = useRef(null)
+  const chapaInputRef = useRef(null)
   const initRef = useRef(null)
 
   // ── Carregar relatório existente (se já foi iniciado antes) ─────────────
@@ -150,7 +160,14 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       try {
         const f = typeof existente.fotos === 'string'
           ? JSON.parse(existente.fotos) : existente.fotos
-        if (Array.isArray(f)) setFotos(f)
+        if (Array.isArray(f)) {
+          setFotos(f)
+          let snap = existente.checklistSnapshot
+          if (typeof snap === 'string') {
+            try { snap = JSON.parse(snap) } catch { snap = null }
+          }
+          if (snap && !Array.isArray(snap) && snap.fotoChapa && f[0]) setFotoChapa(f[0])
+        }
       } catch { /* manter padrão */ }
     }
   }, [reparacao.id, getRelatorioByReparacao])
@@ -282,7 +299,31 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     }
   }
 
-  const removerFoto = (idx) => setFotos(prev => prev.filter((_, i) => i !== idx))
+  const removerFoto = (idx) => {
+    const alvo = fotos[idx]
+    setFotos(prev => prev.filter((_, i) => i !== idx))
+    if (alvo && alvo === fotoChapa) setFotoChapa('')
+  }
+
+  const handleFotoChapa = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    guardarFotoNoDispositivo(file, 1, 'chapa')
+    showToast('Cópia da chapa guardada no telemóvel, na pasta Transferências.', 'info', 4000)
+    setFotoCarregando(true)
+    try {
+      const blob = await fileToMemory(file)
+      const dataUrl = await comprimirFotoParaRelatorio(blob)
+      setFotoChapa(dataUrl)
+      setFotos(prev => fotosComChapa(prev, dataUrl, MAX_FOTOS))
+    } catch (err) {
+      showToast(err?.message || 'Não foi possível processar a fotografia da chapa.', 'error', 4000)
+      logger.error('ExecutarReparacaoModal', 'handleFotoChapa', err?.message || String(err))
+    } finally {
+      setFotoCarregando(false)
+      if (e.target) e.target.value = ''
+    }
+  }
 
   // ── Peças ────────────────────────────────────────────────────────────────
 
@@ -305,9 +346,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         trabalhoRealizado:  form.trabalhoRealizado.trim(),
         horasMaoObra:       form.horasMaoObra ? parseFloat(form.horasMaoObra) : null,
         checklistRespostas: JSON.stringify(form.checklistRespostas),
-        checklistSnapshot:  JSON.stringify(checklistItems.map(it => ({ id: it.id, texto: it.texto ?? it.nome, ordem: it.ordem, grupo: it.grupo ?? null }))),
+        checklistSnapshot:  snapshotReparacao(checklistItems, String(fotoChapa).startsWith('data:image')),
         pecasUsadas:        JSON.stringify(pecasFiltradas),
-        fotos:              JSON.stringify(fotos),
+        fotos:              JSON.stringify(fotosComChapa(fotos, fotoChapa, MAX_FOTOS)),
         notas:              form.notas.trim(),
         assinadoPeloCliente: false,
       }
@@ -391,6 +432,16 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
   // ── Submissão final (com assinatura) ────────────────────────────────────
 
   const handleConcluir = async () => {
+    const msgChapa = mensagemFotoChapa({ fotoChapa }, { confirmada: true })
+    if (msgChapa) {
+      showToast(msgChapa, 'warning')
+      return
+    }
+    const msgFotos = mensagemFotosEquipamento(fotos, fotoChapa)
+    if (msgFotos) {
+      showToast(msgFotos, 'warning')
+      return
+    }
     // Validação
     const erros = []
     if (!form.tecnico?.trim())       erros.push('Indique o nome do técnico')
@@ -457,9 +508,9 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
         trabalhoRealizado:   form.trabalhoRealizado.trim(),
         horasMaoObra:        form.horasMaoObra ? parseFloat(form.horasMaoObra) : null,
         checklistRespostas:  JSON.stringify(form.checklistRespostas),
-        checklistSnapshot:   JSON.stringify(checklistItems.map(it => ({ id: it.id, texto: it.texto ?? it.nome, ordem: it.ordem, grupo: it.grupo ?? null }))),
+        checklistSnapshot:   snapshotReparacao(checklistItems, String(fotoChapa).startsWith('data:image')),
         pecasUsadas:         JSON.stringify(pecasFiltradas),
-        fotos:               JSON.stringify(fotos),
+        fotos:               JSON.stringify(fotosComChapa(fotos, fotoChapa, MAX_FOTOS)),
         notas:               form.notas.trim(),
         dataCriacao:         dataEmissaoIso,
       }
@@ -529,7 +580,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
       notas:              form.notas,
       checklistRespostas: form.checklistRespostas,
       pecasUsadas:        pecas.filter(p => p.descricao?.trim() || p.codigo?.trim()),
-      fotos,
+      fotos: fotosComChapa(fotos, fotoChapa, MAX_FOTOS),
       assinaturaDigital:  assinaturaFeita ? canvasRef.current?.toDataURL('image/png') : null,
       nomeAssinante:      form.nomeAssinante,
       numeroRelatorio:    '(pré-visualização)',
@@ -561,7 +612,7 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
     } finally {
       hideGlobalLoading()
     }
-  }, [form, pecas, fotos, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome, sub?.nome, marcas, categoriaNome, declaracaoClienteDepois, showGlobalLoading, hideGlobalLoading, showToast])
+  }, [form, pecas, fotos, fotoChapa, assinaturaFeita, reparacao, maq, cli, checklistItems, isAdmin, getTecnicoByNome, sub?.nome, marcas, categoriaNome, declaracaoClienteDepois, showGlobalLoading, hideGlobalLoading, showToast])
 
   const handleVerPdf = useCallback(async (relGerado) => {
     const { gerarPdfCompacto } = await import('../utils/gerarPdfRelatorio')
@@ -804,6 +855,19 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
                 </div>
               </div>
 
+              {maq && (
+                <div className="exec-section">
+                  <h3 className="exec-section-title">Chapa de identificação</h3>
+                  <p className="fotos-limite-hint">N.º de série: <strong>{maq.numeroSerie || '—'}</strong></p>
+                  <FotoChapaCampo
+                    fotoChapa={fotoChapa}
+                    carregando={fotoCarregando}
+                    onChange={handleFotoChapa}
+                    inputRef={chapaInputRef}
+                  />
+                </div>
+              )}
+
               <MaquinaDocumentacaoLinks maquina={maq} />
 
               {/* Secção: Peças / Consumíveis */}
@@ -876,10 +940,12 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
               {/* Secção: Fotos */}
               <div className="exec-section">
                 <h3 className="exec-section-title">Fotos ({fotos.length}/{MAX_FOTOS})</h3>
+                <p className="fotos-limite-hint">Introduzir fotos do equipamento e do local de instalação. A chapa de identificação não conta para esta foto.</p>
                 <div className="fotos-grid">
                   {fotos.map((f, i) => (
                     <div key={i} className="foto-thumb">
-                      <img src={safeHttpUrl(f) ?? f} alt={`Foto ${i + 1}`} />
+                      <img src={safeHttpUrl(f) ?? f} alt={f === fotoChapa ? 'Chapa de identificação' : `Foto ${i + 1}`} />
+                      {f === fotoChapa && <span className="foto-chapa-legenda">Chapa</span>}
                       <button type="button" className="foto-remove" onClick={() => removerFoto(i)}><X size={12} /></button>
                     </div>
                   ))}

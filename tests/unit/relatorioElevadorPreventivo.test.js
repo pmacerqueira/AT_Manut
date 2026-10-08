@@ -21,9 +21,17 @@ import {
   pontoImplicaForaDeServico,
   respostaOperacao,
   contextoEmissaoFromForm,
+  fotosComChapa,
+  mensagemFotoChapa,
+  mensagemFotosEquipamento,
+  TEXTO_FOTOS_EQUIPAMENTO,
+  maquinaIdsComRetiradaPendente,
   linhasContextoEmissao,
+  mensagemComunicacaoUrgente,
+  mensagemIncoerenciaGrupo,
   mensagemPedidoForaAmbito,
   codigoResposta,
+  rotuloRespostaPdf,
 } from '../../src/domain/relatorioElevadorPreventivo.js'
 import { referenciasCitaveisNoPdf } from '../../src/domain/catalogoReferenciasElevador.js'
 
@@ -175,7 +183,22 @@ describe('relatorio elevador preventivo', () => {
       }),
       b: respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' }),
     }
-    assert.ok(validarChecklistElevador(items, comAnomalia).some(e => /conservação visível/.test(e)))
+    assert.equal(validarChecklistElevador(items, comAnomalia).length, 0)
+    const seguranca = [
+      { id: 'curso', texto: 'Sistema de fim de curso e limitadores' },
+      { id: 'grupo', texto: 'Outros dispositivos de segurança previstos no manual' },
+    ]
+    const respostasGrupo = {
+      curso: respostaOperacao({
+        execucao: 'executado',
+        observacao: 'anomalia',
+        descricao: 'Fim de curso partido.',
+        recomendacao: 'Não utilizar até substituir.',
+      }),
+      grupo: respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' }),
+    }
+    assert.match(mensagemIncoerenciaGrupo(seguranca, respostasGrupo, ''), /Escreva o esclarecimento/)
+    assert.equal(mensagemIncoerenciaGrupo(seguranca, respostasGrupo, 'O fim de curso está partido; os outros dispositivos não.'), '')
     const parcial = respostaOperacao({
       execucao: 'parcial',
       observacao: 'nao_observado',
@@ -201,7 +224,8 @@ describe('relatorio elevador preventivo', () => {
   it('falha crítica recomenda fora de serviço e o resto não', () => {
     assert.equal(pontoImplicaForaDeServico({ texto: 'Sistema de fim de curso e limitadores' }), true)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Cabos de aço: estado e aderência nas polias' }), true)
-    assert.equal(pontoImplicaForaDeServico({ texto: 'Travão: ferodos' }), true)
+    assert.equal(pontoImplicaForaDeServico({ texto: 'Trancas de Segurança' }), true)
+    assert.equal(pontoImplicaForaDeServico({ texto: 'Motor de Accionamento' }), false)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Nível de óleo do redutor' }), false)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Verificar cabos elétricos e relés' }), false)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Manual de instruções do fabricante' }), false)
@@ -236,18 +260,102 @@ describe('relatorio elevador preventivo', () => {
     ), null)
   })
 
-  it('pedido de reparação fica fora da visita e não abre esse serviço', () => {
-    assert.match(mensagemPedidoForaAmbito({ pedidoExtra: '' }), /reparação, alteração ou certificação/)
-    assert.match(mensagemPedidoForaAmbito({ pedidoExtra: 'sim', pedidoExtraDescricao: 'curto' }), /não é executado/)
-    assert.equal(mensagemPedidoForaAmbito({ pedidoExtra: 'sim', pedidoExtraDescricao: 'Reparação do fim de curso' }), '')
+  it('reparação gera ordem de serviço e alteração fica fora do âmbito', () => {
+    assert.match(mensagemPedidoForaAmbito({}), /pediu reparação/)
+    assert.match(mensagemPedidoForaAmbito({
+      pedidoReparacao: 'sim',
+      pedidoReparacaoDescricao: 'Substituir o fim de curso',
+      pedidoFora: 'sim',
+      pedidoForaDescricao: 'curto',
+    }), /alteração ou certificação/)
+    assert.equal(mensagemPedidoForaAmbito({
+      pedidoReparacao: 'sim',
+      pedidoReparacaoDescricao: 'Substituir o fim de curso',
+      pedidoFora: 'nao',
+    }), '')
     const emissao = contextoEmissaoFromForm({
-      pedidoSoPreventiva: true,
-      pedidoExtra: 'sim',
-      pedidoExtraDescricao: 'Alteração da capacidade',
+      pedidoReparacao: 'sim',
+      pedidoReparacaoDescricao: 'Substituir o fim de curso',
+      pedidoFora: 'sim',
+      pedidoForaDescricao: 'Alteração da capacidade',
     }, [])
-    const linha = linhasContextoEmissao(emissao).find(row => row[0] === 'PEDIDO FORA DO ÂMBITO')
-    assert.match(linha[1], /Alteração da capacidade/)
-    assert.match(linha[1], /Não gera reparação/)
+    const ordem = linhasContextoEmissao(emissao).find(row => row[0] === 'ORDEM DE SERVIÇO DE REPARAÇÃO')
+    const fora = linhasContextoEmissao(emissao).find(row => row[0] === 'PEDIDO FORA DO ÂMBITO')
+    assert.match(ordem[1], /ordem de serviço NAVEL/)
+    assert.match(fora[1], /Não gera alteração nem certificação/)
+  })
+
+  it('recomendação urgente fica registada sem assinatura e o email conta se for enviado', () => {
+    const form = { comunicacaoUrgente: 'email' }
+    assert.match(mensagemComunicacaoUrgente(form, { urgente: true, vaiEnviarEmail: false }), /exige o envio/)
+    assert.equal(mensagemComunicacaoUrgente(form, { urgente: true, vaiEnviarEmail: true }), '')
+    const emissao = contextoEmissaoFromForm({ ...form, comunicacaoUrgente: 'email' }, [])
+    const linha = linhasContextoEmissao({ ...emissao, comunicacaoUrgente: 'email' }).find(row => row[0] === 'COMUNICAÇÃO DA RECOMENDAÇÃO URGENTE')
+    assert.match(linha[1], /envio deste relatório por email/)
+    assert.match(linha[1], /Não depende da assinatura/)
+  })
+
+  it('teste com anomalia exige recomendação e teste não observado exige motivo', () => {
+    const items = [{ id: 't', texto: 'Teste funcional com carga: veículo na função habitual, 2 ciclos completos de subida e descida' }]
+    const semRec = respostaTeste({
+      executado: true,
+      carga: 'sem_carga',
+      observacao: 'anomalia',
+      descricao: 'Ruído na descida.',
+    })
+    assert.ok(validarChecklistElevador(items, { t: semRec }).some(e => /recomendação/i.test(e)))
+    const naoObs = respostaTeste({ executado: true, carga: 'sem_carga', observacao: 'nao_observado' })
+    assert.ok(validarChecklistElevador(items, { t: naoObs }).some(e => /não foi observado/.test(e)))
+    assert.equal(rotuloRespostaPdf(respostaTeste({ executado: false, motivo: 'Sem energia no quadro.' })), 'S/ TESTE')
+  })
+
+  it('série confirmada na chapa exige a fotografia e essa foto abre o relatório', () => {
+    assert.match(mensagemFotoChapa({ serieConfirmada: 'sim' }), /chapa/)
+    assert.match(mensagemFotoChapa({ serieConfirmada: 'nao' }), /chapa/)
+    assert.equal(mensagemFotoChapa({ serieConfirmada: 'desconhecido' }), '')
+    assert.equal(mensagemFotoChapa({ serieConfirmada: 'sim', fotoChapa: 'data:image/jpeg;base64,aaa' }), '')
+    assert.deepEqual(
+      fotosComChapa(['data:image/jpeg;base64,bbb'], 'data:image/jpeg;base64,aaa', 6),
+      ['data:image/jpeg;base64,aaa', 'data:image/jpeg;base64,bbb'],
+    )
+    const ctx = contextoEmissaoFromForm({
+      serieConfirmada: 'sim',
+      fotoChapa: 'data:image/jpeg;base64,aaa',
+      checklistRespostas: {},
+    }, [])
+    assert.equal(ctx.fotoChapa, true)
+    assert.ok(linhasContextoEmissao(ctx).some(row => row[0] === 'FOTO DA CHAPA DE IDENTIFICAÇÃO'))
+    const chapa = 'data:image/jpeg;base64,aaa'
+    assert.equal(mensagemFotosEquipamento([chapa], chapa), TEXTO_FOTOS_EQUIPAMENTO)
+    assert.equal(mensagemFotosEquipamento([chapa, 'data:image/jpeg;base64,bbb'], chapa), '')
+    assert.equal(mensagemFotosEquipamento([], ''), TEXTO_FOTOS_EQUIPAMENTO)
+    assert.equal(mensagemFotoChapa({}, { confirmada: true }), 'Tire uma foto da chapa de identificação do equipamento.')
+    assert.equal(mensagemFotoChapa({ serieConfirmada: 'desconhecido' }, { confirmada: true }), '')
+  })
+
+  it('calendário destaca a máquina com retirada de serviço ainda pendente', () => {
+    const relatorios = [
+      {
+        manutencaoId: 'm1',
+        dataCriacao: '2026-04-14',
+        checklistSnapshot: { emissao: { ...buildEmissao(), recomendaRetirada: true } },
+      },
+      {
+        manutencaoId: 'm2',
+        dataCriacao: '2026-08-01',
+        checklistSnapshot: { emissao: { ...buildEmissao(), recomendaRetirada: false } },
+      },
+    ]
+    const manutencoes = [
+      { id: 'm1', maquinaId: 'maq-a' },
+      { id: 'm2', maquinaId: 'maq-a' },
+      { id: 'm3', maquinaId: 'maq-b' },
+    ]
+    const ids = maquinaIdsComRetiradaPendente(relatorios, manutencoes)
+    assert.equal(ids.has('maq-a'), false)
+    const soAntiga = maquinaIdsComRetiradaPendente([relatorios[0]], manutencoes)
+    assert.equal(soAntiga.has('maq-a'), true)
+    assert.equal(soAntiga.has('maq-b'), false)
   })
 
   it('aditamento não reutiliza o número original', () => {

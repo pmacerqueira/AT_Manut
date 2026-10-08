@@ -8,6 +8,7 @@ export default function FotosStep({
   visible,
   isCorrectionMode,
   fotos,
+  fotoChapa = '',
   fotoCarregando,
   fotoCameraRef,
   fotoInputRef,
@@ -16,11 +17,18 @@ export default function FotosStep({
   confirmacaoPendente,
   setConfirmacaoPendente,
   onConfirmAdvance,
+  exigeFotoEquipamento = false,
+  erroChecklist = '',
 }) {
   return (
     <div className="wizard-step-content" style={{ display: visible ? 'block' : 'none' }}>
       {isCorrectionMode && <h3 className="admin-edit-section-title">Fotografias</h3>}
-      {!isCorrectionMode && <p className="wizard-step-hint">Adicione fotografias de apoio à manutenção.</p>}
+      <p className="wizard-step-hint">
+        {exigeFotoEquipamento
+          ? 'Introduzir fotos do equipamento e do local de instalação. A chapa de identificação não conta para esta foto.'
+          : 'Adicione fotografias de apoio à manutenção.'}
+      </p>
+      {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
       <div className="form-section fotos-section">
         <div className="fotos-header">
           <span className="fotos-label">
@@ -51,7 +59,8 @@ export default function FotosStep({
           <div className="fotos-grid">
             {fotos.map((src, idx) => (
               <div key={idx} className="foto-thumb">
-                <img src={src} alt={`Foto ${idx + 1}`} />
+                <img src={src} alt={src === fotoChapa ? 'Chapa de identificação' : `Foto ${idx + 1}`} />
+                {src === fotoChapa && <span className="foto-chapa-legenda">Chapa</span>}
                 <button type="button" className="foto-remover" onClick={() => removerFoto(idx)} aria-label={`Remover foto ${idx + 1}`}>
                   <X size={12} />
                 </button>
@@ -61,7 +70,7 @@ export default function FotosStep({
         )}
         {fotos.length === 0 && <p className="fotos-vazio">Nenhuma fotografia adicionada.</p>}
       </div>
-      {confirmacaoPendente === 'fotos' && (
+      {confirmacaoPendente === 'fotos' && !exigeFotoEquipamento && (
         <div className="wizard-confirm">
           <AlertTriangle size={16} />
           <span>Pretende continuar sem fotografias?</span>

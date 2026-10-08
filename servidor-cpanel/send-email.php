@@ -461,6 +461,7 @@ $decisao_motivo     = trim((string)($resumo_exec['decisaoMotivo'] ?? ''));
 $nota_legal_titulo  = trim((string)($resumo_exec['notaLegalTitulo'] ?? ''));
 $nota_legal_intro   = trim((string)($resumo_exec['notaLegalIntro'] ?? ''));
 $nota_legal_linhas  = is_array($resumo_exec['notaLegalLinhas'] ?? null) ? $resumo_exec['notaLegalLinhas'] : [];
+$nota_legal_fontes  = is_array($resumo_exec['notaLegalFontes'] ?? null) ? $resumo_exec['notaLegalFontes'] : [];
 $declaracao_titulo_resumo = trim((string)($resumo_exec['declaracaoTitulo'] ?? ''));
 $veredito_key      = $resumo_exec['veredito'] ?? 'conforme';
 $veredito_style    = atm_veredito_style_php($veredito_key);
@@ -1639,7 +1640,9 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
     if ($manutencao_tipo !== 'reparacao' && (count($proximas_filtradas) > 0 || $peri_maq !== '')) {
         if (count($proximas_filtradas) > 0) {
             $n_prox = count($proximas_filtradas);
-            $reserved_after = $decl_box_h + $sig_box_h_preview + 14;
+            $planeamento_h = ($declaracao_legislacao === 'elevadores') ? 16 : 0;
+            $aviso_h = $recomenda_retirada ? 14 : 0;
+            $reserved_after = $decl_box_h + $sig_box_h_preview + $planeamento_h + $aviso_h + 14;
             $avail_table = max(50, $y_closing_max - $pdf->GetY() - $reserved_after);
             $prox_row_h = 7;
             $prox_font = 8;
@@ -1695,7 +1698,14 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
                 $tec_pm = $pm['tecnico'] ?? '';
                 $pdf->Cell(0, $prox_row_h, f($tec_pm !== '' ? $tec_pm : 'A designar'), 0, 1);
             }
-            $pdf->Ln(4);
+            $pdf->Ln(2);
+            if ($declaracao_legislacao === 'elevadores') {
+                $pdf->SetFont('Arial', 'I', 7);
+                $pdf->SetTextColor(55, 65, 81);
+                $pdf->SetX($M);
+                $pdf->MultiCell($cW, 3.4, f('O agendamento indicado é um simples planeamento solicitado pelo cliente. Não constitui aprovação continuada de segurança, nem verificação legal ou de segurança. Essa verificação apenas poderá ser efetuada por uma Entidade Certificada Independente.'), 0, 'L');
+                $pdf->Ln(2);
+            }
         } else {
             $peri_str = isset($peri_labels[$peri_maq]) ? $peri_labels[$peri_maq] : '';
             $pdf->SetFillColor(243, 244, 246);
@@ -1709,14 +1719,21 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $pdf->SetTextColor(55, 65, 81);
             $pdf->SetX($M + 4);
             $pdf->Cell(0, 5, '-' . ($peri_str !== '' ? ' (periodicidade ' . f($peri_str) . ')' : ''), 0, 1);
-            $pdf->Ln(6);
+            $pdf->Ln(4);
+            if ($declaracao_legislacao === 'elevadores') {
+                $pdf->SetFont('Arial', 'I', 7);
+                $pdf->SetTextColor(55, 65, 81);
+                $pdf->SetX($M);
+                $pdf->MultiCell($cW, 3.4, f('O agendamento indicado é um simples planeamento solicitado pelo cliente. Não constitui aprovação continuada de segurança, nem verificação legal ou de segurança. Essa verificação apenas poderá ser efetuada por uma Entidade Certificada Independente.'), 0, 'L');
+                $pdf->Ln(2);
+            }
         }
     }
 
     // Declaração de aceitação — imediatamente antes das assinaturas
     $nota_legal_h = 0;
     if (count($nota_legal_linhas) > 0) {
-        $nota_legal_h = 62;
+        $nota_legal_h = 62 + (count($nota_legal_fontes) > 0 ? 22 : 0);
     }
     $decisao_h = ($decisao_titulo !== '' && $decisao_motivo !== '') ? 28 : 0;
     if ($pdf->GetY() + $decl_box_h + $nota_legal_h + $decisao_h + $sig_box_h_preview + 6 > $y_closing_max) {
@@ -1769,6 +1786,24 @@ if (file_exists(__DIR__ . '/fpdf.php')) {
             $pdf->SetY(max($y_after_ref, $pdf->GetY()) + 1);
         }
         $pdf->Ln(2);
+        if (count($nota_legal_fontes) > 0) {
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->SetTextColor(30, 58, 95);
+            $pdf->SetX($M);
+            $pdf->Cell(0, 4, 'Fontes', 0, 1);
+            $pdf->SetFont('Arial', '', 6);
+            $pdf->SetTextColor(30, 64, 175);
+            foreach ($nota_legal_fontes as $fonte) {
+                if (!is_array($fonte)) {
+                    continue;
+                }
+                $rotulo = f((string)($fonte['rotulo'] ?? ''));
+                $url = (string)($fonte['url'] ?? '');
+                $pdf->SetX($M);
+                $pdf->MultiCell($cW, 3.2, $rotulo . ': ' . $url, 0, 'L');
+            }
+            $pdf->Ln(2);
+        }
     }
 
     if ($decisao_titulo !== '' && $decisao_motivo !== '') {
@@ -2138,8 +2173,13 @@ if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
                . '<td style="padding:6px;">' . atm_html_esc($tec_pm) . '</td>'
                . '</tr>';
     }
-    $html .= '</table>'
-           . '<div style="margin-top:10px;font-size:11px;color:#6b7280;line-height:1.5;">'
+    $html .= '</table>';
+    if ($declaracao_legislacao === 'elevadores') {
+        $html .= '<div style="margin-top:10px;font-size:11px;color:#374151;line-height:1.5;">'
+               . atm_html_esc('O agendamento indicado é um simples planeamento solicitado pelo cliente. Não constitui aprovação continuada de segurança, nem verificação legal ou de segurança. Essa verificação apenas poderá ser efetuada por uma Entidade Certificada Independente.')
+               . '</div>';
+    }
+    $html .= '<div style="margin-top:10px;font-size:11px;color:#6b7280;line-height:1.5;">'
            . 'Datas calculadas a partir da periodicidade do equipamento. '
            . 'Para reagendar, contacte os nossos serviços.'
            . '</div></div></td></tr>';
@@ -2150,7 +2190,13 @@ if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
            . '<div style="color:#374151;font-size:12px;">'
            . '<strong>' . atm_html_esc($proxima_email_fmt) . '</strong>'
            . ($proxima_resumo_tec !== '' ? ' (técnico: <strong>' . atm_html_esc($proxima_resumo_tec) . '</strong>)' : '')
-           . '</div></div></td></tr>';
+           . '</div>';
+    if ($declaracao_legislacao === 'elevadores') {
+        $html .= '<div style="margin-top:10px;font-size:11px;color:#374151;line-height:1.5;">'
+               . atm_html_esc('O agendamento indicado é um simples planeamento solicitado pelo cliente. Não constitui aprovação continuada de segurança, nem verificação legal ou de segurança. Essa verificação apenas poderá ser efetuada por uma Entidade Certificada Independente.')
+               . '</div>';
+    }
+    $html .= '</div></td></tr>';
 }
 
 // CTA de contacto (técnico + NAVEL)
@@ -2187,7 +2233,21 @@ if (count($nota_legal_linhas) > 0) {
                . atm_html_esc((string)($nl['vigencia'] ?? ''))
                . '</p>';
     }
-    $html .= '</div></td></tr>';
+    $html .= '</div>';
+    if (count($nota_legal_fontes) > 0) {
+        $html .= '<div style="margin-top:8px;font-size:11px;color:#1e3a5f;line-height:1.45;">'
+               . '<strong>Fontes</strong>';
+        foreach ($nota_legal_fontes as $fonte) {
+            if (!is_array($fonte)) {
+                continue;
+            }
+            $url = (string)($fonte['url'] ?? '');
+            $html .= '<div>' . atm_html_esc((string)($fonte['rotulo'] ?? '')) . ': '
+                   . '<a href="' . atm_html_esc($url) . '" style="color:#1e40af;">' . atm_html_esc($url) . '</a></div>';
+        }
+        $html .= '</div>';
+    }
+    $html .= '</td></tr>';
 }
 
 if ($decisao_titulo !== '' && $decisao_motivo !== '') {
@@ -2264,12 +2324,18 @@ if ($manutencao_tipo !== 'reparacao' && count($proximas_email_rows) > 0) {
         $tec_pm = trim((string)($pm['tecnico'] ?? ''));
         $text .= "- " . $data_pm . ($tec_pm !== '' ? " (" . $tec_pm . ")" : '') . "\r\n";
     }
+    if ($declaracao_legislacao === 'elevadores') {
+        $text .= "O agendamento indicado e um simples planeamento solicitado pelo cliente. Nao constitui aprovacao continuada de seguranca, nem verificacao legal ou de seguranca. Essa verificacao apenas podera ser efetuada por uma Entidade Certificada Independente.\r\n";
+    }
 } elseif ($proxima_email_fmt !== '') {
     $text .= "\r\nProxima intervencao prevista: " . $proxima_email_fmt;
     if ($proxima_resumo_tec !== '') {
         $text .= " (" . $proxima_resumo_tec . ")";
     }
     $text .= "\r\n";
+    if ($declaracao_legislacao === 'elevadores') {
+        $text .= "O agendamento indicado e um simples planeamento solicitado pelo cliente. Nao constitui aprovacao continuada de seguranca, nem verificacao legal ou de seguranca. Essa verificacao apenas podera ser efetuada por uma Entidade Certificada Independente.\r\n";
+    }
 }
 
 $text .= "\r\nContacto: " . ATM_TELEFONES_GERAIS . " | " . REPLY_TO . "\r\n";

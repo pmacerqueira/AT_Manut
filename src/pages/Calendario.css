@@ -124,6 +124,23 @@
   border: 1px solid rgba(26, 184, 240, 0.35);
 }
 
+.event-manut--fora,
+.event-previsto--fora {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #b91c1c;
+  font-weight: 700;
+}
+
+.event-manut--fora .event-manut-play {
+  background: rgba(185, 28, 28, 0.18);
+  color: #991b1b;
+}
+
+.dot-fora {
+  background: #b91c1c;
+}
+
 /* Linha: editar (texto) + executar (ícone) — touch-friendly em tablet */
 .event-manut--row {
   display: flex;

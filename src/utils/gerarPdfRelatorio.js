@@ -10,8 +10,8 @@ import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
-import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, linhaPontoAtencao, linhasContextoEmissao, NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, rotuloRespostaPdf, textoRececaoVisivel, TITULO_RELATORIO_ELEVADOR } from '../domain/relatorioElevadorPreventivo'
-import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, linhaPontoAtencao, linhasContextoEmissao, NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, rotuloRespostaPdf, TEXTO_PLANEAMENTO_PROXIMAS, textoRececaoVisivel, TITULO_RELATORIO_ELEVADOR } from '../domain/relatorioElevadorPreventivo'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
 import { linhasNotasRelatorio, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
@@ -877,8 +877,9 @@ export async function gerarPdfCompacto({
     const declLinesPreview = pdf.splitTextToSize(declTextPreview, cW - 12)
     const declBoxHPreview = 10 + declLinesPreview.length * 3.6 + 6
     const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
-    const notaLegalReserva = aplicaNotaLegalColocacao({ categoriaNome, isReparacao }) ? 64 : 0
-    const reservedAfter = declBoxHPreview + sigBoxHPreview + notaLegalReserva + 14
+    const notaLegalReserva = aplicaNotaLegalColocacao({ categoriaNome, isReparacao }) ? 84 : 0
+    const planeamentoElevador = aplicaNotaLegalColocacao({ categoriaNome, isReparacao: false })
+    const reservedAfter = declBoxHPreview + sigBoxHPreview + notaLegalReserva + (planeamentoElevador ? 18 : 0) + 14
 
     if (proximas.length > 0 || periMaqVal) {
       const fmtD = (d) => { const s = String(d ?? '').slice(0, 10).split('-'); return s.length === 3 ? `${s[2]}/${s[1]}/${s[0]}` : '\u2014' }
@@ -935,6 +936,14 @@ export async function gerarPdfCompacto({
           y += chosen.rowMm
         })
         y += 4
+        if (planeamentoElevador) {
+          pdf.setFontSize(7); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(55, 65, 81)
+          pdf.splitTextToSize(TEXTO_PLANEAMENTO_PROXIMAS, cW).forEach(ln => {
+            pdf.text(ln, M, y)
+            y += 3.4
+          })
+          y += 3
+        }
       } else {
         const dataProxStr = '\u2014'
         const periStr = periLabels[periMaqVal] ?? ''
@@ -945,6 +954,14 @@ export async function gerarPdfCompacto({
         pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81)
         pdf.text(`${dataProxStr}${periStr ? ` (periodicidade ${periStr})` : ''}`, M + 60, y)
         y += boxH + 4
+        if (planeamentoElevador) {
+          pdf.setFontSize(7); pdf.setFont('helvetica', 'italic'); pdf.setTextColor(55, 65, 81)
+          pdf.splitTextToSize(TEXTO_PLANEAMENTO_PROXIMAS, cW).forEach(ln => {
+            pdf.text(ln, M, y)
+            y += 3.4
+          })
+          y += 3
+        }
       }
     }
   }
@@ -967,16 +984,24 @@ export async function gerarPdfCompacto({
     const sigBoxHPreview = (tecnicoObj?.assinaturaDigital || relatorio?.assinaturaDigital) ? 38 : 20
     const mostraNotaLegal = aplicaNotaLegalColocacao({ categoriaNome, isReparacao })
     let notaLegalH = 0
+    let notaLegalQuadroH = 0
     if (mostraNotaLegal) {
       pdf.setFontSize(6.5)
       const introMed = pdf.splitTextToSize(NOTA_LEGAL_COLOCACAO_INTRO, cW - 8)
-      notaLegalH = 8 + introMed.length * 3.2 + 2
+      notaLegalQuadroH = 8 + introMed.length * 3.2 + 2
       for (const linha of NOTA_LEGAL_COLOCACAO_LINHAS) {
         const refMed = pdf.splitTextToSize(linha.referencia, 58)
         const vigMed = pdf.splitTextToSize(linha.vigencia, Math.max(24, cW - 70))
-        notaLegalH += Math.max(refMed.length, vigMed.length, 1) * 3.2 + 1.2
+        notaLegalQuadroH += Math.max(refMed.length, vigMed.length, 1) * 3.2 + 1.2
       }
-      notaLegalH += 4
+      notaLegalQuadroH += 4
+      pdf.setFontSize(6)
+      let fontesH = 5
+      for (const fonte of NOTA_LEGAL_COLOCACAO_FONTES) {
+        const fonteMed = pdf.splitTextToSize(`${fonte.rotulo}: ${fonte.url}`, cW - 8)
+        fontesH += fonteMed.length * 3.2
+      }
+      notaLegalH = notaLegalQuadroH + fontesH
     }
     const decisao = (!isReparacao && emissaoElevador)
       ? decisaoOperacionalElevador(checklistItems, relatorio?.checklistRespostas, {
@@ -1006,7 +1031,7 @@ export async function gerarPdfCompacto({
     if (y + notaLegalH + 8 > yClosingMax) { pdf.addPage(); y = 20 }
     const yNota = y - 3
     pdf.setFillColor(248, 250, 252); pdf.setDrawColor(30, 58, 95); pdf.setLineWidth(0.4)
-    pdf.rect(M, yNota, cW, notaLegalH, 'FD')
+    pdf.rect(M, yNota, cW, notaLegalQuadroH, 'FD')
     pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
     pdf.text(NOTA_LEGAL_COLOCACAO_TITULO, M + 3, y + 1)
     y += 5
@@ -1024,7 +1049,21 @@ export async function gerarPdfCompacto({
       vigLines.forEach((ln, i) => { pdf.setFont('helvetica', 'normal'); pdf.text(ln, M + 62, y + i * 3.2) })
       y += n * 3.2 + 1.2
     })
-    y += 4
+    y = Math.max(y + 2, yNota + notaLegalQuadroH + 3)
+    pdf.setFontSize(6.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)
+    pdf.text('Fontes', M + 3, y)
+    y += 3.6
+    pdf.setFont('helvetica', 'normal'); pdf.setTextColor(30, 64, 175)
+    NOTA_LEGAL_COLOCACAO_FONTES.forEach(fonte => {
+      const linha = `${fonte.rotulo}: ${fonte.url}`
+      const linhas = pdf.splitTextToSize(linha, cW - 8)
+      linhas.forEach((ln, i) => {
+        if (i === 0 && typeof pdf.textWithLink === 'function') pdf.textWithLink(ln, M + 3, y, { url: fonte.url })
+        else pdf.text(ln, M + 3, y)
+        y += 3.2
+      })
+    })
+    y += 3
   }
 
   if (decisao) {

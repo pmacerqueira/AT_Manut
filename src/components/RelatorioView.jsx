@@ -5,8 +5,8 @@ import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { useData } from '../context/DataContext'
 import { categoriaNomeFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
-import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, NOTA_AMBITO_TITULO, pontosNotaAmbito, TEXTO_PEDIDO_FORA_AMBITO, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
-import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, NOTA_AMBITO_TITULO, pontosNotaAmbito, TEXTO_COMUNICACAO_EMAIL, TEXTO_ORDEM_REPARACAO, TEXTO_PEDIDO_FORA_AMBITO, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
 import { SUBCATEGORIAS_COM_CONTADOR_HORAS } from '../context/DataContext'
@@ -76,10 +76,34 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
         )}
       </section>
 
-      {emissao?.pedidoExtra === 'sim' && emissao.pedidoExtraDescricao && (
+      {emissao?.pedidoReparacao === 'sim' && emissao.pedidoReparacaoDescricao && (
+        <section className="relatorio-section">
+          <h3>Ordem de serviço de reparação</h3>
+          <p>{emissao.pedidoReparacaoDescricao}. {TEXTO_ORDEM_REPARACAO}</p>
+        </section>
+      )}
+      {((emissao?.pedidoFora === 'sim' && emissao.pedidoForaDescricao) || (emissao?.pedidoExtra === 'sim' && emissao.pedidoExtraDescricao && emissao?.pedidoFora !== 'sim')) && (
         <section className="relatorio-section">
           <h3>Pedido fora do âmbito</h3>
-          <p>{emissao.pedidoExtraDescricao}. {TEXTO_PEDIDO_FORA_AMBITO}</p>
+          <p>{emissao.pedidoForaDescricao || emissao.pedidoExtraDescricao}. {TEXTO_PEDIDO_FORA_AMBITO}</p>
+        </section>
+      )}
+      {emissao?.esclarecimentoIncoerencia && (
+        <section className="relatorio-section">
+          <h3>Esclarecimento</h3>
+          <p>{emissao.esclarecimentoIncoerencia}</p>
+        </section>
+      )}
+      {emissao?.comunicacaoUrgente === 'email' && (
+        <section className="relatorio-section">
+          <h3>Comunicação da recomendação urgente</h3>
+          <p>{TEXTO_COMUNICACAO_EMAIL}</p>
+        </section>
+      )}
+      {emissao?.comunicacaoUrgente === 'outro' && emissao.comunicacaoUrgenteNota && (
+        <section className="relatorio-section">
+          <h3>Comunicação da recomendação urgente</h3>
+          <p>{emissao.comunicacaoUrgenteNota}</p>
         </section>
       )}
 
@@ -161,6 +185,12 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
               ))}
             </tbody>
           </table>
+          <p><strong>Fontes</strong></p>
+          {NOTA_LEGAL_COLOCACAO_FONTES.map(fonte => (
+            <p key={fonte.url}>
+              {fonte.rotulo}: <a href={fonte.url}>{fonte.url}</a>
+            </p>
+          ))}
         </section>
       )}
 

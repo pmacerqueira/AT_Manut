@@ -884,6 +884,20 @@ body:has(.modal-overlay) {
   object-fit: cover;
   display: block;
 }
+.checklist-chapa { margin-top: 0.75rem; }
+.checklist-chapa-thumb { width: 120px; margin-top: 0.5rem; }
+
+.foto-chapa-legenda {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 4px;
+  background: rgba(18, 18, 22, 0.82);
+  color: #f0f0f0;
+  font-size: 0.68rem;
+  text-align: center;
+}
 .foto-remover {
   position: absolute;
   top: var(--radius-xs);

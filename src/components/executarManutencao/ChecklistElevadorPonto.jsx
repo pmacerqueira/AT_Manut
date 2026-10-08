@@ -141,6 +141,9 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           {valor?.executado === false && (
             <Campo label="Porque não foi executado" value={valor.motivo || ''} onChange={motivo => set(respostaTeste({ ...valor, executado: false, motivo }))} />
           )}
+          {valor?.executado && valor?.observacao === 'nao_observado' && (
+            <Campo label="Porque não foi observado" value={valor.motivo || ''} onChange={motivo => set(respostaTeste({ ...valor, motivo }))} />
+          )}
           {valor?.observacao === 'anomalia' && (
             <>
               <Campo label="O que observou" value={valor.descricao || ''} onChange={descricao => set(respostaTeste({ ...valor, descricao }))} />

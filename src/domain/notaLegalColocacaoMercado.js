@@ -54,3 +54,11 @@ export const NOTA_LEGAL_COLOCACAO_LINHAS = [
     vigencia: 'Substitui a Diretiva 2006/42/CE. Os elevadores de veículos ficam no anexo I, parte A. Aplicação geral: 20 de janeiro de 2027. Não recertifica equipamentos já colocados no mercado. Manutenção que não altere os requisitos essenciais não é modificação substancial.',
   },
 ]
+
+/** Fontes da conferência, impressas logo abaixo do quadro. Não entram na lista do regime. */
+export const NOTA_LEGAL_COLOCACAO_FONTES = [
+  { rotulo: 'Decreto-Lei n.º 50/2005', url: 'https://diariodarepublica.pt/dr/detalhe/decreto-lei/50-2005-584397' },
+  { rotulo: 'Decreto-Lei n.º 103/2008', url: 'https://diariodarepublica.pt/dr/detalhe/decreto-lei/103-2008-456188' },
+  { rotulo: 'Regulamento (UE) 2023/1230', url: 'https://eur-lex.europa.eu/eli/reg/2023/1230/oj' },
+  { rotulo: 'Catálogo de normas (IPQ)', url: 'https://www.ipq.pt/servicos-ipq/consultar-o-catalogo-de-normas/' },
+]

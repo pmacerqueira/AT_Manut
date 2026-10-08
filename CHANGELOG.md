@@ -9,6 +9,27 @@ Política de continuidade:
 
 ---
 
+## [1.17.29] — 2026-10-08 — Validações do ponto 10
+
+### Alteração
+- Teste com anomalia exige descrição e recomendação. Teste não observado exige motivo. Teste não executado sai como «S/ TESTE».
+- Dispositivo de segurança com anomalia e grupo «sem anomalia» exige esclarecimento antes de emitir.
+- Recomendação urgente fica registada sem assinatura. O envio do relatório por email conta, se for feito nessa gravação.
+- Reparação pedida fica como ordem de serviço NAVEL a preparar. Alteração ou certificação ficam fora do âmbito e não abrem esses serviços.
+- As quatro fontes da conferência ficam logo abaixo do quadro legal, no PDF, no ecrã e no email.
+- Por baixo da tabela das próximas manutenções de elevador, o agendamento fica descrito como planeamento pedido pelo cliente, sem aprovação de segurança nem verificação legal.
+- Se a emissão recomenda fora de serviço, as visitas ainda em aberto desse equipamento ficam destacadas no calendário.
+- Nos elevadores de duas e quatro colunas, as perguntas do accionamento passam a «Motor de Accionamento» e «Trancas de Segurança». Uma anomalia nas trancas continua a recomendar fora de serviço.
+- Em qualquer equipamento, ao confirmar a série, o técnico tira uma foto da chapa. A cópia fica na pasta Transferências do telemóvel e a mesma foto entra no PDF, à frente das outras. O mesmo vale para reparações.
+- Em manutenções e reparações, a secção de fotos exige pelo menos mais uma fotografia do equipamento e do local. O aviso amarelo «Introduzir fotos do equipamento e do local de instalação» fica até o técnico carregar em OK.
+- O reagendamento automático mantém a visita que já está em curso e a montagem. Trimestral, semestral e anual continuam a abrir o período seguinte. A recomendação de fora de serviço não apaga esse planeamento.
+
+### Deploy
+- Publicada em 2026-10-08: PWA em `public_html/manut/` e `send-email.php` em `public_html/api/`.
+- Em 2026-10-08 as perguntas de elevador foram actualizadas no MySQL de produção. Os dois ficheiros SQL não encontravam o texto que já estava na base; a correcção foi feita sobre as frases reais, só nas subcategorias sub1, sub2, sub4, sub12 e sub13. Relatórios já gravados não foram reescritos. Lavagem e compressores não foram alterados.
+
+---
+
 ## [1.17.28] — 2026-10-08 — Avisos amarelos com OK
 
 ### Alteração

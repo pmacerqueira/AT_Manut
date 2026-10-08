@@ -155,6 +155,69 @@ describe('recalcularPeriodicasNoEstado', () => {
     assert.ok(next.some(m => m.maquinaId === 'm1' && m.id !== 'old1'))
     assert.ok(next.some(m => m.id === 'keep'))
   })
+
+  it('mantém a visita em curso e a montagem, e não duplica o período já em execução', () => {
+    const prev = [
+      { id: 'feita', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2026-04-17' },
+      { id: 'curso', maquinaId: 'm1', status: 'em_progresso', tipo: 'periodica', data: '2026-07-16' },
+      { id: 'mont', maquinaId: 'm1', status: 'agendada', tipo: 'montagem', data: '2026-09-01' },
+    ]
+    const { next, idsRemover, novas } = recalcularPeriodicasNoEstado(prev, {
+      maquinaId: 'm1',
+      periodicidade: 'trimestral',
+      dataExecucao: '2026-04-17',
+      hojeStr: '2026-08-15',
+      intervalos: INTERVALOS,
+      idSeed: 9100,
+    })
+    assert.equal(idsRemover.includes('curso'), false)
+    assert.equal(idsRemover.includes('mont'), false)
+    assert.equal(idsRemover.includes('feita'), false)
+    assert.ok(next.some(m => m.id === 'curso' && m.status === 'em_progresso'))
+    assert.ok(next.some(m => m.id === 'mont'))
+    assert.equal(novas.filter(n => n.data >= '2026-07-13' && n.data <= '2026-07-19').length, 0)
+    assert.ok(novas.some(n => n.data >= '2026-10-01'))
+  })
+
+  it('continua a planear as próximas datas mesmo quando a visita recomenda fora de serviço', () => {
+    const { novas } = recalcularPeriodicasNoEstado([
+      { id: 'feita', maquinaId: 'm1', status: 'concluida', tipo: 'periodica', data: '2026-06-01' },
+    ], {
+      maquinaId: 'm1',
+      periodicidade: 'trimestral',
+      dataExecucao: '2026-06-01',
+      hojeStr: '2026-06-02',
+      intervalos: INTERVALOS,
+      idSeed: 9200,
+    })
+    assert.ok(novas.length >= 8)
+    assert.ok(novas.every(n => n.data > '2026-06-01'))
+    assert.equal(novas[0].status, 'agendada')
+  })
+})
+
+describe('periodicidades de planeamento', () => {
+  for (const [periodicidade, dias] of [['trimestral', 90], ['semestral', 180], ['anual', 365]]) {
+    it(`${periodicidade} abre o primeiro slot cerca de um período depois da execução`, () => {
+      const { novas } = gerarManutencoesPeriodicasFuturas({
+        dataBaseIso: '2026-03-02',
+        periodicidade,
+        intervaloDias: dias,
+        maquinaId: 'm1',
+        limiteMs: new Date('2028-03-02T12:00:00').getTime(),
+        diasOcupados: new Set(),
+        hojeStr: '2026-03-02',
+        observacoes: 'test',
+        idSeed: dias,
+      })
+      const base = new Date('2026-03-02T12:00:00').getTime()
+      const primeiro = new Date(`${novas[0].data}T12:00:00`).getTime()
+      const deltaDias = Math.round((primeiro - base) / (24 * 3600 * 1000))
+      assert.ok(deltaDias >= dias - 3 && deltaDias <= dias + 4, `${periodicidade} delta ${deltaDias} data ${novas[0].data}`)
+      const dia = new Date(`${novas[0].data}T12:00:00`).getDay()
+      assert.ok(dia !== 0 && dia !== 6)
+    })
+  }
 })
 
 describe('deveIncluirSlotPeriodicoAntesDeHoje', () => {

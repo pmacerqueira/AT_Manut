@@ -17,6 +17,7 @@ import {
   subMonths,
 } from 'date-fns'
 import { getHojeAzores } from '../utils/datasAzores'
+import { maquinaIdsComRetiradaPendente } from '../domain/relatorioElevadorPreventivo'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import ContentLoader from '../components/ContentLoader'
 import { useDeferredReady } from '../hooks/useDeferredReady'
@@ -28,7 +29,8 @@ export default function Calendario() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const navigate = useNavigate()
-  const { maquinas, manutencoes, reparacoes, getSubcategoria } = useData()
+  const { maquinas, manutencoes, reparacoes, relatorios, getSubcategoria } = useData()
+  const foraDeServico = maquinaIdsComRetiradaPendente(relatorios, manutencoes)
   const contentReady = useDeferredReady(manutencoes.length >= 0)
 
   const getManutencoesForDay = (date) => {
@@ -155,15 +157,18 @@ export default function Calendario() {
                     const sub = maq ? getSubcategoria(maq.subcategoriaId) : null
                     const desc = maq ? `${sub?.nome || ''} ${maq.marca}`.trim() : ''
                     const podeExecutar = m.status === 'pendente' || m.status === 'agendada' || m.status === 'em_progresso'
+                    const pendenciaFora = podeExecutar && foraDeServico.has(String(m.maquinaId))
                     return (
-                      <div key={m.id} className="event event-manut event-manut--row">
+                      <div key={m.id} className={`event event-manut event-manut--row${pendenciaFora ? ' event-manut--fora' : ''}`}>
                         <button
                           type="button"
                           className="event-manut-titulo"
-                          title={`Manutenção: ${desc} — Editar agendamento`}
+                          title={pendenciaFora
+                            ? `Pendência: fora de serviço recomendado. ${desc}. O agendamento não autoriza o uso.`
+                            : `Manutenção: ${desc} — Editar agendamento`}
                           onClick={(e) => { e.stopPropagation(); navigate(`/manutencoes?editar=${m.id}`) }}
                         >
-                          {desc?.slice(0, 12)}…
+                          {pendenciaFora ? 'Fora de serviço · ' : ''}{desc?.slice(0, 12)}…
                         </button>
                         {podeExecutar && (
                           <button
@@ -198,7 +203,18 @@ export default function Calendario() {
                   {maqs.filter(e => !manuts.some(m => m.maquinaId === e.id)).map(e => {
                     const sub = getSubcategoria(e.subcategoriaId)
                     const desc = `${sub?.nome || ''} ${e.marca}`.trim()
-                    return <div key={e.id} className="event event-previsto" title={`Prevista: ${desc}`}>{desc?.slice(0, 12)}…</div>
+                    const pendenciaFora = foraDeServico.has(String(e.id))
+                    return (
+                      <div
+                        key={e.id}
+                        className={`event event-previsto${pendenciaFora ? ' event-previsto--fora' : ''}`}
+                        title={pendenciaFora
+                          ? `Pendência: fora de serviço recomendado. ${desc}. O agendamento não autoriza o uso.`
+                          : `Prevista: ${desc}`}
+                      >
+                        {pendenciaFora ? 'Fora de serviço · ' : ''}{desc?.slice(0, 12)}…
+                      </div>
+                    )
                   })}
                 </div>
               </div>
@@ -213,6 +229,7 @@ export default function Calendario() {
         <span><span className="dot dot-blue"></span> Manutenção</span>
         <span><span className="dot dot-purple"></span> Reparação</span>
         <span><span className="dot dot-gray"></span> Prevista</span>
+        <span><span className="dot dot-fora"></span> Fora de serviço</span>
       </div>
       </ContentLoader>
     </div>

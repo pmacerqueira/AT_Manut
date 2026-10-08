@@ -24,6 +24,7 @@ import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
 import { PenLine, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Save, ChevronLeft, ChevronRight, Plus, HelpCircle } from 'lucide-react'
+import FotoChapaCampo from './executarManutencao/FotoChapaCampo'
 import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
@@ -71,6 +72,11 @@ import {
   contextoEmissaoFromForm,
   emissaoDoRelatorio,
   fundamentoInaplicavel,
+  fotosComChapa,
+  mensagemComunicacaoUrgente,
+  mensagemFotoChapa,
+  mensagemFotosEquipamento,
+  mensagemIncoerenciaGrupo,
   mensagemNotasContraditoriasElevador,
   mensagemPedidoForaAmbito,
   NOTA_AMBITO_PONTOS,
@@ -131,13 +137,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     assinaturaRecusada: false,
     canalAlternativo: '',
     serieConfirmada: '',
+    fotoChapa: '',
     anoFabrico: '',
     capacidadeComunicada: '',
     fornecidoPelaNavel: '',
     instaladoPelaNavel: '',
     pedidoSoPreventiva: false,
+    pedidoReparacao: '',
+    pedidoReparacaoDescricao: '',
+    pedidoFora: '',
+    pedidoForaDescricao: '',
     pedidoExtra: '',
     pedidoExtraDescricao: '',
+    esclarecimentoIncoerencia: '',
+    comunicacaoUrgente: '',
+    comunicacaoUrgenteNota: '',
     limitacoesAdmissao: '',
   })
   const [fotos, setFotos] = useState([])
@@ -182,6 +196,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const lastPosRef  = useRef({ x: 0, y: 0 })
   const fotoInputRef = useRef(null)
   const fotoCameraRef = useRef(null)
+  const chapaVerifRef = useRef(null)
   /** Evita repetir bootstrap do formulário para o mesmo `manutencaoAtual.id`. */
   const bootstrappedIdRef = useRef(null)
   /** Re-bootstrap quando o relatório (checklist gravada) aparece ou muda no estado. */
@@ -503,13 +518,21 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       assinaturaRecusada: !!emissaoDoRelatorio(existingRel)?.assinaturaRecusada,
       canalAlternativo: emissaoDoRelatorio(existingRel)?.canalAlternativo || '',
       serieConfirmada: emissaoDoRelatorio(existingRel)?.serieConfirmada || '',
+      fotoChapa: (emissaoDoRelatorio(existingRel)?.fotoChapa && nextFotos[0]) ? nextFotos[0] : '',
       anoFabrico: emissaoDoRelatorio(existingRel)?.anoFabrico || (maq?.anoFabrico ? String(maq.anoFabrico) : ''),
       capacidadeComunicada: emissaoDoRelatorio(existingRel)?.capacidadeComunicada || '',
       fornecidoPelaNavel: emissaoDoRelatorio(existingRel)?.fornecidoPelaNavel || '',
       instaladoPelaNavel: emissaoDoRelatorio(existingRel)?.instaladoPelaNavel || '',
       pedidoSoPreventiva: !!emissaoDoRelatorio(existingRel)?.pedidoSoPreventiva,
+      pedidoReparacao: emissaoDoRelatorio(existingRel)?.pedidoReparacao || '',
+      pedidoReparacaoDescricao: emissaoDoRelatorio(existingRel)?.pedidoReparacaoDescricao || '',
+      pedidoFora: emissaoDoRelatorio(existingRel)?.pedidoFora || '',
+      pedidoForaDescricao: emissaoDoRelatorio(existingRel)?.pedidoForaDescricao || '',
       pedidoExtra: emissaoDoRelatorio(existingRel)?.pedidoExtra || '',
       pedidoExtraDescricao: emissaoDoRelatorio(existingRel)?.pedidoExtraDescricao || '',
+      esclarecimentoIncoerencia: emissaoDoRelatorio(existingRel)?.esclarecimentoIncoerencia || '',
+      comunicacaoUrgente: emissaoDoRelatorio(existingRel)?.comunicacaoUrgente || '',
+      comunicacaoUrgenteNota: emissaoDoRelatorio(existingRel)?.comunicacaoUrgenteNota || '',
       limitacoesAdmissao: emissaoDoRelatorio(existingRel)?.limitacoesAdmissao || '',
     }
     setForm(nextForm)
@@ -774,8 +797,30 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   }, [fotos.length, showToast])
 
   const removerFoto = useCallback((idx) => {
+    const alvo = fotos[idx]
     setFotos(prev => prev.filter((_, i) => i !== idx))
-  }, [])
+    setForm(f => (f.fotoChapa && f.fotoChapa === alvo ? { ...f, fotoChapa: '' } : f))
+  }, [fotos])
+
+  const handleFotoChapa = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    guardarFotoNoDispositivo(file, 1, 'chapa')
+    showToast('Cópia da chapa guardada no telemóvel, na pasta Transferências.', 'info', 4000)
+    setFotoCarregando(true)
+    try {
+      const blob = await fileToMemory(file)
+      const dataUrl = await comprimirFotoParaRelatorio(blob)
+      setForm(f => ({ ...f, fotoChapa: dataUrl }))
+      setFotos(prev => fotosComChapa(prev, dataUrl, MAX_FOTOS))
+    } catch (err) {
+      showToast(err?.message || 'Não foi possível processar a fotografia da chapa.', 'error', 4000)
+      logger.warn('ExecutarManutencaoModal', 'handleFotoChapa', 'Falha ao adicionar foto da chapa', { msg: err?.message })
+    } finally {
+      setFotoCarregando(false)
+      if (e.target) e.target.value = ''
+    }
+  }, [showToast])
 
   // ── Wizard: validação por etapa + navegação ──────────────────────────────
   const validateStep = useCallback((s) => {
@@ -801,8 +846,18 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           avisarBloqueio(msgPedido)
           return false
         }
+        const msgGrupo = mensagemIncoerenciaGrupo(items, form.checklistRespostas, form.esclarecimentoIncoerencia)
+        if (msgGrupo) {
+          avisarBloqueio(msgGrupo)
+          return false
+        }
         if (!form.serieConfirmada) {
           avisarBloqueio('Indique se a série foi confirmada no local.')
+          return false
+        }
+        const msgChapa = mensagemFotoChapa(form)
+        if (msgChapa) {
+          avisarBloqueio(msgChapa)
           return false
         }
       }
@@ -828,10 +883,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       setErroChecklist('')
       return true
     }
+    const validarFotosPasso = () => {
+      const msgFotos = mensagemFotosEquipamento(fotos, form.fotoChapa)
+      if (msgFotos) {
+        avisarBloqueio(msgFotos)
+        return false
+      }
+      setErroChecklist('')
+      return true
+    }
 
     if (s === W.verif) {
       if (!confirmaEquipamentoSerie) {
         avisarBloqueio('Confirme o número de série do equipamento antes de avançar.')
+        return false
+      }
+      const msgChapaVerif = mensagemFotoChapa(form, { confirmada: true })
+      if (msgChapaVerif) {
+        avisarBloqueio(msgChapaVerif)
         return false
       }
       if (temContadorHoras && !useKaeserPipeline) {
@@ -880,14 +949,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       }
       if (s === W.checklist) return validarChecklistCompleta()
       if (s === W.notas) return validarNotasPasso()
-      if (s === W.fotos) {
-        if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
-          setConfirmacaoPendente('fotos')
-          showToast('Pretende continuar sem fotografias? Confirme «Sim, avançar».', 'warning', 4000)
-          return false
-        }
-        return true
-      }
+      if (s === W.fotos) return validarFotosPasso()
       if (s === W.tec) {
         if (!form.tecnico) {
           avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
@@ -927,14 +989,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
     if (s === W.checklist) return validarChecklistCompleta()
     if (s === W.notas) return validarNotasPasso()
-    if (s === W.fotos) {
-      if (fotos.length === 0 && confirmacaoPendente !== 'fotos') {
-        setConfirmacaoPendente('fotos')
-        showToast('Pretende continuar sem fotografias? Confirme «Sim, avançar».', 'warning', 4000)
-        return false
-      }
-      return true
-    }
+    if (s === W.fotos) return validarFotosPasso()
     if (s === W.tec) {
       if (!form.tecnico) {
         avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
@@ -1001,6 +1056,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     })
     return () => cancelAnimationFrame(id)
   }, [erroChecklist, erroAssinatura, confirmacaoPendente])
+
+  useEffect(() => {
+    if (isCorrectionMode || step !== W.fotos) return
+    const msg = mensagemFotosEquipamento(fotos, form.fotoChapa)
+    if (msg) showToast(msg, 'warning')
+  }, [isCorrectionMode, step, W.fotos, fotos, form.fotoChapa, showToast])
 
   const pecasDoPlanoKaeser = useCallback((tipo) => {
     if (!tipo || !maq) return []
@@ -1093,7 +1154,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         ...rel,
         checklistRespostas: respostasPreview,
         notas: form.notas,
-        fotos,
+        fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
         tecnico: form.tecnico,
         nomeAssinante: form.nomeAssinante,
         assinadoPeloCliente: !!assinaturaPreview,
@@ -1239,10 +1300,33 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         avisarBloqueio(msgPedido)
         return
       }
+      const msgGrupo = mensagemIncoerenciaGrupo(items, form.checklistRespostas, form.esclarecimentoIncoerencia)
+      if (msgGrupo) {
+        avisarBloqueio(msgGrupo)
+        return
+      }
+      const msgCom = mensagemComunicacaoUrgente(form, {
+        urgente: contextoEmissaoFromForm(form, items).recomendaRetirada,
+        vaiEnviarEmail: !!enviarEmailAoGravar,
+      })
+      if (msgCom) {
+        avisarBloqueio(msgCom, 'assinatura')
+        return
+      }
       if (!form.serieConfirmada) {
         avisarBloqueio('Indique se a série foi confirmada no local.')
         return
       }
+    }
+    const msgChapa = mensagemFotoChapa(form, { confirmada: true })
+    if (msgChapa) {
+      avisarBloqueio(msgChapa)
+      return
+    }
+    const msgFotos = mensagemFotosEquipamento(fotos, form.fotoChapa)
+    if (msgFotos) {
+      avisarBloqueio(msgFotos)
+      return
     }
     if (!form.tecnico) {
       avisarBloqueio('Selecione o técnico que realizou a manutenção.', 'assinatura')
@@ -1331,7 +1415,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           : null,
       }),
       notas: form.notas.slice(0, 300),
-      fotos,
+      fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
       tecnico: form.tecnico,
       assinadoPeloCliente: !semAssinatura,
       nomeAssinante: semAssinatura ? '' : form.nomeAssinante.trim(),
@@ -1667,6 +1751,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         showToast(msgPedidoAdmin, 'warning', 5000)
         return
       }
+      const msgGrupoAdmin = mensagemIncoerenciaGrupo(items, form.checklistRespostas, form.esclarecimentoIncoerencia)
+      if (msgGrupoAdmin) {
+        showToast(msgGrupoAdmin, 'warning', 5000)
+        return
+      }
+      const msgComAdmin = mensagemComunicacaoUrgente(form, {
+        urgente: contextoEmissaoFromForm(form, items).recomendaRetirada,
+        vaiEnviarEmail: false,
+      })
+      if (msgComAdmin) {
+        showToast(msgComAdmin, 'warning', 5000)
+        return
+      }
       if (!form.serieConfirmada) {
         showToast('Indique se a série foi confirmada no local.', 'warning')
         return
@@ -1683,6 +1780,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const msgNotasAdmin = mensagemObservacoesInsuficientes(form.notas, quickNotes)
     if (msgNotasAdmin) {
       showToast(msgNotasAdmin, 'warning', 4000)
+      return
+    }
+    const msgChapaAdmin = mensagemFotoChapa(form, { confirmada: true })
+    if (msgChapaAdmin) {
+      showToast(msgChapaAdmin, 'warning')
+      return
+    }
+    const msgFotosAdmin = mensagemFotosEquipamento(fotos, form.fotoChapa)
+    if (msgFotosAdmin) {
+      showToast(msgFotosAdmin, 'warning')
       return
     }
     if (temContadorHoras) {
@@ -1708,7 +1815,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           contexto: contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAditamento }, items, { assinaturaRecusada: true }),
         }),
         notas: form.notas.slice(0, 300),
-        fotos,
+        fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
         tecnico: form.tecnico,
         nomeAssinante: '',
         assinadoPeloCliente: false,
@@ -1735,7 +1842,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         contexto: modoElevador ? contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAdmin }, items) : null,
       }),
       notas: form.notas.slice(0, 300),
-      fotos,
+      fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
       tecnico: form.tecnico,
       nomeAssinante: form.nomeAssinante.trim(),
     }
@@ -2174,10 +2281,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 <input
                   type="checkbox"
                   checked={confirmaEquipamentoSerie}
-                  onChange={e => { setConfirmaEquipamentoSerie(e.target.checked); setErroChecklist('') }}
+                  onChange={e => {
+                    setConfirmaEquipamentoSerie(e.target.checked)
+                    setErroChecklist('')
+                    if (e.target.checked && !form.fotoChapa) chapaVerifRef.current?.click()
+                  }}
                 />
                 <span>Confirmo que o equipamento acima é o que estou a manter / inspeccionar nesta visita.</span>
               </label>
+              <FotoChapaCampo
+                fotoChapa={form.fotoChapa}
+                carregando={fotoCarregando}
+                onChange={handleFotoChapa}
+                inputRef={chapaVerifRef}
+              />
               {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
             </div>
           )}
@@ -2405,6 +2522,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             manutencaoAtual={manutencaoAtual}
             aplicarTipoKaeserComPecas={aplicarTipoKaeserComPecas}
             modoElevador={modoElevador}
+            onFotoChapa={handleFotoChapa}
+            fotoChapaCarregando={fotoCarregando}
           />
 
           <NotasStep
@@ -2420,10 +2539,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             erroChecklist={erroChecklist}
           />
 
+          {isCorrectionMode && (
+            <FotoChapaCampo
+              fotoChapa={form.fotoChapa}
+              carregando={fotoCarregando}
+              onChange={handleFotoChapa}
+              inputRef={chapaVerifRef}
+            />
+          )}
+
           <FotosStep
             visible={isCorrectionMode || step === W.fotos}
             isCorrectionMode={isCorrectionMode}
             fotos={fotos}
+            fotoChapa={form.fotoChapa}
             fotoCarregando={fotoCarregando}
             fotoCameraRef={fotoCameraRef}
             fotoInputRef={fotoInputRef}
@@ -2432,6 +2561,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             confirmacaoPendente={confirmacaoPendente}
             setConfirmacaoPendente={setConfirmacaoPendente}
             onConfirmAdvance={() => { setConfirmacaoPendente(null); setStep(W.tec) }}
+            exigeFotoEquipamento
+            erroChecklist={step === W.fotos || isCorrectionMode ? erroChecklist : ''}
           />
 
           <TecnicoStep
@@ -2468,6 +2599,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                 : NOTA_AMBITO_PONTOS,
               aberto: modoElevador,
             }}
+            exigeComunicacaoUrgente={modoElevador && contextoEmissaoFromForm(form, items).recomendaRetirada}
             onGuardarNomeContacto={guardarNomeContacto}
             opcoesAssinanteSecao={assinanteSecao.opcoes}
             secaoDetectada={assinanteSecao.secaoDetectada}

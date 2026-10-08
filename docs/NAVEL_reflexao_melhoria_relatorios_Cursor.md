@@ -128,13 +128,14 @@ Evitar “interdição legal”, como se a NAVEL fosse autoridade administrativa
 - Anomalia exige descrição e recomendação.
 - Não executado/não observado exige motivo.
 - Não aplicável exige fundamento.
-- Fim de curso danificado + grupo satisfatório: alertar incoerência e exigir esclarecimento antes de emissão.
+- Qualquer dispositivo de segurança danificado + grupo satisfatório: alertar incoerência e exigir esclarecimento antes de emissão.
 - Deficiência crítica impede textos positivos automáticos.
 - Teste não executado não pode surgir aprovado.
 - Documento não apresentado não pode ficar validado por assinatura do cliente.
 - Manutenção concluída não deve preencher aprovação de uso.
-- Recomendação urgente exige registo de comunicação, sem depender da assinatura.
-- Pedido de reparação, alteração ou certificação: assinalar fora do âmbito NAVEL; não gerar novo fluxo desses serviços.
+- Recomendação urgente exige registo de comunicação, sem depender da assinatura (o envio por email pode sanar este requisito, desde que fique registado no relatório essa opção).
+- Pedido de alteração ou certificação: assinalar fora do âmbito NAVEL; não gerar novo fluxo desses serviços.
+- Pedido de reparação: assinalar que será preparada uma ordem de serviço NAVEL para reparação.
 
 Pesquisa de palavras em notas pode ajudar, mas não substitui classificação técnica humana.
 

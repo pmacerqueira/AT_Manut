@@ -23,13 +23,35 @@ export const TEXTO_AMBITO_ELEVADOR =
   'O presente relatório documenta exclusivamente a manutenção preventiva realizada pela NAVEL, incluindo as operações executadas, as observações efetuadas e os testes funcionais expressamente identificados, nas condições existentes à data da intervenção. Não constitui certificação, declaração de conformidade, verificação legal de segurança, avaliação integral da segurança do equipamento ou validação da instalação original. As anomalias observadas e as recomendações correspondentes são comunicadas ao cliente nos termos registados neste documento. Esta delimitação não afasta as responsabilidades da NAVEL pela manutenção efetivamente realizada nem dispensa o cliente das suas obrigações próprias.'
 
 /** Falha nestes pontos: o relatório recomenda fora de serviço, sem ser interdição legal. */
-const RE_PONTO_FORA_DE_SERVICO = /bloqueio|cabos de a[cç]o|cabo de seguran[cç]a|porca de carga|trav[aã]o|sincroniza|fim de curso|limitador|bra[cç]os?|suportes? de carga|estrutura|ancoragem|fixa[cç][aã]o|reten[cç][aã]o/i
+const RE_PONTO_FORA_DE_SERVICO = /bloqueio|cabos de a[cç]o|cabo de seguran[cç]a|porca de carga|trav[aã]o|trancas?|sincroniza|fim de curso|limitador|bra[cç]os?|suportes? de carga|estrutura|ancoragem|fixa[cç][aã]o|reten[cç][aã]o/i
 
 export const TEXTO_RECOMENDACAO_FORA_DE_SERVICO =
   'Colocar o equipamento fora de serviço de imediato, após a tomada de conhecimento, a assinatura e o envio deste relatório, até correção da deficiência.'
 
 export const AVISO_FORA_DE_SERVICO =
   'Recomendação ao cliente: colocar o equipamento fora de serviço de imediato, após a tomada de conhecimento, a assinatura e o envio deste relatório, até correção da deficiência. As datas seguintes são planeamento e não autorizam o uso.'
+
+export const TEXTO_PLANEAMENTO_PROXIMAS =
+  'O agendamento indicado é um simples planeamento solicitado pelo cliente. Não constitui aprovação continuada de segurança, nem verificação legal ou de segurança. Essa verificação apenas poderá ser efetuada por uma Entidade Certificada Independente.'
+
+/** Máquinas cuja emissão de elevador mais recente recomenda fora de serviço. */
+export function maquinaIdsComRetiradaPendente(relatorios, manutencoes) {
+  const maquinaPorManut = new Map((manutencoes || []).map(m => [String(m.id), m.maquinaId]))
+  const latest = new Map()
+  for (const rel of relatorios || []) {
+    const em = emissaoDoRelatorio(rel)
+    if (!em) continue
+    const maquinaId = rel.maquinaId || maquinaPorManut.get(String(rel.manutencaoId))
+    if (maquinaId == null || maquinaId === '') continue
+    const chave = String(maquinaId)
+    const data = String(rel.dataAssinatura || rel.dataCriacao || '')
+    const prev = latest.get(chave)
+    if (!prev || data >= prev.data) latest.set(chave, { data, retirada: !!em.recomendaRetirada })
+  }
+  const ids = new Set()
+  for (const [id, v] of latest) if (v.retirada) ids.add(id)
+  return ids
+}
 
 export const TITULO_DECISAO_FORA_DE_SERVICO = 'Decisão operacional: Fora de serviço imediato'
 
@@ -281,18 +303,105 @@ export function rotuloRespostaPdf(valor) {
 
 const ROTULO_SIM_NAO = { sim: 'Sim', nao: 'Não', desconhecido: 'Desconhecido' }
 
+export const TEXTO_ORDEM_REPARACAO =
+  'Será preparada uma ordem de serviço NAVEL para reparação. Esta visita não executa a reparação.'
+
 export const TEXTO_PEDIDO_FORA_AMBITO =
-  'Não foi executado nesta visita. Não gera reparação, alteração nem certificação.'
+  'Não foi executado nesta visita. Não gera alteração nem certificação.'
+
+export const TEXTO_COMUNICACAO_EMAIL =
+  'A recomendação urgente fica comunicada pelo envio deste relatório por email. Não depende da assinatura do cliente.'
+
+const RE_GRUPO_SATISFATORIO = /dispositivos de seguran|estado geral|conserva[cç][aã]o vis/i
+
+export function grupoSatisfatorioComSegurancaDanificada(items, respostas) {
+  const lista = items || []
+  const danificados = lista.filter(it => {
+    const valor = respostas?.[it.id]
+    if ((valor?.papel || papelDoPonto(it)) === 'documento') return false
+    return pontoImplicaForaDeServico(it) && anomaliaNoPonto(valor)
+  })
+  if (!danificados.length) return null
+  const grupos = lista.filter(it => {
+    if (danificados.some(d => d.id === it.id)) return false
+    if (!RE_GRUPO_SATISFATORIO.test(String(it.texto ?? ''))) return false
+    const valor = respostas?.[it.id]
+    if ((valor?.papel || papelDoPonto(it)) === 'documento') return false
+    return valor?.observacao === 'sem_anomalia' || codigoResposta(valor) === 'sim'
+  })
+  if (!grupos.length) return null
+  return {
+    danificados: danificados.map(it => String(it.texto ?? '').trim()).filter(Boolean),
+    grupos: grupos.map(it => String(it.texto ?? '').trim()).filter(Boolean),
+  }
+}
+
+export function mensagemIncoerenciaGrupo(items, respostas, esclarecimento) {
+  const hit = grupoSatisfatorioComSegurancaDanificada(items, respostas)
+  if (!hit) return ''
+  if (String(esclarecimento ?? '').trim().length >= DETALHE_MIN) return ''
+  return `Dispositivo de segurança com anomalia (${hit.danificados.join('; ')}) e grupo sem anomalia («${hit.grupos.join('; ')}»). Escreva o esclarecimento antes de emitir.`
+}
 
 export function mensagemPedidoForaAmbito(form) {
-  const extra = form?.pedidoExtra || ''
-  if (extra !== 'nao' && extra !== 'sim') {
-    return 'Indique se o cliente pediu também reparação, alteração ou certificação.'
+  const rep = form?.pedidoReparacao || ''
+  const fora = form?.pedidoFora || ''
+  if (rep !== 'nao' && rep !== 'sim') return 'Indique se o cliente pediu reparação.'
+  if (rep === 'sim' && String(form?.pedidoReparacaoDescricao || '').trim().length < DETALHE_MIN) {
+    return 'Descreva a reparação pedida. Fica registado que será preparada uma ordem de serviço NAVEL.'
   }
-  if (extra === 'sim' && String(form?.pedidoExtraDescricao || '').trim().length < DETALHE_MIN) {
-    return 'Descreva o pedido de reparação, alteração ou certificação. Fica fora desta visita e não é executado.'
+  if (fora !== 'nao' && fora !== 'sim') return 'Indique se o cliente pediu alteração ou certificação.'
+  if (fora === 'sim' && String(form?.pedidoForaDescricao || '').trim().length < DETALHE_MIN) {
+    return 'Descreva o pedido de alteração ou certificação. Fica fora do âmbito e não é executado.'
   }
   return ''
+}
+
+export function mensagemComunicacaoUrgente(form, { urgente = false, vaiEnviarEmail = false } = {}) {
+  if (!urgente) return ''
+  const modo = form?.comunicacaoUrgente || ''
+  if (modo === 'email') {
+    if (!vaiEnviarEmail) {
+      return 'A recomendação urgente por email exige o envio do relatório agora. Sem envio, registe outro canal.'
+    }
+    return ''
+  }
+  if (modo === 'outro') {
+    if (String(form?.comunicacaoUrgenteNota || '').trim().length < DETALHE_MIN) {
+      return 'Registe o canal da recomendação urgente. Não depende da assinatura.'
+    }
+    return ''
+  }
+  return 'Registe a comunicação da recomendação urgente. O envio do relatório por email serve, se for feito agora.'
+}
+
+/** A série vista na chapa só fica confirmada com a fotografia dessa chapa. Vale para qualquer equipamento. */
+export function mensagemFotoChapa(form, { confirmada = false } = {}) {
+  const serie = form?.serieConfirmada
+  if (serie === 'desconhecido') return ''
+  const precisa = confirmada || serie === 'sim' || serie === 'nao'
+  if (!precisa) return ''
+  if (String(form?.fotoChapa || '').startsWith('data:image')) return ''
+  return 'Tire uma foto da chapa de identificação do equipamento.'
+}
+
+export const TEXTO_FOTOS_EQUIPAMENTO = 'Introduzir fotos do equipamento e do local de instalação'
+
+/** A chapa não substitui a foto do equipamento e do local. Vale para qualquer equipamento. */
+export function mensagemFotosEquipamento(fotos, fotoChapa) {
+  const lista = (Array.isArray(fotos) ? fotos : []).filter(Boolean)
+  const chapa = String(fotoChapa || '')
+  const doEquipamento = chapa.startsWith('data:image') ? lista.filter(f => f !== chapa) : lista
+  if (doEquipamento.length >= 1) return ''
+  return TEXTO_FOTOS_EQUIPAMENTO
+}
+
+/** A chapa fica na primeira posição das fotos do relatório, sem repetir. */
+export function fotosComChapa(fotos, fotoChapa, max = 6) {
+  const lista = (Array.isArray(fotos) ? fotos : []).filter(Boolean)
+  const chapa = String(fotoChapa || '')
+  if (!chapa.startsWith('data:image')) return lista.slice(0, max)
+  return [chapa, ...lista.filter(f => f !== chapa)].slice(0, max)
 }
 
 export function linhasContextoEmissao(emissao) {
@@ -300,6 +409,7 @@ export function linhasContextoEmissao(emissao) {
   const sn = (v) => ROTULO_SIM_NAO[v] || ''
   const rows = []
   if (emissao.serieConfirmada) rows.push(['SÉRIE CONFIRMADA NO LOCAL', sn(emissao.serieConfirmada) || String(emissao.serieConfirmada)])
+  if (emissao.fotoChapa) rows.push(['FOTO DA CHAPA DE IDENTIFICAÇÃO', 'Sim'])
   if (emissao.anoFabrico) rows.push(['ANO DE FABRICO', String(emissao.anoFabrico)])
   if (emissao.capacidadeComunicada) rows.push(['CAPACIDADE COMUNICADA', String(emissao.capacidadeComunicada)])
   if (emissao.fornecidoPelaNavel) rows.push(['FORNECIDO PELA NAVEL', sn(emissao.fornecidoPelaNavel)])
@@ -307,8 +417,21 @@ export function linhasContextoEmissao(emissao) {
   if (emissao.funcaoAssinante) rows.push(['FUNÇÃO DE QUEM RECEBE', String(emissao.funcaoAssinante)])
   if (emissao.assinaturaRecusada) rows.push(['ASSINATURA DO CLIENTE', `Recusada. Canal: ${emissao.canalAlternativo || '—'}`])
   if (emissao.pedidoSoPreventiva) rows.push(['PEDIDO', 'Só manutenção preventiva'])
-  if (emissao.pedidoExtra === 'sim' && emissao.pedidoExtraDescricao) {
+  if (emissao.pedidoReparacao === 'sim' && emissao.pedidoReparacaoDescricao) {
+    rows.push(['ORDEM DE SERVIÇO DE REPARAÇÃO', `${emissao.pedidoReparacaoDescricao}. ${TEXTO_ORDEM_REPARACAO}`])
+  }
+  if (emissao.pedidoFora === 'sim' && emissao.pedidoForaDescricao) {
+    rows.push(['PEDIDO FORA DO ÂMBITO', `${emissao.pedidoForaDescricao}. ${TEXTO_PEDIDO_FORA_AMBITO}`])
+  } else if (emissao.pedidoExtra === 'sim' && emissao.pedidoExtraDescricao) {
     rows.push(['PEDIDO FORA DO ÂMBITO', `${emissao.pedidoExtraDescricao}. ${TEXTO_PEDIDO_FORA_AMBITO}`])
+  }
+  if (emissao.esclarecimentoIncoerencia) {
+    rows.push(['ESCLARECIMENTO', String(emissao.esclarecimentoIncoerencia)])
+  }
+  if (emissao.comunicacaoUrgente === 'email') {
+    rows.push(['COMUNICAÇÃO DA RECOMENDAÇÃO URGENTE', TEXTO_COMUNICACAO_EMAIL])
+  } else if (emissao.comunicacaoUrgente === 'outro' && emissao.comunicacaoUrgenteNota) {
+    rows.push(['COMUNICAÇÃO DA RECOMENDAÇÃO URGENTE', String(emissao.comunicacaoUrgenteNota)])
   }
   if (emissao.limitacoesAdmissao) rows.push(['LIMITAÇÕES DO PEDIDO', String(emissao.limitacoesAdmissao)])
   return rows
@@ -328,13 +451,21 @@ export function contextoEmissaoFromForm(form, items, extra = {}) {
     assinaturaRecusada: extra.assinaturaRecusada != null ? !!extra.assinaturaRecusada : !!form?.assinaturaRecusada,
     canalAlternativo: String(form?.canalAlternativo || '').trim(),
     serieConfirmada: form?.serieConfirmada || '',
+    fotoChapa: String(form?.fotoChapa || '').startsWith('data:image'),
     anoFabrico: String(form?.anoFabrico || '').trim(),
     capacidadeComunicada: String(form?.capacidadeComunicada || '').trim(),
     fornecidoPelaNavel: form?.fornecidoPelaNavel || '',
     instaladoPelaNavel: form?.instaladoPelaNavel || '',
     pedidoSoPreventiva: !!form?.pedidoSoPreventiva,
+    pedidoReparacao: form?.pedidoReparacao === 'sim' ? 'sim' : (form?.pedidoReparacao === 'nao' ? 'nao' : ''),
+    pedidoReparacaoDescricao: form?.pedidoReparacao === 'sim' ? String(form?.pedidoReparacaoDescricao || '').trim() : '',
+    pedidoFora: form?.pedidoFora === 'sim' ? 'sim' : (form?.pedidoFora === 'nao' ? 'nao' : ''),
+    pedidoForaDescricao: form?.pedidoFora === 'sim' ? String(form?.pedidoForaDescricao || '').trim() : '',
     pedidoExtra: form?.pedidoExtra === 'sim' ? 'sim' : (form?.pedidoExtra === 'nao' ? 'nao' : ''),
     pedidoExtraDescricao: form?.pedidoExtra === 'sim' ? String(form?.pedidoExtraDescricao || '').trim() : '',
+    esclarecimentoIncoerencia: String(form?.esclarecimentoIncoerencia || '').trim(),
+    comunicacaoUrgente: form?.comunicacaoUrgente === 'email' || form?.comunicacaoUrgente === 'outro' ? form.comunicacaoUrgente : '',
+    comunicacaoUrgenteNota: form?.comunicacaoUrgente === 'outro' ? String(form?.comunicacaoUrgenteNota || '').trim() : '',
     limitacoesAdmissao: String(form?.limitacoesAdmissao || '').trim(),
     recomendaRetirada: recomenda,
   }
@@ -376,11 +507,6 @@ function detalheCurto(valor) {
 export function validarChecklistElevador(items, respostas) {
   const erros = []
   const lista = items || []
-  const haAnomalia = lista.some(it => {
-    const valor = respostas?.[it.id]
-    if ((valor?.papel || papelDoPonto(it)) === 'documento') return false
-    return codigoResposta(valor) === 'nao'
-  })
   for (const [i, it] of lista.entries()) {
     const valor = respostas?.[it.id]
     const c = codigoResposta(valor)
@@ -404,8 +530,14 @@ export function validarChecklistElevador(items, respostas) {
       if (testeConfirmaCargaVeiculo(it) && valor.executado && valor.carga !== 'sem_carga' && valor.carga !== 'com_carga') {
         erros.push(`Teste «${rotulo}»: confirme se foi sem carga ou com carga (veículo na função habitual, 2 ciclos completos).`)
       }
+      if (valor.executado && valor.observacao === 'nao_observado' && !detalheCurto(valor.motivo)) {
+        erros.push(`Teste «${rotulo}»: indique porque não foi observado.`)
+      }
       if (valor.observacao === 'anomalia' && !detalheCurto(valor.descricao)) {
         erros.push(`Teste «${rotulo}»: descreva a anomalia observada.`)
+      }
+      if (valor.observacao === 'anomalia' && !detalheCurto(valor.recomendacao)) {
+        erros.push(`Teste «${rotulo}»: indique a recomendação transmitida ao cliente.`)
       }
       continue
     }
@@ -426,9 +558,6 @@ export function validarChecklistElevador(items, respostas) {
       if (valor.observacao === 'anomalia') {
         if (!detalheCurto(valor.descricao)) erros.push(`Anomalia em «${rotulo}»: descreva o que observou.`)
         if (!detalheCurto(valor.recomendacao)) erros.push(`Anomalia em «${rotulo}»: indique a recomendação transmitida ao cliente.`)
-      }
-      if (haAnomalia && valor.observacao === 'sem_anomalia' && /estado geral|conserva[cç][aã]o vis[ií]vel|estrutura vis[ií]vel/i.test(rotulo)) {
-        erros.push('Há anomalias noutros pontos. A conservação visível não pode ficar sem anomalia observada.')
       }
       continue
     }

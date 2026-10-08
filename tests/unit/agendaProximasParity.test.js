@@ -91,6 +91,20 @@ describe('agenda ↔ PDF próximas (paridade)', () => {
     assert.ok(novas.some(n => n.data >= '2026-11-01'))
   })
 
+  it('pré-visualização antes de concluir não usa uma agenda antiga', () => {
+    const prox = buildProximasManutencoesManutencao({
+      relatorio: { dataCriacao: '2026-06-01T12:00:00.000Z' },
+      manutencao: { id: 'aberta', maquinaId: 'm1', status: 'em_progresso', tipo: 'periodica', tecnico: 'Tec' },
+      maquina: { id: 'm1', periodicidadeManut: 'semestral' },
+      manutencoes: [
+        { id: 'aberta', maquinaId: 'm1', status: 'em_progresso', tipo: 'periodica', data: '2026-06-01' },
+        { id: 'longe', maquinaId: 'm1', status: 'agendada', tipo: 'periodica', data: '2028-01-04' },
+      ],
+    })
+    assert.ok(prox[0].data > '2026-06-01')
+    assert.ok(prox[0].data < '2027-01-01')
+  })
+
   it('concluída sem slots abertos faz fallback a computarProximasDatas', () => {
     const prox = buildProximasManutencoesManutencao({
       relatorio: { dataCriacao: '2026-07-31T12:00:00.000Z' },

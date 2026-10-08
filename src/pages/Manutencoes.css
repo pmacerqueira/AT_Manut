@@ -157,6 +157,8 @@
 .checklist-identificacao { margin: 0.75rem 0; }
 .checklist-identificacao summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; }
 .checklist-identificacao label { display: block; margin-top: 0.5rem; }
+.checklist-chapa { margin-top: 0.75rem; }
+.checklist-chapa-thumb { width: 120px; margin-top: 0.5rem; }
 .checklist-identificacao input,
 .checklist-identificacao select,
 .checklist-identificacao textarea { width: 100%; min-height: 48px; margin-top: 0.25rem; }

@@ -32,11 +32,12 @@ const PASSES = [
  * @param {number} [indice]
  * @returns {string} nome do ficheiro
  */
-export function guardarFotoNoDispositivo(file, indice = 1) {
+export function guardarFotoNoDispositivo(file, indice = 1, rotulo = '') {
   const agora = new Date()
   const p = (n) => String(n).padStart(2, '0')
   const stamp = `${agora.getFullYear()}${p(agora.getMonth() + 1)}${p(agora.getDate())}_${p(agora.getHours())}${p(agora.getMinutes())}${p(agora.getSeconds())}`
-  const nome = `NAVEL_${stamp}_${indice}.jpg`
+  const sufixo = rotulo ? String(rotulo).replace(/[^\w.-]+/g, '') : String(indice)
+  const nome = `NAVEL_${stamp}_${sufixo || indice}.jpg`
   const url = URL.createObjectURL(file)
   const a = document.createElement('a')
   a.href = url

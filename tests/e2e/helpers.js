@@ -874,21 +874,30 @@ export async function checklistMarcarTodos(page) {
   }
 }
 
-/** Wizard de execução: «Seguinte» e, se aparecer, confirmação «Sim, avançar» (fotos vazias). */
+const JPEG_MINIMO = Buffer.from(
+  'ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbd53fffd9',
+  'hex',
+)
+
+async function anexarJpeg(locator) {
+  if (await locator.count() === 0) return
+  await locator.first().setInputFiles({
+    name: 'foto.jpg',
+    mimeType: 'image/jpeg',
+    buffer: JPEG_MINIMO,
+  })
+}
+
+/** Wizard de execução: «Seguinte». No passo das fotos, junta uma fotografia do equipamento. */
 export async function execWizardSeguinte(page) {
+  const passoFotos = page.getByText('Introduzir fotos do equipamento e do local de instalação')
+  if (await passoFotos.isVisible({ timeout: 800 }).catch(() => false)) {
+    await anexarJpeg(page.locator('.fotos-section input[type="file"]').first())
+    await page.waitForTimeout(600)
+  }
   const seguinte = page.locator('.wizard-footer-actions button.btn.primary').filter({ hasText: /Seguinte/ })
   if (await seguinte.isVisible({ timeout: 4000 }).catch(() => false)) {
     await seguinte.click()
-    await page.waitForTimeout(250)
-  }
-  // Confirmação inline no passo Fotografias — o rodapé com «Seguinte» pode interceptar o hit-test; forçar + scroll.
-  const simAvancar = page
-    .locator('.wizard-confirm')
-    .filter({ hasText: /continuar sem fotografias|sem fotografias/i })
-    .getByRole('button', { name: /Sim, avançar/i })
-  if (await simAvancar.isVisible({ timeout: 2500 }).catch(() => false)) {
-    await simAvancar.scrollIntoViewIfNeeded()
-    await simAvancar.click({ force: true })
     await page.waitForTimeout(250)
   }
 }
@@ -897,7 +906,16 @@ export async function execWizardSeguinte(page) {
 export async function confirmExecWizardVerificacaoEquipamento(page) {
   const verif = page.locator('[data-testid="exec-passo-verificacao"]')
   if (await verif.isVisible({ timeout: 4000 }).catch(() => false)) {
+    const chooser = page.waitForEvent('filechooser', { timeout: 2500 }).catch(() => null)
     await verif.locator('input[type="checkbox"]').first().check()
+    const ficheiro = await chooser
+    if (ficheiro) {
+      await ficheiro.setFiles({ name: 'chapa.jpg', mimeType: 'image/jpeg', buffer: JPEG_MINIMO })
+      await page.waitForTimeout(600)
+    } else {
+      await anexarJpeg(verif.locator('[data-testid="foto-chapa-input"]'))
+      await page.waitForTimeout(600)
+    }
     await execWizardSeguinte(page)
   }
 }

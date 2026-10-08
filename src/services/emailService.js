@@ -19,7 +19,7 @@ import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
 import { codigoResposta, emissaoDoRelatorio, rotuloRespostaPdf, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
-import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
+import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { buildResumoExecutivoEmailPayload } from '../utils/relatorioPdfResumo'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { notasRelatorioParaTexto, getQuickNotes } from '../components/executarManutencao/execWizardHelpers'
@@ -233,6 +233,7 @@ export async function enviarRelatorioEmail({
               notaLegalTitulo: NOTA_LEGAL_COLOCACAO_TITULO,
               notaLegalIntro: NOTA_LEGAL_COLOCACAO_INTRO,
               notaLegalLinhas: NOTA_LEGAL_COLOCACAO_LINHAS,
+              notaLegalFontes: NOTA_LEGAL_COLOCACAO_FONTES,
             }
           : {}),
       }

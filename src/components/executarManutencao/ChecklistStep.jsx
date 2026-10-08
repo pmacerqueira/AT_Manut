@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { History, X } from 'lucide-react'
+import FotoChapaCampo from './FotoChapaCampo'
 import MaquinaDocumentacaoLinks from '../MaquinaDocumentacaoLinks'
 import ChecklistElevadorPonto from './ChecklistElevadorPonto'
 import { limparCitacaoNormaChecklist } from '../../domain/notaLegalColocacaoMercado'
@@ -7,6 +8,7 @@ import {
   codigoResposta,
   ESTADOS_MANUTENCAO_ELEVADOR,
   fundamentoInaplicavel,
+  mensagemIncoerenciaGrupo,
   papelDoPonto,
   respostaInaplicavel,
   respostaOperacao,
@@ -33,6 +35,8 @@ export default function ChecklistStep({
   manutencaoAtual,
   aplicarTipoKaeserComPecas,
   modoElevador = false,
+  onFotoChapa,
+  fotoChapaCarregando = false,
 }) {
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem')
   /** Em «Corrigir relatório» KAESER A/B/C/D o modal já tem tabela editável — evitar duplicar lista só-leitura. */
@@ -40,7 +44,9 @@ export default function ChecklistStep({
     && (isCorrectionMode || !useKaeserPipeline)
     && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser))
   const identificacaoRef = useRef(null)
-  const forcarIdentificacao = modoElevador && /pedido|s[eé]rie|limita/i.test(erroChecklist || '')
+  const forcarIdentificacao = modoElevador && /pedido|pediu|s[eé]rie|limita|esclarecimento|dispositivo de seguran|chapa/i.test(erroChecklist || '')
+  const chapaInputRef = useRef(null)
+  const pedeFotoChapa = form.serieConfirmada === 'sim' || form.serieConfirmada === 'nao'
 
   useEffect(() => {
     if (!forcarIdentificacao || !identificacaoRef.current) return
@@ -137,17 +143,33 @@ export default function ChecklistStep({
             </button>
           </div>
           {modoElevador && (
+            <>
             <details className="checklist-identificacao" open ref={identificacaoRef}>
               <summary>Identificação desta visita e pedido</summary>
               <label className="label-required">
                 Série confirmada no local
-                <select value={form.serieConfirmada || ''} onChange={e => setForm(f => ({ ...f, serieConfirmada: e.target.value }))}>
+                <select
+                  value={form.serieConfirmada || ''}
+                  onChange={e => {
+                    const valor = e.target.value
+                    setForm(f => ({ ...f, serieConfirmada: valor }))
+                    if ((valor === 'sim' || valor === 'nao') && !form.fotoChapa) chapaInputRef.current?.click()
+                  }}
+                >
                   <option value="">—</option>
                   <option value="sim">Sim</option>
                   <option value="nao">Não</option>
                   <option value="desconhecido">Não foi possível ver a chapa</option>
                 </select>
               </label>
+              {pedeFotoChapa && (
+                <FotoChapaCampo
+                  fotoChapa={form.fotoChapa}
+                  carregando={fotoChapaCarregando}
+                  onChange={onFotoChapa}
+                  inputRef={chapaInputRef}
+                />
+              )}
               <label>
                 Ano de fabrico (ou «desconhecido»)
                 <input value={form.anoFabrico || ''} maxLength={20} onChange={e => setForm(f => ({ ...f, anoFabrico: e.target.value }))} />
@@ -179,21 +201,40 @@ export default function ChecklistStep({
                 O pedido desta visita é manutenção preventiva
               </label>
               <label>
-                O cliente pediu também reparação, alteração ou certificação?
-                <select value={form.pedidoExtra || ''} onChange={e => setForm(f => ({ ...f, pedidoExtra: e.target.value, pedidoExtraDescricao: e.target.value === 'sim' ? f.pedidoExtraDescricao : '' }))}>
+                O cliente pediu reparação?
+                <select value={form.pedidoReparacao || ''} onChange={e => setForm(f => ({ ...f, pedidoReparacao: e.target.value, pedidoReparacaoDescricao: e.target.value === 'sim' ? f.pedidoReparacaoDescricao : '' }))}>
                   <option value="">—</option>
                   <option value="nao">Não</option>
-                  <option value="sim">Sim — fica fora desta visita</option>
+                  <option value="sim">Sim — será preparada ordem de serviço NAVEL</option>
                 </select>
               </label>
-              {form.pedidoExtra === 'sim' && (
+              {form.pedidoReparacao === 'sim' && (
                 <label>
-                  O que foi pedido (não é executado)
+                  Reparação pedida (não é executada nesta visita)
                   <textarea
-                    value={form.pedidoExtraDescricao || ''}
+                    value={form.pedidoReparacaoDescricao || ''}
                     maxLength={240}
-                    placeholder="Ex.: reparação do fim de curso, ou alteração da capacidade"
-                    onChange={e => setForm(f => ({ ...f, pedidoExtraDescricao: e.target.value }))}
+                    placeholder="Ex.: substituir o fim de curso"
+                    onChange={e => setForm(f => ({ ...f, pedidoReparacaoDescricao: e.target.value }))}
+                  />
+                </label>
+              )}
+              <label>
+                O cliente pediu alteração ou certificação?
+                <select value={form.pedidoFora || ''} onChange={e => setForm(f => ({ ...f, pedidoFora: e.target.value, pedidoForaDescricao: e.target.value === 'sim' ? f.pedidoForaDescricao : '' }))}>
+                  <option value="">—</option>
+                  <option value="nao">Não</option>
+                  <option value="sim">Sim — fora do âmbito, não é executado</option>
+                </select>
+              </label>
+              {form.pedidoFora === 'sim' && (
+                <label>
+                  Alteração ou certificação pedida
+                  <textarea
+                    value={form.pedidoForaDescricao || ''}
+                    maxLength={240}
+                    placeholder="Ex.: alteração da capacidade"
+                    onChange={e => setForm(f => ({ ...f, pedidoForaDescricao: e.target.value }))}
                   />
                 </label>
               )}
@@ -202,6 +243,19 @@ export default function ChecklistStep({
                 <textarea value={form.limitacoesAdmissao || ''} onChange={e => setForm(f => ({ ...f, limitacoesAdmissao: e.target.value }))} />
               </label>
             </details>
+            {mensagemIncoerenciaGrupo(items, form.checklistRespostas, '') && (
+              <label className="form-section">
+                Esclarecimento obrigatório
+                <textarea
+                  value={form.esclarecimentoIncoerencia || ''}
+                  maxLength={400}
+                  placeholder="O que está danificado e o que o grupo sem anomalia realmente abrange"
+                  onChange={e => setForm(f => ({ ...f, esclarecimentoIncoerencia: e.target.value }))}
+                />
+                <span className="form-hint">{mensagemIncoerenciaGrupo(items, form.checklistRespostas, form.esclarecimentoIncoerencia)}</span>
+              </label>
+            )}
+            </>
           )}
           <div className="checklist-respostas">
             {items.map((item, i) => {

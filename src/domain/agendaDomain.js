@@ -18,6 +18,7 @@ export const THREE_YEARS_MS = 3 * 365.25 * 24 * 3600 * 1000
 export function isSlotCadeiaPeriodicaAberta(m, maquinaId) {
   if (normEntityId(m.maquinaId) !== normEntityId(maquinaId)) return false
   if (!STATUS_MANUTENCAO_ABERTA.has(m.status)) return false
+  if (m.status === 'em_progresso') return false
   return m.tipo !== 'montagem'
 }
 
@@ -30,7 +31,7 @@ export function buildDiasOcupadosFromManutencoes(manutencoes, { excludeIds } = {
   const excl = excludeIds ? new Set(excludeIds) : null
   return new Set(
     manutencoes
-      .filter(m => (!excl || !excl.has(m.id)) && (m.status === 'agendada' || m.status === 'pendente'))
+      .filter(m => (!excl || !excl.has(m.id)) && (m.status === 'agendada' || m.status === 'pendente' || m.status === 'em_progresso'))
       .map(m => m.data),
   )
 }
@@ -49,6 +50,18 @@ export function calcLimiteExecucaoMs(dataExecIso, hojeStr) {
  * Slots passados: criar só se forem o primeiro da cadeia e o atraso ≤ 1 período
  * (ex.: execução Abr → Jul em falta em Ago). Âncoras antigas saltam anos passados.
  */
+function dataJaCobertaPelaCadeia(isoAjustada, isoBruta, datas) {
+  const perto = (iso) => {
+    const t = new Date(`${iso}T12:00:00`).getTime()
+    for (const existente of datas) {
+      const diff = Math.abs(new Date(`${existente}T12:00:00`).getTime() - t)
+      if (diff <= 3 * 24 * 3600 * 1000) return true
+    }
+    return false
+  }
+  return perto(isoAjustada) || perto(isoBruta)
+}
+
 export function deveIncluirSlotPeriodicoAntesDeHoje(iso, hojeStr, intervaloDias, novasCount) {
   if (!hojeStr || iso >= hojeStr) return true
   if (novasCount > 0) return false
@@ -78,6 +91,7 @@ export function gerarManutencoesPeriodicasFuturas({
   trackConflitos = false,
   manutencoesForConflitos = [],
   incluirCriadoEm = false,
+  datasJaNaCadeia = null,
 }) {
   const anoInicio = new Date(dataBaseIso).getFullYear()
   const anoFim = new Date(limiteMs).getFullYear()
@@ -85,6 +99,7 @@ export function gerarManutencoesPeriodicasFuturas({
   const ocupados = new Set(diasOcupados)
   const novas = []
   const conflitos = []
+  let passosCadeia = 0
   let d = new Date(`${dataBaseIso}T12:00:00`)
 
   while (true) {
@@ -93,7 +108,12 @@ export function gerarManutencoesPeriodicasFuturas({
 
     const { data: dAjustada, conflito } = encontrarDiaLivre(d, feriadosSet, ocupados)
     const iso = dateToIsoLocal(dAjustada)
-    if (!deveIncluirSlotPeriodicoAntesDeHoje(iso, hojeStr, intervaloDias, novas.length)) continue
+    if (!deveIncluirSlotPeriodicoAntesDeHoje(iso, hojeStr, intervaloDias, passosCadeia)) continue
+    if (datasJaNaCadeia && dataJaCobertaPelaCadeia(iso, dateToIsoLocal(d), datasJaNaCadeia)) {
+      passosCadeia += 1
+      ocupados.add(iso)
+      continue
+    }
 
     const idx = novas.length
     const id = idSuffixRandom
@@ -112,6 +132,7 @@ export function gerarManutencoesPeriodicasFuturas({
     }
     if (incluirCriadoEm) row.criadoEm = new Date().toISOString()
     novas.push(row)
+    passosCadeia += 1
 
     if (trackConflitos && conflito) {
       const existentes = manutencoesForConflitos.filter(
@@ -171,6 +192,11 @@ export function recalcularPeriodicasNoEstado(prev, {
   const idsRemoverSet = new Set(idsRemover)
   const semFuturas = prev.filter(m => !idsRemoverSet.has(m.id))
   const diasOcupados = buildDiasOcupadosFromManutencoes(semFuturas)
+  const datasJaNaCadeia = new Set(
+    semFuturas
+      .filter(m => normEntityId(m.maquinaId) === normEntityId(maquinaId) && m.status === 'em_progresso' && m.tipo !== 'montagem' && m.data)
+      .map(m => String(m.data).slice(0, 10)),
+  )
   const { novas } = gerarManutencoesPeriodicasFuturas({
     dataBaseIso: dataExecucao,
     periodicidade,
@@ -182,6 +208,7 @@ export function recalcularPeriodicasNoEstado(prev, {
     hojeStr,
     observacoes,
     idSeed,
+    datasJaNaCadeia,
   })
 
   return {
@@ -222,6 +249,11 @@ export function recalcularAgendaMaquinaNoAcc(acc, {
   let nextAcc = acc.filter(m => !idsRemoverSet.has(m.id))
 
   const diasOcupados = buildDiasOcupadosFromManutencoes(nextAcc)
+  const datasJaNaCadeia = new Set(
+    nextAcc
+      .filter(m => sameMid(m, maq.id) && m.status === 'em_progresso' && m.tipo !== 'montagem' && m.data)
+      .map(m => String(m.data).slice(0, 10)),
+  )
   const conclConc = nextAcc
     .filter(m => sameMid(m, maq.id) && m.status === 'concluida' && m.data)
     .sort((a, b) => b.data.localeCompare(a.data))
@@ -242,6 +274,7 @@ export function recalcularAgendaMaquinaNoAcc(acc, {
     idSeed,
     idSuffixRandom: true,
     incluirCriadoEm: true,
+    datasJaNaCadeia,
   })
 
   nextAcc = [...nextAcc, ...novas]

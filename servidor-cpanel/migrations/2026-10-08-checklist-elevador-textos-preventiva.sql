@@ -98,11 +98,11 @@ UPDATE checklist_items SET ordem = ordem + 2
 UPDATE checklist_items SET texto = 'Redutor: ruído e vibração' WHERE id = 'ch7';
 
 INSERT INTO checklist_items (id, subcategoria_id, ordem, texto)
-SELECT 'ch7b', 'sub1', 8, 'Motor: ruído e vibração'
+SELECT 'ch7b', 'sub1', 8, 'Motor de Accionamento'
  WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE id = 'ch7b');
 
 INSERT INTO checklist_items (id, subcategoria_id, ordem, texto)
-SELECT 'ch7c', 'sub1', 9, 'Travão: ferodos'
+SELECT 'ch7c', 'sub1', 9, 'Trancas de Segurança'
  WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE id = 'ch7c');
 
 UPDATE checklist_items SET ordem = ordem + 2
@@ -112,11 +112,11 @@ UPDATE checklist_items SET ordem = ordem + 2
 UPDATE checklist_items SET texto = 'Redutor: ruído e vibração' WHERE id = 'ch107';
 
 INSERT INTO checklist_items (id, subcategoria_id, ordem, texto)
-SELECT 'ch107b', 'sub13', 8, 'Motor: ruído e vibração'
+SELECT 'ch107b', 'sub13', 8, 'Motor de Accionamento'
  WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE id = 'ch107b');
 
 INSERT INTO checklist_items (id, subcategoria_id, ordem, texto)
-SELECT 'ch107c', 'sub13', 9, 'Travão: o que se observou'
+SELECT 'ch107c', 'sub13', 9, 'Trancas de Segurança'
  WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE id = 'ch107c');
 
 -- Onde já existe um teste de subida e descida, a última linha fica só a limpeza.
@@ -134,3 +134,6 @@ SELECT 'ch14c', 'sub1', 18, 'Limpeza do equipamento no fim da intervenção'
 INSERT INTO checklist_items (id, subcategoria_id, ordem, texto)
 SELECT 'ch114c', 'sub13', 18, 'Limpeza do equipamento no fim da intervenção'
  WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE id = 'ch114c');
+
+UPDATE checklist_items SET texto = 'Motor de Accionamento' WHERE id IN ('ch7b', 'ch107b');
+UPDATE checklist_items SET texto = 'Trancas de Segurança' WHERE id IN ('ch7c', 'ch107c');
