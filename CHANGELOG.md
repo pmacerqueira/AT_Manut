@@ -9,6 +9,16 @@ Política de continuidade:
 
 ---
 
+## [1.17.33] — 2026-10-09 — Barra «por enviar» deixa de piscar a cada gravação
+
+### Correcções
+- **Barra vermelha no rodapé durante <1 s ao gravar cliente/equipamento** (reportado no PC). Desde a v1.17.31 cada gravação entra primeiro na fila local e só depois segue para o servidor; a barra «Dados guardados neste telemóvel · 1 operação por enviar» aparecia no instante em que a operação entrava na fila e desaparecia quando o servidor respondia. Novo hook `usePendentesEstaveis(syncPending, isOnline)` (`src/hooks/`): online, só conta como «por enviar» o que continuar na fila após **1,5 s**; offline mostra de imediato; esvaziar a fila esconde de imediato. Aplicado em `OfflineBanner` (barra fixa) e no bloco «por enviar» do Dashboard.
+
+### Qualidade
+- Verificado com spec temporário: gravação de 700 ms → barra nunca aparece; gravação de 3 s → aparece após a tolerância e some ao concluir. Lints 0 erros.
+
+---
+
 ## [1.17.32] — 2026-10-09 — Telemóvel e tablet: auditoria responsiva dos fluxos do técnico
 
 Resultado de uma auditoria aos fluxos de trabalho em ecrãs de 390×844 (telemóvel) e 820×1180 (tablet), como ATecnica: Dashboard, Manutenções, assistente de execução (8 passos, incluindo bloqueios), Reparações, Equipamentos, Calendário, Agendar, offline. Sem overflow horizontal em nenhum ecrã; os problemas concentravam-se no assistente de execução no telemóvel. Cinco melhorias + notas menores, todas implementadas.

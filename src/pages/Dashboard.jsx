@@ -10,6 +10,7 @@ import { logger } from '../utils/logger'
 import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper, Hammer, CloudUpload } from 'lucide-react'
 import { queueItems } from '../services/syncQueue'
 import { descreverPendentesPorEnviar } from '../domain/pendentesEnvioDomain'
+import { usePendentesEstaveis } from '../hooks/usePendentesEstaveis'
 // Search e Play mantidos para uso no day-panel
 import {
   format,
@@ -40,7 +41,9 @@ import './Dashboard.css'
 import { pt } from 'date-fns/locale'
 
 export default function Dashboard() {
-  const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria, syncPending, isSyncing, processSync, isOnline } = useData()
+  const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria, syncPending: syncPendingBruto, isSyncing, processSync, isOnline } = useData()
+  // Bloco «por enviar» só aparece com itens realmente retidos (não durante o envio normal de uma gravação)
+  const syncPending = usePendentesEstaveis(syncPendingBruto, isOnline)
   const contentReady = useDeferredReady(manutencoes.length >= 0)
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'

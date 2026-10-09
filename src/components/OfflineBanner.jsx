@@ -14,13 +14,17 @@ import { cacheTimestamp } from '../services/localCache'
 import { getHojeAzores } from '../utils/datasAzores'
 import { addDays } from 'date-fns'
 import { CloudOff, CheckCircle2 } from 'lucide-react'
+import { usePendentesEstaveis } from '../hooks/usePendentesEstaveis'
 import './OfflineBanner.css'
 
 const PREFETCH_DIAS = 5
 const READY_DISPLAY_MS = 3000 // pílula flutuante: 2.5 s visível + fade (CSS)
 
 export default function OfflineBanner() {
-  const { isOnline, syncPending, processSync, manutencoes, maquinas, loading } = useData()
+  const { isOnline, syncPending: syncPendingBruto, processSync, manutencoes, maquinas, loading } = useData()
+  // Só conta como "por enviar" o que continua na fila depois de uma tolerância (evita a barra a piscar
+  // a cada gravação bem-sucedida — a operação entra na fila antes de seguir para o servidor).
+  const syncPending = usePendentesEstaveis(syncPendingBruto, isOnline)
   const [syncing,   setSyncing]   = useState(false)
   const [cacheDate, setCacheDate] = useState(null)
   const [visible,   setVisible]   = useState(false)
