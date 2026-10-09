@@ -938,15 +938,25 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setForm(f => (f.fotoChapa && f.fotoChapa === alvo ? { ...f, fotoChapa: '' } : f))
   }, [fotos])
 
-  const handleFotoChapa = useCallback(async (e) => {
+  const handleFotoChapa = useCallback(async (e, origem = 'camara') => {
     const file = e.target.files?.[0]
     if (!file) return
-    guardarFotoNoDispositivo(file, 1, 'chapa')
-    showToast('Cópia da chapa guardada no telemóvel, na pasta Transferências.', 'info', 4000)
+    if (file.type && !file.type.startsWith('image/')) {
+      showToast('O ficheiro escolhido não é uma imagem.', 'error', 4000)
+      if (e.target) e.target.value = ''
+      return
+    }
+    // Da galeria a foto já está no telemóvel — a cópia em Transferências só faz sentido para a câmara.
+    if (origem === 'camara') {
+      guardarFotoNoDispositivo(file, 1, 'chapa')
+      showToast('Cópia da chapa guardada no telemóvel, na pasta Transferências.', 'info', 4000)
+    }
     setFotoCarregando(true)
     try {
       const blob = await fileToMemory(file)
       const dataUrl = await comprimirFotoParaRelatorio(blob)
+      logger.action('ExecutarManutencaoModal', 'fotoChapa',
+        `Foto da chapa (${origem}) reduzida de ${Math.round(file.size / 1024)} KB para ~${Math.round(dataUrl.length * 0.75 / 1024)} KB`)
       setForm(f => ({ ...f, fotoChapa: dataUrl }))
       setFotos(prev => fotosComChapa(prev, dataUrl, MAX_FOTOS))
     } catch (err) {

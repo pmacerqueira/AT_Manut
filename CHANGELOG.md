@@ -9,6 +9,17 @@ Política de continuidade:
 
 ---
 
+## [1.17.34] — 2026-10-09 — Foto da chapa também a partir da galeria
+
+### Novidades
+- **Passo 1 (manutenção) e reparação — «Galeria» ao lado de «Tirar foto da chapa»** (`FotoChapaCampo.jsx`). Segundo `<input type="file" accept="image/*">` sem `capture` (`data-testid="foto-chapa-galeria-input"`); o handler recebe `origem` (`'camara' | 'galeria'`). Da galeria **não** se grava cópia em Transferências (a foto já está no telemóvel) nem aparece o toast respectivo; da câmara mantém-se tudo como estava. Ficheiros que não sejam imagem são recusados com toast de erro.
+- **Tamanho das fotos da galeria:** a compressão já existente (`comprimirImagemRelatorio.js` — passagens 1200 px/0,78 → … → 640 px/0,36, meta ~280–320 KB por foto) aplica-se também à chapa. Medido em teste: JPEG 4000×3000 de **11,6 MB → ~194 KB em 1,4 s**, sem sobrecarregar o upload. Cada foto da chapa fica registada no log com o tamanho original → reduzido (`logger.action … fotoChapa`).
+
+### Qualidade
+- Specs 04 + 09: 43/43. Verificação temporária (removida): galeria 11,6 MB → 194 KB sem download; câmara → download `NAVEL_<data>_chapa.jpg`.
+
+---
+
 ## [1.17.33] — 2026-10-09 — Barra «por enviar» deixa de piscar a cada gravação
 
 ### Correcções

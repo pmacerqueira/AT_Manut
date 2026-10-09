@@ -47,6 +47,7 @@ Objetivo: **mínimo percurso** sem **redundâncias** que façam perder o context
 | **Checklist elevador compacta** | Botões em 2 colunas (3 no tablet). Pontos correntes: atalho «Executado, sem anomalia» + «Responder em detalhe» (abre os grupos feito/observado; abrem sozinhos se já houver resposta fora do atalho). Pontos de segurança: grupos sempre visíveis. |
 | **Modal de reparação** | Ecrã inteiro no telemóvel, rodapé fixo `[👁] [Guardar progresso] / [Concluir e assinar]`; sem «Cancelar» (× no cabeçalho). |
 | **Só o que o técnico precisa** | «Sincronizar agenda» e «Selecionar» (lote) são Admin-only. Cartão com uma única acção mostra «Editar» directo. Badge «5d atraso / Hoje / em 10d». |
+| **Foto da chapa: câmara ou galeria** (v1.17.34) | Passo 1 e reparação têm «Tirar foto da chapa» e «Galeria». Da câmara fica cópia em Transferências; da galeria não. Em ambos a imagem é reduzida por `comprimirFotoParaRelatorio` (≤1200 px, ~200–320 KB) — um original de 11,6 MB passa a ~194 KB. |
 | **Mínimos de leitura/toque** | Campos ≥ 16 px em ecrãs tácteis (sem zoom iOS); texto ≥ 12 px; barra verde de prontidão como pílula flutuante que não bloqueia toques; «Menu» da barra inferior fecha o menu lateral. |
 
 ## Fases técnicas

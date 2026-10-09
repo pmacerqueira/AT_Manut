@@ -885,6 +885,7 @@ body:has(.modal-overlay) {
   display: block;
 }
 .checklist-chapa { margin-top: 0.75rem; }
+.checklist-chapa-btns { flex-wrap: wrap; margin-top: 0.35rem; }
 .checklist-chapa-thumb { width: 120px; margin-top: 0.5rem; }
 
 .foto-chapa-legenda {
