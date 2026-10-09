@@ -1,6 +1,6 @@
 # AT_Manut — Documentação Técnica
 
-**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-10-08
+**Versão:** ver `src/config/version.js` · **Última revisão estrutural:** 2026-10-09
 
 > Nota de continuidade entre agentes/modelos:
 > - não existe memória global automática entre chats;
@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (114 testes) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (189 testes) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -133,7 +133,9 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   │   ├── apiService.js               # Chamadas ao backend PHP/MySQL (inclui reparações)
 │   │   ├── emailService.js             # enviarRelatorio, enviarLembreteEmail
 │   │   ├── localCache.js               # Cache de dados do servidor (TTL 30 dias)
-│   │   └── syncQueue.js                # Fila de operações offline → sync
+│   │   ├── idbKv.js                    # Mini key-value sobre IndexedDB (uma store por DB)
+│   │   ├── execDraft.js                # Rascunhos do wizard de execução (IndexedDB, TTL 14 dias)
+│   │   └── syncQueue.js                # Fila de operações offline → sync (IndexedDB + espelho em memória)
 │   │
 │   ├── utils/
 │   │   ├── relatorioBaseStyles.js      # CSS base partilhado entre relatórios HTML (frota, histórico)
@@ -169,7 +171,7 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │
 ├── tests/
 │   ├── e2e/                            # Playwright — ver docs/TESTES-E2E.md (452 testes · 19 ficheiros)
-│   └── unit/                           # Node test runner — npm run test:unit (114 testes)
+│   └── unit/                           # Node test runner — npm run test:unit (189 testes)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
@@ -234,7 +236,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 | Chave | Conteúdo |
 |-------|----------|
 | `atm_cache_v1` | Cache principal — snapshot de todos os dados do servidor (TTL 30 dias). Usado quando offline. |
-| `atm_sync_queue` | Fila de operações offline pendentes — enviadas ao reconectar |
+| IndexedDB `atm_sync_queue_v1` | Fila de operações offline pendentes (até 200 MB; espelho em memória em `syncQueue.js`) — enviadas ao reconectar. A chave legada `atm_sync_queue` do localStorage é migrada no arranque; sem IndexedDB usa-se o localStorage (4 MB). |
+| IndexedDB `atm_exec_drafts_v1` | Rascunhos do assistente de execução por manutenção (TTL 14 dias; `execDraft.js`). Fallback `atm_exec_draft_<id>` no localStorage, sem fotos. |
 | `atm_app_version` | Versão instalada (detecção de upgrade / cache busting) |
 | `atm_config_alertas` | `{ diasAviso: 7 }` — configuração de alertas |
 | `atm_alertas_dismiss` | Data ISO do último dismiss do modal proactivo |

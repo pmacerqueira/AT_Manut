@@ -106,6 +106,39 @@ O workspace `c:\Cursor_Projetos\NAVEL` contém vários projectos independentes (
 
 ---
 
+## 9) Handoff — técnico no terreno (2026-10-08, v1.17.31)
+
+**Origem:** avaliação de UX pedida pelo Pedro; implementados os pontos 1–4. **Ponto 5 (execução em lote) fica para análise conjunta** — as operações em lote são do Admin, não dos técnicos.
+
+**O que mudou e onde:**
+- Rascunho automático do wizard: `src/services/execDraft.js` + bloco de restauro/autosave em `ExecutarManutencaoModal.jsx` (`draftInfo`, `bootstrapTick`, `descartarRascunho`). Repõe só se `sig` (manutenção|relatório|checklist) coincidir e ≤ 14 dias. Cancelar guarda em vez de perder.
+- Checklist sem «Marcar todos»: `ChecklistStep.jsx` (só «Desmarcar todos»); `ChecklistElevadorPonto.jsx` com atalho «Executado, sem anomalia» excepto em pontos de segurança (`pontoImplicaForaDeServico`). Elevadores sem pré-preenchimento da visita anterior (`fontePreFill`).
+- Painel «Na última visita»: `src/domain/ultimaVisitaDomain.js` + `UltimaVisitaPanel.jsx` (passo 1).
+- Fila offline em IndexedDB: `syncQueue.js` (API síncrona mantida; `initQueue()` no mount do `DataContext`); Dashboard «O meu dia» com bloco «por enviar» (`pendentesEnvioDomain.js`).
+
+**Testes:** 189 unitários. Specs E2E 04 e 09 repostos a 43/43 — cinco testes de 04 e três de 09 já falhavam na v1.17.30 por mudanças do modelo de elevadores; os helpers (`checklistMarcarTodos`, `execWizardSeguinte`, `ensureNotasComFrasePredefinida`, `preencherContextoElevadorChecklist`, `preencherFuncaoAssinanteElevador`) foram alinhados.
+
+**Risco a vigiar:** rascunho reposto noutro dispositivo não acontece (é local); se o Admin corrigir o relatório entretanto, a `sig` muda e o rascunho é descartado — comportamento desejado.
+
+---
+
+## 10) Handoff — auditoria responsiva (2026-10-09, v1.17.32)
+
+**Origem:** auditoria aos fluxos do técnico em telemóvel (390×844) e tablet (820×1180) com Playwright (`isMobile`, `hasTouch`), como ATecnica. Sem overflow horizontal; os problemas estavam no assistente de execução no telemóvel. Cinco melhorias + notas menores, todas implementadas e verificadas por screenshot (toasts = 0 nos bloqueios; rodapés numa fila; checklist 2 colunas; rodapé da reparação visível sem scroll; «Menu» fecha o menu).
+
+**O que mudou e onde:**
+- Validação inline sem toast: `avisarBloqueio` (ExecutarManutencaoModal) só define `erroChecklist`/`erroAssinatura`; `Toast.jsx` exporta `clearToasts`; o wizard limpa toasts em cada `step` e no unmount. Estilo `.modal-relatorio-form .form-erro` (caixa vermelha, ícone «!», `scroll-margin-top`).
+- Cabeçalho/rodapé do wizard: `.wizard-head` + `.wizard-close` (×); `.wizard-footer-cancel` oculto ≤480 px; `.wizard-btn-prev` só ícone; `.wizard-btn-next` flex 1; `.wizard-footer--final` para Gravar/Enviar.
+- Checklist elevador: `ChecklistElevadorPonto.jsx` com `detalhePedido` + `.checklist-detalhe-toggle`; grelha 2 colunas em `.checklist-item-btns--elevador`.
+- Reparação: `ExecutarReparacaoModal.jsx` sem «Cancelar» no rodapé; CSS ≤600 px `height: 100dvh`; `Reparacoes.css` exclui `.modal-exec-rep` da regra de rodapé em coluna.
+- Admin-only: `AgendaCompletaRefreshButton` em Dashboard/Manutenções e «Selecionar» em Manutenções. Cartão mobile: «Editar» directo quando é a única acção; badge «5d atraso / em 10d».
+- Layout: `.sidebar-backdrop { bottom: nav-height }`; `.offline-banner--ready` pílula fixa `pointer-events: none`; `.bnav-item` 12 px.
+- Mínimos: `@media (pointer: coarse)` inputs 16 px `!important` (dentro do bloco ≤1024 px do `index.css`); `clamp(0.75rem, 2.2vw, 0.88rem)` nos títulos de modais.
+
+**Não feito / a decidir:** teste manual offline real (os screenshots offline do Playwright saem em branco por limitação do `goto` sem rede — seguir `docs/TESTE-OFFLINE-MANUAL.md`); ponto 5 da avaliação anterior (execução em lote) continua por analisar.
+
+---
+
 ## 6) Política de limpeza documental
 
 - Conteúdo redundante deve ser removido ou substituído por referência ao documento canónico.

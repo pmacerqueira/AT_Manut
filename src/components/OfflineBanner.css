@@ -81,12 +81,28 @@
   cursor: not-allowed;
 }
 
-/* M5: Prontidão da semana (dados carregados) */
+/* M5: Prontidão da semana (dados carregados) — pílula flutuante no topo, fora do fluxo:
+   não empurra o breadcrumb nem provoca salto de layout ao desaparecer, e não intercepta toques
+   (pointer-events: none) (v1.17.32). */
 .offline-banner--ready {
+  position: fixed;
+  top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  max-width: calc(100vw - 1.5rem);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
   background: #f0fdf4;
   color: #166534;
-  border-bottom: 1px solid #86efac;
-  animation: banner-slide-down 0.25s ease, banner-fade-out 0.5s ease 3.5s forwards;
+  border: 1px solid #86efac;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  animation: banner-pill-in 0.25s ease, banner-fade-out 0.5s ease 2.5s forwards;
+}
+@keyframes banner-pill-in {
+  from { transform: translate(-50%, -8px); opacity: 0; }
+  to   { transform: translate(-50%, 0);    opacity: 1; }
 }
 
 @keyframes banner-fade-out {

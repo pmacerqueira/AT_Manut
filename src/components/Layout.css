@@ -31,7 +31,7 @@
   background: none;
   border: none;
   color: var(--color-text);
-  font-size: var(--text-2xs);
+  font-size: 0.75rem; /* mínimo legível no terreno: 12px (v1.17.32) */
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -336,8 +336,11 @@
   .bottom-nav {
     display: flex;
   }
+  /* O fundo escuro termina acima da barra inferior: o botão «Menu» (que passa a ×) continua
+     a responder e fecha o menu com um toque (v1.17.32). */
   .sidebar-backdrop {
     display: block;
+    bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
   }
   .sidebar {
     position: fixed;

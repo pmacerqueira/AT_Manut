@@ -7,7 +7,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { logger } from '../utils/logger'
-import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper, Hammer } from 'lucide-react'
+import { Cpu, Wrench, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, X, Users, Search, Play, CalendarPlus, Package, ArrowLeft, Clock, PartyPopper, Hammer, CloudUpload } from 'lucide-react'
+import { queueItems } from '../services/syncQueue'
+import { descreverPendentesPorEnviar } from '../domain/pendentesEnvioDomain'
 // Search e Play mantidos para uso no day-panel
 import {
   format,
@@ -38,7 +40,7 @@ import './Dashboard.css'
 import { pt } from 'date-fns/locale'
 
 export default function Dashboard() {
-  const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria } = useData()
+  const { maquinas, manutencoes, clientes, reparacoes, getSubcategoria, getRelatorioByManutencao, getChecklistBySubcategoria, syncPending, isSyncing, processSync, isOnline } = useData()
   const contentReady = useDeferredReady(manutencoes.length >= 0)
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -99,6 +101,12 @@ export default function Dashboard() {
   [reparacoes, hoje])
 
   const totalHoje = manutHoje.length + reparacoesHoje.length
+
+  // Guardado neste telemóvel, por enviar ao servidor (fila offline)
+  const pendentesEnvio = useMemo(() => {
+    if (!syncPending) return []
+    return descreverPendentesPorEnviar(queueItems(), { manutencoes, maquinas, clientes, reparacoes })
+  }, [syncPending, manutencoes, maquinas, clientes, reparacoes])
 
   // Etapa 2 — Alerta de conformidade: dias máximos em atraso (dias civis, Açores)
   const diasMaxAtraso = useMemo(() => {
@@ -161,7 +169,8 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-header dashboard-page-header">
         <h1>Dashboard</h1>
-        <AgendaCompletaRefreshButton />
+        {/* Recalcular a agenda periódica é tarefa de gestão — só Admin (v1.17.32). */}
+        {isAdmin && <AgendaCompletaRefreshButton />}
         <div className="dashboard-header-spacer" aria-hidden="true" />
       </div>
 
@@ -230,6 +239,34 @@ export default function Dashboard() {
             <span className="badge badge-danger">{totalHoje} pendente{totalHoje > 1 ? 's' : ''}</span>
           )}
         </div>
+
+        {syncPending > 0 && (
+          <div className="meu-dia-por-enviar" role="status" data-testid="meu-dia-por-enviar">
+            <div className="meu-dia-por-enviar-head">
+              <CloudUpload size={16} />
+              <strong>Guardado neste telemóvel, por enviar ao servidor</strong>
+              <span className="badge badge-warning badge-sm">{syncPending}</span>
+            </div>
+            {pendentesEnvio.length > 0 && (
+              <ul className="meu-dia-por-enviar-lista">
+                {pendentesEnvio.map(p => (
+                  <li key={p.chave}>
+                    <span>{p.titulo}</span>
+                    {p.detalhe && <span className="meu-dia-item-cliente">{p.detalhe}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="meu-dia-por-enviar-acoes">
+              <span className="text-muted">
+                {isSyncing ? 'A enviar ao servidor…' : isOnline ? 'Nada se perde: envia quando tocar em Sincronizar ou sozinho em segundos.' : 'Sem rede. Fica guardado até haver ligação.'}
+              </span>
+              <button type="button" className="btn primary btn-sm" onClick={() => processSync()} disabled={isSyncing || !isOnline}>
+                {isSyncing ? 'A sincronizar…' : 'Sincronizar agora'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {totalHoje === 0 ? (
           <div className="meu-dia-vazio">

@@ -26,7 +26,8 @@ import { createReparacoesHandlers } from './slices/reparacoesSlice'
 import { APP_VERSION } from '../config/version'
 import { logger } from '../utils/logger'
 import { saveCache, loadCache } from '../services/localCache'
-import { enqueue, processQueue, queueSize, removeItem, setItemSending } from '../services/syncQueue'
+import { enqueue, initQueue, processQueue, queueSize, removeItem, setItemSending } from '../services/syncQueue'
+import { purgeExpiredExecDrafts } from '../services/execDraft'
 import { API_TIMEOUT_BULK_MS } from '../config/limits'
 
 const DataContext = createContext(null)
@@ -210,7 +211,14 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     fetchTodos({ source: 'mount' })
-    if (queueSize() > 0) processSync()
+    // A fila vive em IndexedDB: só depois de carregada sabemos se há operações por enviar.
+    initQueue()
+      .then(() => {
+        setSyncPending(queueSize())
+        if (queueSize() > 0) processSync()
+      })
+      .catch(() => {})
+    purgeExpiredExecDrafts().catch(() => {})
     const handleFocus = () => fetchTodos({ source: 'focus' })
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)

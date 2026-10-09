@@ -154,8 +154,9 @@ Quando o utilizador cola um relatório de suporte (texto iniciado com `=== RELAT
 |---|---|
 | Operação concluída (gravar, enviar, eliminar) | `showToast('msg', 'success')` |
 | Erro de rede / servidor | `showToast('msg', 'error', 4000)` |
-| Aviso de regra de negócio | `showToast('msg', 'warning')` |
+| Aviso de regra de negócio (fora de assistentes) | `showToast('msg', 'warning')` |
 | Validação de campo num formulário | Manter inline (próximo do campo) |
+| Bloqueio de passo nos assistentes de execução | **Inline** (`avisarBloqueio` → `.form-erro` no topo do passo + scroll); **nunca** toast. Chamar `clearToasts()` ao mudar de passo/fechar (v1.17.32) |
 | Erro de login | Manter inline (padrão UX) |
 
 ### Indicador de carregamento (Overlay "N")
@@ -187,7 +188,8 @@ logger.fatal('Componente', 'crash', erro.message, { stack: erro.stack?.slice(0,6
 | Chave | Conteúdo |
 |---|---|
 | `atm_cache_v1` | Snapshot dos dados do servidor (TTL 30 dias) |
-| `atm_sync_queue` | Fila de operações offline pendentes |
+| IndexedDB `atm_sync_queue_v1` | Fila de operações offline pendentes (v1.17.31+; `syncQueue.js` mantém API síncrona com espelho em memória; migra `atm_sync_queue` legado; fallback localStorage 4 MB) |
+| IndexedDB `atm_exec_drafts_v1` | Rascunhos do wizard de execução (`execDraft.js`, TTL 14 dias, repostos só se `sig` coincidir) |
 | `atm_app_version` | Versão para cache busting |
 | `atm_api_token` | JWT em `sessionStorage` (não localStorage) |
 
@@ -242,7 +244,7 @@ Formato: `MAJOR.MINOR.PATCH` — patches para correcções, minor para novas fun
 
 ## Testes E2E (Playwright)
 
-A suite tem **452 testes** listados (19 ficheiros em `tests/e2e/`) — contagem canónica: `npx playwright test tests/e2e/ --list`. **Unitários:** `npm run test:unit` — **113** testes em `tests/unit/`. Reporters: **list**, **blob** (`blob-report/`, suporta `--last-failed`), **html**, **json**.
+A suite tem **452 testes** listados (19 ficheiros em `tests/e2e/`) — contagem canónica: `npx playwright test tests/e2e/ --list`. **Unitários:** `npm run test:unit` — **189** testes em `tests/unit/`. Reporters: **list**, **blob** (`blob-report/`, suporta `--last-failed`), **html**, **json**.
 
 ```powershell
 # O Playwright arranca o Vite via webServer (playwright.config.js). Com CI=true não reaproveita servidor na porta 5173.

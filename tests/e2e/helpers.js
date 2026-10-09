@@ -865,12 +865,84 @@ export function getInputByLabel(page, labelText, scope = '.modal') {
 
 // ── Acções no checklist ───────────────────────────────────────────────────────
 
-/** Marca todos os itens do checklist como "Sim" via botão "Marcar todos". */
+/**
+ * Responde «sem anomalia» a todos os pontos da checklist.
+ * Desde a v1.17.31 não existe botão global «Marcar todos»: o técnico responde ponto a ponto.
+ * Nos pontos de elevador correntes usa o atalho «Executado, sem anomalia»; nos pontos de
+ * segurança (sem atalho) responde à execução e à observação em separado.
+ */
 export async function checklistMarcarTodos(page) {
-  const btn = page.locator('.checklist-quick-actions .btn-link-checklist').filter({ hasText: /^Marcar todos$/i })
-  if (await btn.isVisible({ timeout: 4000 }).catch(() => false)) {
-    await btn.click()
-    await page.waitForTimeout(300)
+  await page.locator('.checklist-item-row').first().waitFor({ state: 'visible', timeout: 4000 }).catch(() => {})
+  const rows = page.locator('.checklist-item-row')
+  const count = await rows.count()
+  for (let i = 0; i < count; i++) {
+    const row = rows.nth(i)
+    const atalho = row.locator('.btn-simnao--atalho')
+    if (await atalho.count() > 0) {
+      await atalho.click()
+      await page.waitForTimeout(60)
+      continue
+    }
+    // Grupos de botões: primeiro botão de cada grupo = resposta positiva (Sim / Executado / Sem anomalia).
+    // Os sub-grupos (observação, condição) só aparecem depois da resposta anterior, por isso iteramos até estabilizar.
+    for (let passo = 0; passo < 4; passo++) {
+      const grupos = row.locator('.checklist-item-btns')
+      const nGrupos = await grupos.count()
+      let clicou = false
+      for (let g = 0; g < nGrupos; g++) {
+        const grupo = grupos.nth(g)
+        if (await grupo.locator('.btn-simnao.active-sim, .btn-simnao.active-na').count() > 0) continue
+        const positivo = grupo.locator('.btn-simnao').first()
+        if (await positivo.isVisible().catch(() => false)) {
+          await positivo.click()
+          await page.waitForTimeout(60)
+          clicou = true
+        }
+      }
+      if (!clicou) break
+    }
+  }
+  await page.waitForTimeout(200)
+  await preencherContextoElevadorChecklist(page)
+}
+
+/**
+ * Elevadores (modelo preventivo 2026-10): o passo da checklist exige também o contexto da visita
+ * — série confirmada, pedido só preventivo, reparação/alteração pedidas. Preenche o mínimo coerente
+ * com «sem anomalias»; é inócuo nas outras categorias (os campos não existem).
+ */
+export async function preencherContextoElevadorChecklist(page) {
+  const modal = page.locator('.modal, [role="dialog"]').first()
+  const serie = modal.getByLabel('Série confirmada no local')
+  if (await serie.count() === 0) return
+  const abrir = modal.getByText('Identificação desta visita e pedido').first()
+  if (await abrir.isVisible().catch(() => false)) {
+    const aberto = await serie.isVisible().catch(() => false)
+    if (!aberto) await abrir.click()
+  }
+  if (await serie.isVisible().catch(() => false) && !(await serie.inputValue())) {
+    await serie.selectOption('sim')
+  }
+  const preventiva = modal.getByLabel('O pedido desta visita é manutenção preventiva')
+  if (await preventiva.isVisible().catch(() => false) && !(await preventiva.isChecked())) {
+    await preventiva.check()
+  }
+  const rep = modal.getByLabel('O cliente pediu reparação?')
+  if (await rep.isVisible().catch(() => false) && !(await rep.inputValue())) {
+    await rep.selectOption('nao')
+  }
+  const fora = modal.getByLabel('O cliente pediu alteração ou certificação?')
+  if (await fora.isVisible().catch(() => false) && !(await fora.inputValue())) {
+    await fora.selectOption('nao')
+  }
+  await page.waitForTimeout(120)
+}
+
+/** Elevadores: o passo do cliente pede também a função de quem recebe o relatório. Inócuo nas outras categorias. */
+export async function preencherFuncaoAssinanteElevador(page, funcao = 'Responsável de oficina') {
+  const campo = page.locator('.modal input[placeholder*="responsável de oficina" i]').first()
+  if (await campo.isVisible().catch(() => false) && !(await campo.inputValue())) {
+    await campo.fill(funcao)
   }
 }
 
@@ -879,21 +951,33 @@ const JPEG_MINIMO = Buffer.from(
   'hex',
 )
 
-async function anexarJpeg(locator) {
+// PNG 1×1 distinto do JPEG: a app não conta como foto do equipamento uma imagem igual à da chapa.
+const PNG_MINIMO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+async function anexarJpeg(locator, { variante = 'jpeg' } = {}) {
   if (await locator.count() === 0) return
-  await locator.first().setInputFiles({
-    name: 'foto.jpg',
-    mimeType: 'image/jpeg',
-    buffer: JPEG_MINIMO,
-  })
+  await locator.first().setInputFiles(variante === 'png'
+    ? { name: 'equipamento.png', mimeType: 'image/png', buffer: PNG_MINIMO }
+    : { name: 'foto.jpg', mimeType: 'image/jpeg', buffer: JPEG_MINIMO })
 }
 
 /** Wizard de execução: «Seguinte». No passo das fotos, junta uma fotografia do equipamento. */
 export async function execWizardSeguinte(page) {
-  const passoFotos = page.getByText('Introduzir fotos do equipamento e do local de instalação')
+  // `.first()`: o texto repete-se (ajuda + mensagem de bloqueio) e sem ele o strict mode devolvia false.
+  const passoFotos = page.getByText('Introduzir fotos do equipamento e do local de instalação').first()
   if (await passoFotos.isVisible({ timeout: 800 }).catch(() => false)) {
-    await anexarJpeg(page.locator('.fotos-section input[type="file"]').first())
-    await page.waitForTimeout(600)
+    const grelha = page.locator('.fotos-section .fotos-grid img, .fotos-section .foto-thumb')
+    const antes = await grelha.count()
+    await anexarJpeg(page.locator('.fotos-section input[type="file"]').first(), { variante: 'png' })
+    // A foto é comprimida de forma assíncrona — esperar que apareça na grelha antes de avançar.
+    await expect
+      .poll(async () => grelha.count(), { timeout: 6000, intervals: [150, 300, 500] })
+      .toBeGreaterThan(antes)
+      .catch(() => {})
+    await page.waitForTimeout(200)
   }
   const seguinte = page.locator('.wizard-footer-actions button.btn.primary').filter({ hasText: /Seguinte/ })
   if (await seguinte.isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -920,9 +1004,13 @@ export async function confirmExecWizardVerificacaoEquipamento(page) {
   }
 }
 
-/** Alinha com a regra da app: observações com pelo menos uma frase das notas rápidas por defeito. */
+/**
+ * Alinha com a regra da app: observações descritivas (≥ 24 caracteres com espaços ou nota rápida).
+ * Usa texto livre neutro — o modelo preventivo de elevadores bloqueia frases genéricas
+ * («Equipamento em bom estado geral», etc.), por isso não se usa nota rápida positiva.
+ */
 export function ensureNotasComFrasePredefinida(text) {
-  const snippet = 'Equipamento em bom estado geral'
+  const snippet = 'Verificação executada em todos os pontos da checklist; sem anomalias a reportar.'
   const t = (text || '').trim()
   if (t.includes(snippet)) return t
   return t ? `${t}\n${snippet}` : snippet
@@ -1045,10 +1133,11 @@ export async function fillExecucaoModal(page, {
   }
   await execWizardSeguinte(page)
 
-  const inputNome = page.locator('.modal input[placeholder*="Nome completo" i], .modal input[placeholder*="responsável" i]').first()
+  const inputNome = page.locator('.modal input[placeholder*="Nome completo" i]').first()
   if (await inputNome.isVisible({ timeout: 2000 }).catch(() => false)) {
     await inputNome.fill(nomeAssinante)
   }
+  await preencherFuncaoAssinanteElevador(page)
   await execWizardSeguinte(page)
 
   await signCanvas(page)

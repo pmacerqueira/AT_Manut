@@ -23,8 +23,11 @@ import { sugerirFaseKaeser } from '../utils/sugerirFaseKaeser.js'
 import { format, addDays } from 'date-fns'
 import { getHojeAzores, nowISO, validarDataExecucaoNaoFutura } from '../utils/datasAzores'
 import { useNavigate } from 'react-router-dom'
-import { PenLine, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Save, ChevronLeft, ChevronRight, Plus, HelpCircle } from 'lucide-react'
+import { PenLine, X, CalendarClock, AlertTriangle, CheckCircle2, Mail, Save, ChevronLeft, ChevronRight, Plus, HelpCircle, History } from 'lucide-react'
 import FotoChapaCampo from './executarManutencao/FotoChapaCampo'
+import UltimaVisitaPanel from './executarManutencao/UltimaVisitaPanel'
+import { resumoUltimaVisita } from '../domain/ultimaVisitaDomain'
+import { clearExecDraft, draftAplicavel, loadExecDraft, saveExecDraft } from '../services/execDraft'
 import { usePermissions, isRelatorioEnviadoAoCliente } from '../hooks/usePermissions'
 import { formatarDataPT, distribuirHorarios, buildFeriadosSet, proximoDiaUtilLivre } from '../utils/diasUteis'
 import { enviarRelatorioEmail } from '../services/emailService'
@@ -118,7 +121,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     relatorios: todosRelatorios,
     marcas,
   } = useData()
-  const { showToast } = useToast()
+  const { showToast, clearToasts } = useToast()
   const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading()
   const nomesTecnicos = useMemo(() => tecnicos.filter(t => t.ativo !== false).map(t => t.nome), [tecnicos])
   const quickNotes = useMemo(() => getQuickNotes(), [isOpen])
@@ -159,12 +162,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [manutencaoAtual, setManutencaoAtual] = useState(null)
   const [erroChecklist, setErroChecklist] = useState('')
   const [erroAssinatura, setErroAssinatura] = useState('')
-  /** Bloqueio do wizard: texto junto ao campo e toast amarelo ao centro (visível no telemóvel). */
+  /**
+   * Bloqueio do wizard: texto inline (`.form-erro`) no topo do passo, com scroll até lá
+   * (efeito abaixo). Sem toast — no telemóvel o balão ao centro tapava o próprio campo em falta
+   * e ficava de um passo para o outro (v1.17.32).
+   */
   const avisarBloqueio = useCallback((msg, campo = 'checklist') => {
     if (campo === 'assinatura') setErroAssinatura(msg)
     else setErroChecklist(msg)
-    showToast(msg, 'warning', 4000)
-  }, [showToast])
+  }, [])
   const [assinaturaFeita, setAssinaturaFeita] = useState(false)
   /** True após «Limpar assinatura» no canvas — não reutilizar assinatura antiga do relatório ao gravar. */
   const [signatureClearedByUser, setSignatureClearedByUser] = useState(false)
@@ -189,6 +195,14 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   const [kaeserSemConsumiveis, setKaeserSemConsumiveis] = useState(false)
   /** Intervenção anual: escolha livre de kit A/B/C/D; não sobrescrever tipo no blur das horas. */
   const [kaeserIntervencaoAnual, setKaeserIntervencaoAnual] = useState(false)
+  /**
+   * Rascunho automático no dispositivo.
+   * status: idle | checking | none | restored. `ts` = hora do rascunho reposto.
+   */
+  const [draftInfo, setDraftInfo] = useState({ status: 'idle', ts: null })
+  /** Incrementar força novo bootstrap («Começar de novo»). */
+  const [bootstrapTick, setBootstrapTick] = useState(0)
+  const draftSaveTimerRef = useRef(null)
 
   const navigate = useNavigate()
   const canvasRef   = useRef(null)
@@ -344,6 +358,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       execCancelBaselineRef.current = ''
       setSignatureClearedByUser(false)
       setConclusaoVariant('executada')
+      setDraftInfo({ status: 'idle', ts: null })
+      if (draftSaveTimerRef.current) { clearTimeout(draftSaveTimerRef.current); draftSaveTimerRef.current = null }
       return
     }
     if (!maq) return
@@ -423,18 +439,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         }
       }
     }
-    const fontePreFill = existingRel || lastRel
-    const isPreFilled = !existingRel && !!lastRel
-    setPreFilledFromLast(isPreFilled)
-
-    const prefillMap = normalizarChecklistRespostasMap(fontePreFill?.checklistRespostas)
     const elevadorBootstrap = aplicaModeloElevadorPreventivo({
       categoriaNome: categoriaNomeFromMaquina(maq, getSubcategoria, getCategoria),
       tipoManutencao: tipoAtual,
     })
+    // Elevadores: nenhuma resposta vem pré-marcada da visita anterior — cada ponto é uma decisão desta visita.
+    // O que ficou registado da última vez aparece no painel «Na última visita» do passo 1.
+    const fontePreFill = existingRel || (elevadorBootstrap ? null : lastRel)
+    const isPreFilled = !existingRel && !!lastRel && !elevadorBootstrap
+    setPreFilledFromLast(isPreFilled)
+
+    const prefillMap = normalizarChecklistRespostasMap(fontePreFill?.checklistRespostas)
     checklistItems.forEach((it) => {
       let prev = prefillMap[it.id] ?? prefillMap[String(it.id)] ?? ''
-      if (!existingRel && elevadorBootstrap && (typeof prev !== 'object' || !prev?.papel)) prev = ''
       if (prev === '' && elevadorBootstrap) {
         const fund = fundamentoInaplicavel(it, maq?.subcategoriaId)
         if (fund) prev = respostaInaplicavel(it, fund)
@@ -559,6 +576,37 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       hasPreviewPdf: false,
       kaeserPecasDirty: false,
     })
+
+    // Rascunho automático: repor o que o técnico já tinha preenchido, se ainda for válido
+    // para este estado do relatório (mesma assinatura de bootstrap) e não tiver expirado.
+    if (isCorrectionMode) {
+      setDraftInfo({ status: 'none', ts: null })
+    } else {
+      setDraftInfo({ status: 'checking', ts: null })
+      const sigAtual = bootstrapSig
+      loadExecDraft(mid)
+        .then((draft) => {
+          if (bootstrappedIdRef.current !== mid || bootstrapRelSigRef.current !== sigAtual) return
+          if (!draftAplicavel(draft, sigAtual)) {
+            if (draft) clearExecDraft(mid).catch(() => {})
+            setDraftInfo({ status: 'none', ts: null })
+            return
+          }
+          setForm(f => ({ ...f, ...draft.form }))
+          if (Array.isArray(draft.fotos) && draft.fotos.length > 0) setFotos(draft.fotos)
+          if (typeof draft.confirmaEquipamentoSerie === 'boolean') setConfirmaEquipamentoSerie(draft.confirmaEquipamentoSerie)
+          if (typeof draft.emailDestinatario === 'string' && draft.emailDestinatario) setEmailDestinatario(draft.emailDestinatario)
+          if (Number.isInteger(draft.step) && draft.step >= 1 && draft.step < W.total) setStep(draft.step)
+          // O banner `exec-draft-banner` no corpo do passo informa o técnico (sem toast —
+          // seria fechado pela mudança de passo e duplicava a informação).
+          setDraftInfo({ status: 'restored', ts: draft.ts })
+          logger.action('ExecutarManutencaoModal', 'rascunhoReposto', `Rascunho reposto (passo ${draft.step ?? 1})`, {
+            manutencaoId: mid, fotos: Array.isArray(draft.fotos) ? draft.fotos.length : 0, fotosOmitidas: !!draft.fotosOmitidas,
+          })
+        })
+        .catch(() => setDraftInfo({ status: 'none', ts: null }))
+    }
+
     requestAnimationFrame(() => {
       const canvas = canvasRef.current
       if (!canvas) return
@@ -584,7 +632,78 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         img.src = assinaturaImgSrc
       }
     })
-  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, quickEdit, isCorrectionMode, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq, cli?.assinaturaContacto])
+  }, [isOpen, execUiPhase, manutencaoAtual?.id, maq?.id, adminEdit, quickEdit, isCorrectionMode, manutencoes, getChecklistBySubcategoria, getRelatorioByManutencao, getPecasPlanoByMaquina, todosRelatorios, fallbackUltimaManutDataKaeser, temManutencaoConcluidaNaMaq, cli?.assinaturaContacto, bootstrapTick, W.total])
+
+  /** Gravação automática do rascunho no dispositivo (debounce), só quando há alterações face ao bootstrap. */
+  useEffect(() => {
+    if (!isOpen || isCorrectionMode || concluido) return undefined
+    if (execUiPhase !== 'form' || !manutencaoAtual) return undefined
+    if (draftInfo.status !== 'none' && draftInfo.status !== 'restored') return undefined
+    const mid = normEntityId(manutencaoAtual.id)
+    if (bootstrappedIdRef.current !== mid) return undefined
+    const atual = snapshotExecCancelState({
+      form, fotos, emailDestinatario, assinaturaFeita, step, confirmaEquipamentoSerie,
+      adminEdit: false, hasPreviewPdf: false, kaeserPecasDirty: false,
+    })
+    if (atual === execCancelBaselineRef.current) return undefined
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current)
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null
+      saveExecDraft(mid, {
+        ts: Date.now(),
+        sig: bootstrapRelSigRef.current,
+        step,
+        form,
+        fotos,
+        confirmaEquipamentoSerie,
+        emailDestinatario,
+      }).catch(() => {})
+    }, 700)
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current)
+        draftSaveTimerRef.current = null
+      }
+    }
+  }, [isOpen, isCorrectionMode, concluido, execUiPhase, manutencaoAtual, draftInfo.status, form, fotos, emailDestinatario, assinaturaFeita, step, confirmaEquipamentoSerie])
+
+  /** Intervenção concluída: o rascunho deixa de fazer sentido. */
+  useEffect(() => {
+    if (!concluido || !manutencaoAtual) return
+    if (draftSaveTimerRef.current) { clearTimeout(draftSaveTimerRef.current); draftSaveTimerRef.current = null }
+    clearExecDraft(normEntityId(manutencaoAtual.id)).catch(() => {})
+    setDraftInfo({ status: 'idle', ts: null })
+  }, [concluido, manutencaoAtual])
+
+  const descartarRascunho = useCallback(() => {
+    if (!manutencaoAtual) return
+    if (!window.confirm('Começar de novo? O rascunho guardado neste dispositivo é apagado.')) return
+    if (draftSaveTimerRef.current) { clearTimeout(draftSaveTimerRef.current); draftSaveTimerRef.current = null }
+    const mid = normEntityId(manutencaoAtual.id)
+    setDraftInfo({ status: 'idle', ts: null })
+    clearExecDraft(mid)
+      .catch(() => {})
+      .finally(() => {
+        bootstrappedIdRef.current = null
+        setStep(1)
+        setConfirmaEquipamentoSerie(false)
+        setBootstrapTick(t => t + 1)
+      })
+    logger.action('ExecutarManutencaoModal', 'rascunhoDescartado', 'Técnico começou de novo', { manutencaoId: mid })
+  }, [manutencaoAtual])
+
+  /** O que ficou registado na última intervenção concluída deste equipamento (passo 1). */
+  const resumoUltimaVisitaMaq = useMemo(() => {
+    if (!maq?.id) return null
+    return resumoUltimaVisita({
+      maquinaId: maq.id,
+      manutencoes,
+      relatorios: todosRelatorios,
+      checklistItems: items,
+      excluirManutencaoId: manutencaoAtual?.id ?? null,
+      hoje: getHojeAzores(),
+    })
+  }, [maq?.id, manutencoes, todosRelatorios, items, manutencaoAtual?.id])
 
   const confirmarCriarIntervencaoHoje = useCallback(() => {
     if (!maq) return
@@ -633,9 +752,24 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     })
     const base = execCancelBaselineRef.current
     if (base && atual !== base) {
-      if (!window.confirm(
-        'Tem a certeza que pretende sair? O progresso e os dados preenchidos neste assistente serão perdidos.',
-      )) return
+      const guardaRascunho = !isCorrectionMode && !!manutencaoAtual
+        && (draftInfo.status === 'none' || draftInfo.status === 'restored')
+      const msg = guardaRascunho
+        ? 'Sair do assistente? O que preencheu fica guardado neste dispositivo e é reposto quando voltar a abrir esta manutenção.'
+        : 'Tem a certeza que pretende sair? O progresso e os dados preenchidos neste assistente serão perdidos.'
+      if (!window.confirm(msg)) return
+      if (guardaRascunho) {
+        if (draftSaveTimerRef.current) { clearTimeout(draftSaveTimerRef.current); draftSaveTimerRef.current = null }
+        saveExecDraft(normEntityId(manutencaoAtual.id), {
+          ts: Date.now(),
+          sig: bootstrapRelSigRef.current,
+          step,
+          form,
+          fotos,
+          confirmaEquipamentoSerie,
+          emailDestinatario,
+        }).catch(() => {})
+      }
     }
     onClose()
   }, [
@@ -651,6 +785,8 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     previewPdfUrl,
     kaeserPecasDirty,
     onClose,
+    manutencaoAtual,
+    draftInfo.status,
   ])
 
   useEffect(() => {
@@ -1025,7 +1161,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return true
     }
     return true
-  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes, avisarBloqueio, showToast, modoElevador])
+  }, [useKaeserPipeline, W, form, items, fotos, assinaturaFeita, signatureClearedByUser, rel?.assinaturaDigital, confirmacaoPendente, isAdmin, confirmaEquipamentoSerie, temContadorHoras, kaeserSemConsumiveis, quickNotes, avisarBloqueio, modoElevador])
 
   const goNext = useCallback(() => {
     if (step >= W.total) return
@@ -1057,11 +1193,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     return () => cancelAnimationFrame(id)
   }, [erroChecklist, erroAssinatura, confirmacaoPendente])
 
+  // Ao mudar de passo, fechar toasts do passo anterior (incl. avisos amarelos) — não devem
+  // ficar a tapar o conteúdo seguinte. Ao desmontar o assistente, idem.
   useEffect(() => {
-    if (isCorrectionMode || step !== W.fotos) return
-    const msg = mensagemFotosEquipamento(fotos, form.fotoChapa)
-    if (msg) showToast(msg, 'warning')
-  }, [isCorrectionMode, step, W.fotos, fotos, form.fotoChapa, showToast])
+    clearToasts()
+  }, [step, clearToasts])
+  useEffect(() => () => clearToasts(), [clearToasts])
 
   const pecasDoPlanoKaeser = useCallback((tipo) => {
     if (!tipo || !maq) return []
@@ -1213,22 +1350,25 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     setErroAssinatura('')
     if (!manutencaoAtual || !maq) return
 
+    // No passo Finalizar só se mostra `erroAssinatura`; os bloqueios de gravação vão todos para aí.
+    const bloquearGravar = (msg) => avisarBloqueio(msg, 'assinatura')
+
     if (!isAdmin && rel && isRelatorioEnviadoAoCliente(rel)) {
-      showToast('O relatório já foi enviado ao cliente. Só um administrador pode alterar.', 'warning')
+      bloquearGravar('O relatório já foi enviado ao cliente. Só um administrador pode alterar.')
       return
     }
 
     const agFormGravar = (form.adminDataAgendada || '').trim()
     const exFormGravar = (form.adminDataExecucao || '').trim()
     if (rel && !isRelatorioEnviadoAoCliente(rel) && (!agFormGravar || !exFormGravar)) {
-      showToast('Indique a data de agendamento e a data de execução do relatório.', 'warning')
+      bloquearGravar('Indique a data de agendamento e a data de execução do relatório.')
       return
     }
 
     if (exFormGravar) {
       const vEx = validarDataExecucaoNaoFutura(exFormGravar)
       if (!vEx.ok) {
-        showToast(vEx.message, 'warning')
+        bloquearGravar(vEx.message)
         return
       }
     }
@@ -1236,20 +1376,20 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     if (drGravar) {
       const vDr = validarDataExecucaoNaoFutura(drGravar)
       if (!vDr.ok) {
-        showToast(vDr.message, 'warning')
+        bloquearGravar(vDr.message)
         return
       }
     }
 
     if (!isCorrectionMode) {
       if (!confirmaEquipamentoSerie) {
-        showToast('Confirme o equipamento (número de série) antes de gravar.', 'warning')
+        bloquearGravar('Confirme o equipamento (número de série) antes de gravar.')
         return
       }
       if (temContadorHoras) {
         const hs = String(form.horasServico).trim()
         if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
-          showToast('Indique as horas no contador (acumuladas) do equipamento.', 'warning')
+          bloquearGravar('Indique as horas no contador (acumuladas) do equipamento.')
           return
         }
       }
@@ -1257,13 +1397,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         const pecasSan = sanitizarPecasRelatorio(form.pecasUsadas)
         const algumUsado = pecasSan.some(p => p.usado && Number(p.quantidadeUsada) > 0)
         if (!algumUsado && !kaeserSemConsumiveis) {
-          showToast('Consumíveis: indique quantidades ou confirme ausência de materiais.', 'warning')
+          bloquearGravar('Consumíveis: indique quantidades ou confirme ausência de materiais.')
           return
         }
       }
       const msgNotasGravar = mensagemObservacoesInsuficientes(form.notas, quickNotes)
       if (msgNotasGravar) {
-        showToast(msgNotasGravar, 'warning', 4000)
+        bloquearGravar(msgNotasGravar)
         return
       }
       if (modoElevador) {
@@ -1272,7 +1412,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           temAnomaliaChecklist(items, form.checklistRespostas),
         )
         if (msgContra) {
-          showToast(msgContra, 'warning', 5000)
+          bloquearGravar(msgContra)
           return
         }
       }
@@ -1685,7 +1825,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     }
 
     if (!emailDestinatario.trim()) {
-      showToast('Indique o email do cliente ou use "Gravar" para fechar sem envio.', 'warning')
+      avisarBloqueio('Indique o email do cliente ou use "Gravar" para fechar sem envio.', 'assinatura')
       return
     }
 
@@ -1725,35 +1865,37 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
   const handleAdminEditSave = () => {
     if (!manutencaoAtual || !maq || !rel) return
+    setErroChecklist('')
+    setErroAssinatura('')
     if (!form.tecnico) {
-      showToast('Selecione o técnico responsável.', 'warning')
+      avisarBloqueio('Selecione o técnico responsável.', 'assinatura')
       return
     }
     const todasMarcadasAdmin = checklistEstaCompleta(items, form.checklistRespostas, { elevador: modoElevador })
     if (!todasMarcadasAdmin) {
-      showToast(modoElevador
+      avisarBloqueio(modoElevador
         ? 'Preencha a execução e a observação de todos os pontos.'
-        : 'Preencha toda a checklist (Sim/Não).', 'warning')
+        : 'Preencha toda a checklist (Sim/Não).')
       return
     }
     if (modoElevador) {
       const erroElev = validarChecklistElevador(items, form.checklistRespostas)[0]
       if (erroElev) {
-        showToast(erroElev, 'warning', 5000)
+        avisarBloqueio(erroElev)
         return
       }
       if (!form.pedidoSoPreventiva) {
-        showToast('Confirme que o pedido desta visita é manutenção preventiva.', 'warning')
+        avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
         return
       }
       const msgPedidoAdmin = mensagemPedidoForaAmbito(form)
       if (msgPedidoAdmin) {
-        showToast(msgPedidoAdmin, 'warning', 5000)
+        avisarBloqueio(msgPedidoAdmin)
         return
       }
       const msgGrupoAdmin = mensagemIncoerenciaGrupo(items, form.checklistRespostas, form.esclarecimentoIncoerencia)
       if (msgGrupoAdmin) {
-        showToast(msgGrupoAdmin, 'warning', 5000)
+        avisarBloqueio(msgGrupoAdmin)
         return
       }
       const msgComAdmin = mensagemComunicacaoUrgente(form, {
@@ -1761,11 +1903,11 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         vaiEnviarEmail: false,
       })
       if (msgComAdmin) {
-        showToast(msgComAdmin, 'warning', 5000)
+        avisarBloqueio(msgComAdmin, 'assinatura')
         return
       }
       if (!form.serieConfirmada) {
-        showToast('Indique se a série foi confirmada no local.', 'warning')
+        avisarBloqueio('Indique se a série foi confirmada no local.')
         return
       }
       const msgContra = mensagemNotasContraditoriasElevador(
@@ -1773,29 +1915,29 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         temAnomaliaChecklist(items, form.checklistRespostas),
       )
       if (msgContra) {
-        showToast(msgContra, 'warning', 5000)
+        avisarBloqueio(msgContra)
         return
       }
     }
     const msgNotasAdmin = mensagemObservacoesInsuficientes(form.notas, quickNotes)
     if (msgNotasAdmin) {
-      showToast(msgNotasAdmin, 'warning', 4000)
+      avisarBloqueio(msgNotasAdmin)
       return
     }
     const msgChapaAdmin = mensagemFotoChapa(form, { confirmada: true })
     if (msgChapaAdmin) {
-      showToast(msgChapaAdmin, 'warning')
+      avisarBloqueio(msgChapaAdmin)
       return
     }
     const msgFotosAdmin = mensagemFotosEquipamento(fotos, form.fotoChapa)
     if (msgFotosAdmin) {
-      showToast(msgFotosAdmin, 'warning')
+      avisarBloqueio(msgFotosAdmin)
       return
     }
     if (temContadorHoras) {
       const hs = String(form.horasServico).trim()
       if (hs === '' || Number.isNaN(Number(hs)) || Number(hs) < 0) {
-        showToast('Indique as horas no contador (acumuladas) do equipamento.', 'warning')
+        avisarBloqueio('Indique as horas no contador (acumuladas) do equipamento.')
         return
       }
     }
@@ -1870,17 +2012,17 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     const execNova = (form.adminDataExecucao || '').trim()
 
     if (!agNova) {
-      showToast('Indique a data de agendamento da manutenção.', 'warning')
+      avisarBloqueio('Indique a data de agendamento da manutenção.', 'assinatura')
       return
     }
     if (!execNova) {
-      showToast('Indique a data de execução do relatório.', 'warning')
+      avisarBloqueio('Indique a data de execução do relatório.', 'assinatura')
       return
     }
 
     const vExecNova = validarDataExecucaoNaoFutura(execNova)
     if (!vExecNova.ok) {
-      showToast(vExecNova.message, 'warning')
+      avisarBloqueio(vExecNova.message, 'assinatura')
       return
     }
 
@@ -2230,11 +2372,25 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
   return (
     <div className="modal-overlay" role="presentation">
       <div className="modal modal-assinatura modal-relatorio-form" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="exec-manut-modal-title">
-          <h2 id="exec-manut-modal-title">{isCorrectionMode ? 'Corrigir relatório' : 'Executar manutenção'}</h2>
-        {maq && <p className="modal-hint">{desc}</p>}
-        {isCorrectionMode && rel?.numeroRelatorio && (
-          <p className="modal-hint" style={{ marginTop: '-0.25rem' }}>Relatório {rel.numeroRelatorio}</p>
-        )}
+        <div className="wizard-head">
+          <div className="wizard-head-text">
+            <h2 id="exec-manut-modal-title">{isCorrectionMode ? 'Corrigir relatório' : 'Executar manutenção'}</h2>
+            {maq && <p className="modal-hint">{desc}</p>}
+            {isCorrectionMode && rel?.numeroRelatorio && (
+              <p className="modal-hint" style={{ marginTop: '-0.25rem' }}>Relatório {rel.numeroRelatorio}</p>
+            )}
+          </div>
+          {/* Saída do assistente no cabeçalho (no telemóvel substitui o «Cancelar» do rodapé). */}
+          <button
+            type="button"
+            className="wizard-close"
+            aria-label="Sair do assistente"
+            title="Sair do assistente"
+            onClick={handleCancelarExecucao}
+          >
+            <X size={20} aria-hidden />
+          </button>
+        </div>
 
         {!isCorrectionMode && (
           <div className="wizard-progress">
@@ -2250,6 +2406,16 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
 
         <form onSubmit={handleSubmit}>
         <div className="wizard-body">
+
+          {!isCorrectionMode && draftInfo.status === 'restored' && (
+            <div className="exec-draft-banner" role="status" data-testid="exec-draft-banner">
+              <History size={15} />
+              <span>
+                Rascunho das {new Date(draftInfo.ts).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: 'Atlantic/Azores' })} reposto. Reveja o que já tinha preenchido.
+              </span>
+              <button type="button" className="btn-link-checklist" onClick={descartarRascunho}>Começar de novo</button>
+            </div>
+          )}
 
           {/* ═══ Passo 1: confirmação de equipamento, data e horas (se contador) ═══ */}
           {!isCorrectionMode && step === W.verif && maq && (
@@ -2267,6 +2433,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
                   Data da intervenção: <strong>{formatarDataPT(getHojeAzores())}</strong>
                 </p>
               </div>
+              <UltimaVisitaPanel resumo={resumoUltimaVisitaMaq} />
               {temContadorHoras && !useKaeserPipeline && (
                 <div className="form-section">
                   <HorasContadorInput
@@ -2629,7 +2796,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             manutencaoAtual={manutencaoAtual}
             form={form}
             setForm={setForm}
-            erroAssinatura={erroAssinatura}
+            erroAssinatura={erroAssinatura || erroChecklist}
             resumoFinalizacao={resumoFinalizacao}
             emailDestinatario={emailDestinatario}
             setEmailDestinatario={setEmailDestinatario}
@@ -2641,8 +2808,9 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         </div>{/* fim .wizard-body */}
 
         {/* ═══ Rodapé fixo ═══ */}
-        <div className="wizard-footer">
-          <button type="button" className="btn secondary" onClick={handleCancelarExecucao}>Cancelar</button>
+        <div className={`wizard-footer${step === W.total && !isCorrectionMode ? ' wizard-footer--final' : ''}`}>
+          {/* No telemóvel este botão está oculto (CSS) — a saída faz-se pelo × do cabeçalho. */}
+          <button type="button" className="btn secondary wizard-footer-cancel" onClick={handleCancelarExecucao}>Cancelar</button>
           {isCorrectionMode ? (
             <div className="wizard-footer-actions">
               <button type="button" className="btn btn-gravar-sucesso" onClick={handleAdminEditSave}>
@@ -2652,12 +2820,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           ) : (
             <div className="wizard-footer-actions">
               {step > 1 && (
-                <button type="button" className="btn secondary" onClick={goPrev}>
-                  <ChevronLeft size={16} /> Anterior
+                <button type="button" className="btn secondary wizard-btn-prev" onClick={goPrev} aria-label="Passo anterior">
+                  <ChevronLeft size={18} aria-hidden /> <span className="wizard-btn-prev-label">Anterior</span>
                 </button>
               )}
               {step < W.total && (
-                <button type="button" className="btn primary" onClick={goNext}>
+                <button type="button" className="btn primary wizard-btn-next" onClick={goNext}>
                   Seguinte <ChevronRight size={16} />
                 </button>
               )}

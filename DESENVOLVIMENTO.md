@@ -2,7 +2,7 @@
 
 Referência para desenvolvimento contínuo. Ver também [DOCUMENTACAO.md](./DOCUMENTACAO.md).
 
-**Última revisão:** 2026-10-08 · **Versão da app:** ver `src/config/version.js`
+**Última revisão:** 2026-10-09 · **Versão da app:** ver `src/config/version.js`
 **Localização:** `c:\Cursor_Projetos\NAVEL\AT_Manut\`
 
 ---
@@ -78,6 +78,12 @@ Próximo passo:
 | `src/context/slices/reparacoesSlice.js` | CRUD reparações + relatórios de reparação |
 | `src/components/executarManutencao/` | Passos do wizard: KAESER (`KaeserHorasStep`, `KaeserPecasStep`), `ChecklistStep`, `NotasStep`, `FotosStep`, `TecnicoStep`, `ClienteStep`, `AssinaturaStep`, `FinalizarStep` |
 | `src/components/executarManutencao/execWizardHelpers.js` | Wizard helpers; **`linhasNotasRelatorio()`** — uma nota por linha (incl. legado com notas rápidas embutidas) |
+| `src/components/executarManutencao/UltimaVisitaPanel.jsx` | Painel «Na última visita» no passo 1 (anomalias, documentos em falta, por fazer, fora de serviço, notas) |
+| `src/domain/ultimaVisitaDomain.js` | `resumoUltimaVisita()` — resumo puro da última intervenção concluída de um equipamento |
+| `src/domain/pendentesEnvioDomain.js` | `descreverPendentesPorEnviar()` — fila offline → linhas legíveis por equipamento (Dashboard) |
+| `src/services/execDraft.js` | Rascunho do wizard: `saveExecDraft`/`loadExecDraft`/`clearExecDraft`, `draftAplicavel` (sig + TTL 14 dias) |
+| `src/services/idbKv.js` | `createKvStore(dbName)` — get/set/del/keys/clear sobre IndexedDB |
+| `src/services/syncQueue.js` | Fila offline em IndexedDB `atm_sync_queue_v1` com espelho em memória; `initQueue()` migra `atm_sync_queue`; `queueItems()` para a UI |
 | `src/utils/relatorioManutencaoPayload.js` | Payload canónico PDF/email manutenção (`buildRelatorioManutencaoPdfArgs`, próximas datas) |
 | `src/utils/relatorioPdfResumo.js` | Resumo executivo, veredito, não conformidades (`buildResumoExecutivoMeta`, `buildResumoExecutivoEmailPayload`) |
 | `src/context/AuthContext.jsx` | Login, sessão JWT, `user`, `isAdmin` |
@@ -288,7 +294,7 @@ const addXxx = useCallback((data) => {
 npm run dev                 # http://localhost:5400 (não 5173 — essa porta era partilhada)
 
 # Testes unitários (domain + slices)
-npm run test:unit            # 125 testes em tests/unit/
+npm run test:unit            # 189 testes em tests/unit/
 
 # Testes — suite E2E completa (452 listados)
 npm run test:e2e             # equivalente: npx playwright test tests/e2e/

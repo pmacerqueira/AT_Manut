@@ -435,25 +435,46 @@
 /* ── Responsivo ───────────────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
+  /* Ecrã inteiro com rodapé sempre visível: o corpo faz scroll por dentro, o botão «Concluir»
+     nunca fica fora do ecrã (antes `min-height: min-content` do .modal base empurrava o rodapé
+     para fora e obrigava a fazer scroll do overlay) (v1.17.32). */
   .modal-exec-rep {
-    max-height: min(98vh, 98dvh);
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
     width: 100vw;
-    border-radius: 0.75rem 0.75rem 0 0;
-    margin: auto 0 0;
+    border-radius: 0;
+    margin: 0;
   }
+  /* Rodapé em duas filas (v1.17.32): [👁] [Guardar progresso] / [Concluir e assinar] */
   .modal-exec-rep .modal-footer {
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
   }
   .modal-exec-rep .modal-footer .btn {
-    flex: 1 1 calc(50% - 0.4rem);
     min-width: 0;
-    font-size: 0.82rem;
-    padding: 0.5rem 0.4rem;
+    min-height: 2.75rem;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.6rem;
     justify-content: center;
+  }
+  .modal-exec-rep .modal-footer .btn-previsualizar-rep {
+    flex: 0 0 auto;
+    width: 2.75rem;
+    padding-inline: 0;
+  }
+  .modal-exec-rep .modal-footer .btn-previsualizar-rep-label {
+    display: none;
+  }
+  .modal-exec-rep .modal-footer .btn-guardar-progresso {
+    flex: 1 1 auto;
   }
   .modal-exec-rep .modal-footer .btn-concluir {
     flex: 1 1 100%;
+    min-height: 3rem;
+    font-size: 1.05rem;
+    font-weight: 700;
   }
   .form-row {
     flex-direction: column;

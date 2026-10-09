@@ -148,9 +148,9 @@ Verificar que operações (criar/editar/eliminar) feitas offline são enfileirad
    - Deve aparecer uma notificação (Toast) a indicar que a operação foi guardada/enfileirada
    - **OU** o banner pode mudar para indicar "X operações aguardam sincronização"
 
-5. **Ir a DevTools → Application → Local Storage:**
-   - Procurar chave `atm_sync_queue`
-   - Clicar na chave e ver o valor
+5. **Ir a DevTools → Application → IndexedDB → `atm_sync_queue_v1` → store `kv` → chave `queue`** (v1.17.31+; a fila deixou de viver em `localStorage`):
+   - Em browsers sem IndexedDB o fallback continua a ser a chave `atm_sync_queue` em Local Storage
+   - Alternativa sem DevTools: o Dashboard «O meu dia» mostra «Guardado neste telemóvel, por enviar ao servidor» com os equipamentos afectados
 
 6. **Verificar estrutura da fila:**
    - Deve ser um **array** com pelo menos 1 item
@@ -170,17 +170,17 @@ Verificar que operações (criar/editar/eliminar) feitas offline são enfileirad
      ```
 
 7. **Screenshot:**
-   - Tirar screenshot da chave `atm_sync_queue` no localStorage
+   - Tirar screenshot da chave `queue` em IndexedDB `atm_sync_queue_v1` (ou do bloco «por enviar» no Dashboard)
 
 ### Resultado Esperado
 
-- ✅ Chave `atm_sync_queue` **existe** no localStorage
+- ✅ Fila **existe** em IndexedDB `atm_sync_queue_v1` (ou `atm_sync_queue` no localStorage, em fallback)
 - ✅ Fila **tem itens** (array com length > 0)
 - ✅ Item na fila tem `resource: "clientes"` e `action: "create"` (ou update/delete conforme operação)
 
 ### Reportar
 
-- [ ] `atm_sync_queue` existe? **SIM / NÃO**
+- [ ] Fila `atm_sync_queue_v1` (IndexedDB) existe? **SIM / NÃO**
 - [ ] Tem itens na fila? **SIM / NÃO** (quantos? **___**)
 - [ ] Que operação está na fila? **resource: _____, action: _____**
 
@@ -208,8 +208,8 @@ Verificar que ao voltar online, a fila de sincronização é processada automati
    - Anotar as mudanças de estado do banner
 
 4. **Verificar a fila de sincronização:**
-   - Ir a DevTools → Application → Local Storage → `atm_sync_queue`
-   - Verificar se a fila está **vazia** (array vazio `[]` ou chave não existe)
+   - Ir a DevTools → Application → IndexedDB → `atm_sync_queue_v1` → `kv` → `queue`
+   - Verificar se a fila está **vazia** (array vazio `[]` ou chave não existe); o bloco «por enviar» do Dashboard deve ter desaparecido
 
 5. **Verificar dados actualizados:**
    - Navegar de volta para "Clientes"
@@ -227,7 +227,7 @@ Verificar que ao voltar online, a fila de sincronização é processada automati
 ### Resultado Esperado
 
 - ✅ Banner **mudou de estado** (mostrou "a sincronizar" e depois desapareceu)
-- ✅ Fila `atm_sync_queue` ficou **vazia** (array vazio ou chave removida)
+- ✅ Fila `atm_sync_queue_v1` ficou **vazia** (array vazio ou chave removida)
 - ✅ Dados estão **consistentes** (cliente aparece na lista ou foi rejeitado com feedback)
 - ✅ Sem erros no console (ou erros esperados/documentados)
 
@@ -287,7 +287,8 @@ Browser: _______________ (versão: ___)
 ### Chaves localStorage relevantes:
 
 - `atm_cache_v1` — Cache de todos os dados (clientes, máquinas, manutenções, etc.) — modelo actual
-- `atm_sync_queue` — Fila de operações pendentes de sincronização
+- IndexedDB `atm_sync_queue_v1` — Fila de operações pendentes de sincronização (v1.17.31+; `atm_sync_queue` em localStorage só como fallback/legado migrado)
+- IndexedDB `atm_exec_drafts_v1` — Rascunhos do assistente de execução (repostos ao reabrir a mesma manutenção, 14 dias)
 - `atm_clientes`, `atm_maquinas`, etc. — Dados persistidos (legacy; pode não existir; o modelo actual usa `atm_cache_v1`)
 
 ### Comportamento esperado do banner:

@@ -9,6 +9,78 @@ Política de continuidade:
 
 ---
 
+## [1.17.32] — 2026-10-09 — Telemóvel e tablet: auditoria responsiva dos fluxos do técnico
+
+Resultado de uma auditoria aos fluxos de trabalho em ecrãs de 390×844 (telemóvel) e 820×1180 (tablet), como ATecnica: Dashboard, Manutenções, assistente de execução (8 passos, incluindo bloqueios), Reparações, Equipamentos, Calendário, Agendar, offline. Sem overflow horizontal em nenhum ecrã; os problemas concentravam-se no assistente de execução no telemóvel. Cinco melhorias + notas menores, todas implementadas.
+
+### 1. Bloqueios de validação só inline — sem toasts no assistente
+- `avisarBloqueio` deixa de abrir toast: a mensagem aparece numa caixa vermelha no topo do passo (`.form-erro`, com ícone «!», scroll automático até lá). Antes, o balão amarelo ao centro tapava o próprio campo em falta (ex.: o canvas de assinatura) e ficava de um passo para o outro até o técnico carregar em OK.
+- Removido o aviso automático «Introduzir fotos do equipamento…» ao entrar no passo 4 (era mostrado antes de o técnico ter hipótese de tirar a foto e persistia até ao passo 8).
+- Os bloqueios de gravação (passo Finalizar, «Guardar alterações» do Admin, email em falta, datas) também passam para inline. O passo Finalizar mostra agora `erroAssinatura || erroChecklist`.
+- `ToastProvider` ganha `clearToasts({ onlySticky })`; o assistente fecha todos os toasts ao mudar de passo e ao desmontar. Toast «Rascunho das HH:MM recuperado» removido — o banner no corpo do passo já informa.
+
+### 2. Rodapé do assistente no telemóvel: uma fila, «Seguinte» em destaque
+- ≤480 px: `[‹] [Seguinte ———]` numa só fila; «Anterior» é só ícone (`aria-label="Passo anterior"`), «Seguinte» ocupa o resto com 48 px de altura. Último passo: `[‹] [Gravar] [Enviar]` (Admin: «Guardar sem ass.» numa linha acima).
+- «Cancelar» sai do rodapé no telemóvel. A saída faz-se pelo novo **×** no cabeçalho (`.wizard-close`, `aria-label="Sair do assistente"`, presente em todos os tamanhos; no desktop/tablet o «Cancelar» do rodapé mantém-se). O rodapé passou de ~130 px para ~65 px — com o teclado virtual aberto sobra muito mais ecrã para o conteúdo.
+
+### 3. Checklist de elevador no telemóvel: 2 colunas e detalhe recolhido
+- Botões de resposta em grelha de 2 colunas com rótulos a quebrar linha (antes: 1 coluna, 8–10 botões empilhados por ponto; um ponto ocupava mais de um ecrã). Tablet mantém 3 colunas.
+- Pontos correntes: «Executado, sem anomalia» visível + ligação «Responder em detalhe» que abre os grupos «O que foi feito» / «O que foi observado». Os grupos abrem sozinhos quando há uma resposta que não é o atalho e não podem ser recolhidos enquanto houver uma resposta parcial. Pontos de segurança: grupos sempre visíveis (sem alteração de regra).
+
+### 4. Modal de reparação no telemóvel: rodapé sempre visível, sem «Cancelar»
+- O modal passa a ocupar o ecrã inteiro (`100dvh`) com o corpo a fazer scroll por dentro — antes o `min-height: min-content` do `.modal` base empurrava o rodapé para fora do ecrã e o «Concluir e assinar» ficava cortado/escondido.
+- Rodapé: `[👁] [Guardar progresso]` / `[Concluir e assinar ———]`. «Cancelar» removido (o × do cabeçalho já existia); «Pré-visualizar» é ícone no telemóvel. Regra genérica `.reparacoes-page .modal .modal-footer { flex-direction: column }` deixa de se aplicar a `.modal-exec-rep`.
+
+### 5. Listas do técnico sem acções de gestão; menu e barra verde
+- «Sincronizar agenda» (Dashboard e Manutenções) e «Selecionar» (modo lote) passam a Admin-only — eram os dois primeiros botões, em largura total, antes do primeiro trabalho.
+- Cartão de manutenção (mobile): quando a única acção do menu «⋯» é «Editar», mostra-se o botão de lápis directo (um toque em vez de dois).
+- Badge de dias: «+5d» / «−10d» → «5d atraso» / «Hoje» / «em 10d», com `title` por extenso.
+- Barra verde «Dados sincronizados…» deixa de empurrar o breadcrumb e de provocar salto de layout ao desaparecer: é uma pílula flutuante no topo, `pointer-events: none`, 2,5 s + fade.
+- `.sidebar-backdrop` termina acima da barra inferior: o botão «Menu» (que mostra ×) volta a responder e fecha o menu.
+
+### Notas menores
+- Campos de formulário em ecrãs tácteis nunca abaixo de 16 px (`@media (pointer: coarse) { input, select, textarea { font-size: 16px !important } }`) — evita o zoom automático do iOS Safari nos filtros de Manutenções executadas e na pesquisa de Agendar.
+- Mínimo 12 px para texto: títulos de modais `clamp(0.75rem, …)` (eram 9,6 px no telemóvel), rótulos da revisão final, chips/badges/rótulos dos filtros de executadas, barra inferior, «opcional» em Agendar.
+
+### Qualidade
+- Unitários: 189/189. E2E: `04-manutencoes` actualizado (abre «Responder em detalhe» antes de escolher «Anomalia»; «Listar todas» espera pelo DOM da página lazy em vez de 1,2 s fixos — falhava no arranque frio do Vite). Specs 04, 05, 07, 09, 11, 16, 17, 19: 227 testes, 223 a passar; as 4 falhas (16 R6 ×2, 17 RA-2, 19 B5) já existiam na v1.17.30. Build de produção limpo.
+
+---
+
+## [1.17.31] — 2026-10-08 — Técnico no terreno: rascunho, um toque por ponto, última visita, fila robusta
+
+Resultado da avaliação de UX dos técnicos (pontos 1–4). O ponto 5 (execução em lote) fica para análise conjunta; as operações em lote são exclusivas do Admin.
+
+### 1. Rascunho automático do assistente de execução
+- Tudo o que o técnico preenche (passo, respostas, notas, fotos, série confirmada, email) fica guardado neste dispositivo em IndexedDB (`atm_exec_drafts_v1`, 700 ms após cada alteração; fallback `localStorage` sem fotos).
+- Ao reabrir a mesma manutenção, o rascunho é reposto se corresponder ao mesmo relatório/checklist e tiver menos de 14 dias. Aviso «Rascunho das HH:MM recuperado» + faixa com «Começar de novo».
+- «Cancelar» deixa de perder trabalho: «Sair do assistente? O que preencheu fica guardado neste dispositivo…». O rascunho é apagado ao concluir.
+- Correcção de relatório pelo Admin não usa rascunho.
+
+### 2. Checklist: um toque por ponto, sem atalho global
+- Removidos «Marcar todos» e «Sem anomalia nos pontos aplicáveis» em todas as categorias. Fica só «Desmarcar todos».
+- Elevadores: nos pontos correntes há um botão «Executado, sem anomalia» (um toque). Nos **pontos de segurança** (trancas, fins de curso, válvulas, paragem de emergência, etc.) não há atalho: a execução e a observação respondem-se em separado, com a linha destacada.
+- Elevadores deixam de vir pré-preenchidos com as respostas da visita anterior — cada ponto é uma decisão desta visita. (Outras categorias mantêm o pré-preenchimento com indicação visível.)
+
+### 3. Painel «Na última visita» (passo 1)
+- Abaixo da confirmação do equipamento: data e há quantos dias, técnico, n.º do relatório, anomalias (com descrição e recomendação), documentos em falta, pontos não executados/parciais e motivo, fora de serviço recomendado, reparação pedida, contador e as primeiras notas. Para equipamento sem histórico: «Primeira intervenção registada neste equipamento.»
+- Lógica pura em `src/domain/ultimaVisitaDomain.js`; componente `UltimaVisitaPanel.jsx`.
+
+### 4. Fila offline em IndexedDB + «por enviar» no painel do técnico
+- `syncQueue.js` passa a guardar em IndexedDB (`atm_sync_queue_v1`, limite 200 MB) com espelho em memória — a API (`enqueue`, `processQueue`, …) mantém-se síncrona. Migra automaticamente a fila legada `atm_sync_queue` do `localStorage`. Sem IndexedDB cai no `localStorage` (4 MB).
+- Dashboard «O meu dia»: bloco «Guardado neste telemóvel, por enviar ao servidor» com os equipamentos/clientes afectados e botão «Sincronizar agora». Mensagem distinta com e sem rede.
+
+### Correcções de testes (regressões anteriores detectadas)
+- Cinco testes de `04-manutencoes.spec.js` e três de `09-edge-cases.spec.js` já falhavam na `v1.17.30` (contexto de elevador não preenchido, nota rápida bloqueada pelo modelo preventivo, foto do equipamento igual à da chapa, botão da chapa oculto, agenda a gerar periódica em mock «vazio»). Helpers alinhados: `checklistMarcarTodos` responde ponto a ponto (incl. pontos de segurança), `preencherContextoElevadorChecklist`, `preencherFuncaoAssinanteElevador`, nota descritiva neutra, PNG distinto para a foto do equipamento, espera pela compressão da foto.
+
+### Qualidade
+- Unitários: **189** (`ultimaVisitaDomain`, `pendentesEnvioDomain`, `execDraft`, `syncQueue` novos). Specs 04 + 09: 43/43.
+
+### Ficheiros novos
+- `src/services/idbKv.js`, `src/services/execDraft.js`, `src/domain/ultimaVisitaDomain.js`, `src/domain/pendentesEnvioDomain.js`, `src/components/executarManutencao/UltimaVisitaPanel.jsx`.
+
+---
+
 ## [1.17.30] — 2026-10-08 — Rótulos completos na checklist
 
 ### Alteração

@@ -135,8 +135,9 @@ test.describe('Modal execução — upload de fotos', () => {
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
       await navegarWizardAteFotos(page)
 
-      // Secção de fotos deve existir
-      await expect(page.locator('.fotos-section, .btn-foto').first()).toBeVisible({ timeout: 4000 })
+      // Secção de fotos deve existir (não usar `.btn-foto` solto: o da chapa, no passo 1, fica oculto no DOM)
+      await expect(page.locator('.fotos-section').first()).toBeVisible({ timeout: 4000 })
+      await expect(page.locator('.fotos-section .btn-foto').first()).toBeVisible()
     }
   })
 
@@ -223,10 +224,10 @@ test.describe('Modal execução — upload de fotos', () => {
       await page.locator('.modal').first().waitFor({ state: 'visible', timeout: 5000 })
       await navegarWizardAteFotos(page)
 
-      // O contador deve mostrar 0/6 inicialmente
+      // Contador /6: 0 ou 1 (a foto da chapa tirada no passo 1 fica na lista, v1.17.29+)
       const fotosCount = page.locator('.fotos-count, .fotos-label').first()
       if (await fotosCount.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(fotosCount).toContainText(/0\/6|0 \/ 6/)
+        await expect(fotosCount).toContainText(/[01]\/6|[01] \/ 6/)
       }
 
       await page.locator('.modal-relatorio-form').getByRole('button', { name: 'Cancelar' }).click()
@@ -370,8 +371,8 @@ test.describe('Modal assinatura de relatório', () => {
 test.describe('Estado vazio — sem dados', () => {
 
   test('Lista de manutenções vazia mostra mensagem adequada', async ({ page }) => {
-    // Usar mock sem manutenções
-    await setupApiMock(page, { customData: { manutencoes: [], relatorios: [] } })
+    // Mock sem manutenções nem equipamentos — sem máquinas a agenda não gera periódicas na sincronização automática
+    await setupApiMock(page, { customData: { manutencoes: [], relatorios: [], maquinas: [] } })
     await doLoginAdmin(page)
     await page.goto('/manut/manutencoes')
     await page.waitForTimeout(800)

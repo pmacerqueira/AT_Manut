@@ -1055,15 +1055,17 @@ export default function ExecutarReparacaoModal({ reparacao, onClose }) {
 
             </div>
 
+            {/* Rodapé (v1.17.32): sem «Cancelar» — a saída é o × do cabeçalho. No telemóvel:
+                Pré-visualizar (ícone) + Guardar progresso numa fila, «Concluir e assinar» em destaque. */}
             <div className="modal-footer">
-              <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
               <button
                 type="button"
-                className="btn secondary"
+                className="btn secondary btn-previsualizar-rep"
                 onClick={handlePrevisualizar}
                 title="Pré-visualizar relatório (PDF/impressão)"
+                aria-label="Pré-visualizar relatório"
               >
-                <Eye size={14} /> Pré-visualizar
+                <Eye size={16} aria-hidden /> <span className="btn-previsualizar-rep-label">Pré-visualizar</span>
               </button>
               <button
                 type="button"

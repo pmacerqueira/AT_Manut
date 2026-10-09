@@ -293,11 +293,12 @@ body.modo-campo .icon-btn.secondary:hover {
   .form-row-nova {
     grid-template-columns: 1fr;
   }
-  .reparacoes-page .modal .modal-footer {
+  /* O modal de execução (.modal-exec-rep) tem rodapé próprio em 2 filas — não empilhar (v1.17.32) */
+  .reparacoes-page .modal:not(.modal-exec-rep) .modal-footer {
     flex-direction: column;
     align-items: stretch;
   }
-  .reparacoes-page .modal .modal-footer .btn {
+  .reparacoes-page .modal:not(.modal-exec-rep) .modal-footer .btn {
     width: 100%;
     justify-content: center;
   }

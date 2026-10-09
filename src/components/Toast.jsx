@@ -9,6 +9,11 @@
  *
  * Tipos: 'success' | 'error' | 'warning' | 'info'
  * O aviso (warning) não desaparece sozinho: o técnico fecha com OK.
+ *
+ * `clearToasts()` fecha tudo o que estiver aberto; os assistentes de execução chamam-no ao mudar
+ * de passo e ao fechar, para que avisos antigos não fiquem a tapar o passo seguinte.
+ * Regra (v1.17.32): bloqueios de validação dentro de um assistente mostram-se inline (`.form-erro`),
+ * não em toast — o toast amarelo fica reservado a regras de negócio fora dos passos.
  */
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import './Toast.css'
@@ -73,8 +78,26 @@ export function ToastProvider({ children }) {
     }))
   }, [])
 
+  /**
+   * Fecha todos os toasts abertos (ex.: ao mudar de passo num assistente ou ao fechar um modal),
+   * para que avisos de um contexto anterior não fiquem a tapar o conteúdo do seguinte.
+   * `onlySticky: true` fecha só os avisos amarelos (que de outro modo ficam até OK).
+   */
+  const clearToasts = useCallback(({ onlySticky = false } = {}) => {
+    setToasts(prev => {
+      const keep = prev.filter(t => onlySticky && !t.sticky)
+      prev.forEach(t => {
+        if (keep.includes(t)) return
+        clearTimeout(timerRef.current[t.id])
+        delete timerRef.current[t.id]
+        if (t.sticky) avisosAbertos.current.delete(t.message)
+      })
+      return keep
+    })
+  }, [])
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ showToast, clearToasts }}>
       {children}
       <div className="toast-stack" aria-live="polite" aria-atomic="false">
         {toasts.map(t => (

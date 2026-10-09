@@ -134,7 +134,7 @@
 .form-tecnico-destaque { border-left: 3px solid var(--color-accent); padding-left: 0.5rem; }
 .form-tecnico-hint { font-size: 0.85em; color: var(--color-text-muted); font-weight: 400; margin-left: 0.25rem; }
 .form-section { display: block; margin-bottom: 1.25rem; }
-.form-section h3 { margin: 0 0 0.75rem; font-size: clamp(0.6rem, 2.2vw, 0.88rem); font-weight: 500; color: var(--color-text-muted); }
+.form-section h3 { margin: 0 0 0.75rem; font-size: clamp(0.75rem, 2.2vw, 0.88rem); font-weight: 500; color: var(--color-text-muted); }
 /* No wizard, a checklist ocupa o espaço natural — o wizard-body faz o scroll */
 .checklist-respostas { margin-bottom: 0.5rem; }
 .checklist-item-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); font-size: 0.85em; }
@@ -146,8 +146,9 @@
 .checklist-elevador-estado { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.75rem 0; font-size: 0.9rem; }
 .checklist-elevador-estado select { min-height: 48px; width: 100%; }
 .checklist-item-row--elevador { flex-direction: column; align-items: stretch; }
-.checklist-item-btns--elevador { display: grid; grid-template-columns: 1fr; gap: 0.35rem; width: 100%; margin-left: 0; }
-.checklist-item-btns--elevador .btn-simnao { min-height: 48px; width: 100%; }
+/* Telemóvel: grelha de 2 colunas com rótulos a quebrar linha — um ponto cabe num ecrã (v1.17.32) */
+.checklist-item-btns--elevador { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; width: 100%; margin-left: 0; }
+.checklist-item-btns--elevador .btn-simnao { min-height: 48px; width: 100%; white-space: normal; line-height: 1.2; padding: 0.4rem 0.5rem; font-size: 0.9rem; }
 .checklist-detalhe label { display: block; margin-top: 0.4rem; font-size: 0.85rem; }
 .checklist-detalhe textarea { width: 100%; min-height: 4.5rem; margin-top: 0.25rem; }
 .checklist-papel { display: block; font-size: 0.75rem; color: var(--color-text-muted); margin: 0.15rem 0 0.35rem; }
@@ -166,6 +167,49 @@
 @media (min-width: 720px) {
   .checklist-item-btns--elevador { grid-template-columns: 1fr 1fr 1fr; }
 }
+
+/* Um toque por ponto (elevador): atalho só nos pontos correntes */
+.btn-simnao--atalho { display: block; width: 100%; min-height: 48px; margin: 0.25rem 0 0.4rem; font-weight: 600; }
+/* Atalho + «Responder em detalhe» na mesma linha; os grupos de detalhe ficam recolhidos (v1.17.32) */
+.checklist-atalho-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; margin: 0.25rem 0 0.4rem; }
+.checklist-atalho-linha .btn-simnao--atalho { flex: 1 1 220px; margin: 0; }
+.checklist-detalhe-toggle { flex: 0 0 auto; margin-left: auto; min-height: 44px; padding: 0 0.5rem; font: inherit; font-size: 0.82rem; white-space: nowrap; background: none; border: none; color: var(--color-accent); text-decoration: underline; cursor: pointer; }
+.checklist-detalhe-toggle:disabled { opacity: 0.55; cursor: default; text-decoration: none; }
+.checklist-item-row--seguranca { border-left: 3px solid #d97706; padding-left: 0.6rem; }
+.checklist-papel--seguranca { color: #b45309; font-weight: 600; }
+body.modo-campo .checklist-papel--seguranca { color: #fbbf24; }
+
+/* «Na última visita» — passo 1 do assistente */
+.ultima-visita { margin: 0.5rem 0 0.9rem; border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius-sm, 8px); background: var(--color-bg-elevated); font-size: 0.88rem; }
+.ultima-visita--pendencias { border-left-color: #d97706; }
+.ultima-visita summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-height: 48px; padding: 0.4rem 0.75rem; cursor: pointer; list-style: none; }
+.ultima-visita summary::-webkit-details-marker { display: none; }
+.ultima-visita-titulo { font-weight: 700; }
+.ultima-visita-meta { color: var(--color-text-muted); font-size: 0.8rem; flex-basis: 100%; }
+@media (min-width: 720px) { .ultima-visita-meta { flex-basis: auto; margin-left: auto; } }
+.ultima-visita > *:not(summary) { padding: 0 0.75rem; }
+.ultima-visita > *:last-child { padding-bottom: 0.6rem; }
+.ultima-visita-alerta { display: flex; align-items: flex-start; gap: 0.4rem; margin: 0.25rem 0 0.5rem; color: #b45309; font-weight: 600; }
+.ultima-visita-bloco { margin: 0.35rem 0 0.6rem; }
+.ultima-visita-bloco strong { display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-text-muted); margin-bottom: 0.2rem; }
+.ultima-visita-bloco ul { margin: 0; padding-left: 1.1rem; }
+.ultima-visita-bloco li { margin-bottom: 0.3rem; }
+.ultima-visita-ponto { display: block; }
+.ultima-visita-detalhe { display: block; color: var(--color-text-muted); font-size: 0.82rem; }
+.ultima-visita-ok { margin: 0.25rem 0 0.5rem; color: #15803d; }
+.ultima-visita-bloco--secundario { color: var(--color-text-muted); font-size: 0.82rem; }
+.ultima-visita-bloco--secundario p { margin: 0 0 0.25rem; }
+.ultima-visita-notas { margin: 0; padding-left: 1.1rem; }
+.ultima-visita-vazia { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; margin: 0.25rem 0 0.75rem; }
+body.modo-campo .ultima-visita-ok { color: #4ade80; }
+body.modo-campo .ultima-visita-alerta { color: #fbbf24; }
+
+/* Rascunho reposto no assistente */
+.exec-draft-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; margin: 0 0 0.75rem; background: #fffbeb; border: 1px solid #fde68a; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.85rem; color: #78350f; }
+.exec-draft-banner svg { flex-shrink: 0; }
+.exec-draft-banner .btn-link-checklist { margin-left: auto; min-height: 44px; background: none; border: none; padding: 0 0.25rem; font: inherit; color: #92400e; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+body.modo-campo .exec-draft-banner { background: #292524; border-color: #57534e; border-left-color: #fbbf24; color: #fde68a; }
+body.modo-campo .exec-draft-banner .btn-link-checklist { color: #fcd34d; }
 
 /* Bloco da checklist no wizard — destaque visual */
 .checklist-section-wizard {
@@ -1380,6 +1424,76 @@ body.modo-campo .num-servico {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Cabeçalho do wizard: título + × de saída (v1.17.32) */
+.wizard-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.wizard-head-text {
+  flex: 1;
+  min-width: 0;
+}
+.wizard-head-text h2 {
+  margin-top: 0;
+}
+.wizard-close {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.12));
+  background: var(--color-bg-elevated, rgba(255,255,255,0.04));
+  color: var(--color-text, #e2e8f0);
+  margin: -0.25rem -0.25rem 0 0;
+}
+.wizard-close:hover {
+  background: rgba(255,255,255,0.1);
+}
+body.modo-campo .wizard-close {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+/* Bloqueio de validação inline — único canal de aviso dentro do wizard (sem toast) */
+.modal-relatorio-form .form-erro {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-left-width: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  scroll-margin-top: 1rem;
+}
+.modal-relatorio-form .form-erro::before {
+  content: '!';
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1.25rem;
+  text-align: center;
+}
+body.modo-campo .modal-relatorio-form .form-erro {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 /* Rodapé fixo do wizard — substitui .wizard-nav e .form-actions */
 .wizard-footer {
   flex-shrink: 0;
@@ -1457,7 +1571,7 @@ body.modo-campo .num-servico {
 .exec-review-grid span {
   display: block;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.18rem;
@@ -1747,18 +1861,49 @@ body.modo-campo .wizard-body::-webkit-scrollbar-thumb:hover {
   .exec-review-grid {
     grid-template-columns: 1fr;
   }
+  /* Rodapé numa só fila (v1.17.32): «Anterior» compacto à esquerda, «Seguinte» primário a
+     ocupar o resto; o «Cancelar» sai do rodapé — a saída faz-se pelo × do cabeçalho. */
   .wizard-footer {
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
   }
-  .wizard-footer > .btn.secondary:first-child {
-    order: 3;
-    width: 100%;
-    margin-top: 0.25rem;
+  .wizard-footer .wizard-footer-cancel {
+    display: none;
   }
   .wizard-footer-actions {
     flex: 1;
-    justify-content: space-between;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+  .wizard-footer-actions .wizard-btn-prev {
+    flex: 0 0 auto;
+    padding-inline: 0.8rem;
+  }
+  .wizard-footer-actions .wizard-btn-prev .wizard-btn-prev-label {
+    display: none;
+  }
+  .wizard-footer-actions .wizard-btn-next {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 3rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  /* Último passo: Gravar + Enviar lado a lado; «Guardar sem ass.» (Admin) passa para cima */
+  .wizard-footer--final .wizard-footer-actions {
+    flex-wrap: wrap;
+  }
+  .wizard-footer--final .wizard-footer-actions .btn-gravar-sucesso,
+  .wizard-footer--final .wizard-footer-actions .btn-enviar-relatorio {
+    flex: 1 1 40%;
+    justify-content: center;
+    min-height: 3rem;
+  }
+  .wizard-footer--final .wizard-footer-actions .btn-outline-warning {
+    flex: 1 1 100%;
+    order: -1;
+    justify-content: center;
   }
   .wizard-preview-iframe {
     height: 40vh;
@@ -2259,7 +2404,7 @@ body.modo-campo .quick-note-chip--active:hover {
   color: #fcd34d;
 }
 .exec-chip--sm {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   padding: 0.28rem 0.55rem;
 }
 .exec-chip--email {
@@ -2271,7 +2416,7 @@ body.modo-campo .quick-note-chip--active:hover {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-muted);
   min-width: min(100%, 10rem);
@@ -2311,7 +2456,7 @@ body.modo-campo .quick-note-chip--active:hover {
 }
 
 .exec-grupo-por-enviar {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.4rem;
   background: rgba(251, 191, 36, 0.18);
   color: #fcd34d;
@@ -2321,7 +2466,7 @@ body.modo-campo .quick-note-chip--active:hover {
 
 .exec-grupo-mobile-equip {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 400;
   margin-top: 0.15rem;
 }
@@ -2471,7 +2616,7 @@ body.modo-campo .quick-note-chip--active:hover {
   flex-shrink: 0;
   align-self: flex-start;
   margin-top: 0.12em;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   background: rgba(59, 130, 246, 0.2);

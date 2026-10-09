@@ -94,7 +94,7 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 | Email/PDF servidor | PHP no cPanel (`servidor-cpanel/send-email.php`) |
 | Leitor QR | @zxing/browser (câmara, `QrReaderModal.jsx`) |
 | Gráficos KPIs | recharts (`Metricas.jsx`) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 listados em 19 ficheiros); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (117 testes em `tests/unit/`) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 listados em 19 ficheiros); `npm run test:e2e` / `npm run test:e2e:last-failed` · Unitários: `npm run test:unit` (189 testes em `tests/unit/`) |
 | Imagens | sharp (optimize-images via script prebuild) + compressão JPEG no browser para fotos de relatórios/equipamentos |
 
 ---
@@ -104,7 +104,8 @@ npx playwright test tests/e2e/16-reparacoes.spec.js tests/e2e/17-reparacoes-avan
 - **Fonte de verdade:** MySQL no cPanel via `api/data.php`
 - **Cache offline:** `localStorage` (chaves `atm_*`) com TTL 30 dias
 - **Autenticação:** JWT em `sessionStorage` (sessão expira ao fechar janela)
-- **Fila de sync:** `atm_sync_queue` — operações offline enviadas ao reconectar
+- **Fila de sync:** IndexedDB `atm_sync_queue_v1` (fallback localStorage) — operações offline enviadas ao reconectar; o Dashboard mostra o que está «por enviar»
+- **Rascunhos do assistente:** IndexedDB `atm_exec_drafts_v1` — o que o técnico preencheu é reposto ao reabrir a manutenção (14 dias)
 - **Configuração:** `atm_config_alertas` (dias de aviso), `atm_alertas_dismiss` (dispensar modal)
 
 ---

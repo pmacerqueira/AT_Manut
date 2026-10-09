@@ -30,10 +30,15 @@ showToast('Mensagem importante.', 'success', 5000)  // duração custom
 |----------|------|---------|
 | Operação concluída (gravar, enviar, eliminar) | `success` | 4 s |
 | Erro de rede / servidor | `error` | 4 s |
-| Aviso de regra de negócio | `warning` | Até o técnico carregar em OK |
+| Aviso de regra de negócio (fora de assistentes) | `warning` | Até o técnico carregar em OK |
 | Informação geral | `info` | 2.5 s |
 | Validação de campo num formulário | Inline (próximo do campo) | — |
+| **Bloqueio de passo num assistente** (Executar manutenção / reparação) | **Inline** — caixa `.form-erro` no topo do passo, com scroll até lá; **nunca** toast (v1.17.32) | — |
 | Erro de login | Inline (padrão UX) | — |
+
+### Assistentes (wizards) — v1.17.32
+- Ao **mudar de passo** e ao **fechar** o assistente chamar `clearToasts()` (do `useToast()`): nenhum balão de um passo anterior pode ficar a tapar o seguinte.
+- No telemóvel o balão ao centro tapava exactamente o campo em falta (ex.: canvas de assinatura) — por isso a validação é inline e o toast amarelo fica reservado a regras de negócio fora dos passos.
 
 ### Nunca usar
 - `alert()` — usar sempre `showToast()`

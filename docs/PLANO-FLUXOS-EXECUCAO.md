@@ -27,6 +27,28 @@ Objetivo: **mínimo percurso** sem **redundâncias** que façam perder o context
 - **Copy curta** em botões críticos («Próximas deste equipamento» em vez de «Ir»).
 - Revisão periódica de **touch targets** (min. 44px) e hierarquia visual nos ecrãs já responsivos (`Calendario`, `Manutencoes`, modais).
 
+## Técnico no terreno — regras do assistente (v1.17.31)
+
+| Regra | Comportamento |
+|---|---|
+| **Rascunho automático** | Tudo o que o técnico preenche fica guardado no dispositivo (IndexedDB `atm_exec_drafts_v1`) e é reposto ao reabrir a **mesma** manutenção, se o relatório/checklist não mudou entretanto e tiver ≤ 14 dias. Faixa «Rascunho das HH:MM recuperado» com «Começar de novo». **Cancelar** guarda, não apaga. Apaga-se ao concluir. Correcção pelo Admin não usa rascunho. |
+| **Um toque por ponto** | Não existe «Marcar todos» nem «Sem anomalia nos pontos aplicáveis» em nenhuma categoria. Elevador: atalho «Executado, sem anomalia» só nos pontos correntes; nos **pontos de segurança** responde-se à execução e à observação em separado (linha destacada). |
+| **Sem pré-preenchimento em elevadores** | As respostas da visita anterior não vêm marcadas — cada ponto é uma decisão desta visita. As outras categorias mantêm o pré-preenchimento com indicação visível. |
+| **«Na última visita»** | Painel no passo 1: data/há N dias, técnico, n.º do relatório, anomalias (descrição + recomendação), documentos em falta, pontos por fazer e motivo, fora de serviço, reparação pedida, contador, primeiras notas. Sem histórico: «Primeira intervenção registada neste equipamento.» |
+| **Por enviar** | Fila offline em IndexedDB `atm_sync_queue_v1`; Dashboard «O meu dia» lista «Guardado neste telemóvel, por enviar ao servidor» por equipamento/cliente, com «Sincronizar agora». |
+| **Execução em lote** | Exclusiva do Admin; por analisar em conjunto (ponto 5 da avaliação). |
+
+## Telemóvel e tablet — regras do assistente (v1.17.32)
+
+| Regra | Comportamento |
+|---|---|
+| **Bloqueio inline, sem toast** | Qualquer validação que impeça «Seguinte»/«Gravar» aparece numa caixa vermelha no topo do passo (`.form-erro`) com scroll até lá. O assistente fecha todos os toasts ao mudar de passo e ao sair (`clearToasts`). |
+| **Rodapé numa fila** (≤480 px) | `[‹] [Seguinte ———]`; último passo `[‹] [Gravar] [Enviar]`. «Cancelar» só no desktop/tablet — no telemóvel sai-se pelo **×** do cabeçalho (`aria-label="Sair do assistente"`, mesmo diálogo de confirmação/rascunho). |
+| **Checklist elevador compacta** | Botões em 2 colunas (3 no tablet). Pontos correntes: atalho «Executado, sem anomalia» + «Responder em detalhe» (abre os grupos feito/observado; abrem sozinhos se já houver resposta fora do atalho). Pontos de segurança: grupos sempre visíveis. |
+| **Modal de reparação** | Ecrã inteiro no telemóvel, rodapé fixo `[👁] [Guardar progresso] / [Concluir e assinar]`; sem «Cancelar» (× no cabeçalho). |
+| **Só o que o técnico precisa** | «Sincronizar agenda» e «Selecionar» (lote) são Admin-only. Cartão com uma única acção mostra «Editar» directo. Badge «5d atraso / Hoje / em 10d». |
+| **Mínimos de leitura/toque** | Campos ≥ 16 px em ecrãs tácteis (sem zoom iOS); texto ≥ 12 px; barra verde de prontidão como pílula flutuante que não bloqueia toques; «Menu» da barra inferior fecha o menu lateral. |
+
 ## Fases técnicas
 
 ### Fase A — Executar seguro (P0) — *fechada em v1.16.6*

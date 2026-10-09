@@ -12,7 +12,7 @@
 import { test, expect } from '@playwright/test'
 import {
   setupApiMock, doLoginAdmin, doLoginTecnico,
-  checklistMarcarTodos, checklistFillAllSim, signCanvas,
+  checklistMarcarTodos, checklistFillAllSim, signCanvas, preencherFuncaoAssinanteElevador,
   execWizardSeguinte,
   fillExecucaoModal,
   confirmExecWizardVerificacaoEquipamento,
@@ -33,7 +33,9 @@ test.describe('Manutenções — Filtros e listagem', () => {
   test('Listar todas as manutenções', async ({ page }) => {
     await page.goto('/manut/manutencoes')
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(1200)
+    // A página é React.lazy: no primeiro arranque do Vite a transformação do chunk
+    // pode demorar >1 s — esperar pelo DOM em vez de um timeout fixo.
+    await expect(page.locator('.manutencoes-table, .manutencoes-cards').first()).toBeAttached({ timeout: 15000 })
     // No desktop (1280x800): a tabela .manutencoes-table é mostrada
     // No mobile: os cards .manutencoes-cards são mostrados
     // Verificar presença no DOM (um deles pode estar oculto via CSS responsive)
@@ -188,17 +190,22 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await expect(page.locator('.checklist-respostas, .checklist-item-row').first()).toBeVisible({ timeout: 4000 })
   })
 
-  test('Botão "Marcar todos" preenche toda a checklist como Sim', async ({ page }) => {
+  test('Checklist sem atalho global «Marcar todos»: responde-se ponto a ponto', async ({ page }) => {
     await page.locator('.btn-executar-manut').first().click()
     await page.locator('.modal-overlay').first().waitFor({ state: 'visible', timeout: 5000 })
 
     await confirmExecWizardVerificacaoEquipamento(page)
-    await checklistMarcarTodos(page)
+    await expect(page.locator('.checklist-item-row').first()).toBeVisible({ timeout: 4000 })
 
-    // Todos os itens devem ter ".active-sim"
-    const simBtns = page.locator('.btn-simnao.active-sim')
-    const count = await simBtns.count()
-    expect(count).toBeGreaterThan(0)
+    // O botão global de preenchimento deixou de existir (v1.17.31) — só «Desmarcar todos».
+    await expect(page.locator('.checklist-quick-actions .btn-link-checklist').filter({ hasText: /^Marcar todos$/i })).toHaveCount(0)
+    await expect(page.locator('.checklist-quick-actions .btn-link-checklist').filter({ hasText: /Sem anomalia nos pontos aplicáveis/i })).toHaveCount(0)
+
+    // Um toque por ponto preenche cada linha
+    await checklistMarcarTodos(page)
+    const linhas = await page.locator('.checklist-item-row').count()
+    const simBtns = page.locator('.checklist-item-row .btn-simnao.active-sim')
+    expect(await simBtns.count()).toBeGreaterThanOrEqual(linhas)
   })
 
   test('Submeter sem checklist completo mostra erro', async ({ page }) => {
@@ -217,7 +224,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await execWizardSeguinte(page)
 
     await expect(
-      page.locator('.form-erro').filter({ hasText: /checklist|verificadas/i }).first()
+      page.locator('.form-erro').filter({ hasText: /checklist|verificadas|todos os pontos/i }).first()
     ).toBeVisible({ timeout: 5000 })
   })
 
@@ -243,6 +250,7 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
     await execWizardSeguinte(page)
 
     await page.locator('.modal input[placeholder*="Nome completo" i]').first().fill('Cliente Teste')
+    await preencherFuncaoAssinanteElevador(page)
     await execWizardSeguinte(page)
 
     // Passo assinatura: Admin pode avançar sem desenhar; no passo final «Enviar» exige assinatura
@@ -302,9 +310,13 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
       await page.waitForTimeout(100)
       await expect(rows.nth(0).locator('.btn-simnao.active-sim')).toBeVisible()
 
-      // Segundo item (se existir): Não
+      // Segundo item (se existir): resposta negativa («Não» / «Não disponibilizado» / «Anomalia»)
       if (count > 1) {
-        await rows.nth(1).locator('.btn-simnao').nth(1).click()
+        // Pontos correntes de elevador (v1.17.32): «Anomalia» está nos grupos de detalhe, recolhidos
+        // até tocar em «Responder em detalhe».
+        const toggle = rows.nth(1).locator('.checklist-detalhe-toggle:not(.is-open)')
+        if (await toggle.isVisible().catch(() => false)) await toggle.click()
+        await rows.nth(1).locator('.btn-simnao').filter({ hasText: /^Não$|^Não disponibilizado$|^Anomalia$/ }).first().click()
         await page.waitForTimeout(100)
         await expect(rows.nth(1).locator('.btn-simnao.active-nao')).toBeVisible()
       }

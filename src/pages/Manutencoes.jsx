@@ -1025,8 +1025,11 @@ export default function Manutencoes() {
           <div className="mc-top">
             <span className={`badge badge-${st}`}>{statusLabel[st]}</span>
             {dias != null && (
-              <span className={`mc-dias-badge ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}>
-                {dias > 0 ? `+${dias}d` : dias === 0 ? 'Hoje' : `${dias}d`}
+              <span
+                className={`mc-dias-badge ${dias > 0 ? 'dias-atraso' : dias === 0 ? 'dias-hoje' : 'dias-futuro'}`}
+                title={dias > 0 ? `${dias} dia(s) de atraso` : dias === 0 ? 'Agendada para hoje' : `Faltam ${-dias} dia(s)`}
+              >
+                {dias > 0 ? `${dias}d atraso` : dias === 0 ? 'Hoje' : `em ${-dias}d`}
               </span>
             )}
             {isHistorico(m) && <span className="badge badge-historico"><Archive size={10} /> Histórico</span>}
@@ -1108,35 +1111,51 @@ export default function Manutencoes() {
               {isConcluida && !rel && (
                 <button className="icon-btn secondary" onClick={() => setModalRecolherAssinatura({ manutencao: m, maquina: maq })} title="Registar assinatura"><FileSignature size={15} /></button>
               )}
-              <div className="mc-overflow-wrapper">
-                <button className="icon-btn secondary" onClick={() => setOverflowOpen(overflowOpen === m.id ? null : m.id)} title="Mais acções"><MoreHorizontal size={15} /></button>
-                {overflowOpen === m.id && (
-                  <div className="mc-overflow-menu" onClick={() => setOverflowOpen(null)}>
-                    {rel?.fotos?.length > 0 && (
-                      <button onClick={() => setModalFotos({ fotos: rel.fotos })}><Paperclip size={14} /> Fotografias</button>
-                    )}
-                    {rel && (
-                      <>
-                        <button onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)}><FileDown size={14} /> PDF</button>
-                        <button onClick={() => abrirModalEmail(m)}><Mail size={14} /> Enviar email</button>
-                        {isAdmin && isConcluida && (
-                          rel.enviadoParaCliente?.email ? (
-                            <button onClick={() => reverterMarcarEnvioCliente(rel)}><Undo2 size={14} /> Reverter marca de envio</button>
-                          ) : (
-                            <button onClick={() => abrirModalMarcarEnvioManual(m)}><MailCheck size={14} /> Marcar enviado ao cliente</button>
-                          )
+              {(() => {
+                // Menu «⋯» só quando há mais do que uma acção; com uma única (tipicamente «Editar»
+                // para o técnico) mostra-se o botão directo — um toque em vez de dois (v1.17.32).
+                const podeEditar = canEditManutencao(m.id)
+                const podeEliminar = canDeleteManutencao(m.id)
+                const nAcoes = (rel?.fotos?.length > 0 ? 1 : 0) + (rel ? 2 : 0) + (rel && isAdmin && isConcluida ? 1 : 0)
+                  + (podeEditar ? 1 : 0) + (podeEliminar ? 1 : 0)
+                if (nAcoes === 0) return null
+                if (nAcoes === 1 && podeEditar) {
+                  return (
+                    <button className="icon-btn secondary" onClick={() => openEdit(m)} title="Editar" aria-label="Editar manutenção"><Pencil size={15} /></button>
+                  )
+                }
+                return (
+                  <div className="mc-overflow-wrapper">
+                    <button className="icon-btn secondary" onClick={() => setOverflowOpen(overflowOpen === m.id ? null : m.id)} title="Mais acções"><MoreHorizontal size={15} /></button>
+                    {overflowOpen === m.id && (
+                      <div className="mc-overflow-menu" onClick={() => setOverflowOpen(null)}>
+                        {rel?.fotos?.length > 0 && (
+                          <button onClick={() => setModalFotos({ fotos: rel.fotos })}><Paperclip size={14} /> Fotografias</button>
                         )}
-                      </>
-                    )}
-                    {canEditManutencao(m.id) && (
-                      <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
-                    )}
-                    {canDeleteManutencao(m.id) && (
-                      <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m)}><Trash2 size={14} /> Eliminar</button>
+                        {rel && (
+                          <>
+                            <button onClick={() => handleAbrirPdf(m, maq, rel, sub, cliente)}><FileDown size={14} /> PDF</button>
+                            <button onClick={() => abrirModalEmail(m)}><Mail size={14} /> Enviar email</button>
+                            {isAdmin && isConcluida && (
+                              rel.enviadoParaCliente?.email ? (
+                                <button onClick={() => reverterMarcarEnvioCliente(rel)}><Undo2 size={14} /> Reverter marca de envio</button>
+                              ) : (
+                                <button onClick={() => abrirModalMarcarEnvioManual(m)}><MailCheck size={14} /> Marcar enviado ao cliente</button>
+                              )
+                            )}
+                          </>
+                        )}
+                        {podeEditar && (
+                          <button onClick={() => openEdit(m)}><Pencil size={14} /> Editar</button>
+                        )}
+                        {podeEliminar && (
+                          <button className="mc-overflow-danger" onClick={() => setModalConfirmDelete(m)}><Trash2 size={14} /> Eliminar</button>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -1179,7 +1198,9 @@ export default function Manutencoes() {
           )}
         </div>
         <div className="page-header-actions">
-          <AgendaCompletaRefreshButton />
+          {/* Recalcular agenda e execução em lote são tarefas de gestão (Admin); o técnico vê
+              só o que precisa para trabalhar (v1.17.32). */}
+          {isAdmin && <AgendaCompletaRefreshButton />}
           {!filter && (
             <button
               type="button"
@@ -1189,9 +1210,11 @@ export default function Manutencoes() {
               {mostrarTodas ? 'Ocultar executadas' : `Ver todas (${manutencoesExecutadas.length})`}
             </button>
           )}
-          <button type="button" className={bulkMode ? 'secondary' : 'btn-outline-muted'} onClick={toggleBulkMode}>
-            <CheckSquare size={16} /> {bulkMode ? 'Cancelar selecção' : 'Selecionar'}
-          </button>
+          {isAdmin && (
+            <button type="button" className={bulkMode ? 'secondary' : 'btn-outline-muted'} onClick={toggleBulkMode}>
+              <CheckSquare size={16} /> {bulkMode ? 'Cancelar selecção' : 'Selecionar'}
+            </button>
+          )}
           {isAdmin && (
             <button type="button" onClick={openAdd}>
               <Plus size={18} /> Nova manutenção

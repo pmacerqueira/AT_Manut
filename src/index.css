@@ -481,7 +481,7 @@ body:has(.modal-overlay) {
 .modal-conflitos-header h2,
 .agendamento-sugestao-modal h3 {
   margin: 0 0 0.85rem;
-  font-size: clamp(0.6rem, 2.2vw, 0.88rem);
+  font-size: clamp(0.75rem, 2.2vw, 0.88rem);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -1294,6 +1294,14 @@ body:has(.modal-overlay) {
   input, select, textarea {
     padding: var(--space-md) var(--space-lg);
     font-size: 16px;
+  }
+  /* Em ecrãs táteis nenhum campo pode ficar abaixo de 16px — o iOS Safari faz zoom automático
+     ao focar e o técnico perde o enquadramento. Rede de segurança para selectores específicos
+     (filtros, pesquisa) que definem fontes menores (v1.17.32). */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
+      font-size: 16px !important;
+    }
   }
   form label > span:not(.required) { font-size: var(--text-md); }
   .textarea-full { min-height: 120px; }

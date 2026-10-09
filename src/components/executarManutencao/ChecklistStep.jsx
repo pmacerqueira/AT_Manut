@@ -9,9 +9,7 @@ import {
   ESTADOS_MANUTENCAO_ELEVADOR,
   fundamentoInaplicavel,
   mensagemIncoerenciaGrupo,
-  papelDoPonto,
   respostaInaplicavel,
-  respostaOperacao,
 } from '../../domain/relatorioElevadorPreventivo'
 import { INTERVALOS_KAESER } from '../../domain/equipamentoDomain'
 import { tipoKaeserNaPosicao, proximaPosicaoKaeser, descricaoCicloKaeser } from '../../constants/kaeserCiclo'
@@ -65,7 +63,7 @@ export default function ChecklistStep({
       {!isCorrectionMode && (
         <p className="wizard-step-hint">
           {modoElevador
-            ? 'Em cada ponto: sem anomalia observada, anomalia (com descrição e recomendação) ou não aplicável.'
+            ? 'Responda ponto a ponto. Nos pontos correntes há um toque para «Executado, sem anomalia»; nos pontos de segurança responde-se à execução e à observação em separado.'
             : 'Confirme ponto a ponto se a tarefa foi executada (Sim/Não).'}
         </p>
       )}
@@ -107,36 +105,15 @@ export default function ChecklistStep({
               </select>
             </label>
           )}
+          {/* Sem «Marcar todos»: cada ponto é uma decisão do técnico. Só se pode limpar. */}
           <div className="checklist-quick-actions">
             <button type="button" className="btn-link-checklist"
               onClick={() => {
-                const all = {}
-                items.forEach(it => {
-                  if (!modoElevador) {
-                    all[it.id] = 'sim'
-                    return
-                  }
-                  const fund = fundamentoInaplicavel(it, maq?.subcategoriaId)
-                  const papel = papelDoPonto(it)
-                  if (fund) {
-                    all[it.id] = respostaInaplicavel(it, fund)
-                    return
-                  }
-                  if (papel === 'documento' || papel === 'teste') {
-                    all[it.id] = ''
-                    return
-                  }
-                  all[it.id] = respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' })
-                })
-                setForm(f => ({ ...f, checklistRespostas: all }))
-              }}>
-              {modoElevador ? 'Sem anomalia nos pontos aplicáveis' : 'Marcar todos'}
-            </button>
-            <span className="checklist-quick-sep">/</span>
-            <button type="button" className="btn-link-checklist"
-              onClick={() => {
                 const empty = {}
-                items.forEach(it => { empty[it.id] = '' })
+                items.forEach(it => {
+                  const fund = modoElevador ? fundamentoInaplicavel(it, maq?.subcategoriaId) : ''
+                  empty[it.id] = fund ? respostaInaplicavel(it, fund) : ''
+                })
                 setForm(f => ({ ...f, checklistRespostas: empty }))
               }}>
               Desmarcar todos

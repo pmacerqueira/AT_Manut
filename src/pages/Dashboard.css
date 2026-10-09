@@ -175,6 +175,31 @@ button.stat-card-link:hover {
   padding: 0.25rem 0;
 }
 
+/* Guardado no telemóvel, por enviar (fila offline) */
+.meu-dia-por-enviar {
+  margin: 0 0 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #fde68a;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 0.88rem;
+}
+.meu-dia-por-enviar-head { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.meu-dia-por-enviar-head svg { flex-shrink: 0; }
+.meu-dia-por-enviar-lista { list-style: none; margin: 0.45rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.meu-dia-por-enviar-lista li { display: flex; flex-direction: column; }
+.meu-dia-por-enviar-lista li > span:first-child { font-weight: 600; }
+.meu-dia-por-enviar-lista .meu-dia-item-cliente { color: #92400e; }
+.meu-dia-por-enviar-head .badge { background: #f59e0b; color: #1c1917; font-weight: 700; }
+body.modo-campo .meu-dia-por-enviar-lista .meu-dia-item-cliente { color: #fcd34d; }
+.meu-dia-por-enviar-acoes { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.55rem; }
+.meu-dia-por-enviar-acoes .text-muted { font-size: 0.8rem; color: #92400e; flex: 1 1 14rem; }
+.meu-dia-por-enviar-acoes .btn { min-height: 44px; }
+body.modo-campo .meu-dia-por-enviar { background: #292524; border-color: #57534e; border-left-color: #fbbf24; color: #fde68a; }
+body.modo-campo .meu-dia-por-enviar-acoes .text-muted { color: #fcd34d; }
+
 .meu-dia-lista {
   list-style: none;
   margin: 0;
@@ -499,7 +524,7 @@ button.stat-card-link:hover {
 }
 .day-panel-header h3 {
   margin: 0;
-  font-size: clamp(0.6rem, 2.2vw, 0.88rem);
+  font-size: clamp(0.75rem, 2.2vw, 0.88rem);
   font-weight: 500;
   text-transform: capitalize;
   color: var(--color-text);
@@ -652,7 +677,7 @@ button.stat-card-link:hover {
 }
 .action-sheet-title {
   margin: 0 0 0.85rem;
-  font-size: clamp(0.6rem, 2.2vw, 0.88rem);
+  font-size: clamp(0.75rem, 2.2vw, 0.88rem);
   font-weight: 500;
   color: var(--color-text);
   white-space: nowrap;

@@ -498,7 +498,7 @@ export default function Agendamento() {
             />
           </label>
           <label>
-            <span>Hora (HH:MM) <span className="text-muted" style={{ fontWeight: 'normal', fontSize: '0.8em' }}>opcional</span></span>
+            <span>Hora (HH:MM) <span className="text-muted" style={{ fontWeight: 'normal', fontSize: 'max(0.8em, 0.75rem)' }}>opcional</span></span>
             <input
               type="text"
               inputMode="numeric"

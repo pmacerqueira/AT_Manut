@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   aplicarForaDeServico,
   papelDoPonto,
@@ -42,6 +43,12 @@ function Campo({ label, value, onChange }) {
 export default function ChecklistElevadorPonto({ item, index, valor, onChange }) {
   const papel = valor?.papel || papelDoPonto(item)
   const critico = pontoImplicaForaDeServico(item)
+  /**
+   * Pontos correntes (com atalho): os grupos «O que foi feito» / «O que foi observado» ficam
+   * recolhidos até o técnico tocar em «Responder em detalhe» — ou até haver uma resposta que
+   * não seja o atalho. Nos pontos de segurança estão sempre visíveis (v1.17.32).
+   */
+  const [detalhePedido, setDetalhePedido] = useState(false)
   const set = (next) => {
     if (critico && (next?.observacao === 'anomalia' || next?.r === 'nao')) {
       onChange(aplicarForaDeServico([item], { [item.id]: next })[item.id])
@@ -156,11 +163,51 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
     )
   }
 
+  const executadoSemAnomalia = valor?.execucao === 'executado' && valor?.observacao === 'sem_anomalia'
+  const temRespostaForaDoAtalho = !executadoSemAnomalia && !!(valor?.execucao || valor?.observacao)
+  const mostrarDetalhe = critico || detalhePedido || temRespostaForaDoAtalho
   return (
-    <div className="checklist-item-row checklist-item-row--elevador">
+    <div className={`checklist-item-row checklist-item-row--elevador${critico ? ' checklist-item-row--seguranca' : ''}`}>
       <span className="checklist-item-num">{index + 1}.</span>
       <span className="checklist-item-texto">{limparCitacaoNormaChecklist(item.texto)}</span>
-      <span className="checklist-papel">Execução e observação são respostas diferentes</span>
+      {critico ? (
+        <span className="checklist-papel checklist-papel--seguranca">
+          Ponto de segurança: responda à execução e à observação em separado.
+        </span>
+      ) : (
+        <>
+          <span className="checklist-papel">Execução e observação são respostas diferentes</span>
+          <div className="checklist-atalho-linha">
+            <button
+              type="button"
+              className={`btn-simnao btn-simnao--atalho ${executadoSemAnomalia ? 'active-sim' : ''}`}
+              aria-label={`Ponto ${index + 1}: executado, sem anomalia`}
+              onClick={() => { setDetalhePedido(false); set(respostaOperacao({
+                execucao: 'executado',
+                observacao: 'sem_anomalia',
+                descricao: '',
+                recomendacao: '',
+                fundamento: '',
+                motivo: '',
+                recomendaRetirada: false,
+              })) }}
+            >
+              Executado, sem anomalia
+            </button>
+            <button
+              type="button"
+              className={`btn-link-checklist checklist-detalhe-toggle${mostrarDetalhe ? ' is-open' : ''}`}
+              aria-expanded={mostrarDetalhe}
+              onClick={() => setDetalhePedido(v => !v)}
+              disabled={temRespostaForaDoAtalho}
+              title={temRespostaForaDoAtalho ? 'Há uma resposta em detalhe neste ponto' : undefined}
+            >
+              {mostrarDetalhe ? 'Ocultar detalhe' : 'Responder em detalhe'}
+            </button>
+          </div>
+        </>
+      )}
+      {mostrarDetalhe && (
       <div className="checklist-subrow">
         <span>O que foi feito</span>
         <Botoes
@@ -183,6 +230,8 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           ]}
         />
       </div>
+      )}
+      {mostrarDetalhe && (
       <div className="checklist-subrow">
         <span>O que foi observado</span>
         <Botoes
@@ -205,6 +254,7 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           ]}
         />
       </div>
+      )}
       <div className="checklist-detalhe">
         {(valor?.execucao === 'parcial' || valor?.execucao === 'nao_executado' || valor?.observacao === 'nao_observado') && (
           <Campo label="Motivo" value={valor.motivo || ''} onChange={motivo => set(respostaOperacao({ ...valor, motivo }))} />

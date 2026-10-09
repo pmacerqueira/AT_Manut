@@ -17,7 +17,7 @@ import { CloudOff, CheckCircle2 } from 'lucide-react'
 import './OfflineBanner.css'
 
 const PREFETCH_DIAS = 5
-const READY_DISPLAY_MS = 4000
+const READY_DISPLAY_MS = 3000 // pílula flutuante: 2.5 s visível + fade (CSS)
 
 export default function OfflineBanner() {
   const { isOnline, syncPending, processSync, manutencoes, maquinas, loading } = useData()
@@ -79,7 +79,7 @@ export default function OfflineBanner() {
           <span>
             {syncing
               ? 'A enviar ao servidor…'
-              : `${syncPending} operação${syncPending !== 1 ? 'ões' : ''} por enviar`}
+              : `${syncPending} ${syncPending === 1 ? 'operação' : 'operações'} por enviar`}
           </span>
         </div>
         <button
