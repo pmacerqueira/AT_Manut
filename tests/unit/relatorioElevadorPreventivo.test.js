@@ -18,6 +18,10 @@ import {
   papelDoPonto,
   fundamentoInaplicavel,
   respostaDocumento,
+  codigoResposta,
+  notasComLinhasAutomaticas,
+  NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO,
+  temAnomaliaChecklist,
   pontoImplicaForaDeServico,
   respostaOperacao,
   contextoEmissaoFromForm,
@@ -30,7 +34,6 @@ import {
   mensagemComunicacaoUrgente,
   mensagemIncoerenciaGrupo,
   mensagemPedidoForaAmbito,
-  codigoResposta,
   rotuloRespostaPdf,
 } from '../../src/domain/relatorioElevadorPreventivo.js'
 import { referenciasCitaveisNoPdf } from '../../src/domain/catalogoReferenciasElevador.js'
@@ -166,6 +169,27 @@ describe('relatorio elevador preventivo', () => {
       },
     )
     assert.equal(docNaoBloqueiaEstrutura.length, 0)
+    assert.equal(codigoResposta(respostaDocumento('nao_disponibilizado')), 'nota')
+    assert.equal(temAnomaliaChecklist(
+      [{ id: 'd', texto: 'Registo de intervenções' }],
+      { d: respostaDocumento('nao_disponibilizado') },
+    ), false)
+    const semFundamento = validarChecklistElevador(
+      [
+        { id: 'op', texto: 'Limpeza do equipamento' },
+        { id: 'doc', texto: 'Manual de instruções' },
+      ],
+      {
+        op: respostaOperacao({ execucao: 'na', observacao: 'na' }),
+        doc: respostaDocumento('na'),
+      },
+    )
+    assert.deepEqual(semFundamento, [])
+    const itensRegisto = [{ id: 'r', texto: 'Registo de intervenções do equipamento' }]
+    const notas = notasComLinhasAutomaticas('Verificação executada.', itensRegisto, {
+      r: respostaDocumento('nao_disponibilizado'),
+    })
+    assert.match(notas, new RegExp(NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO))
   })
 
   it('execução incompleta não fica como verificação sem anomalia', () => {

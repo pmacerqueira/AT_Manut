@@ -10,7 +10,7 @@ import { APP_FOOTER_TEXT } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { resolveChecklist } from './resolveChecklist'
 import { resolveDeclaracaoCliente } from '../constants/relatorio'
-import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, linhaPontoAtencao, linhasContextoEmissao, NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, rotuloRespostaPdf, TEXTO_PLANEAMENTO_PROXIMAS, textoRececaoVisivel, TITULO_RELATORIO_ELEVADOR } from '../domain/relatorioElevadorPreventivo'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, linhaPontoAtencao, linhasContextoEmissao, NOTA_AMBITO_PONTOS, NOTA_AMBITO_TITULO, notasComLinhasAutomaticas, rotuloRespostaPdf, TEXTO_PLANEAMENTO_PROXIMAS, textoRececaoVisivel, TITULO_RELATORIO_ELEVADOR } from '../domain/relatorioElevadorPreventivo'
 import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { MAX_FOTOS } from '../config/limits'
 import { horasContadorParaRelatorio } from './horasContadorEquipamento'
@@ -506,9 +506,10 @@ export async function gerarPdfCompacto({
       wrapped.forEach((ln, li) => { pdf.text(ln, M + 3, y + li * 4.2) })
       y += blockH
     })
-    if (relatorio?.notas?.trim()) {
+    const notasParaPdf = notasComLinhasAutomaticas(relatorio?.notas, checklistItems, relatorio?.checklistRespostas)
+    if (notasParaPdf.trim()) {
       const hint = pdf.splitTextToSize(
-        `Observa\u00e7\u00f5es registadas: ${linhasNotasRelatorio(relatorio.notas).join(' | ')}`,
+        `Observa\u00e7\u00f5es registadas: ${linhasNotasRelatorio(notasParaPdf).join(' | ')}`,
         cW - 6,
       )
       if (y + hint.length * 4 > 275) { pdf.addPage(); y = 20 }
@@ -717,8 +718,9 @@ export async function gerarPdfCompacto({
   }
 
   function renderNotasSection() {
-    if (!relatorio?.notas) return
-    const notaLinhas = linhasNotasRelatorio(relatorio.notas, getQuickNotes())
+    const notasParaPdf = notasComLinhasAutomaticas(relatorio?.notas, checklistItems, relatorio?.checklistRespostas)
+    if (!notasParaPdf) return
+    const notaLinhas = linhasNotasRelatorio(notasParaPdf, getQuickNotes())
     if (notaLinhas.length === 0) return
     if (y > 240) { pdf.addPage(); y = 20 }
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 58, 95)

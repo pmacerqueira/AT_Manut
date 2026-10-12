@@ -74,14 +74,14 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           opcoes={[
             { id: 'analisado', label: 'Analisado', activo: 'active-sim' },
             { id: 'nao_analisado', label: 'Disponível, não analisado', activo: 'active-na' },
-            { id: 'nao_disponibilizado', label: 'Não disponibilizado', activo: 'active-nao' },
+            { id: 'nao_disponibilizado', label: 'Não disponibilizado', activo: 'active-na' },
             { id: 'ilegivel', label: 'Ilegível', activo: 'active-nao' },
             { id: 'na', label: 'Não aplicável', activo: 'active-na' },
           ]}
         />
         {valor?.documento === 'na' && (
           <div className="checklist-detalhe">
-            <Campo label="Fundamento" value={valor.fundamento || ''} onChange={fundamento => set(respostaDocumento('na', { fundamento }))} />
+            <Campo label="Fundamento (opcional)" value={valor.fundamento || ''} onChange={fundamento => set(respostaDocumento('na', { fundamento }))} />
           </div>
         )}
       </div>
@@ -215,7 +215,7 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           valor={valor?.execucao || ''}
           onPick={(execucao) => set(respostaOperacao({
             execucao,
-            observacao: valor?.observacao || '',
+            observacao: execucao === 'na' ? 'na' : (valor?.observacao === 'na' ? '' : (valor?.observacao || '')),
             descricao: valor?.descricao || '',
             recomendacao: valor?.recomendacao || '',
             fundamento: valor?.fundamento || '',
@@ -238,7 +238,7 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           aria={`Observação ${index + 1}`}
           valor={valor?.observacao || ''}
           onPick={(observacao) => set(respostaOperacao({
-            execucao: valor?.execucao || '',
+            execucao: observacao === 'na' ? 'na' : (valor?.execucao === 'na' ? '' : (valor?.execucao || '')),
             observacao,
             descricao: valor?.descricao || '',
             recomendacao: valor?.recomendacao || '',
@@ -260,7 +260,7 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
           <Campo label="Motivo" value={valor.motivo || ''} onChange={motivo => set(respostaOperacao({ ...valor, motivo }))} />
         )}
         {valor?.execucao === 'na' && (
-          <Campo label="Fundamento" value={valor.fundamento || ''} onChange={fundamento => set(respostaOperacao({ ...valor, fundamento }))} />
+          <Campo label="Fundamento (opcional)" value={valor.fundamento || ''} onChange={fundamento => set(respostaOperacao({ ...valor, fundamento }))} />
         )}
         {valor?.observacao === 'anomalia' && (
           <>

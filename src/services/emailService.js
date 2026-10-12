@@ -18,7 +18,7 @@ import { EMAIL_CONFIG, getSendEmailUrl, getSendReportUrl, isEmailConfigured } fr
 import { APP_VERSION } from '../config/version'
 import { EMPRESA } from '../constants/empresa'
 import { declaracaoLegislacaoVariantFromCategoriaNome, resolveDeclaracaoCliente } from '../constants/relatorio'
-import { codigoResposta, emissaoDoRelatorio, rotuloRespostaPdf, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
+import { codigoResposta, emissaoDoRelatorio, notasComLinhasAutomaticas, rotuloRespostaPdf, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
 import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { buildResumoExecutivoEmailPayload } from '../utils/relatorioPdfResumo'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
@@ -288,7 +288,10 @@ export async function enviarRelatorioEmail({
         assinado_por:     relatorio?.nomeAssinante ?? '',
         data_assinatura:  relatorio?.dataAssinatura ?? '',
         assinatura_digital: assinaturaB64,
-        notas:            notasRelatorioParaTexto(relatorio?.notas ?? '', getQuickNotes()),
+        notas:            notasRelatorioParaTexto(
+          notasComLinhasAutomaticas(relatorio?.notas ?? '', itemsResolvidos, relatorioParsed.checklistRespostas),
+          getQuickNotes(),
+        ),
         quick_notes_json: JSON.stringify(getQuickNotes()),
         checklist_json:   checklistJson,
         photos_json:      photosJson,

@@ -10,6 +10,7 @@ import {
   decisaoOperacionalElevador,
   linhasContextoEmissao,
   NOTA_AMBITO_TITULO,
+  notasComLinhasAutomaticas,
   pontosNotaAmbito,
   TITULO_RELATORIO_ELEVADOR,
 } from '../domain/relatorioElevadorPreventivo.js'
@@ -256,11 +257,12 @@ export function buildResumoExecutivoMeta({
       : calcularVereditoChecklist(relatorio?.checklistRespostas, checklistItems)
   const naoConformes = isReparacao ? [] : itensNaoConformes(relatorio, checklistItems)
   const pendentes = emissao ? itensPendentesElevador(relatorio, checklistItems) : []
+  const notasRelatorio = notasComLinhasAutomaticas(relatorio?.notas, checklistItems, relatorio?.checklistRespostas)
   const bullets = isReparacao
-    ? buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes: [], max: 6 })
+    ? buildResumoExecutivoBullets({ notas: notasRelatorio, naoConformes: [], max: 6 })
     : emissao
-      ? buildBulletsElevador({ notas: relatorio?.notas, naoConformes, pendentes, max: 6 })
-      : buildResumoExecutivoBullets({ notas: relatorio?.notas, naoConformes, max: 6 })
+      ? buildBulletsElevador({ notas: notasRelatorio, naoConformes, pendentes, max: 6 })
+      : buildResumoExecutivoBullets({ notas: notasRelatorio, naoConformes, max: 6 })
   const contagemLinha = emissao
     ? `Resumo de respostas: ${nSim} sem anomalia observada · ${nNao} anomalias${nParcial ? ` · ${nParcial} execução incompleta ou não observada` : ''}${nNa ? ` · ${nNa} não aplicável` : ''}`
     : ''

@@ -5,7 +5,7 @@ import { TIPOS_DOCUMENTO } from '../context/DataContext'
 import { useData } from '../context/DataContext'
 import { categoriaNomeFromMaquina, resolveDeclaracaoClienteForMaquina } from '../constants/relatorio'
 import { resolveChecklist } from '../utils/resolveChecklist'
-import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, NOTA_AMBITO_TITULO, pontosNotaAmbito, TEXTO_COMUNICACAO_EMAIL, TEXTO_ORDEM_REPARACAO, TEXTO_PEDIDO_FORA_AMBITO, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
+import { AVISO_FORA_DE_SERVICO, codigoResposta, decisaoOperacionalElevador, emissaoDoRelatorio, NOTA_AMBITO_TITULO, notasComLinhasAutomaticas, pontosNotaAmbito, TEXTO_COMUNICACAO_EMAIL, TEXTO_ORDEM_REPARACAO, TEXTO_PEDIDO_FORA_AMBITO, textoRececaoVisivel } from '../domain/relatorioElevadorPreventivo'
 import { aplicaNotaLegalColocacao, limparCitacaoNormaChecklist, NOTA_LEGAL_COLOCACAO_FONTES, NOTA_LEGAL_COLOCACAO_INTRO, NOTA_LEGAL_COLOCACAO_LINHAS, NOTA_LEGAL_COLOCACAO_TITULO } from '../domain/notaLegalColocacaoMercado'
 import { horasContadorParaRelatorio } from '../utils/horasContadorEquipamento'
 import { linhasNotasRelatorio } from '../components/executarManutencao/execWizardHelpers'
@@ -16,6 +16,9 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
   const { getSubcategoria, getCategoria } = useData()
   if (!relatorio) return null
   const items = resolveChecklist(relatorio, checklistItems)
+  const notasVisiveis = linhasNotasRelatorio(
+    notasComLinhasAutomaticas(relatorio.notas, items, relatorio.checklistRespostas),
+  )
   const emissao = emissaoDoRelatorio(relatorio)
   const decisao = decisaoOperacionalElevador(items, relatorio?.checklistRespostas, {
     recomendaRetirada: !!emissao?.recomendaRetirada,
@@ -120,6 +123,8 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'sim' && <span className="badge-sim">{emissao ? 'Sem anomalia' : 'Sim'}</span>}
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nao' && <span className="badge-nao">{emissao ? 'Anomalia' : 'Não'}</span>}
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'na' && <span>Não aplicável</span>}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nota' && <span>Não disponibilizado</span>}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'parcial' && <span>Parcial</span>}
                     {!codigoResposta(relatorio.checklistRespostas?.[item.id]) && '—'}
                   </td>
                 </tr>
@@ -129,11 +134,11 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
         </section>
       )}
 
-      {relatorio.notas && (
+      {notasVisiveis.length > 0 && (
         <section className="relatorio-section notas-section">
           <h3>Notas importantes</h3>
           <div className="notas-texto">
-            {linhasNotasRelatorio(relatorio.notas).map((line, i) => (
+            {notasVisiveis.map((line, i) => (
               <p key={i} className="notas-linha">{line}</p>
             ))}
           </div>

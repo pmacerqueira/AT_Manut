@@ -9,6 +9,14 @@ Política de continuidade:
 
 ---
 
+## [1.17.36] — 2026-10-12 — Não aplicável e registo não disponibilizado não bloqueiam o relatório
+
+### Correcções
+- **«Não aplicável» deixa avançar e emitir.** Nos pontos de verificação (operação e documento) já não é obrigatório escrever o fundamento. Marcar «Não aplicável» num dos lados da operação preenche o outro. O campo de fundamento fica opcional.
+- **«Não disponibilizado» no registo de intervenções.** Deixa de contar como anomalia (não pinta o relatório de não conforme nem entra nos pontos de atenção). O relatório (ecrã, PDF e email) inclui a nota «Registo de intervenções não disponibilizado pelo cliente.» O mesmo vale para os outros documentos marcados «Não disponibilizado», cada um com a sua linha nas notas.
+
+---
+
 ## [1.17.35] — 2026-10-12 — A foto da chapa deixa de ser pedida no passo 2
 
 ### Correcções

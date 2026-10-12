@@ -280,7 +280,7 @@ export default function ChecklistStep({
                     )}
                     {codigo === 'na' && (
                       <div className="checklist-detalhe">
-                        <label>Fundamento<textarea value={valor?.fundamento || ''} onChange={e => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: { r: 'na', fundamento: e.target.value } } }))} /></label>
+                        <label>Fundamento (opcional)<textarea value={valor?.fundamento || ''} onChange={e => setForm(f => ({ ...f, checklistRespostas: { ...f.checklistRespostas, [item.id]: { r: 'na', fundamento: e.target.value } } }))} /></label>
                       </div>
                     )}
                   </div>

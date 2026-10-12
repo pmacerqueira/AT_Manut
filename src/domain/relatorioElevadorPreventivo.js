@@ -225,7 +225,8 @@ export function respostaDocumento(estado, extra = {}) {
   const mapa = {
     analisado: 'sim',
     nao_analisado: 'nao',
-    nao_disponibilizado: 'nao',
+    // Não é anomalia do equipamento: o cliente não facultou o documento.
+    nao_disponibilizado: 'nota',
     ilegivel: 'nao',
     na: 'na',
   }
@@ -279,7 +280,7 @@ export function rotuloRespostaPdf(valor) {
     const doc = {
       analisado: 'ANALISADO',
       nao_analisado: 'NÃO ANALISADO',
-      nao_disponibilizado: 'AUSENTE',
+      nao_disponibilizado: 'NÃO DISPONIBILIZADO',
       ilegivel: 'ILEGÍVEL',
       na: 'N/A',
     }
@@ -471,14 +472,48 @@ export function contextoEmissaoFromForm(form, items, extra = {}) {
   }
 }
 
-/** @returns {'sim'|'nao'|'na'|'parcial'|''} */
+/** Nota factual quando o cliente não faculta o registo de intervenções. */
+export const NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO =
+  'Registo de intervenções não disponibilizado pelo cliente.'
+
+export function ehRegistoIntervencoes(item) {
+  return /registo de interven/.test(String(item?.texto ?? '').toLowerCase())
+}
+
+/** Linhas a acrescentar às notas do relatório (não contam como anomalia). */
+export function linhasNotaDocumentoNaoDisponibilizado(items, respostas) {
+  const linhas = []
+  for (const it of items || []) {
+    const v = respostas?.[it.id]
+    if (!v || typeof v !== 'object' || v.documento !== 'nao_disponibilizado') continue
+    if (ehRegistoIntervencoes(it)) {
+      linhas.push(NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO)
+      continue
+    }
+    const nome = limparCitacaoNormaChecklist(it.texto) || 'Documento'
+    linhas.push(`${nome}: não disponibilizado pelo cliente.`)
+  }
+  return linhas
+}
+
+/** Notas do técnico mais as linhas automáticas que ainda não estejam escritas. */
+export function notasComLinhasAutomaticas(notas, items, respostas) {
+  const base = String(notas ?? '').trim()
+  const extra = linhasNotaDocumentoNaoDisponibilizado(items, respostas)
+    .filter(l => !base.includes(l))
+  return [base, ...extra].filter(Boolean).join('\n')
+}
+
+/** @returns {'sim'|'nao'|'na'|'parcial'|'nota'|''} */
 export function codigoResposta(valor) {
   if (valor && typeof valor === 'object') {
+    if (valor.papel === 'documento' && valor.documento === 'nao_disponibilizado') return 'nota'
     const r = String(valor.r ?? valor.valor ?? '')
     if (r === 'sim' || r === 'OK') return 'sim'
     if (r === 'nao' || r === 'NOK') return 'nao'
     if (r === 'na' || r === 'N/A') return 'na'
     if (r === 'parcial') return 'parcial'
+    if (r === 'nota') return 'nota'
     return ''
   }
   if (valor === 'sim' || valor === 'OK') return 'sim'
@@ -491,7 +526,7 @@ export function checklistEstaCompleta(items, respostas, { elevador = false } = {
   if (!items?.length) return true
   return items.every(it => {
     const c = codigoResposta(respostas?.[it.id])
-    if (elevador) return c === 'sim' || c === 'nao' || c === 'na' || c === 'parcial'
+    if (elevador) return c === 'sim' || c === 'nao' || c === 'na' || c === 'parcial' || c === 'nota'
     return c === 'sim' || c === 'nao'
   })
 }
@@ -512,15 +547,12 @@ export function validarChecklistElevador(items, respostas) {
     const c = codigoResposta(valor)
     const rotulo = String(it.texto ?? `ponto ${i + 1}`).trim()
     const papel = valor?.papel || ''
-    if (c !== 'sim' && c !== 'nao' && c !== 'na' && c !== 'parcial') {
+    if (c !== 'sim' && c !== 'nao' && c !== 'na' && c !== 'parcial' && c !== 'nota') {
       erros.push(`Ponto ${i + 1}: preencha a execução e o que foi observado.`)
       continue
     }
     if (papel === 'documento') {
       if (!valor.documento) erros.push(`Documento «${rotulo}»: indique se foi disponibilizado e analisado.`)
-      if (valor.documento === 'na' && !detalheCurto(valor.fundamento)) {
-        erros.push(`Documento «${rotulo}»: indique o fundamento de não aplicável.`)
-      }
       continue
     }
     if (papel === 'teste') {
@@ -542,6 +574,9 @@ export function validarChecklistElevador(items, respostas) {
       continue
     }
     if (papel === 'operacao') {
+      if (c === 'na' || valor.execucao === 'na' || valor.observacao === 'na') {
+        continue
+      }
       if (!valor.execucao || !valor.observacao) {
         erros.push(`Ponto ${i + 1}: indique o que foi feito e o que foi observado.`)
         continue
@@ -552,9 +587,6 @@ export function validarChecklistElevador(items, respostas) {
       if (valor.observacao === 'nao_observado' && !detalheCurto(valor.motivo)) {
         erros.push(`«${rotulo}»: indique porque não foi observado.`)
       }
-      if ((valor.execucao === 'na' || valor.observacao === 'na') && !detalheCurto(valor.fundamento)) {
-        erros.push(`Não aplicável em «${rotulo}»: indique o fundamento.`)
-      }
       if (valor.observacao === 'anomalia') {
         if (!detalheCurto(valor.descricao)) erros.push(`Anomalia em «${rotulo}»: descreva o que observou.`)
         if (!detalheCurto(valor.recomendacao)) erros.push(`Anomalia em «${rotulo}»: indique a recomendação transmitida ao cliente.`)
@@ -564,9 +596,6 @@ export function validarChecklistElevador(items, respostas) {
     if (c === 'nao') {
       if (!detalheCurto(valor?.descricao)) erros.push(`Anomalia em «${rotulo}»: descreva o que observou.`)
       if (!detalheCurto(valor?.recomendacao)) erros.push(`Anomalia em «${rotulo}»: indique a recomendação transmitida ao cliente.`)
-    }
-    if (c === 'na' && !detalheCurto(valor?.fundamento)) {
-      erros.push(`Não aplicável em «${rotulo}»: indique o fundamento.`)
     }
   }
   return erros
