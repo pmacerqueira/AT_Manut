@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { History, X } from 'lucide-react'
-import FotoChapaCampo from './FotoChapaCampo'
 import MaquinaDocumentacaoLinks from '../MaquinaDocumentacaoLinks'
 import ChecklistElevadorPonto from './ChecklistElevadorPonto'
 import { limparCitacaoNormaChecklist } from '../../domain/notaLegalColocacaoMercado'
@@ -33,8 +32,6 @@ export default function ChecklistStep({
   manutencaoAtual,
   aplicarTipoKaeserComPecas,
   modoElevador = false,
-  onFotoChapa,
-  fotoChapaCarregando = false,
 }) {
   const isKaeserPeriodicExec = !!(isKaeserAbcdMaq && manutencaoAtual?.tipo !== 'montagem')
   /** Em «Corrigir relatório» KAESER A/B/C/D o modal já tem tabela editável — evitar duplicar lista só-leitura. */
@@ -43,8 +40,6 @@ export default function ChecklistStep({
     && (form.pecasUsadas.length > 0 || (isKaeserAbcdMaq && form.tipoManutKaeser))
   const identificacaoRef = useRef(null)
   const forcarIdentificacao = modoElevador && /pedido|pediu|s[eé]rie|limita|esclarecimento|dispositivo de seguran|chapa/i.test(erroChecklist || '')
-  const chapaInputRef = useRef(null)
-  const pedeFotoChapa = form.serieConfirmada === 'sim' || form.serieConfirmada === 'nao'
 
   useEffect(() => {
     if (!forcarIdentificacao || !identificacaoRef.current) return
@@ -127,11 +122,7 @@ export default function ChecklistStep({
                 Série confirmada no local
                 <select
                   value={form.serieConfirmada || ''}
-                  onChange={e => {
-                    const valor = e.target.value
-                    setForm(f => ({ ...f, serieConfirmada: valor }))
-                    if ((valor === 'sim' || valor === 'nao') && !form.fotoChapa) chapaInputRef.current?.click()
-                  }}
+                  onChange={e => setForm(f => ({ ...f, serieConfirmada: e.target.value }))}
                 >
                   <option value="">—</option>
                   <option value="sim">Sim</option>
@@ -139,13 +130,8 @@ export default function ChecklistStep({
                   <option value="desconhecido">Não foi possível ver a chapa</option>
                 </select>
               </label>
-              {pedeFotoChapa && (
-                <FotoChapaCampo
-                  fotoChapa={form.fotoChapa}
-                  carregando={fotoChapaCarregando}
-                  onChange={onFotoChapa}
-                  inputRef={chapaInputRef}
-                />
+              {!String(form.fotoChapa || '').startsWith('data:image') && (form.serieConfirmada === 'sim' || form.serieConfirmada === 'nao') && (
+                <p className="form-hint">A foto da chapa de identificação tira-se no passo 1. Volte atrás para a adicionar.</p>
               )}
               <label>
                 Ano de fabrico (ou «desconhecido»)

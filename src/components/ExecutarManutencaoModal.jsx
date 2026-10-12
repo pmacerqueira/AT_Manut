@@ -2699,8 +2699,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             manutencaoAtual={manutencaoAtual}
             aplicarTipoKaeserComPecas={aplicarTipoKaeserComPecas}
             modoElevador={modoElevador}
-            onFotoChapa={handleFotoChapa}
-            fotoChapaCarregando={fotoCarregando}
           />
 
           <NotasStep

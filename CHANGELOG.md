@@ -9,6 +9,13 @@ Política de continuidade:
 
 ---
 
+## [1.17.35] — 2026-10-12 — A foto da chapa deixa de ser pedida no passo 2
+
+### Correcções
+- **Passo 2 (checklist do elevador) já não pede a foto da chapa.** A fotografia fica só no passo 1. No passo 2 mantém-se «Série confirmada no local» e o resto da identificação; escolher Sim/Não já não abre a câmara. Se a foto faltar (rascunho reposto, que não guarda a imagem), o passo 2 indica para voltar ao passo 1 em vez de voltar a pedir a captura. A correcção pelo Admin continua com o campo da foto.
+
+---
+
 ## [1.17.34] — 2026-10-09 — Foto da chapa também a partir da galeria
 
 ### Novidades
