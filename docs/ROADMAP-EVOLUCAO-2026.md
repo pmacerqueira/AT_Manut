@@ -14,7 +14,7 @@
 |----------|--------|-----------|
 | **Base técnica** | React 19, Vite, PWA, offline-first | Solidez para escalar; stack moderna |
 | **Integridade de dados** | Cascatas CRUD completas, confirmações de eliminação | Dados consistentes; protecção contra erros |
-| **Cobertura E2E** | 452 testes listados em 19 ficheiros (`docs/TESTES-E2E.md`) | Regressão controlada; refactoring seguro |
+| **Cobertura E2E** | 453 testes listados em 20 ficheiros (`docs/TESTES-E2E.md`) | Regressão controlada; refactoring seguro |
 | **Módulos maduros** | Clientes, Equipamentos, Manutenções, Reparações | Núcleo completo para operação diária |
 | **Integrações** | ISTOBAL (webhook), Kaeser (PDF) | Ecossistema alargado; dados centralizados |
 | **UX em campo** | Modo campo, QR Code, assinatura digital, fotos | Adequado a técnicos em instalações |

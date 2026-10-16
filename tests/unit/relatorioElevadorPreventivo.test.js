@@ -21,6 +21,7 @@ import {
   codigoResposta,
   notasComLinhasAutomaticas,
   NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO,
+  NOTA_REGISTO_INTERVENCOES_GERIDO_PELO_CLIENTE,
   temAnomaliaChecklist,
   pontoImplicaForaDeServico,
   respostaOperacao,
@@ -34,6 +35,8 @@ import {
   mensagemComunicacaoUrgente,
   mensagemIncoerenciaGrupo,
   mensagemPedidoForaAmbito,
+  preservarEmissaoLegada,
+  mensagemCorrecaoRelevante,
   rotuloRespostaPdf,
 } from '../../src/domain/relatorioElevadorPreventivo.js'
 import { referenciasCitaveisNoPdf } from '../../src/domain/catalogoReferenciasElevador.js'
@@ -152,6 +155,7 @@ describe('relatorio elevador preventivo', () => {
     assert.equal(papelDoPonto({ texto: 'Limpeza final do equipamento e teste em funcionamento' }), 'teste')
     assert.equal(papelDoPonto({ texto: 'Lubrificação dos pontos' }), 'operacao')
     assert.match(fundamentoInaplicavel({ texto: 'Estado dos cabos de aço' }, 'sub2'), /não tem/)
+    assert.equal(fundamentoInaplicavel({ texto: 'Verificar e afinar a sincronização por cabos de aço dos movimentos das colunas' }, 'sub2'), '')
     assert.equal(fundamentoInaplicavel({ texto: 'Estado dos cabos de aço' }, 'sub1'), '')
     const erros = validarChecklistElevador(
       [{ id: 'd', texto: 'Manual de instruções' }],
@@ -190,6 +194,13 @@ describe('relatorio elevador preventivo', () => {
       r: respostaDocumento('nao_disponibilizado'),
     })
     assert.match(notas, new RegExp(NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO))
+    const notasGerido = notasComLinhasAutomaticas('', itensRegisto, {
+      r: respostaDocumento('gerido_pelo_cliente'),
+    })
+    assert.equal(notasGerido, NOTA_REGISTO_INTERVENCOES_GERIDO_PELO_CLIENTE)
+    assert.equal(codigoResposta(respostaDocumento('gerido_pelo_cliente')), 'nota')
+    assert.equal(rotuloRespostaPdf(respostaDocumento('gerido_pelo_cliente')), 'GERIDO PELO CLIENTE')
+    assert.equal(temAnomaliaChecklist(itensRegisto, { r: respostaDocumento('gerido_pelo_cliente') }), false)
   })
 
   it('execução incompleta não fica como verificação sem anomalia', () => {
@@ -247,8 +258,10 @@ describe('relatorio elevador preventivo', () => {
 
   it('falha crítica recomenda fora de serviço e o resto não', () => {
     assert.equal(pontoImplicaForaDeServico({ texto: 'Sistema de fim de curso e limitadores' }), true)
+    assert.equal(pontoImplicaForaDeServico({ texto: 'Verificar sistemas de fins de curso e atuadores' }), true)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Cabos de aço: estado e aderência nas polias' }), true)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Trancas de Segurança' }), true)
+    assert.equal(pontoImplicaForaDeServico({ texto: 'Verificar o funcionamento dos componentes do circuito hidráulico - válvulas reguladoras de pressão e de caudal' }), true)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Motor de Accionamento' }), false)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Nível de óleo do redutor' }), false)
     assert.equal(pontoImplicaForaDeServico({ texto: 'Verificar cabos elétricos e relés' }), false)
@@ -284,29 +297,86 @@ describe('relatorio elevador preventivo', () => {
     ), null)
   })
 
-  it('reparação gera ordem de serviço e alteração fica fora do âmbito', () => {
-    assert.match(mensagemPedidoForaAmbito({}), /pediu reparação/)
+  it('correção relevante nesta visita exige texto; não gera ordem de serviço', () => {
+    assert.match(mensagemCorrecaoRelevante({}), /correção ou reparação relevante/)
+    assert.equal(mensagemCorrecaoRelevante({ correcaoRelevante: 'nao' }), '')
+    assert.match(mensagemCorrecaoRelevante({
+      correcaoRelevante: 'sim',
+      correcaoRelevanteDescricao: 'curto',
+    }), /Descreva a correção/)
+    assert.equal(mensagemCorrecaoRelevante({
+      correcaoRelevante: 'sim',
+      correcaoRelevanteDescricao: 'Ajuste do fim de curso superior',
+    }), '')
+    const emissao = contextoEmissaoFromForm({
+      correcaoRelevante: 'sim',
+      correcaoRelevanteDescricao: 'Ajuste do fim de curso superior',
+    }, [])
+    assert.equal(emissao.correcaoRelevante, 'sim')
+    const linhas = linhasContextoEmissao(emissao)
+    assert.equal(linhas.some(row => row[0] === 'CORREÇÃO OU REPARAÇÃO REALIZADA' && /fim de curso/.test(row[1])), true)
+    const semTexto = contextoEmissaoFromForm({ correcaoRelevante: 'nao', correcaoRelevanteDescricao: 'não deve ficar' }, [])
+    assert.equal(semTexto.correcaoRelevanteDescricao, '')
+    assert.equal(linhasContextoEmissao(semTexto).some(row => row[0] === 'CORREÇÃO OU REPARAÇÃO REALIZADA'), false)
+  })
+
+  it('uma gravação posterior não apaga campos antigos que o formulário já não edita', () => {
+    const anterior = {
+      serieConfirmada: 'sim',
+      pedidoFora: 'sim',
+      pedidoForaDescricao: 'Alteração da capacidade',
+      limitacoesAdmissao: 'Não se abre o poço',
+      fornecidoPelaNavel: 'sim',
+      instaladoPelaNavel: 'sim',
+    }
+    const contexto = contextoEmissaoFromForm({
+      fornecidoMontadoPelaNavel: 'sim',
+      pedidoReparacao: 'nao',
+      correcaoRelevante: 'nao',
+    }, [])
+    const fundido = preservarEmissaoLegada(anterior, contexto)
+    assert.equal(fundido.serieConfirmada, 'sim')
+    assert.equal(fundido.pedidoFora, 'sim')
+    assert.equal(fundido.limitacoesAdmissao, 'Não se abre o poço')
+    assert.equal(fundido.pedidoReparacao, 'nao')
+    assert.equal(linhasContextoEmissao(fundido).some(row => row[0] === 'PEDIDO FORA DO ÂMBITO'), true)
+  })
+
+  it('reparação adicional gera ordem de serviço; relatórios antigos mantêm o pedido fora do âmbito', () => {
+    assert.match(mensagemPedidoForaAmbito({}), /reparação adicional/)
     assert.match(mensagemPedidoForaAmbito({
       pedidoReparacao: 'sim',
-      pedidoReparacaoDescricao: 'Substituir o fim de curso',
-      pedidoFora: 'sim',
-      pedidoForaDescricao: 'curto',
-    }), /alteração ou certificação/)
+      pedidoReparacaoDescricao: 'curto',
+    }), /reparação adicional/)
     assert.equal(mensagemPedidoForaAmbito({
       pedidoReparacao: 'sim',
       pedidoReparacaoDescricao: 'Substituir o fim de curso',
-      pedidoFora: 'nao',
     }), '')
     const emissao = contextoEmissaoFromForm({
+      fornecidoMontadoPelaNavel: 'sim',
       pedidoReparacao: 'sim',
       pedidoReparacaoDescricao: 'Substituir o fim de curso',
       pedidoFora: 'sim',
       pedidoForaDescricao: 'Alteração da capacidade',
+      limitacoesAdmissao: 'Não se abre o poço',
     }, [])
-    const ordem = linhasContextoEmissao(emissao).find(row => row[0] === 'ORDEM DE SERVIÇO DE REPARAÇÃO')
-    const fora = linhasContextoEmissao(emissao).find(row => row[0] === 'PEDIDO FORA DO ÂMBITO')
+    const linhas = linhasContextoEmissao(emissao)
+    assert.equal(linhas.some(row => row[0] === 'FORNECIDO E MONTADO PELA NAVEL' && row[1] === 'Sim'), true)
+    assert.equal(linhas.some(row => row[0] === 'PEDIDO FORA DO ÂMBITO'), false)
+    assert.equal(linhas.some(row => row[0] === 'LIMITAÇÕES DO PEDIDO'), false)
+    const ordem = linhas.find(row => row[0] === 'ORDEM DE SERVIÇO DE REPARAÇÃO')
     assert.match(ordem[1], /ordem de serviço NAVEL/)
-    assert.match(fora[1], /Não gera alteração nem certificação/)
+    const antigo = linhasContextoEmissao({
+      fornecidoPelaNavel: 'sim',
+      instaladoPelaNavel: 'nao',
+      pedidoFora: 'sim',
+      pedidoForaDescricao: 'Alteração da capacidade',
+      limitacoesAdmissao: 'Não se abre o poço',
+    })
+    assert.equal(antigo.some(row => row[0] === 'FORNECIDO PELA NAVEL'), true)
+    assert.equal(antigo.some(row => row[0] === 'INSTALADO PELA NAVEL'), true)
+    assert.match(antigo.find(row => row[0] === 'PEDIDO FORA DO ÂMBITO')[1], /Não gera alteração nem certificação/)
+    assert.equal(antigo.some(row => row[0] === 'LIMITAÇÕES DO PEDIDO'), true)
   })
 
   it('recomendação urgente fica registada sem assinatura e o email conta se for enviado', () => {
@@ -331,7 +401,7 @@ describe('relatorio elevador preventivo', () => {
     const naoObs = respostaTeste({ executado: true, carga: 'sem_carga', observacao: 'nao_observado' })
     assert.ok(validarChecklistElevador(items, { t: naoObs }).some(e => /não foi observado/.test(e)))
     assert.equal(rotuloRespostaPdf(respostaTeste({ executado: false, motivo: 'Sem energia no quadro.' })), 'SEM TESTE')
-    assert.equal(rotuloRespostaPdf(respostaDocumento('analisado')), 'ANALISADO')
+    assert.equal(rotuloRespostaPdf(respostaDocumento('analisado')), 'OK / ANALISADO')
     assert.equal(rotuloRespostaPdf(respostaOperacao({ execucao: 'executado', observacao: 'sem_anomalia' })), 'EXECUTADO')
   })
 
@@ -350,7 +420,10 @@ describe('relatorio elevador preventivo', () => {
       checklistRespostas: {},
     }, [])
     assert.equal(ctx.fotoChapa, true)
+    assert.equal(ctx.serieConfirmada, undefined)
     assert.ok(linhasContextoEmissao(ctx).some(row => row[0] === 'FOTO DA CHAPA DE IDENTIFICAÇÃO'))
+    assert.equal(linhasContextoEmissao(ctx).some(row => row[0] === 'SÉRIE CONFIRMADA NO LOCAL'), false)
+    assert.ok(linhasContextoEmissao({ serieConfirmada: 'sim' }).some(row => row[0] === 'SÉRIE CONFIRMADA NO LOCAL'))
     const chapa = 'data:image/jpeg;base64,aaa'
     assert.equal(mensagemFotosEquipamento([chapa], chapa), TEXTO_FOTOS_EQUIPAMENTO)
     assert.equal(mensagemFotosEquipamento([chapa, 'data:image/jpeg;base64,bbb'], chapa), '')

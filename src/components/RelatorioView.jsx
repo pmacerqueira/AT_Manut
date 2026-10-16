@@ -123,7 +123,9 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'sim' && <span className="badge-sim">{emissao ? 'Sem anomalia' : 'Sim'}</span>}
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nao' && <span className="badge-nao">{emissao ? 'Anomalia' : 'Não'}</span>}
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'na' && <span>Não aplicável</span>}
-                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nota' && <span>Não disponibilizado</span>}
+                    {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'nota' && (
+                      <span>{relatorio.checklistRespostas?.[item.id]?.documento === 'gerido_pelo_cliente' ? 'Gerido pelo cliente' : 'Não Existente'}</span>
+                    )}
                     {codigoResposta(relatorio.checklistRespostas?.[item.id]) === 'parcial' && <span>Parcial</span>}
                     {!codigoResposta(relatorio.checklistRespostas?.[item.id]) && '—'}
                   </td>
@@ -131,6 +133,13 @@ export default function RelatorioView({ relatorio, manutencao, maquina, cliente,
               ))}
             </tbody>
           </table>
+        </section>
+      )}
+
+      {emissao?.correcaoRelevante === 'sim' && emissao.correcaoRelevanteDescricao && (
+        <section className="relatorio-section">
+          <h3>Correção ou reparação realizada</h3>
+          <p>{emissao.correcaoRelevanteDescricao}</p>
         </section>
       )}
 

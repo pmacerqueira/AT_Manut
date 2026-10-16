@@ -2,6 +2,18 @@ import { Bookmark } from 'lucide-react'
 import { resolveDeclaracaoClienteForMaquina } from '../../constants/relatorio'
 import { normTexto } from '../../domain/clienteAssinantesSecao.js'
 
+const FUNCOES_QUEM_RECEBE = [
+  'Utilizador do elevador',
+  'Chefe de oficina',
+  'Proprietário ou gerente da oficina',
+]
+
+function opcoesFuncaoQuemRecebe(valorActual) {
+  const actual = String(valorActual || '').trim()
+  if (actual && !FUNCOES_QUEM_RECEBE.includes(actual)) return [actual, ...FUNCOES_QUEM_RECEBE]
+  return FUNCOES_QUEM_RECEBE
+}
+
 /**
  * Passo nome do cliente + declaração de aceitação.
  */
@@ -129,15 +141,17 @@ export default function ClienteStep({
 
       {declaracaoTitulo && (
         <>
-          <label className="form-section">
+          <label className="form-section funcao-recebe">
             Função de quem recebe
-            <input
-              type="text"
+            <select
               value={form.funcaoAssinante || ''}
-              maxLength={80}
-              placeholder="Ex.: responsável de oficina"
               onChange={e => setForm(f => ({ ...f, funcaoAssinante: e.target.value }))}
-            />
+            >
+              <option value="">Escolher...</option>
+              {opcoesFuncaoQuemRecebe(form.funcaoAssinante).map(opcao => (
+                <option key={opcao} value={opcao}>{opcao}</option>
+              ))}
+            </select>
           </label>
           <label className="checklist-retirada">
             <input

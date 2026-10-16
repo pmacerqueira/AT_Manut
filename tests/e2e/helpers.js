@@ -877,7 +877,7 @@ export async function checklistMarcarTodos(page) {
   const count = await rows.count()
   for (let i = 0; i < count; i++) {
     const row = rows.nth(i)
-    const atalho = row.locator('.btn-simnao--atalho')
+    const atalho = row.locator('.btn-simnao--atalho').filter({ hasText: 'Executado, sem anomalia' })
     if (await atalho.count() > 0) {
       await atalho.click()
       await page.waitForTimeout(60)
@@ -908,41 +908,33 @@ export async function checklistMarcarTodos(page) {
 
 /**
  * Elevadores (modelo preventivo 2026-10): o passo da checklist exige também o contexto da visita
- * — série confirmada, pedido só preventivo, reparação/alteração pedidas. Preenche o mínimo coerente
+ * — se o equipamento requer reparação adicional. Preenche o mínimo coerente
  * com «sem anomalias»; é inócuo nas outras categorias (os campos não existem).
  */
 export async function preencherContextoElevadorChecklist(page) {
   const modal = page.locator('.modal, [role="dialog"]').first()
-  const serie = modal.getByLabel('Série confirmada no local')
-  if (await serie.count() === 0) return
-  const abrir = modal.getByText('Identificação desta visita e pedido').first()
-  if (await abrir.isVisible().catch(() => false)) {
-    const aberto = await serie.isVisible().catch(() => false)
-    if (!aberto) await abrir.click()
-  }
-  if (await serie.isVisible().catch(() => false) && !(await serie.inputValue())) {
-    await serie.selectOption('sim')
-  }
-  const preventiva = modal.getByLabel('O pedido desta visita é manutenção preventiva')
-  if (await preventiva.isVisible().catch(() => false) && !(await preventiva.isChecked())) {
-    await preventiva.check()
-  }
-  const rep = modal.getByLabel('O cliente pediu reparação?')
+  const rep = modal.getByLabel('O equipamento requer alguma reparação adicional?')
+  if (await rep.count() === 0) return
   if (await rep.isVisible().catch(() => false) && !(await rep.inputValue())) {
     await rep.selectOption('nao')
-  }
-  const fora = modal.getByLabel('O cliente pediu alteração ou certificação?')
-  if (await fora.isVisible().catch(() => false) && !(await fora.inputValue())) {
-    await fora.selectOption('nao')
   }
   await page.waitForTimeout(120)
 }
 
-/** Elevadores: o passo do cliente pede também a função de quem recebe o relatório. Inócuo nas outras categorias. */
-export async function preencherFuncaoAssinanteElevador(page, funcao = 'Responsável de oficina') {
-  const campo = page.locator('.modal input[placeholder*="responsável de oficina" i]').first()
-  if (await campo.isVisible().catch(() => false) && !(await campo.inputValue())) {
-    await campo.fill(funcao)
+/** Elevadores: o passo do cliente pede a função de quem recebe, numa lista fechada. Inócuo nas outras categorias. */
+export async function preencherFuncaoAssinanteElevador(page, funcao = 'Chefe de oficina') {
+  const lista = page.locator('.modal .funcao-recebe select').first()
+  if (await lista.isVisible().catch(() => false) && !(await lista.inputValue())) {
+    const opcoes = ['Utilizador do elevador', 'Chefe de oficina', 'Proprietário ou gerente da oficina']
+    await lista.selectOption(opcoes.includes(funcao) ? funcao : 'Chefe de oficina')
+  }
+}
+
+/** Elevadores: antes das notas, a correção nesta visita é obrigatória. «Não» deixa seguir. Inócuo nas outras categorias. */
+export async function preencherCorrecaoRelevanteElevador(page) {
+  const lista = page.locator('.modal .notas-correcao select').first()
+  if (await lista.isVisible().catch(() => false) && !(await lista.inputValue())) {
+    await lista.selectOption('nao')
   }
 }
 
@@ -979,6 +971,7 @@ export async function execWizardSeguinte(page) {
       .catch(() => {})
     await page.waitForTimeout(200)
   }
+  await preencherCorrecaoRelevanteElevador(page)
   const seguinte = page.locator('.wizard-footer-actions button.btn.primary').filter({ hasText: /Seguinte/ })
   if (await seguinte.isVisible({ timeout: 4000 }).catch(() => false)) {
     await seguinte.click()
@@ -1033,6 +1026,7 @@ export async function navegarWizardAteFotos(page) {
   await checklistMarcarTodos(page)
   await checklistFillAllSim(page)
   await execWizardSeguinte(page)
+  await preencherCorrecaoRelevanteElevador(page)
   const nf = page.locator('.modal textarea.textarea-full').first()
   await nf.waitFor({ state: 'visible', timeout: 5000 })
   await nf.fill(ensureNotasComFrasePredefinida(''))
@@ -1117,6 +1111,7 @@ export async function fillExecucaoModal(page, {
 
   await execWizardSeguinte(page)
 
+  await preencherCorrecaoRelevanteElevador(page)
   const notasField = page.locator('.modal textarea.textarea-full').first()
   const notasFinal = ensureNotasComFrasePredefinida(notas)
   if (await notasField.isVisible({ timeout: 4000 }).catch(() => false)) {

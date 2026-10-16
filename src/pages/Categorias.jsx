@@ -12,19 +12,23 @@ const QUICK_NOTES_DEFAULT = [
   'Equipamento em bom estado geral',
   'Desgaste normal, dentro do esperado',
   'Necessita acompanhamento na próxima visita',
-  'Cliente informado de anomalia',
-  'Peça substituída preventivamente',
-  'Ruído anormal detetado — monitorizar',
-  'Lubrificação efetuada em todos os pontos',
-  'Alinhamento verificado e corrigido',
-  'Filtros substituídos conforme plano',
+  'Requer melhor limpeza e conservação',
+  'Necessita de melhor sinalética de segurança',
   'Sem observações adicionais',
 ]
 
 function loadQuickNotes() {
   try {
     const stored = JSON.parse(localStorage.getItem('atm_quick_notes') || 'null')
-    if (Array.isArray(stored) && stored.length > 0) return stored
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored
+        .map(n => {
+          if (n === 'Ruído anormal detetado — monitorizar') return 'Requer melhor limpeza e conservação'
+          if (n === 'Lubrificação efetuada em todos os pontos') return 'Necessita de melhor sinalética de segurança'
+          return n
+        })
+        .filter(n => n !== 'Alinhamento verificado e corrigido' && n !== 'Filtros substituídos conforme plano' && n !== 'Peça substituída preventivamente' && n !== 'Cliente informado de anomalia' && n !== 'Ruído anormal detetado — monitorizar' && n !== 'Lubrificação efetuada em todos os pontos')
+    }
   } catch { /* fallback */ }
   return [...QUICK_NOTES_DEFAULT]
 }

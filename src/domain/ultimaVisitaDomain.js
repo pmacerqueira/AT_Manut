@@ -76,7 +76,7 @@ export function resumoUltimaVisita({ maquinaId, manutencoes, relatorios, checkli
 
   const emissao = emissaoDoRelatorio(rel)
   const foraDeServico = !!(emissao?.recomendaRetirada || (rel && decisaoOperacionalElevador(itens, respostas)))
-  const pedidoReparacao = emissao?.pedidoReparacao === 'sim' ? textoCurto(emissao.pedidoReparacaoDescricao || 'Reparação pedida pelo cliente') : ''
+  const pedidoReparacao = emissao?.pedidoReparacao === 'sim' ? textoCurto(emissao.pedidoReparacaoDescricao || 'Reparação adicional') : ''
 
   const notas = rel?.notas ? linhasNotasRelatorio(rel.notas).map(l => textoCurto(l, 120)).slice(0, 3) : []
   const horas = horasContadorNaManutencao(manut)

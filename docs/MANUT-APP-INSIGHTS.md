@@ -144,3 +144,17 @@ O workspace `c:\Cursor_Projetos\NAVEL` contém vários projectos independentes (
 - Conteúdo redundante deve ser removido ou substituído por referência ao documento canónico.
 - Conteúdo obsoleto deve ser reescrito com estado atual ou marcado explicitamente como histórico.
 - Antes de criar novo `.md`, validar se o tema já existe num documento canónico.
+
+---
+
+## 11) Handoff — painel da visita do elevador (2026-10-16, v1.17.37)
+
+**Origem:** correcção do relatório de manutenção preventiva dos elevadores, no assistente e na checklist em produção. A versão publicada passa a 1.17.37. Relatórios já emitidos não são reescritos.
+
+**O que mudou:** formulário único para electro-hidráulicos de 2 e 4 colunas; electromecânicos sem hidráulica; trancas em todos os elevadores de veículos; sincronização por cabos nas colunas e sensor de rotações dos fusos só nos electromecânicos; tesoura com nivelamento e equilíbrio hidrostático. Notas: pergunta obrigatória de correção nesta visita; notas rápidas revistas. Função de quem recebe em lista. Foto da chapa não se pede outra vez na correcção se já existir. Gravação posterior preserva campos antigos que o formulário já não edita.
+
+**Onde:** `ChecklistElevadorPonto.jsx`, `NotasStep.jsx`, `ClienteStep.jsx`, `relatorioElevadorPreventivo.js`, `ExecutarManutencaoModal.jsx`, checklist periódica no MySQL, `servidor-cpanel/send-email.php`. Plano: `docs/PLANO-RELATORIOS-ELEVADORES-PREVENTIVA.md` e `docs/PLANO-FLUXOS-EXECUCAO.md`.
+
+**Testes:** `npm run test:unit` — 191 testes. A suite E2E completa não foi corrida nesta publicação.
+
+**Risco a vigiar:** rascunhos em curso guardam respostas por id de ponto; pontos cujo texto mudou no mesmo id podem ficar com a resposta antiga associada à pergunta nova. Relatórios emitidos usam `checklistSnapshot` e não são afectados.

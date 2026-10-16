@@ -1,7 +1,7 @@
 # AT_Manut — Suite de Testes E2E (Playwright)
 
-**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **452 testes** em **19 ficheiros** (specs numerados `01–17`, `19` + `99-responsive-smoke.spec.js`).
-> Última revisão: 2026-06-12 — v1.16.95
+**Contagem canónica:** `npx playwright test tests/e2e/ --list` — na data da última revisão: **453 testes** em **20 ficheiros** (specs numerados `01–17`, `19`, `20` + `99-responsive-smoke.spec.js`).
+> Última revisão: 2026-10-16 — v1.17.37
 
 ---
 
@@ -27,8 +27,9 @@
 | `16-reparacoes.spec.js` | 42 | Reparações base: listagem, filtros, criar, fluxo multi-dia, relatório, ISTOBAL mensal |
 | `17-reparacoes-avancado.spec.js` | 69 | Reparações avançado: permissões, fotos, email, mobile, offline, estados vazios, peças |
 | `19-domain-agenda.spec.js` | 2 | Cascata delete concluída (B4); recálculo pós-execução persiste API (B5) |
+| `20-elevador-responsivo.spec.js` | 1 | Painel da visita do elevador em telemóvel (390 px) e tablet (768 px): botões, moldura de segurança, pergunta de correção, função de quem recebe, sem transbordo |
 | `99-responsive-smoke.spec.js` | 5 | Smoke responsivo (mobile / tablet): barra inferior, cartões, calendário |
-| **Total** | **452** | **19 ficheiros** |
+| **Total** | **453** | **20 ficheiros** |
 
 > **Specs 01–09** (139 testes): núcleo da aplicação.
 > **Specs 10–11** (88 testes): alertas, QR, histórico (v1.5–v1.6).

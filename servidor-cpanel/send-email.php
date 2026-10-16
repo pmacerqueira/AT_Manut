@@ -669,12 +669,8 @@ function atm_quick_notes_default_list() {
         'Equipamento em bom estado geral',
         'Desgaste normal, dentro do esperado',
         'Necessita acompanhamento na próxima visita',
-        'Cliente informado de anomalia',
-        'Peça substituída preventivamente',
-        'Ruído anormal detetado — monitorizar',
-        'Lubrificação efetuada em todos os pontos',
-        'Alinhamento verificado e corrigido',
-        'Filtros substituídos conforme plano',
+        'Requer melhor limpeza e conservação',
+        'Necessita de melhor sinalética de segurança',
         'Sem observações adicionais',
     ];
 }
@@ -721,6 +717,12 @@ function atm_linhas_notas_relatorio($notas, $quick_notes_list = null) {
     $list = is_array($quick_notes_list) && count($quick_notes_list) > 0
         ? $quick_notes_list
         : atm_quick_notes_default_list();
+    $list[] = 'Alinhamento verificado e corrigido';
+    $list[] = 'Filtros substituídos conforme plano';
+    $list[] = 'Peça substituída preventivamente';
+    $list[] = 'Cliente informado de anomalia';
+    $list[] = 'Ruído anormal detetado — monitorizar';
+    $list[] = 'Lubrificação efetuada em todos os pontos';
     $filtered = [];
     foreach ($list as $q) {
         if (is_string($q) && trim($q) !== '') {

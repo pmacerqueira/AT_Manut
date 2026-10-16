@@ -43,7 +43,7 @@
 | **Reparações — fluxo ISTOBAL** | Avisos ES-, relatório individual + resumo mensal faturável | **v1.9.x** |
 | **Reparações — relatório mensal** | Modal mensal ISTOBAL com horas M.O., materiais expansíveis, impressão | **v1.9.x** |
 | **Reparações — permissões** | Admin/ATecnica: criar/executar/ver; só Admin elimina e define data histórica | **v1.9.x** |
-| **Suite de testes E2E** | 452 testes Playwright (19 ficheiros — ver `docs/TESTES-E2E.md`) | **v1.10.3+** |
+| **Suite de testes E2E** | 453 testes Playwright (20 ficheiros — ver `docs/TESTES-E2E.md`) | **v1.10.3+** |
 | **Manutenções históricas** | Inserção de registos passados, badges "Histórico"/"Pendente assinatura" | **v1.11.0** |
 | **Assinatura em 2 passos** | RecolherAssinaturaModal — gravar → recolher assinatura depois | **v1.11.0** |
 | **Agendamento recorrente** | Criação automática de manutenções futuras (1–3 anos) | **v1.11.0** |
@@ -238,7 +238,7 @@ Importação em massa de clientes via JSON SAF-T/Gestor.32 — **eliminada**; cl
 - **Modo campo** — alto contraste para técnicos ao sol
 - **Módulo Reparações completo** — multi-dia, fotos, peças, relatório ISTOBAL mensal
 - **Assinatura do técnico em PDFs** — identificação e assinatura pré-preenchida
-- **452 testes E2E** — ver `docs/TESTES-E2E.md`
+- **453 testes E2E** — ver `docs/TESTES-E2E.md`
 - **Dois perfis bem separados** — Admin com poderes totais, ATecnica restrito ao essencial
 - **Cascatas CRUD completas** — frontend e backend alinhados para integridade de dados
 - **Protecção contra eliminação acidental** — modais de confirmação em operações críticas

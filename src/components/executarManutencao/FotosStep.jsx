@@ -1,5 +1,6 @@
 import { AlertTriangle, Camera, FolderOpen, X } from 'lucide-react'
 import { MAX_FOTOS } from '../../config/limits'
+import { ehMensagemCorrecaoRelevante } from '../../domain/relatorioElevadorPreventivo'
 
 /**
  * Passo fotografias do wizard de execução.
@@ -28,7 +29,7 @@ export default function FotosStep({
           ? 'Introduzir fotos do equipamento e do local de instalação. A chapa de identificação não conta para esta foto.'
           : 'Adicione fotografias de apoio à manutenção.'}
       </p>
-      {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+      {erroChecklist && !ehMensagemCorrecaoRelevante(erroChecklist) && <p className="form-erro">{erroChecklist}</p>}
       <div className="form-section fotos-section">
         <div className="fotos-header">
           <span className="fotos-label">

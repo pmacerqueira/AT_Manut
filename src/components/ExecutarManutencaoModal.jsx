@@ -73,10 +73,13 @@ import {
   aplicaModeloElevadorPreventivo,
   checklistEstaCompleta,
   contextoEmissaoFromForm,
+  preservarEmissaoLegada,
   emissaoDoRelatorio,
+  fornecidoMontadoDoForm,
   fundamentoInaplicavel,
   fotosComChapa,
   mensagemComunicacaoUrgente,
+  mensagemCorrecaoRelevante,
   mensagemFotoChapa,
   mensagemFotosEquipamento,
   mensagemIncoerenciaGrupo,
@@ -143,19 +146,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
     fotoChapa: '',
     anoFabrico: '',
     capacidadeComunicada: '',
-    fornecidoPelaNavel: '',
-    instaladoPelaNavel: '',
+    fornecidoMontadoPelaNavel: '',
     pedidoSoPreventiva: false,
     pedidoReparacao: '',
     pedidoReparacaoDescricao: '',
-    pedidoFora: '',
-    pedidoForaDescricao: '',
-    pedidoExtra: '',
-    pedidoExtraDescricao: '',
+    correcaoRelevante: '',
+    correcaoRelevanteDescricao: '',
     esclarecimentoIncoerencia: '',
     comunicacaoUrgente: '',
     comunicacaoUrgenteNota: '',
-    limitacoesAdmissao: '',
   })
   const [fotos, setFotos] = useState([])
   const [fotoCarregando, setFotoCarregando] = useState(false)
@@ -538,19 +537,15 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       fotoChapa: (emissaoDoRelatorio(existingRel)?.fotoChapa && nextFotos[0]) ? nextFotos[0] : '',
       anoFabrico: emissaoDoRelatorio(existingRel)?.anoFabrico || (maq?.anoFabrico ? String(maq.anoFabrico) : ''),
       capacidadeComunicada: emissaoDoRelatorio(existingRel)?.capacidadeComunicada || '',
-      fornecidoPelaNavel: emissaoDoRelatorio(existingRel)?.fornecidoPelaNavel || '',
-      instaladoPelaNavel: emissaoDoRelatorio(existingRel)?.instaladoPelaNavel || '',
+      fornecidoMontadoPelaNavel: fornecidoMontadoDoForm(emissaoDoRelatorio(existingRel)),
       pedidoSoPreventiva: !!emissaoDoRelatorio(existingRel)?.pedidoSoPreventiva,
       pedidoReparacao: emissaoDoRelatorio(existingRel)?.pedidoReparacao || '',
       pedidoReparacaoDescricao: emissaoDoRelatorio(existingRel)?.pedidoReparacaoDescricao || '',
-      pedidoFora: emissaoDoRelatorio(existingRel)?.pedidoFora || '',
-      pedidoForaDescricao: emissaoDoRelatorio(existingRel)?.pedidoForaDescricao || '',
-      pedidoExtra: emissaoDoRelatorio(existingRel)?.pedidoExtra || '',
-      pedidoExtraDescricao: emissaoDoRelatorio(existingRel)?.pedidoExtraDescricao || '',
+      correcaoRelevante: emissaoDoRelatorio(existingRel)?.correcaoRelevante || '',
+      correcaoRelevanteDescricao: emissaoDoRelatorio(existingRel)?.correcaoRelevanteDescricao || '',
       esclarecimentoIncoerencia: emissaoDoRelatorio(existingRel)?.esclarecimentoIncoerencia || '',
       comunicacaoUrgente: emissaoDoRelatorio(existingRel)?.comunicacaoUrgente || '',
       comunicacaoUrgenteNota: emissaoDoRelatorio(existingRel)?.comunicacaoUrgenteNota || '',
-      limitacoesAdmissao: emissaoDoRelatorio(existingRel)?.limitacoesAdmissao || '',
     }
     setForm(nextForm)
     setFotos(nextFotos)
@@ -983,10 +978,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           avisarBloqueio(erroElev)
           return false
         }
-        if (!form.pedidoSoPreventiva) {
-          avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
-          return false
-        }
         const msgPedido = mensagemPedidoForaAmbito(form)
         if (msgPedido) {
           avisarBloqueio(msgPedido)
@@ -997,11 +988,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           avisarBloqueio(msgGrupo)
           return false
         }
-        if (!form.serieConfirmada) {
-          avisarBloqueio('Indique se a série foi confirmada no local.')
-          return false
-        }
-        const msgChapa = mensagemFotoChapa(form)
+        const msgChapa = mensagemFotoChapa(form, { confirmada: true })
         if (msgChapa) {
           avisarBloqueio(msgChapa)
           return false
@@ -1011,6 +998,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       return true
     }
     const validarNotasPasso = () => {
+      if (modoElevador) {
+        const msgCorrecao = mensagemCorrecaoRelevante(form)
+        if (msgCorrecao) {
+          avisarBloqueio(msgCorrecao)
+          return false
+        }
+      }
       const msgNotas = mensagemObservacoesInsuficientes(form.notas, quickNotes)
       if (msgNotas) {
         avisarBloqueio(msgNotas)
@@ -1315,7 +1309,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           checklistSnapshot: snapshotChecklistParaRelatorio(items, {
             modeloElevador: true,
             estado: form.estadoManutencaoElevador,
-            contexto: contextoEmissaoFromForm({ ...form, checklistRespostas: respostasPreview }, items),
+            contexto: preservarEmissaoLegada(
+              emissaoDoRelatorio(rel),
+              contextoEmissaoFromForm({ ...form, checklistRespostas: respostasPreview }, items),
+            ),
           }),
         } : {}),
         ...(isKaeserAbcdMaq && form.tipoManutKaeser
@@ -1411,6 +1408,13 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           return
         }
       }
+      if (modoElevador) {
+        const msgCorrecaoGravar = mensagemCorrecaoRelevante(form)
+        if (msgCorrecaoGravar) {
+          bloquearGravar(msgCorrecaoGravar)
+          return
+        }
+      }
       const msgNotasGravar = mensagemObservacoesInsuficientes(form.notas, quickNotes)
       if (msgNotasGravar) {
         bloquearGravar(msgNotasGravar)
@@ -1441,10 +1445,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         avisarBloqueio(erroElev)
         return
       }
-      if (!form.pedidoSoPreventiva) {
-        avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
-        return
-      }
       const msgPedido = mensagemPedidoForaAmbito(form)
       if (msgPedido) {
         avisarBloqueio(msgPedido)
@@ -1461,10 +1461,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       })
       if (msgCom) {
         avisarBloqueio(msgCom, 'assinatura')
-        return
-      }
-      if (!form.serieConfirmada) {
-        avisarBloqueio('Indique se a série foi confirmada no local.')
         return
       }
     }
@@ -1561,7 +1557,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         modeloElevador: modoElevador,
         estado: form.estadoManutencaoElevador,
         contexto: modoElevador
-          ? contextoEmissaoFromForm({ ...form, checklistRespostas: respostasGravar }, items, { assinaturaRecusada: semAssinatura || !!form.assinaturaRecusada })
+          ? preservarEmissaoLegada(
+            emissaoDoRelatorio(rel),
+            contextoEmissaoFromForm({ ...form, checklistRespostas: respostasGravar }, items, { assinaturaRecusada: semAssinatura || !!form.assinaturaRecusada }),
+          )
           : null,
       }),
       notas: form.notas.slice(0, 300),
@@ -1894,10 +1893,6 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         avisarBloqueio(erroElev)
         return
       }
-      if (!form.pedidoSoPreventiva) {
-        avisarBloqueio('Confirme que o pedido desta visita é manutenção preventiva.')
-        return
-      }
       const msgPedidoAdmin = mensagemPedidoForaAmbito(form)
       if (msgPedidoAdmin) {
         avisarBloqueio(msgPedidoAdmin)
@@ -1916,16 +1911,19 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
         avisarBloqueio(msgComAdmin, 'assinatura')
         return
       }
-      if (!form.serieConfirmada) {
-        avisarBloqueio('Indique se a série foi confirmada no local.')
-        return
-      }
       const msgContra = mensagemNotasContraditoriasElevador(
         form.notas,
         temAnomaliaChecklist(items, form.checklistRespostas),
       )
       if (msgContra) {
         avisarBloqueio(msgContra)
+        return
+      }
+    }
+    if (modoElevador) {
+      const msgCorrecaoAdmin = mensagemCorrecaoRelevante(form)
+      if (msgCorrecaoAdmin) {
+        avisarBloqueio(msgCorrecaoAdmin)
         return
       }
     }
@@ -1964,7 +1962,10 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           estado: form.estadoManutencaoElevador,
           retificaDe: rel.id,
           retificaNumero: rel.numeroRelatorio,
-          contexto: contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAditamento }, items, { assinaturaRecusada: true }),
+          contexto: preservarEmissaoLegada(
+            emissaoDoRelatorio(rel),
+            contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAditamento }, items, { assinaturaRecusada: true }),
+          ),
         }),
         notas: form.notas.slice(0, 300),
         fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
@@ -1991,7 +1992,12 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
       checklistSnapshot: snapshotChecklistParaRelatorio(items, {
         modeloElevador: modoElevador,
         estado: form.estadoManutencaoElevador,
-        contexto: modoElevador ? contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAdmin }, items) : null,
+        contexto: modoElevador
+          ? preservarEmissaoLegada(
+            emissaoDoRelatorio(rel),
+            contextoEmissaoFromForm({ ...form, checklistRespostas: respostasAdmin }, items),
+          )
+          : null,
       }),
       notas: form.notas.slice(0, 300),
       fotos: fotosComChapa(fotos, form.fotoChapa, MAX_FOTOS),
@@ -2704,6 +2710,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
           <NotasStep
             visible={isCorrectionMode || step === W.notas}
             isCorrectionMode={isCorrectionMode}
+            modoElevador={modoElevador}
             step={step}
             stepNotas={W.notas}
             form={form}
@@ -2714,7 +2721,7 @@ export default function ExecutarManutencaoModal({ isOpen, onClose, manutencao, m
             erroChecklist={erroChecklist}
           />
 
-          {isCorrectionMode && (
+          {isCorrectionMode && (!modoElevador || !String(form.fotoChapa || '').startsWith('data:image')) && (
             <FotoChapaCampo
               fotoChapa={form.fotoChapa}
               carregando={fotoCarregando}

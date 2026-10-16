@@ -17,19 +17,33 @@ export const QUICK_NOTES_DEFAULT = [
   'Equipamento em bom estado geral',
   'Desgaste normal, dentro do esperado',
   'Necessita acompanhamento na próxima visita',
-  'Cliente informado de anomalia',
-  'Peça substituída preventivamente',
-  'Ruído anormal detetado — monitorizar',
-  'Lubrificação efetuada em todos os pontos',
+  'Requer melhor limpeza e conservação',
+  'Necessita de melhor sinalética de segurança',
+  'Sem observações adicionais',
+]
+
+/** Já não se oferece no assistente. Mantém-se só para partir notas antigas concatenadas. */
+const NOTAS_RAPIDAS_RETIRADAS = [
   'Alinhamento verificado e corrigido',
   'Filtros substituídos conforme plano',
-  'Sem observações adicionais',
+  'Peça substituída preventivamente',
+  'Cliente informado de anomalia',
+  'Ruído anormal detetado — monitorizar',
+  'Lubrificação efetuada em todos os pontos',
 ]
 
 export function getQuickNotes() {
   try {
     const stored = JSON.parse(localStorage.getItem('atm_quick_notes') || 'null')
-    if (Array.isArray(stored) && stored.length > 0) return stored
+    if (Array.isArray(stored) && stored.length > 0) {
+      return stored
+        .map(n => {
+          if (n === 'Ruído anormal detetado — monitorizar') return 'Requer melhor limpeza e conservação'
+          if (n === 'Lubrificação efetuada em todos os pontos') return 'Necessita de melhor sinalética de segurança'
+          return n
+        })
+        .filter(n => !NOTAS_RAPIDAS_RETIRADAS.includes(n))
+    }
   } catch { /* fallback */ }
   return QUICK_NOTES_DEFAULT
 }
@@ -86,10 +100,10 @@ export function linhasNotasRelatorio(notas, quickNotesList) {
     return raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
   }
 
-  const list = (Array.isArray(quickNotesList) && quickNotesList.length > 0
+  const list = [...(Array.isArray(quickNotesList) && quickNotesList.length > 0
     ? quickNotesList
     : QUICK_NOTES_DEFAULT
-  ).filter(q => typeof q === 'string' && q.trim())
+  ), ...NOTAS_RAPIDAS_RETIRADAS].filter(q => typeof q === 'string' && q.trim())
   if (list.length === 0) return [raw]
 
   const byLen = [...list].sort((a, b) => b.length - a.length)

@@ -23,7 +23,7 @@ export const TEXTO_AMBITO_ELEVADOR =
   'O presente relatório documenta exclusivamente a manutenção preventiva realizada pela NAVEL, incluindo as operações executadas, as observações efetuadas e os testes funcionais expressamente identificados, nas condições existentes à data da intervenção. Não constitui certificação, declaração de conformidade, verificação legal de segurança, avaliação integral da segurança do equipamento ou validação da instalação original. As anomalias observadas e as recomendações correspondentes são comunicadas ao cliente nos termos registados neste documento. Esta delimitação não afasta as responsabilidades da NAVEL pela manutenção efetivamente realizada nem dispensa o cliente das suas obrigações próprias.'
 
 /** Falha nestes pontos: o relatório recomenda fora de serviço, sem ser interdição legal. */
-const RE_PONTO_FORA_DE_SERVICO = /bloqueio|cabos de a[cç]o|cabo de seguran[cç]a|porca de carga|trav[aã]o|trancas?|sincroniza|fim de curso|limitador|bra[cç]os?|suportes? de carga|estrutura|ancoragem|fixa[cç][aã]o|reten[cç][aã]o/i
+const RE_PONTO_FORA_DE_SERVICO = /bloqueio|cabos de a[cç]o|cabo de seguran[cç]a|porca de carga|trav[aã]o|trancas?|sincroniza|fins? de curso|limitador|v[aá]lvulas reguladoras|bra[cç]os?|suportes? de carga|estrutura|ancoragem|fixa[cç][aã]o|reten[cç][aã]o|nivelamento|hidrost/i
 
 export const TEXTO_RECOMENDACAO_FORA_DE_SERVICO =
   'Colocar o equipamento fora de serviço de imediato, após a tomada de conhecimento, a assinatura e o envio deste relatório, até correção da deficiência.'
@@ -201,7 +201,7 @@ export function fundamentoInaplicavel(item, subcategoriaId) {
   const t = String(item?.texto ?? '').toLowerCase()
   const hidraulico = subcategoriaId === 'sub2' || subcategoriaId === 'sub4' || subcategoriaId === 'sub12'
   const electromecanico = subcategoriaId === 'sub1' || subcategoriaId === 'sub13'
-  if (hidraulico && /redutor|cabos de a[cç]o|ferodos|polias/.test(t)) {
+  if (hidraulico && !/sincroniza/.test(t) && /redutor|cabos de a[cç]o|ferodos|polias/.test(t)) {
     return 'Este tipo de elevador não tem este componente.'
   }
   if (electromecanico && /central hidr[aá]ulica|cilindro|v[aá]lvula limitadora|óleo da central|oleo da central/.test(t)) {
@@ -228,6 +228,7 @@ export function respostaDocumento(estado, extra = {}) {
     // Não é anomalia do equipamento: o cliente não facultou o documento.
     nao_disponibilizado: 'nota',
     ilegivel: 'nao',
+    gerido_pelo_cliente: 'nota',
     na: 'na',
   }
   return {
@@ -278,10 +279,11 @@ export function rotuloRespostaPdf(valor) {
   if (!valor || typeof valor !== 'object' || !valor.papel) return ''
     if (valor.papel === 'documento') {
     const doc = {
-      analisado: 'ANALISADO',
+      analisado: 'OK / ANALISADO',
       nao_analisado: 'NÃO ANALISADO',
-      nao_disponibilizado: 'NÃO DISPONIBILIZADO',
+      nao_disponibilizado: 'NÃO EXISTENTE',
       ilegivel: 'ILEGÍVEL',
+      gerido_pelo_cliente: 'GERIDO PELO CLIENTE',
       na: 'N/A',
     }
     return doc[valor.documento] || ''
@@ -344,18 +346,44 @@ export function mensagemIncoerenciaGrupo(items, respostas, esclarecimento) {
   return `Dispositivo de segurança com anomalia (${hit.danificados.join('; ')}) e grupo sem anomalia («${hit.grupos.join('; ')}»). Escreva o esclarecimento antes de emitir.`
 }
 
+const RESPOSTA_SIM_NAO = new Set(['sim', 'nao', 'desconhecido'])
+
+/**
+ * Uma resposta só: fornecido e montado pela NAVEL.
+ * Rascunhos antigos tinham dois campos. Se as duas respostas coincidem, essa é a resposta.
+ */
+export function fornecidoMontadoDoForm(form) {
+  const novo = form?.fornecidoMontadoPelaNavel || ''
+  if (RESPOSTA_SIM_NAO.has(novo)) return novo
+  const fornecido = form?.fornecidoPelaNavel || ''
+  const instalado = form?.instaladoPelaNavel || ''
+  if (RESPOSTA_SIM_NAO.has(fornecido) && fornecido === instalado) return fornecido
+  return ''
+}
+
 export function mensagemPedidoForaAmbito(form) {
   const rep = form?.pedidoReparacao || ''
-  const fora = form?.pedidoFora || ''
-  if (rep !== 'nao' && rep !== 'sim') return 'Indique se o cliente pediu reparação.'
+  if (rep !== 'nao' && rep !== 'sim') return 'Indique se o equipamento requer alguma reparação adicional.'
   if (rep === 'sim' && String(form?.pedidoReparacaoDescricao || '').trim().length < DETALHE_MIN) {
-    return 'Descreva a reparação pedida. Fica registado que será preparada uma ordem de serviço NAVEL.'
-  }
-  if (fora !== 'nao' && fora !== 'sim') return 'Indique se o cliente pediu alteração ou certificação.'
-  if (fora === 'sim' && String(form?.pedidoForaDescricao || '').trim().length < DETALHE_MIN) {
-    return 'Descreva o pedido de alteração ou certificação. Fica fora do âmbito e não é executado.'
+    return 'Descreva a reparação adicional. Fica registado que será preparada uma ordem de serviço NAVEL.'
   }
   return ''
+}
+
+/** Correção já feita nesta visita preventiva. Distinta da reparação adicional, que fica para outra ordem. */
+export function mensagemCorrecaoRelevante(form) {
+  const r = form?.correcaoRelevante || ''
+  if (r !== 'sim' && r !== 'nao') {
+    return 'Indique se foi realizada alguma correção ou reparação relevante nesta manutenção preventiva.'
+  }
+  if (r === 'sim' && String(form?.correcaoRelevanteDescricao || '').trim().length < DETALHE_MIN) {
+    return 'Descreva a correção ou reparação realizada nesta visita.'
+  }
+  return ''
+}
+
+export function ehMensagemCorrecaoRelevante(msg) {
+  return /corre[cç][aã]o ou repara[cç][aã]o/i.test(String(msg || ''))
 }
 
 export function mensagemComunicacaoUrgente(form, { urgente = false, vaiEnviarEmail = false } = {}) {
@@ -412,14 +440,21 @@ export function linhasContextoEmissao(emissao) {
   if (emissao.serieConfirmada) rows.push(['SÉRIE CONFIRMADA NO LOCAL', sn(emissao.serieConfirmada) || String(emissao.serieConfirmada)])
   if (emissao.fotoChapa) rows.push(['FOTO DA CHAPA DE IDENTIFICAÇÃO', 'Sim'])
   if (emissao.anoFabrico) rows.push(['ANO DE FABRICO', String(emissao.anoFabrico)])
-  if (emissao.capacidadeComunicada) rows.push(['CAPACIDADE COMUNICADA', String(emissao.capacidadeComunicada)])
-  if (emissao.fornecidoPelaNavel) rows.push(['FORNECIDO PELA NAVEL', sn(emissao.fornecidoPelaNavel)])
-  if (emissao.instaladoPelaNavel) rows.push(['INSTALADO PELA NAVEL', sn(emissao.instaladoPelaNavel)])
+  if (emissao.capacidadeComunicada) rows.push(['CAPACIDADE MÁXIMA DE CARGA (KG)', String(emissao.capacidadeComunicada)])
+  if (emissao.fornecidoMontadoPelaNavel) {
+    rows.push(['FORNECIDO E MONTADO PELA NAVEL', sn(emissao.fornecidoMontadoPelaNavel)])
+  } else {
+    if (emissao.fornecidoPelaNavel) rows.push(['FORNECIDO PELA NAVEL', sn(emissao.fornecidoPelaNavel)])
+    if (emissao.instaladoPelaNavel) rows.push(['INSTALADO PELA NAVEL', sn(emissao.instaladoPelaNavel)])
+  }
   if (emissao.funcaoAssinante) rows.push(['FUNÇÃO DE QUEM RECEBE', String(emissao.funcaoAssinante)])
   if (emissao.assinaturaRecusada) rows.push(['ASSINATURA DO CLIENTE', `Recusada. Canal: ${emissao.canalAlternativo || '—'}`])
   if (emissao.pedidoSoPreventiva) rows.push(['PEDIDO', 'Só manutenção preventiva'])
   if (emissao.pedidoReparacao === 'sim' && emissao.pedidoReparacaoDescricao) {
     rows.push(['ORDEM DE SERVIÇO DE REPARAÇÃO', `${emissao.pedidoReparacaoDescricao}. ${TEXTO_ORDEM_REPARACAO}`])
+  }
+  if (emissao.correcaoRelevante === 'sim' && emissao.correcaoRelevanteDescricao) {
+    rows.push(['CORREÇÃO OU REPARAÇÃO REALIZADA', String(emissao.correcaoRelevanteDescricao)])
   }
   if (emissao.pedidoFora === 'sim' && emissao.pedidoForaDescricao) {
     rows.push(['PEDIDO FORA DO ÂMBITO', `${emissao.pedidoForaDescricao}. ${TEXTO_PEDIDO_FORA_AMBITO}`])
@@ -451,30 +486,52 @@ export function contextoEmissaoFromForm(form, items, extra = {}) {
     funcaoAssinante: String(form?.funcaoAssinante || '').trim(),
     assinaturaRecusada: extra.assinaturaRecusada != null ? !!extra.assinaturaRecusada : !!form?.assinaturaRecusada,
     canalAlternativo: String(form?.canalAlternativo || '').trim(),
-    serieConfirmada: form?.serieConfirmada || '',
     fotoChapa: String(form?.fotoChapa || '').startsWith('data:image'),
     anoFabrico: String(form?.anoFabrico || '').trim(),
     capacidadeComunicada: String(form?.capacidadeComunicada || '').trim(),
-    fornecidoPelaNavel: form?.fornecidoPelaNavel || '',
-    instaladoPelaNavel: form?.instaladoPelaNavel || '',
-    pedidoSoPreventiva: !!form?.pedidoSoPreventiva,
+    fornecidoMontadoPelaNavel: fornecidoMontadoDoForm(form),
+    pedidoSoPreventiva: true,
     pedidoReparacao: form?.pedidoReparacao === 'sim' ? 'sim' : (form?.pedidoReparacao === 'nao' ? 'nao' : ''),
     pedidoReparacaoDescricao: form?.pedidoReparacao === 'sim' ? String(form?.pedidoReparacaoDescricao || '').trim() : '',
-    pedidoFora: form?.pedidoFora === 'sim' ? 'sim' : (form?.pedidoFora === 'nao' ? 'nao' : ''),
-    pedidoForaDescricao: form?.pedidoFora === 'sim' ? String(form?.pedidoForaDescricao || '').trim() : '',
-    pedidoExtra: form?.pedidoExtra === 'sim' ? 'sim' : (form?.pedidoExtra === 'nao' ? 'nao' : ''),
-    pedidoExtraDescricao: form?.pedidoExtra === 'sim' ? String(form?.pedidoExtraDescricao || '').trim() : '',
+    correcaoRelevante: form?.correcaoRelevante === 'sim' ? 'sim' : (form?.correcaoRelevante === 'nao' ? 'nao' : ''),
+    correcaoRelevanteDescricao: form?.correcaoRelevante === 'sim' ? String(form?.correcaoRelevanteDescricao || '').trim() : '',
     esclarecimentoIncoerencia: String(form?.esclarecimentoIncoerencia || '').trim(),
     comunicacaoUrgente: form?.comunicacaoUrgente === 'email' || form?.comunicacaoUrgente === 'outro' ? form.comunicacaoUrgente : '',
     comunicacaoUrgenteNota: form?.comunicacaoUrgente === 'outro' ? String(form?.comunicacaoUrgenteNota || '').trim() : '',
-    limitacoesAdmissao: String(form?.limitacoesAdmissao || '').trim(),
     recomendaRetirada: recomenda,
   }
 }
 
-/** Nota factual quando o cliente não faculta o registo de intervenções. */
+/** Campos que o formulário já não edita. Uma gravação posterior não os apaga do relatório antigo. */
+const CHAVES_EMISSAO_LEGADA = [
+  'serieConfirmada',
+  'fornecidoPelaNavel',
+  'instaladoPelaNavel',
+  'pedidoFora',
+  'pedidoForaDescricao',
+  'pedidoExtra',
+  'pedidoExtraDescricao',
+  'limitacoesAdmissao',
+]
+
+export function preservarEmissaoLegada(anterior, contexto) {
+  if (!anterior || typeof anterior !== 'object' || !contexto) return contexto
+  const extra = {}
+  for (const chave of CHAVES_EMISSAO_LEGADA) {
+    const valor = anterior[chave]
+    if (valor == null || valor === '') continue
+    if (contexto[chave] != null && contexto[chave] !== '') continue
+    extra[chave] = valor
+  }
+  return { ...contexto, ...extra }
+}
+
+/** Nota factual quando o documento ou o registo de intervenções não existe. */
 export const NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO =
-  'Registo de intervenções não disponibilizado pelo cliente.'
+  'Registo de intervenções não existente.'
+
+export const NOTA_REGISTO_INTERVENCOES_GERIDO_PELO_CLIENTE =
+  'Registo de intervenções não disponibilizado — gerido pelo cliente.'
 
 export function ehRegistoIntervencoes(item) {
   return /registo de interven/.test(String(item?.texto ?? '').toLowerCase())
@@ -485,13 +542,18 @@ export function linhasNotaDocumentoNaoDisponibilizado(items, respostas) {
   const linhas = []
   for (const it of items || []) {
     const v = respostas?.[it.id]
-    if (!v || typeof v !== 'object' || v.documento !== 'nao_disponibilizado') continue
+    if (!v || typeof v !== 'object') continue
+    if (v.documento === 'gerido_pelo_cliente') {
+      linhas.push(NOTA_REGISTO_INTERVENCOES_GERIDO_PELO_CLIENTE)
+      continue
+    }
+    if (v.documento !== 'nao_disponibilizado') continue
     if (ehRegistoIntervencoes(it)) {
       linhas.push(NOTA_REGISTO_INTERVENCOES_NAO_DISPONIBILIZADO)
       continue
     }
     const nome = limparCitacaoNormaChecklist(it.texto) || 'Documento'
-    linhas.push(`${nome}: não disponibilizado pelo cliente.`)
+    linhas.push(`${nome}: não existente.`)
   }
   return linhas
 }
@@ -507,7 +569,7 @@ export function notasComLinhasAutomaticas(notas, items, respostas) {
 /** @returns {'sim'|'nao'|'na'|'parcial'|'nota'|''} */
 export function codigoResposta(valor) {
   if (valor && typeof valor === 'object') {
-    if (valor.papel === 'documento' && valor.documento === 'nao_disponibilizado') return 'nota'
+    if (valor.papel === 'documento' && (valor.documento === 'nao_disponibilizado' || valor.documento === 'gerido_pelo_cliente')) return 'nota'
     const r = String(valor.r ?? valor.valor ?? '')
     if (r === 'sim' || r === 'OK') return 'sim'
     if (r === 'nao' || r === 'NOK') return 'nao'

@@ -5,8 +5,10 @@ import ChecklistElevadorPonto from './ChecklistElevadorPonto'
 import { limparCitacaoNormaChecklist } from '../../domain/notaLegalColocacaoMercado'
 import {
   codigoResposta,
+  ehMensagemCorrecaoRelevante,
   ESTADOS_MANUTENCAO_ELEVADOR,
   fundamentoInaplicavel,
+  fornecidoMontadoDoForm,
   mensagemIncoerenciaGrupo,
   respostaInaplicavel,
 } from '../../domain/relatorioElevadorPreventivo'
@@ -43,7 +45,6 @@ export default function ChecklistStep({
 
   useEffect(() => {
     if (!forcarIdentificacao || !identificacaoRef.current) return
-    identificacaoRef.current.open = true
     identificacaoRef.current.scrollIntoView({ block: 'nearest' })
   }, [forcarIdentificacao, erroChecklist])
 
@@ -78,7 +79,7 @@ export default function ChecklistStep({
 
       <MaquinaDocumentacaoLinks maquina={maq} />
 
-      {erroChecklist && <p className="form-erro">{erroChecklist}</p>}
+      {erroChecklist && !ehMensagemCorrecaoRelevante(erroChecklist) && <p className="form-erro">{erroChecklist}</p>}
       {items.length > 0 && (
         <div className="checklist-section-wizard">
           <h3>Checklist de verificação</h3>
@@ -116,34 +117,25 @@ export default function ChecklistStep({
           </div>
           {modoElevador && (
             <>
-            <details className="checklist-identificacao" open ref={identificacaoRef}>
-              <summary>Identificação desta visita e pedido</summary>
-              <label className="label-required">
-                Série confirmada no local
-                <select
-                  value={form.serieConfirmada || ''}
-                  onChange={e => setForm(f => ({ ...f, serieConfirmada: e.target.value }))}
-                >
-                  <option value="">—</option>
-                  <option value="sim">Sim</option>
-                  <option value="nao">Não</option>
-                  <option value="desconhecido">Não foi possível ver a chapa</option>
-                </select>
-              </label>
-              {!String(form.fotoChapa || '').startsWith('data:image') && (form.serieConfirmada === 'sim' || form.serieConfirmada === 'nao') && (
-                <p className="form-hint">A foto da chapa de identificação tira-se no passo 1. Volte atrás para a adicionar.</p>
+            <div className="checklist-identificacao" ref={identificacaoRef}>
+              {!String(form.fotoChapa || '').startsWith('data:image') && (
+                <p className="form-hint">
+                  {isCorrectionMode
+                    ? 'Falta a foto da chapa de identificação. Pode adicioná-la mais abaixo, antes das fotografias.'
+                    : 'A foto da chapa de identificação tira-se no passo 1. Volte atrás para a adicionar.'}
+                </p>
               )}
               <label>
                 Ano de fabrico (ou «desconhecido»)
                 <input value={form.anoFabrico || ''} maxLength={20} onChange={e => setForm(f => ({ ...f, anoFabrico: e.target.value }))} />
               </label>
               <label>
-                Capacidade comunicada pelo cliente
+                Capacidade Máxima de Carga (em Kg.)
                 <input value={form.capacidadeComunicada || ''} maxLength={40} onChange={e => setForm(f => ({ ...f, capacidadeComunicada: e.target.value }))} />
               </label>
               <label>
-                Fornecido pela NAVEL
-                <select value={form.fornecidoPelaNavel || ''} onChange={e => setForm(f => ({ ...f, fornecidoPelaNavel: e.target.value }))}>
+                Fornecido e montado pela NAVEL?
+                <select value={fornecidoMontadoDoForm(form)} onChange={e => setForm(f => ({ ...f, fornecidoMontadoPelaNavel: e.target.value }))}>
                   <option value="">—</option>
                   <option value="sim">Sim</option>
                   <option value="nao">Não</option>
@@ -151,20 +143,7 @@ export default function ChecklistStep({
                 </select>
               </label>
               <label>
-                Instalado pela NAVEL
-                <select value={form.instaladoPelaNavel || ''} onChange={e => setForm(f => ({ ...f, instaladoPelaNavel: e.target.value }))}>
-                  <option value="">—</option>
-                  <option value="sim">Sim</option>
-                  <option value="nao">Não</option>
-                  <option value="desconhecido">Desconhecido</option>
-                </select>
-              </label>
-              <label className="checklist-retirada">
-                <input type="checkbox" checked={!!form.pedidoSoPreventiva} onChange={e => setForm(f => ({ ...f, pedidoSoPreventiva: e.target.checked }))} />
-                O pedido desta visita é manutenção preventiva
-              </label>
-              <label>
-                O cliente pediu reparação?
+                O equipamento requer alguma reparação adicional?
                 <select value={form.pedidoReparacao || ''} onChange={e => setForm(f => ({ ...f, pedidoReparacao: e.target.value, pedidoReparacaoDescricao: e.target.value === 'sim' ? f.pedidoReparacaoDescricao : '' }))}>
                   <option value="">—</option>
                   <option value="nao">Não</option>
@@ -173,7 +152,7 @@ export default function ChecklistStep({
               </label>
               {form.pedidoReparacao === 'sim' && (
                 <label>
-                  Reparação pedida (não é executada nesta visita)
+                  Reparação adicional (não é executada nesta visita)
                   <textarea
                     value={form.pedidoReparacaoDescricao || ''}
                     maxLength={240}
@@ -182,30 +161,7 @@ export default function ChecklistStep({
                   />
                 </label>
               )}
-              <label>
-                O cliente pediu alteração ou certificação?
-                <select value={form.pedidoFora || ''} onChange={e => setForm(f => ({ ...f, pedidoFora: e.target.value, pedidoForaDescricao: e.target.value === 'sim' ? f.pedidoForaDescricao : '' }))}>
-                  <option value="">—</option>
-                  <option value="nao">Não</option>
-                  <option value="sim">Sim — fora do âmbito, não é executado</option>
-                </select>
-              </label>
-              {form.pedidoFora === 'sim' && (
-                <label>
-                  Alteração ou certificação pedida
-                  <textarea
-                    value={form.pedidoForaDescricao || ''}
-                    maxLength={240}
-                    placeholder="Ex.: alteração da capacidade"
-                    onChange={e => setForm(f => ({ ...f, pedidoForaDescricao: e.target.value }))}
-                  />
-                </label>
-              )}
-              <label>
-                Limitações do pedido
-                <textarea value={form.limitacoesAdmissao || ''} onChange={e => setForm(f => ({ ...f, limitacoesAdmissao: e.target.value }))} />
-              </label>
-            </details>
+            </div>
             {mensagemIncoerenciaGrupo(items, form.checklistRespostas, '') && (
               <label className="form-section">
                 Esclarecimento obrigatório

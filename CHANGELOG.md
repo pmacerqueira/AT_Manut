@@ -9,6 +9,39 @@ Política de continuidade:
 
 ---
 
+## [1.17.37] — 2026-10-16 — Painel da visita do elevador mais curto
+
+### Alterações
+- **Uma pergunta em vez de duas:** «Fornecido e montado pela NAVEL?» substitui «Fornecido pela NAVEL» e «Instalado pela NAVEL».
+- **Reparação:** a pergunta passa a «O equipamento requer alguma reparação adicional?». Se sim, continua a pedir a descrição e a indicar que será preparada uma ordem de serviço NAVEL, sem executar a reparação nesta visita.
+- **Saem do painel** «O cliente pediu alteração ou certificação?» e «Limitações do pedido». Os relatórios já emitidos que tenham essas respostas continuam a mostrá-las.
+- **Capacidade:** o campo passa a chamar-se «Capacidade Máxima de Carga (em Kg.)». No PDF e no email a linha fica «CAPACIDADE MÁXIMA DE CARGA (KG)».
+- **Sai do painel** a pergunta «Série confirmada no local». A foto da chapa, no passo 1, continua obrigatória. Relatórios já emitidos que tenham essa resposta continuam a mostrá-la.
+- **Sai o título** «Identificação desta visita e pedido». Os campos ficam logo a seguir a «Desmarcar todos».
+- **Sai a caixa** «O pedido desta visita é manutenção preventiva». Nas manutenções de elevadores isso fica sempre assumido, e o relatório continua a registar «Só manutenção preventiva».
+- **Sai a opção** «Disponível, não analisado» nos pontos de documento. «Não Existente» substitui «Não disponibilizado»: não conta como anomalia e o relatório regista que o documento não existe. Relatórios já emitidos com «não analisado» continuam a mostrar «NÃO ANALISADO».
+- **Marcação CE:** a indicação por baixo do ponto passa a «Tem de estar visível na chapa de identificação do elevador». Nos outros documentos mantém-se que não é uma anomalia do equipamento.
+- **Documentos:** o botão «Analisado» passa a «OK / Analisado». No PDF e no email o rótulo fica «OK / ANALISADO».
+- **Sai «Não aplicável»** nos pontos de documento. Nos pontos de verificação (o que foi feito / o que foi observado) a opção mantém-se. Relatórios já emitidos com «N/A» num documento continuam a mostrá-lo.
+- **Sai «Ilegível»** nos pontos de documento. Relatórios já emitidos com esse estado continuam a mostrar «ILEGÍVEL».
+- **Alimentação elétrica, óleo hidráulico, válvulas do circuito hidráulico, cilindros hidráulicos, suportes de carga e fins de curso:** estes pontos passam a ter o mesmo cartão, com «Executado, sem anomalia», «Não Aplicável» e «Responder em detalhe». Não conta como anomalia. No relatório fica «N/A». Se nas válvulas, nos suportes de carga ou nos fins de curso se registar uma anomalia, a recomendação de fora de serviço mantém-se.
+- **Função de quem recebe:** nos elevadores passa a lista: «Utilizador do elevador», «Chefe de oficina» e «Proprietário ou gerente da oficina». Relatórios já emitidos com outro texto mantêm-no.
+- **Os 14 pontos são de resposta obrigatória.** O assistente não deixa avançar nem gravar enquanto algum ponto da checklist do elevador estiver por responder. «Não Aplicável» e «Não Existente» contam como resposta.
+- **Formulário dos elevadores de colunas:** os electro-hidráulicos de 2 e de 4 colunas usam as mesmas 14 perguntas. Nos electromecânicos, a central hidráulica passa a «sistema moto-redutor e transmissão mecânica», os cilindros a «fusos e porcas de transmissão e segurança», e a válvula com fugas de óleo a «microswitches e fins de curso» e «limpeza e lubrificação adequadas». O elevador de tesoura mantém a checklist própria. Relatórios já emitidos não são reescritos.
+- **Trancas de segurança:** todos os elevadores de veículos, ligeiros e pesados, passam a ter o ponto «Verificar trancas de segurança e o seu bom funcionamento». É ponto de segurança: a execução e a observação respondem-se em separado. Uma anomalia recomenda fora de serviço. Relatórios já emitidos não são reescritos.
+- **Sincronização das colunas:** nos elevadores com mais do que uma coluna verifica-se e afina-se a sincronização por cabos de aço. O sensor de contagem de rotações dos fusos, com autómato transdutor, só existe nos electromecânicos e só aí é ponto obrigatório. Uma anomalia recomenda fora de serviço. O elevador de tesoura não usa estes sistemas. Relatórios já emitidos não são reescritos.
+- **Tesoura:** é hidráulica e não usa sincronização de colunas. A subida em conjunto faz-se por equilíbrio hidrostático. A manutenção passa a verificar e a afinar os sensores de nivelamento das plataformas e o equilíbrio hidrostático, para subirem e descerem ao mesmo tempo e pararem à mesma altura de serviço. Uma anomalia recomenda fora de serviço.
+- **Notas rápidas:** saem «Alinhamento verificado e corrigido», «Filtros substituídos conforme plano», «Peça substituída preventivamente» e «Cliente informado de anomalia». «Ruído anormal detetado — monitorizar» passa a «Requer melhor limpeza e conservação». «Lubrificação efetuada em todos os pontos» passa a «Necessita de melhor sinalética de segurança». Relatórios já emitidos que tenham as frases antigas continuam a mostrá-las.
+- **Registo de intervenções:** passa a ter o botão «Não Disponibilizado - Gerido pelo Cliente». Não conta como anomalia. No PDF e no email o rótulo fica «GERIDO PELO CLIENTE» e as notas incluem «Registo de intervenções não disponibilizado — gerido pelo cliente.»
+- **Correção nesta visita:** antes das notas importantes, a manutenção preventiva do elevador pergunta se foi realizada alguma correção ou reparação relevante. A resposta é obrigatória. «Não» segue para as notas. «Sim» exige o texto escrito à mão. No relatório, no PDF e no email fica «Correção ou reparação realizada». É distinta da reparação adicional, que continua a gerar ordem de serviço para outra visita. Relatórios já emitidos não são reescritos.
+- **Circuito hidráulico:** nos elevadores electro-hidráulicos, o ponto da válvula limitadora passa a «Verificar o funcionamento dos componentes do circuito hidráulico - válvulas reguladoras de pressão e de caudal». Os electromecânicos mantêm o ponto dos microswitches. Relatórios já emitidos não são reescritos.
+- **Foto da chapa na correcção:** se o elevador já tem a foto, a correcção não pede outra. Se faltar, o campo aparece antes das fotografias, para a gravação não ficar bloqueada. Uma gravação posterior de um relatório antigo não apaga respostas que o formulário já não edita (série confirmada, pedido fora do âmbito, limitações).
+
+### Qualidade
+- **191 testes unitários** a passar. Novo teste E2E do painel do elevador em telemóvel (390 px, 2 colunas, Cancelar oculto) e tablet (768 px, 3 colunas): sem transbordo, pergunta de correção sem asterisco, função de quem recebe em lista. O helper que marca a checklist passa a carregar só em «Executado, sem anomalia», porque «Não Aplicável» é outro atalho no mesmo ponto.
+
+---
+
 ## [1.17.36] — 2026-10-12 — Não aplicável e registo não disponibilizado não bloqueiam o relatório
 
 ### Correcções

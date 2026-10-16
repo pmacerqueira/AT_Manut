@@ -2,7 +2,7 @@ import { AlertTriangle, History } from 'lucide-react'
 import { formatarDataPT } from '../../utils/diasUteis'
 
 const ESTADO_DOC = {
-  nao_disponibilizado: 'não disponibilizado',
+  nao_disponibilizado: 'não existente',
   ilegivel: 'ilegível',
 }
 
@@ -80,7 +80,7 @@ export default function UltimaVisitaPanel({ resumo }) {
 
       {resumo.pedidoReparacao && (
         <div className="ultima-visita-bloco">
-          <strong>Reparação pedida pelo cliente</strong>
+          <strong>Reparação adicional</strong>
           <p>{resumo.pedidoReparacao}</p>
         </div>
       )}

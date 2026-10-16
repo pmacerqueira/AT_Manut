@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   aplicarForaDeServico,
+  ehRegistoIntervencoes,
   papelDoPonto,
   pontoImplicaForaDeServico,
   respostaDocumento,
@@ -17,7 +18,7 @@ function Botoes({ opcoes, valor, onPick, aria }) {
         <button
           key={op.id}
           type="button"
-          className={`btn-simnao ${valor === op.id ? op.activo : ''}`}
+          className={`btn-simnao${op.largo ? ' btn-simnao--largo' : ''} ${valor === op.id ? op.activo : ''}`}
           onClick={() => onPick(op.id)}
         >
           {op.label}
@@ -36,6 +37,21 @@ function Campo({ label, value, onChange }) {
   )
 }
 
+/** Atalho «Não Aplicável» nestes pontos, com o mesmo cartão dos pontos correntes. */
+function atalhoNaoAplicavelVisivel(item) {
+  const t = String(item?.texto ?? '')
+  return /alimenta[cç][aã]o el[eé]trica e dispositivos de seguran[cç]a/i.test(t)
+    || /n[ií]vel de [oó]leo da central hidr[aá]ulica/i.test(t)
+    || /v[aá]lvula limitadora de press[aã]o/i.test(t)
+    || /v[aá]lvulas reguladoras de press[aã]o/i.test(t)
+    || /cilindros hidr[aá]ulicos/i.test(t)
+    || /suportes de carga/i.test(t)
+    || /fins? de curso/i.test(t)
+    || /moto-redutor e a transmiss/i.test(t)
+    || /microswitches e fins de curso/i.test(t)
+    || /fusos e porcas de transmiss/i.test(t)
+}
+
 /**
  * Um ponto da checklist de elevador: documento, teste ou operação.
  * O detalhe só aparece quando a resposta o exige.
@@ -46,7 +62,8 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
   /**
    * Pontos correntes (com atalho): os grupos «O que foi feito» / «O que foi observado» ficam
    * recolhidos até o técnico tocar em «Responder em detalhe» — ou até haver uma resposta que
-   * não seja o atalho. Nos pontos de segurança estão sempre visíveis (v1.17.32).
+   * não seja o atalho. Nos pontos de segurança estão sempre visíveis, excepto a válvula
+   * limitadora, os suportes de carga e os fins de curso, que usam o mesmo cartão dos pontos correntes (v1.17.37).
    */
   const [detalhePedido, setDetalhePedido] = useState(false)
   const set = (next) => {
@@ -62,7 +79,11 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
       <div className="checklist-item-row checklist-item-row--elevador">
         <span className="checklist-item-num">{index + 1}.</span>
         <span className="checklist-item-texto">{limparCitacaoNormaChecklist(item.texto)}</span>
-        <span className="checklist-papel">Documento — não é uma anomalia do equipamento</span>
+        <span className="checklist-papel">
+          {/marca[cç][aã]o ce/i.test(String(item.texto ?? ''))
+            ? 'Tem de estar visível na chapa de identificação do elevador'
+            : 'Documento — não é uma anomalia do equipamento'}
+        </span>
         <Botoes
           aria={`Documento ${index + 1}`}
           valor={valor?.documento || ''}
@@ -72,18 +93,16 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
             fundamento: valor?.fundamento || '',
           }))}
           opcoes={[
-            { id: 'analisado', label: 'Analisado', activo: 'active-sim' },
-            { id: 'nao_analisado', label: 'Disponível, não analisado', activo: 'active-na' },
-            { id: 'nao_disponibilizado', label: 'Não disponibilizado', activo: 'active-na' },
-            { id: 'ilegivel', label: 'Ilegível', activo: 'active-nao' },
-            { id: 'na', label: 'Não aplicável', activo: 'active-na' },
+            { id: 'analisado', label: 'OK / Analisado', activo: 'active-sim' },
+            { id: 'nao_disponibilizado', label: 'Não Existente', activo: 'active-na' },
+            ...(ehRegistoIntervencoes(item) ? [{
+              id: 'gerido_pelo_cliente',
+              label: 'Não Disponibilizado - Gerido pelo Cliente',
+              activo: 'active-na',
+              largo: true,
+            }] : []),
           ]}
         />
-        {valor?.documento === 'na' && (
-          <div className="checklist-detalhe">
-            <Campo label="Fundamento (opcional)" value={valor.fundamento || ''} onChange={fundamento => set(respostaDocumento('na', { fundamento }))} />
-          </div>
-        )}
       </div>
     )
   }
@@ -164,13 +183,15 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
   }
 
   const executadoSemAnomalia = valor?.execucao === 'executado' && valor?.observacao === 'sem_anomalia'
-  const temRespostaForaDoAtalho = !executadoSemAnomalia && !!(valor?.execucao || valor?.observacao)
-  const mostrarDetalhe = critico || detalhePedido || temRespostaForaDoAtalho
+  const atalhoNaoAplicavel = atalhoNaoAplicavelVisivel(item)
+  const naoAplicavel = valor?.execucao === 'na' && valor?.observacao === 'na'
+  const temRespostaForaDoAtalho = !executadoSemAnomalia && !(atalhoNaoAplicavel && naoAplicavel) && !!(valor?.execucao || valor?.observacao)
+  const mostrarDetalhe = (critico && !atalhoNaoAplicavel) || detalhePedido || temRespostaForaDoAtalho
   return (
-    <div className={`checklist-item-row checklist-item-row--elevador${critico ? ' checklist-item-row--seguranca' : ''}`}>
+    <div className={`checklist-item-row checklist-item-row--elevador${critico && !atalhoNaoAplicavel ? ' checklist-item-row--seguranca' : ''}`}>
       <span className="checklist-item-num">{index + 1}.</span>
       <span className="checklist-item-texto">{limparCitacaoNormaChecklist(item.texto)}</span>
-      {critico ? (
+      {critico && !atalhoNaoAplicavel ? (
         <span className="checklist-papel checklist-papel--seguranca">
           Ponto de segurança: responda à execução e à observação em separado.
         </span>
@@ -194,6 +215,24 @@ export default function ChecklistElevadorPonto({ item, index, valor, onChange })
             >
               Executado, sem anomalia
             </button>
+            {atalhoNaoAplicavel && (
+              <button
+                type="button"
+                className={`btn-simnao btn-simnao--atalho ${naoAplicavel ? 'active-na' : ''}`}
+                aria-label={`Ponto ${index + 1}: não aplicável`}
+                onClick={() => { setDetalhePedido(false); set(respostaOperacao({
+                  execucao: 'na',
+                  observacao: 'na',
+                  descricao: '',
+                  recomendacao: '',
+                  fundamento: '',
+                  motivo: '',
+                  recomendaRetirada: false,
+                })) }}
+              >
+                Não Aplicável
+              </button>
+            )}
             <button
               type="button"
               className={`btn-link-checklist checklist-detalhe-toggle${mostrarDetalhe ? ' is-open' : ''}`}

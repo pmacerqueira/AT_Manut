@@ -310,15 +310,16 @@ test.describe('Manutenções — Executar manutenção periódica', () => {
       await page.waitForTimeout(100)
       await expect(rows.nth(0).locator('.btn-simnao.active-sim')).toBeVisible()
 
-      // Segundo item (se existir): resposta negativa («Não» / «Não disponibilizado» / «Anomalia»)
+      // Segundo item (se existir): resposta negativa («Não» / «Não Existente» / «Anomalia»)
       if (count > 1) {
         // Pontos correntes de elevador (v1.17.32): «Anomalia» está nos grupos de detalhe, recolhidos
         // até tocar em «Responder em detalhe».
         const toggle = rows.nth(1).locator('.checklist-detalhe-toggle:not(.is-open)')
         if (await toggle.isVisible().catch(() => false)) await toggle.click()
-        await rows.nth(1).locator('.btn-simnao').filter({ hasText: /^Não$|^Não disponibilizado$|^Anomalia$/ }).first().click()
+        await rows.nth(1).locator('.btn-simnao').filter({ hasText: /^Não$|^Não Existente$|^Anomalia$/ }).first().click()
         await page.waitForTimeout(100)
-        await expect(rows.nth(1).locator('.btn-simnao.active-nao')).toBeVisible()
+        // «Não Existente» num documento não é anomalia (active-na). «Não» / «Anomalia» num ponto de verificação fica active-nao.
+        await expect(rows.nth(1).locator('.btn-simnao.active-nao, .btn-simnao.active-na')).toBeVisible()
       }
     }
   })

@@ -39,7 +39,7 @@ Aplicação web PWA para gestão de manutenções preventivas e reparações de 
 | Sanitização HTML | DOMPurify |
 | Email / PDF (servidor) | PHP no cPanel — `servidor-cpanel/send-email.php` |
 | Alertas automáticos | PHP cron — `servidor-cpanel/cron-alertas.php` (diário às 08:00) |
-| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (452 testes listados em 19 ficheiros) · Unitários: `npm run test:unit` (189 testes) |
+| Testes | Playwright E2E — ver `docs/TESTES-E2E.md` (453 testes listados em 20 ficheiros) · Unitários: `npm run test:unit` (191 testes) |
 | Imagens | sharp (`scripts/optimize-images.js`, executado em `prebuild`) + compressão JPEG no browser (`comprimirImagemRelatorio.js`) para fotos de relatórios e equipamento |
 
 ---
@@ -170,8 +170,8 @@ c:\Cursor_Projetos\NAVEL\AT_Manut\
 │   └── MIGRACAO_MYSQL.md
 │
 ├── tests/
-│   ├── e2e/                            # Playwright — ver docs/TESTES-E2E.md (452 testes · 19 ficheiros)
-│   └── unit/                           # Node test runner — npm run test:unit (189 testes)
+│   ├── e2e/                            # Playwright — ver docs/TESTES-E2E.md (453 testes · 20 ficheiros)
+│   └── unit/                           # Node test runner — npm run test:unit (191 testes)
 │
 ├── scripts/
 │   └── optimize-images.js              # Optimização automática de imagens (prebuild)
